@@ -11,7 +11,7 @@ import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { PaymentStatus } from "@/components/payment-status";
 
 // Adresse de réception NF Society
-const LOTTERY_RECIPIENT = "0x7B8a5a4673fcd082b742304032eA49D6bC6e01f5"; // TODO: Mettre l'adresse réelle si différente
+const LOTTERY_RECIPIENT = "0xbf57dc790ba892590c640dc27b26b2665d30104f"; 
 const TICKET_PRICE = 5;
 const TICKET_NOTE = "Loterie NF Society Ticket";
 
