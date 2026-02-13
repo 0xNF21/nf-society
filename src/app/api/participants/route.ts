@@ -1,16 +1,28 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { participants } from "@/lib/db/schema";
-import { sql } from "drizzle-orm";
+import { sql, desc } from "drizzle-orm";
 
 export async function GET() {
   try {
-    const result = await db.select({ count: sql<number>`count(*)` }).from(participants);
-    const allParticipants = await db.select({ transactionHash: participants.transactionHash }).from(participants);
+    const allParticipants = await db
+      .select({
+        address: participants.address,
+        transactionHash: participants.transactionHash,
+        createdAt: participants.createdAt,
+      })
+      .from(participants)
+      .orderBy(desc(participants.createdAt));
+
     const registeredTxHashes = allParticipants.map((p) => p.transactionHash.toLowerCase());
-    return NextResponse.json({ count: Number(result[0].count), registeredTxHashes });
+
+    return NextResponse.json({
+      count: allParticipants.length,
+      participants: allParticipants,
+      registeredTxHashes,
+    });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch count" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch participants" }, { status: 500 });
   }
 }
 

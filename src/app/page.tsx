@@ -1,27 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
 import { ArrowUpRight, Clipboard, QrCode, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { circlesConfig, generatePaymentLink } from "@/lib/circles";
-import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
-import { PaymentStatus } from "@/components/payment-status";
+import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
 
-// Adresse de réception NF Society
 const LOTTERY_RECIPIENT = "0xbf57dc790ba892590c640dc27b26b2665d30104f"; 
 const TICKET_PRICE = 5;
 const TICKET_NOTE = "Loterie NF Society Ticket";
 
 export default function Home() {
-  const [watching, setWatching] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [qrCode, setQrCode] = useState("");
   const [showQr, setShowQr] = useState(false);
   const [ticketCount, setTicketCount] = useState<number>(0);
+  const [participantList, setParticipantList] = useState<ParticipantEntry[]>([]);
+  const [scanning, setScanning] = useState(false);
   const [winner, setWinner] = useState<any>(null);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
 
@@ -29,35 +28,26 @@ export default function Home() {
     return generatePaymentLink(LOTTERY_RECIPIENT, TICKET_PRICE, TICKET_NOTE);
   }, []);
 
-  const { status, payment, error } = usePaymentWatcher({
-    enabled: watching && Boolean(paymentLink),
-    dataValue: TICKET_NOTE,
-    minAmountCRC: TICKET_PRICE,
-    recipientAddress: LOTTERY_RECIPIENT
-  });
-
-  const scanAndRefresh = async () => {
+  const scanAndRefresh = useCallback(async () => {
+    setScanning(true);
     try {
       await fetch("/api/scan", { method: "POST" });
       const res = await fetch("/api/participants");
       const data = await res.json();
       if (data.count !== undefined) setTicketCount(data.count);
+      if (data.participants) setParticipantList(data.participants);
     } catch (err) {
-      console.error("Failed to scan/fetch count", err);
+      console.error("Failed to scan/fetch", err);
+    } finally {
+      setScanning(false);
     }
-  };
-
-  useEffect(() => {
-    scanAndRefresh();
-    const interval = setInterval(scanAndRefresh, 15000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (status === "confirmed" && payment) {
-      scanAndRefresh();
-    }
-  }, [status, payment]);
+    scanAndRefresh();
+    const interval = setInterval(scanAndRefresh, 30000);
+    return () => clearInterval(interval);
+  }, [scanAndRefresh]);
 
   useEffect(() => {
     let active = true;
@@ -176,29 +166,15 @@ export default function Home() {
 
           <Card className="flex h-full flex-col border-2 border-ink/5 shadow-xl">
             <CardHeader>
-              <CardTitle>Suivi du paiement</CardTitle>
-              <CardDescription>Vérification en temps réel sur la blockchain.</CardDescription>
+              <CardTitle>Historique des tickets</CardTitle>
+              <CardDescription>Liste des paiements confirmés sur la blockchain.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-1 flex-col justify-between space-y-6">
-              <PaymentStatus status={status} payment={payment} error={error} />
-              
-              <Button 
-                variant={watching ? "outline" : "default"} 
-                className="w-full"
-                onClick={() => setWatching((prev) => !prev)}
-              >
-                {watching ? "Arrêter la surveillance" : "Vérifier mon paiement"}
-              </Button>
-
-              {status === "confirmed" && (
-                <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-green-800 text-sm flex items-center gap-3 animate-bounce">
-                  <Trophy className="h-6 w-6 text-green-600" />
-                  <div>
-                    <p className="font-bold">Paiement confirmé !</p>
-                    <p className="text-xs">Vous êtes inscrit pour le prochain tirage.</p>
-                  </div>
-                </div>
-              )}
+            <CardContent className="flex flex-1 flex-col justify-between">
+              <TicketHistory
+                participants={participantList}
+                loading={scanning}
+                onRefresh={scanAndRefresh}
+              />
             </CardContent>
           </Card>
         </div>
