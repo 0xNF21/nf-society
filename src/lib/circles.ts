@@ -101,17 +101,17 @@ const WEI_PER_CRC = BigInt("1000000000000000000");
 
 export async function checkPaymentReceived(
   _dataValue: string,
-  minAmountCRC: number,
+  exactAmountCRC: number,
   recipientAddress?: string | null,
   excludeTxHashes?: Set<string>
 ): Promise<CirclesTransferEvent | null> {
-  if (minAmountCRC <= 0) return null;
+  if (exactAmountCRC <= 0) return null;
 
   const normalized = normalizeAddress(recipientAddress ?? "");
   if (!normalized) return null;
 
   const events = await fetchTransferEvents(normalized);
-  const minWei = BigInt(minAmountCRC) * WEI_PER_CRC;
+  const exactWei = BigInt(exactAmountCRC) * WEI_PER_CRC;
 
   for (const event of events) {
     if (!addressesMatch(event.to, normalized)) continue;
@@ -120,7 +120,7 @@ export async function checkPaymentReceived(
 
     try {
       const val = BigInt(event.value);
-      if (val >= minWei) {
+      if (val === exactWei) {
         return event;
       }
     } catch {
@@ -132,14 +132,14 @@ export async function checkPaymentReceived(
 }
 
 export async function checkAllNewPayments(
-  minAmountCRC: number,
+  exactAmountCRC: number,
   recipientAddress: string
 ): Promise<CirclesTransferEvent[]> {
   const normalized = normalizeAddress(recipientAddress);
-  if (!normalized || minAmountCRC <= 0) return [];
+  if (!normalized || exactAmountCRC <= 0) return [];
 
   const events = await fetchTransferEvents(normalized);
-  const minWei = BigInt(minAmountCRC) * WEI_PER_CRC;
+  const exactWei = BigInt(exactAmountCRC) * WEI_PER_CRC;
   const results: CirclesTransferEvent[] = [];
 
   for (const event of events) {
@@ -148,7 +148,7 @@ export async function checkAllNewPayments(
 
     try {
       const val = BigInt(event.value);
-      if (val >= minWei) {
+      if (val === exactWei) {
         results.push(event);
       }
     } catch {

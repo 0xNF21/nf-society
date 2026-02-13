@@ -3,6 +3,12 @@ import { db } from "@/lib/db";
 import { participants } from "@/lib/db/schema";
 import { checkAllNewPayments } from "@/lib/circles";
 
+const LOTTERY_START_TIMESTAMP = 1739404800;
+const TICKET_PRICE_CRC = 5;
+const WEI_PER_CRC = BigInt("1000000000000000000");
+const TICKET_PRICE_WEI = BigInt(TICKET_PRICE_CRC) * WEI_PER_CRC;
+const RECIPIENT = "0xbf57dc790ba892590c640dc27b26b2665d30104f";
+
 export async function POST() {
   try {
     const existingParticipants = await db.select().from(participants);
@@ -13,14 +19,25 @@ export async function POST() {
       existingParticipants.map((p) => p.address.toLowerCase())
     );
 
-    const newPayments = await checkAllNewPayments(5, "0xbf57dc790ba892590c640dc27b26b2665d30104f");
+    const newPayments = await checkAllNewPayments(TICKET_PRICE_CRC, RECIPIENT);
 
     let added = 0;
     for (const payment of newPayments) {
       const txHash = payment.transactionHash.toLowerCase();
       const addr = payment.from.toLowerCase();
+
       if (registeredTxHashes.has(txHash)) continue;
       if (registeredAddresses.has(addr)) continue;
+
+      const eventTimestamp = parseInt(payment.timestamp, 16) || parseInt(payment.timestamp, 10) || 0;
+      if (eventTimestamp < LOTTERY_START_TIMESTAMP) continue;
+
+      try {
+        const val = BigInt(payment.value);
+        if (val !== TICKET_PRICE_WEI) continue;
+      } catch {
+        continue;
+      }
 
       try {
         await db.insert(participants).values({
