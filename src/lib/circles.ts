@@ -33,12 +33,6 @@ type EventPayload = {
   values: Record<string, unknown>;
 };
 
-type QueryResult = {
-  events?: EventPayload[];
-  hasMore?: boolean;
-  nextCursor?: string | null;
-};
-
 function normalizeAddress(value: string): string | null {
   const trimmed = value.trim().toLowerCase();
   if (!trimmed) return null;
@@ -108,7 +102,8 @@ const WEI_PER_CRC = BigInt("1000000000000000000");
 export async function checkPaymentReceived(
   _dataValue: string,
   minAmountCRC: number,
-  recipientAddress?: string | null
+  recipientAddress?: string | null,
+  excludeTxHashes?: Set<string>
 ): Promise<CirclesTransferEvent | null> {
   if (minAmountCRC <= 0) return null;
 
@@ -121,6 +116,7 @@ export async function checkPaymentReceived(
   for (const event of events) {
     if (!addressesMatch(event.to, normalized)) continue;
     if (addressesMatch(event.from, "0x0000000000000000000000000000000000000000")) continue;
+    if (excludeTxHashes && excludeTxHashes.has(event.transactionHash.toLowerCase())) continue;
 
     try {
       const val = BigInt(event.value);

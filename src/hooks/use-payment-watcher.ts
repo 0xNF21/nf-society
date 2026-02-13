@@ -25,7 +25,7 @@ export function usePaymentWatcher({
   useEffect(() => {
     setPayment(null);
     setError(null);
-    if (!enabled || !dataValue || !minAmountCRC) {
+    if (!enabled || !minAmountCRC) {
       setStatus("idle");
       return;
     }
@@ -38,7 +38,13 @@ export function usePaymentWatcher({
       setStatus((prev) => (prev === "confirmed" ? prev : "waiting"));
 
       try {
-        const found = await checkPaymentReceived(dataValue, minAmountCRC, recipientAddress);
+        const res = await fetch("/api/participants");
+        const data = await res.json();
+        const registeredTxHashes = new Set<string>(
+          (data.registeredTxHashes || []).map((h: string) => h.toLowerCase())
+        );
+
+        const found = await checkPaymentReceived(dataValue, minAmountCRC, recipientAddress, registeredTxHashes);
 
         if (cancelled) return;
 

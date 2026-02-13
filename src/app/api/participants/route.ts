@@ -6,7 +6,9 @@ import { sql } from "drizzle-orm";
 export async function GET() {
   try {
     const result = await db.select({ count: sql<number>`count(*)` }).from(participants);
-    return NextResponse.json({ count: Number(result[0].count) });
+    const allParticipants = await db.select({ transactionHash: participants.transactionHash }).from(participants);
+    const registeredTxHashes = allParticipants.map((p) => p.transactionHash.toLowerCase());
+    return NextResponse.json({ count: Number(result[0].count), registeredTxHashes });
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch count" }, { status: 500 });
   }
