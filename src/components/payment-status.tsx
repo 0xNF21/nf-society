@@ -1,14 +1,23 @@
 import { Badge } from "@/components/ui/badge";
 import type { CirclesTransferEvent } from "@/lib/circles";
 import type { PaymentWatchStatus } from "@/hooks/use-payment-watcher";
-import { byteaToString } from "@/lib/bytea";
 
 const statusLabel: Record<PaymentWatchStatus, { label: string; variant: "neutral" | "waiting" | "success" | "error" }> = {
-  idle: { label: "Idle", variant: "neutral" },
-  waiting: { label: "Waiting", variant: "waiting" },
-  confirmed: { label: "Confirmed", variant: "success" },
-  error: { label: "Error", variant: "error" }
+  idle: { label: "En attente", variant: "neutral" },
+  waiting: { label: "Recherche...", variant: "waiting" },
+  confirmed: { label: "Confirmé", variant: "success" },
+  error: { label: "Erreur", variant: "error" }
 };
+
+function formatCRC(weiValue: string): string {
+  try {
+    const val = BigInt(weiValue);
+    const whole = val / BigInt("1000000000000000000");
+    return `${whole} CRC`;
+  } catch {
+    return "? CRC";
+  }
+}
 
 export function PaymentStatus({
   status,
@@ -20,17 +29,11 @@ export function PaymentStatus({
   error: string | null;
 }) {
   const display = statusLabel[status];
-  const dataStr = byteaToString(payment?.data);
-  const dataPreview = dataStr
-    ? dataStr.length > 16
-      ? `${dataStr.slice(0, 12)}…`
-      : dataStr
-    : null;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-ink">Payment status</p>
+        <p className="text-sm font-semibold text-ink">Statut du paiement</p>
         <Badge variant={display.variant}>{display.label}</Badge>
       </div>
       {payment ? (
@@ -40,25 +43,25 @@ export function PaymentStatus({
             <span className="font-mono">{payment.transactionHash.slice(0, 12)}…</span>
           </div>
           <div className="flex items-center justify-between">
-            <span>From</span>
+            <span>De</span>
             <span className="font-mono">{payment.from.slice(0, 10)}…</span>
           </div>
           <div className="flex items-center justify-between">
-            <span>To</span>
+            <span>Vers</span>
             <span className="font-mono">{payment.to.slice(0, 10)}…</span>
           </div>
           <div className="flex items-center justify-between">
-            <span>Data</span>
-            <span className="font-mono">{dataPreview ?? "Unknown"}</span>
+            <span>Montant</span>
+            <span className="font-mono">{formatCRC(payment.value)}</span>
           </div>
         </div>
       ) : (
         <p className="text-xs text-ink/60">
           {status === "idle"
-            ? "Start monitoring after sharing the link with a payer."
+            ? "Cliquez sur Vérifier pour chercher votre paiement."
             : status === "error"
-            ? error || "Payment check failed."
-            : "No matching payment yet."}
+            ? error || "La vérification a échoué."
+            : "Recherche d'un paiement correspondant..."}
         </p>
       )}
     </div>
