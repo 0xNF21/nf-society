@@ -4,7 +4,7 @@ import { RefreshCw, Ticket } from "lucide-react";
 export type ParticipantEntry = {
   address: string;
   transactionHash: string;
-  createdAt: string;
+  paidAt: string;
 };
 
 function shortenAddress(addr: string): string {
@@ -64,7 +64,7 @@ export function TicketHistory({
                 <p className="font-mono text-ink/80 truncate" title={p.address}>
                   {shortenAddress(p.address)}
                 </p>
-                <p className="text-ink/40 text-[10px]">{formatDate(p.createdAt)}</p>
+                <p className="text-ink/40 text-[10px]">{formatDate(p.paidAt)}</p>
               </div>
               <span className="text-ink/60 font-semibold whitespace-nowrap">5 CRC</span>
             </div>

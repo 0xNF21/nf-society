@@ -39,10 +39,14 @@ export async function POST() {
         continue;
       }
 
+      const rawTs = parseInt(payment.timestamp, 16) || parseInt(payment.timestamp, 10) || 0;
+      const paidAt = new Date(rawTs * 1000);
+
       try {
         await db.insert(participants).values({
           address: addr,
           transactionHash: txHash,
+          paidAt,
         }).onConflictDoNothing();
         added++;
         registeredAddresses.add(addr);

@@ -9,10 +9,10 @@ export async function GET() {
       .select({
         address: participants.address,
         transactionHash: participants.transactionHash,
-        createdAt: participants.createdAt,
+        paidAt: participants.paidAt,
       })
       .from(participants)
-      .orderBy(desc(participants.createdAt));
+      .orderBy(desc(participants.paidAt));
 
     const registeredTxHashes = allParticipants.map((p) => p.transactionHash.toLowerCase());
 
@@ -28,7 +28,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { address, transactionHash } = await req.json();
+    const { address, transactionHash, paidAt } = await req.json();
     if (!address || !transactionHash) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     await db.insert(participants).values({
       address,
       transactionHash,
+      paidAt: paidAt ? new Date(paidAt) : new Date(),
     }).onConflictDoNothing();
 
     return NextResponse.json({ success: true });
