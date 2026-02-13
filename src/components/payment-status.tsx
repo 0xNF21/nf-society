@@ -44,7 +44,7 @@ export function PaymentStatus({
           </div>
           <div className="flex items-center justify-between">
             <span>De</span>
-            <span className="font-mono">{payment.from.slice(0, 10)}…</span>
+            <span className="font-mono">{payment.sender.slice(0, 10)}…</span>
           </div>
           <div className="flex items-center justify-between">
             <span>Vers</span>

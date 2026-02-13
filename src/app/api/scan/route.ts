@@ -24,7 +24,7 @@ export async function POST() {
     let added = 0;
     for (const payment of newPayments) {
       const txHash = payment.transactionHash.toLowerCase();
-      const addr = payment.from.toLowerCase();
+      const addr = payment.sender.toLowerCase();
 
       if (registeredTxHashes.has(txHash)) continue;
       if (registeredAddresses.has(addr)) continue;

@@ -5,11 +5,13 @@ export type CirclesTransferEvent = {
   transactionHash: string;
   from: string;
   to: string;
+  operator: string;
   value: string;
   blockNumber: string;
   timestamp: string;
   transactionIndex: string;
   logIndex: string;
+  sender: string;
 };
 
 export const circlesConfig = {
@@ -45,25 +47,31 @@ function addressesMatch(a: string, b: string): boolean {
   return Boolean(left && right && left === right);
 }
 
-function mapTransferSingleEvents(events: EventPayload[] = []): CirclesTransferEvent[] {
+function mapStreamCompletedEvents(events: EventPayload[] = []): CirclesTransferEvent[] {
   return events
-    .filter((item) => item.event === "CrcV2_TransferSingle")
+    .filter((item) => item.event === "CrcV2_StreamCompleted")
     .map((item) => {
       const v = item.values ?? {};
+      const from = String(v.from ?? "");
+      const to = String(v.to ?? "");
+      const operator = String(v.operator ?? "");
+      const amount = String(v.amount ?? "0");
       return {
         transactionHash: String(v.transactionHash ?? ""),
-        from: String(v.from ?? ""),
-        to: String(v.to ?? ""),
-        value: String(v.value ?? "0"),
+        from,
+        to,
+        operator,
+        value: amount,
         blockNumber: String(v.blockNumber ?? ""),
         timestamp: String(v.timestamp ?? ""),
         transactionIndex: String(v.transactionIndex ?? ""),
         logIndex: String(v.logIndex ?? ""),
+        sender: normalizeAddress(from) ?? from,
       };
     });
 }
 
-async function fetchTransferEvents(
+async function fetchStreamCompletedEvents(
   recipientAddress: string
 ): Promise<CirclesTransferEvent[]> {
   const normalized = normalizeAddress(recipientAddress);
@@ -73,7 +81,7 @@ async function fetchTransferEvents(
     jsonrpc: "2.0",
     id: 1,
     method: "circles_events",
-    params: [normalized, null, null, ["CrcV2_TransferSingle"]]
+    params: [normalized, null, null, ["CrcV2_StreamCompleted"]]
   };
 
   const response = await fetch(circlesConfig.rpcUrl, {
@@ -94,7 +102,7 @@ async function fetchTransferEvents(
   }
 
   const result = Array.isArray(payload.result) ? payload.result : (payload.result?.events ?? []);
-  return mapTransferSingleEvents(Array.isArray(result) ? result : []);
+  return mapStreamCompletedEvents(Array.isArray(result) ? result : []);
 }
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
@@ -110,12 +118,11 @@ export async function checkPaymentReceived(
   const normalized = normalizeAddress(recipientAddress ?? "");
   if (!normalized) return null;
 
-  const events = await fetchTransferEvents(normalized);
+  const events = await fetchStreamCompletedEvents(normalized);
   const exactWei = BigInt(exactAmountCRC) * WEI_PER_CRC;
 
   for (const event of events) {
     if (!addressesMatch(event.to, normalized)) continue;
-    if (addressesMatch(event.from, "0x0000000000000000000000000000000000000000")) continue;
     if (excludeTxHashes && excludeTxHashes.has(event.transactionHash.toLowerCase())) continue;
 
     try {
@@ -138,13 +145,12 @@ export async function checkAllNewPayments(
   const normalized = normalizeAddress(recipientAddress);
   if (!normalized || exactAmountCRC <= 0) return [];
 
-  const events = await fetchTransferEvents(normalized);
+  const events = await fetchStreamCompletedEvents(normalized);
   const exactWei = BigInt(exactAmountCRC) * WEI_PER_CRC;
   const results: CirclesTransferEvent[] = [];
 
   for (const event of events) {
     if (!addressesMatch(event.to, normalized)) continue;
-    if (addressesMatch(event.from, "0x0000000000000000000000000000000000000000")) continue;
 
     try {
       const val = BigInt(event.value);
