@@ -36,34 +36,26 @@ export default function Home() {
     recipientAddress: LOTTERY_RECIPIENT
   });
 
-  // Fetch ticket count
-  const fetchCount = async () => {
+  const scanAndRefresh = async () => {
     try {
+      await fetch("/api/scan", { method: "POST" });
       const res = await fetch("/api/participants");
       const data = await res.json();
       if (data.count !== undefined) setTicketCount(data.count);
     } catch (err) {
-      console.error("Failed to fetch count", err);
+      console.error("Failed to scan/fetch count", err);
     }
   };
 
   useEffect(() => {
-    fetchCount();
-    const interval = setInterval(fetchCount, 10000);
+    scanAndRefresh();
+    const interval = setInterval(scanAndRefresh, 15000);
     return () => clearInterval(interval);
   }, []);
 
-  // Save participant on confirmation
   useEffect(() => {
     if (status === "confirmed" && payment) {
-      fetch("/api/participants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: payment.from,
-          transactionHash: payment.transactionHash
-        }),
-      }).then(() => fetchCount());
+      scanAndRefresh();
     }
   }, [status, payment]);
 

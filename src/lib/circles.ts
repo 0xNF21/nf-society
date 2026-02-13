@@ -130,3 +130,31 @@ export async function checkPaymentReceived(
 
   return null;
 }
+
+export async function checkAllNewPayments(
+  minAmountCRC: number,
+  recipientAddress: string
+): Promise<CirclesTransferEvent[]> {
+  const normalized = normalizeAddress(recipientAddress);
+  if (!normalized || minAmountCRC <= 0) return [];
+
+  const events = await fetchTransferEvents(normalized);
+  const minWei = BigInt(minAmountCRC) * WEI_PER_CRC;
+  const results: CirclesTransferEvent[] = [];
+
+  for (const event of events) {
+    if (!addressesMatch(event.to, normalized)) continue;
+    if (addressesMatch(event.from, "0x0000000000000000000000000000000000000000")) continue;
+
+    try {
+      const val = BigInt(event.value);
+      if (val >= minWei) {
+        results.push(event);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return results;
+}
