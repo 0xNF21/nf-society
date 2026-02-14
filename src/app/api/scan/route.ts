@@ -1,17 +1,40 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { participants } from "@/lib/db/schema";
+import { participants, lotteries } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 
 const LOTTERY_START_TIMESTAMP = 1739404800;
-const TICKET_PRICE_CRC = 5;
 const WEI_PER_CRC = BigInt("1000000000000000000");
-const TICKET_PRICE_WEI = BigInt(TICKET_PRICE_CRC) * WEI_PER_CRC;
-const RECIPIENT = "0xbf57dc790ba892590c640dc27b26b2665d30104f";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
-    const existingParticipants = await db.select().from(participants);
+    const lotteryIdParam = req.nextUrl.searchParams.get("lotteryId");
+    const lotteryId = lotteryIdParam ? parseInt(lotteryIdParam, 10) : null;
+
+    if (!lotteryId) {
+      return NextResponse.json({ error: "lotteryId is required" }, { status: 400 });
+    }
+
+    const [lottery] = await db
+      .select()
+      .from(lotteries)
+      .where(eq(lotteries.id, lotteryId))
+      .limit(1);
+
+    if (!lottery) {
+      return NextResponse.json({ error: "Lottery not found" }, { status: 404 });
+    }
+
+    const recipientAddress = lottery.recipientAddress;
+    const ticketPriceCrc = lottery.ticketPriceCrc;
+
+    const ticketPriceWei = BigInt(ticketPriceCrc) * WEI_PER_CRC;
+
+    const existingParticipants = await db
+      .select()
+      .from(participants)
+      .where(eq(participants.lotteryId, lotteryId));
     const registeredTxHashes = new Set(
       existingParticipants.map((p) => p.transactionHash.toLowerCase())
     );
@@ -19,7 +42,7 @@ export async function POST() {
       existingParticipants.map((p) => p.address.toLowerCase())
     );
 
-    const newPayments = await checkAllNewPayments(TICKET_PRICE_CRC, RECIPIENT);
+    const newPayments = await checkAllNewPayments(ticketPriceCrc, recipientAddress);
 
     let added = 0;
     for (const payment of newPayments) {
@@ -34,7 +57,7 @@ export async function POST() {
 
       try {
         const val = BigInt(payment.value);
-        if (val !== TICKET_PRICE_WEI) continue;
+        if (val !== ticketPriceWei) continue;
       } catch {
         continue;
       }
@@ -44,6 +67,7 @@ export async function POST() {
 
       try {
         await db.insert(participants).values({
+          lotteryId: lotteryId,
           address: addr,
           transactionHash: txHash,
           paidAt,
@@ -56,7 +80,10 @@ export async function POST() {
       }
     }
 
-    const countResult = await db.select().from(participants);
+    const countResult = await db
+      .select()
+      .from(participants)
+      .where(eq(participants.lotteryId, lotteryId));
     return NextResponse.json({ added, total: countResult.length });
   } catch (error) {
     console.error("Scan error:", error);

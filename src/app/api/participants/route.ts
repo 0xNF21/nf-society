@@ -1,10 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { participants } from "@/lib/db/schema";
-import { sql, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const lotteryIdParam = req.nextUrl.searchParams.get("lotteryId");
+    const lotteryId = lotteryIdParam ? parseInt(lotteryIdParam, 10) : null;
+
+    if (!lotteryId) {
+      return NextResponse.json({ count: 0, participants: [], registeredTxHashes: [] });
+    }
+
     const allParticipants = await db
       .select({
         address: participants.address,
@@ -12,6 +19,7 @@ export async function GET() {
         paidAt: participants.paidAt,
       })
       .from(participants)
+      .where(eq(participants.lotteryId, lotteryId))
       .orderBy(desc(participants.paidAt));
 
     const registeredTxHashes = allParticipants.map((p) => p.transactionHash.toLowerCase());
@@ -26,14 +34,15 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { address, transactionHash, paidAt } = await req.json();
-    if (!address || !transactionHash) {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    const { address, transactionHash, paidAt, lotteryId } = await req.json();
+    if (!address || !transactionHash || !lotteryId) {
+      return NextResponse.json({ error: "Missing fields (address, transactionHash, lotteryId required)" }, { status: 400 });
     }
 
     await db.insert(participants).values({
+      lotteryId: parseInt(lotteryId, 10),
       address,
       transactionHash,
       paidAt: paidAt ? new Date(paidAt) : new Date(),

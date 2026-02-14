@@ -13,8 +13,8 @@ const body = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Circles × Gnosis App Starter Kit",
-  description: "A mobile-first starter kit for Circles payments in the Gnosis app."
+  title: "NF Society — Loteries décentralisées",
+  description: "Plateforme de loteries transparentes et vérifiables sur la blockchain Circles"
 };
 
 export default function RootLayout({

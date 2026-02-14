@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { participants, draws } from "@/lib/db/schema";
-import { desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 
@@ -37,11 +37,19 @@ function selectWinner(
   return Number(value % BigInt(participantCount));
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const lotteryIdParam = req.nextUrl.searchParams.get("lotteryId");
+    const lotteryId = lotteryIdParam ? parseInt(lotteryIdParam, 10) : null;
+
+    if (!lotteryId) {
+      return NextResponse.json({ draw: null });
+    }
+
     const latestDraw = await db
       .select()
       .from(draws)
+      .where(eq(draws.lotteryId, lotteryId))
       .orderBy(desc(draws.id))
       .limit(1);
 
@@ -71,14 +79,29 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { password } = await req.json();
+    const { password, lotteryId: bodyLotteryId } = await req.json();
+    const lotteryIdParam = req.nextUrl.searchParams.get("lotteryId");
+    const lotteryId = lotteryIdParam
+      ? parseInt(lotteryIdParam, 10)
+      : bodyLotteryId
+        ? parseInt(bodyLotteryId, 10)
+        : null;
+
+    if (!lotteryId) {
+      return NextResponse.json({ error: "lotteryId is required" }, { status: 400 });
+    }
+
     const adminPassword = process.env.ADMIN_PASSWORD;
 
     if (!adminPassword || password !== adminPassword) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const allParticipants = await db.select().from(participants);
+    const allParticipants = await db
+      .select()
+      .from(participants)
+      .where(eq(participants.lotteryId, lotteryId));
+
     if (allParticipants.length === 0) {
       return NextResponse.json(
         { error: "No participants yet" },
@@ -93,6 +116,7 @@ export async function POST(req: NextRequest) {
     const addresses = allParticipants.map((p) => p.address).join(",");
 
     await db.insert(draws).values({
+      lotteryId,
       winnerAddress: winner.address,
       blockNumber: block.number,
       blockHash: block.hash,
