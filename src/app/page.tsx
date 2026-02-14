@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
-import { ArrowUpRight, Clipboard, QrCode, RefreshCw, Trophy, Users } from "lucide-react";
+import { ArrowUpRight, Clipboard, Lock, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,14 @@ import { TicketHistory, type ParticipantEntry } from "@/components/payment-statu
 const LOTTERY_RECIPIENT = "0xbf57dc790ba892590c640dc27b26b2665d30104f"; 
 const TICKET_PRICE = 5;
 const TICKET_NOTE = "Loterie NF Society Ticket";
+
+type DrawProof = {
+  blockNumber: number;
+  blockHash: string;
+  participantCount: number;
+  selectionIndex: number;
+  method: string;
+};
 
 export default function Home() {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
@@ -24,7 +32,12 @@ export default function Home() {
   const [winner, setWinner] = useState<any>(null);
   const [winnerProfile, setWinnerProfile] = useState<{ name: string; imageUrl: string | null } | null>(null);
   const [drawLoading, setDrawLoading] = useState(false);
+  const [drawProof, setDrawProof] = useState<DrawProof | null>(null);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminAuth, setAdminAuth] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
 
   const paymentLink = useMemo(() => {
     return generatePaymentLink(LOTTERY_RECIPIENT, TICKET_PRICE, TICKET_NOTE);
@@ -86,13 +99,48 @@ export default function Home() {
     }
   };
 
+  const handleAdminLogin = async () => {
+    if (!adminPassword.trim()) return;
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword }),
+      });
+      if (res.ok) {
+        setAdminAuth(true);
+        setAuthError("");
+      } else {
+        setAuthError("Mot de passe incorrect");
+      }
+    } catch {
+      setAuthError("Erreur de connexion");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const handleDraw = async () => {
     setDrawLoading(true);
     setWinner(null);
     setWinnerProfile(null);
+    setDrawProof(null);
     try {
-      const res = await fetch("/api/draw", { method: "POST" });
+      const res = await fetch("/api/draw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword }),
+      });
       const data = await res.json();
+      if (data.error) {
+        if (data.error === "Unauthorized") {
+          setAdminAuth(false);
+          setAuthError("Session expirée, veuillez vous reconnecter");
+        }
+        return;
+      }
       if (data.winner) {
         let profile = null;
         try {
@@ -107,6 +155,7 @@ export default function Home() {
             if (p && (p.name || p.imageUrl)) profile = p;
           }
         } catch {}
+        if (data.proof) setDrawProof(data.proof);
         setWinnerProfile(profile);
         setWinner(data.winner);
       }
@@ -225,6 +274,47 @@ export default function Home() {
               <p className="text-3xl font-bold text-ink">
                 {winnerProfile?.name || winner.address.slice(0, 6) + "..." + winner.address.slice(-4)}
               </p>
+
+              {drawProof && (
+                <div className="mt-4 w-full max-w-lg bg-white border border-ink/10 rounded-2xl p-5 text-left space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
+                    <Shield className="h-4 w-4" />
+                    Preuve de tirage vérifiable
+                  </div>
+                  <div className="space-y-2 text-xs text-ink/70">
+                    <div className="flex justify-between">
+                      <span className="font-medium text-ink/50">Bloc Gnosis</span>
+                      <a
+                        href={`https://gnosisscan.io/block/${drawProof.blockNumber}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-mono text-indigo-600 hover:underline"
+                      >
+                        #{drawProof.blockNumber}
+                      </a>
+                    </div>
+                    <div className="flex justify-between items-start gap-4">
+                      <span className="font-medium text-ink/50 shrink-0">Hash du bloc</span>
+                      <span className="font-mono text-[10px] text-ink/60 break-all text-right">
+                        {drawProof.blockHash}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-ink/50">Participants</span>
+                      <span className="font-mono">{drawProof.participantCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-ink/50">Index sélectionné</span>
+                      <span className="font-mono">{drawProof.selectionIndex}</span>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-ink/5">
+                      <p className="text-[10px] text-ink/40">
+                        <span className="font-semibold">Méthode :</span> {drawProof.method}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -234,18 +324,65 @@ export default function Home() {
             variant="ghost" 
             size="sm" 
             className="text-ink/20 hover:text-ink/40"
-            onClick={() => setIsAdminOpen(!isAdminOpen)}
+            onClick={() => {
+              setIsAdminOpen(!isAdminOpen);
+              if (isAdminOpen) {
+                setAdminAuth(false);
+                setAdminPassword("");
+                setAuthError("");
+              }
+            }}
           >
+            <Lock className="h-3 w-3 mr-1" />
             Zone Admin
           </Button>
 
-          {isAdminOpen && (
+          {isAdminOpen && !adminAuth && (
+            <div className="bg-white border-2 border-ink/10 rounded-3xl p-8 shadow-2xl w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <h3 className="text-lg font-bold text-ink mb-4 flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Authentification requise
+              </h3>
+              <div className="space-y-4">
+                <input
+                  type="password"
+                  placeholder="Mot de passe admin"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
+                  className="w-full px-4 py-3 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+                {authError && (
+                  <p className="text-sm text-red-600 font-medium">{authError}</p>
+                )}
+                <Button
+                  onClick={handleAdminLogin}
+                  disabled={authLoading || !adminPassword.trim()}
+                  className="w-full bg-ink hover:bg-ink/90 text-white font-semibold h-11 disabled:opacity-60"
+                >
+                  {authLoading ? (
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Vérification...
+                    </span>
+                  ) : (
+                    "Se connecter"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isAdminOpen && adminAuth && (
             <div className="bg-white border-2 border-red-100 rounded-3xl p-8 shadow-2xl w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
               <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2">
                 Panneau de Tirage
               </h3>
+              <p className="text-sm text-ink/60 mb-4">
+                Le tirage utilise le hash du dernier bloc de la blockchain Gnosis comme source d&apos;aléatoire. Le résultat est vérifiable par tous.
+              </p>
               <p className="text-sm text-ink/60 mb-6">
-                Cliquez sur le bouton ci-dessous pour choisir aléatoirement un gagnant parmi les {ticketCount} participants.
+                {ticketCount} participant{ticketCount !== 1 ? "s" : ""} dans la loterie.
               </p>
               <Button onClick={handleDraw} disabled={drawLoading} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 shadow-lg shadow-red-200 disabled:opacity-60">
                 {drawLoading ? (
