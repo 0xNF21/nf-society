@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { participants, draws } from "@/lib/db/schema";
+import { desc } from "drizzle-orm";
 
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 
@@ -34,6 +35,38 @@ function selectWinner(
   const lastBytes = hashHex.slice(-16);
   const value = BigInt("0x" + lastBytes);
   return Number(value % BigInt(participantCount));
+}
+
+export async function GET() {
+  try {
+    const latestDraw = await db
+      .select()
+      .from(draws)
+      .orderBy(desc(draws.id))
+      .limit(1);
+
+    if (latestDraw.length === 0) {
+      return NextResponse.json({ draw: null });
+    }
+
+    const d = latestDraw[0];
+    return NextResponse.json({
+      draw: {
+        winnerAddress: d.winnerAddress,
+        proof: {
+          blockNumber: d.blockNumber,
+          blockHash: d.blockHash,
+          participantCount: d.participantCount,
+          selectionIndex: d.selectionIndex,
+          method: "Winner = BigInt(last 16 hex chars of blockHash) % participantCount",
+        },
+        drawnAt: d.drawnAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("Fetch draw error:", error);
+    return NextResponse.json({ draw: null });
+  }
 }
 
 export async function POST(req: NextRequest) {

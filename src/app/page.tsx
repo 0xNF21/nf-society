@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
-import { ArrowUpRight, Clipboard, Lock, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Clipboard, HelpCircle, Lock, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,26 @@ type DrawProof = {
   selectionIndex: number;
   method: string;
 };
+
+function FaqItem({ question, answer }: { question: string; answer: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-ink/5 last:border-0">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between py-4 text-left text-sm font-medium text-ink/80 hover:text-ink transition-colors"
+      >
+        {question}
+        <ChevronDown className={`h-4 w-4 shrink-0 text-ink/40 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="pb-4 text-sm text-ink/60 leading-relaxed animate-in fade-in slide-in-from-top-1 duration-200">
+          {answer}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Home() {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
@@ -63,6 +83,31 @@ export default function Home() {
     const interval = setInterval(scanAndRefresh, 30000);
     return () => clearInterval(interval);
   }, [scanAndRefresh]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/draw");
+        const data = await res.json();
+        if (data.draw) {
+          setWinner({ address: data.draw.winnerAddress });
+          setDrawProof(data.draw.proof);
+          try {
+            const profRes = await fetch("/api/profiles", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ addresses: [data.draw.winnerAddress] }),
+            });
+            if (profRes.ok) {
+              const profData = await profRes.json();
+              const p = profData.profiles?.[data.draw.winnerAddress.toLowerCase()];
+              if (p && (p.name || p.imageUrl)) setWinnerProfile(p);
+            }
+          } catch {}
+        }
+      } catch {}
+    })();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -256,7 +301,7 @@ export default function Home() {
             <CardHeader className="text-center">
               <CardTitle className="flex items-center justify-center gap-3 text-2xl">
                 <Trophy className="h-8 w-8 text-yellow-600" />
-                Gagnant Sélectionné !
+                Gagnant du dernier tirage
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center pb-8 gap-4">
@@ -318,6 +363,44 @@ export default function Home() {
             </CardContent>
           </Card>
         )}
+
+        <Card className="border-2 border-ink/5 shadow-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5 text-indigo-500" />
+              Comment ça marche ?
+            </CardTitle>
+            <CardDescription>Tout ce que vous devez savoir sur la loterie et la transparence du tirage.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y divide-ink/5">
+              <FaqItem
+                question="Comment participer ?"
+                answer="Envoyez exactement 5 CRC à l'adresse de la loterie en cliquant sur « Acheter mon ticket ». Le paiement se fait via l'application Gnosis/Circles. Une fois le paiement confirmé sur la blockchain, votre ticket apparaît automatiquement dans l'historique."
+              />
+              <FaqItem
+                question="Comment le gagnant est-il choisi ?"
+                answer="Le gagnant est sélectionné grâce au hash (empreinte numérique) du dernier bloc de la blockchain Gnosis au moment du tirage. Ce hash est un nombre imprévisible généré par le réseau blockchain — personne, pas même l'organisateur, ne peut le deviner ou le manipuler à l'avance. On prend les 16 derniers caractères de ce hash, on le convertit en nombre, puis on fait un modulo par le nombre de participants pour obtenir l'index du gagnant."
+              />
+              <FaqItem
+                question="Comment vérifier que le tirage est honnête ?"
+                answer="Après chaque tirage, la preuve complète est affichée publiquement : le numéro de bloc, le hash du bloc, le nombre de participants et l'index sélectionné. Vous pouvez vérifier le hash du bloc sur GnosisScan (le lien est fourni), puis refaire le calcul vous-même : prenez les 16 derniers caractères hexadécimaux du hash, convertissez-les en nombre, et divisez par le nombre de participants. Le reste de cette division donne l'index du gagnant dans la liste."
+              />
+              <FaqItem
+                question="Qui peut effectuer le tirage ?"
+                answer="Seul l'administrateur de la loterie peut déclencher le tirage, via une zone protégée par mot de passe. Cependant, le résultat et sa preuve sont toujours publics et vérifiables par tous."
+              />
+              <FaqItem
+                question="Est-ce qu'on peut acheter plusieurs tickets ?"
+                answer="Chaque adresse Circles ne peut acheter qu'un seul ticket par loterie. Si vous envoyez un deuxième paiement depuis la même adresse, il ne sera pas comptabilisé comme un ticket supplémentaire."
+              />
+              <FaqItem
+                question="Quand a lieu le tirage ?"
+                answer="Le tirage est effectué par l'administrateur une fois que suffisamment de participants ont rejoint la loterie. La date exacte sera communiquée par NF Society."
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         <footer className="mt-12 pt-8 border-t border-ink/5 flex flex-col items-center gap-4">
           <Button 
