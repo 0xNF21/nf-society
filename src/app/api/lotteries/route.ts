@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const slug = body.slug || title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
     const isNFSociety = organizer.toLowerCase().includes("nf society");
-    const effectiveLogoUrl = logoUrl !== undefined ? logoUrl : (isNFSociety ? "/nf-society-logo.png" : undefined);
+    const effectiveLogoUrl = (logoUrl !== undefined && logoUrl !== null && logoUrl !== "") ? logoUrl : (isNFSociety ? "/nf-society-logo.png" : undefined);
 
     const [created] = await db.insert(lotteries).values({
       slug,
