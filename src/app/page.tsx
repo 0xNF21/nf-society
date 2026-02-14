@@ -216,9 +216,6 @@ export default function Home() {
               <p className="text-3xl font-bold text-ink">
                 {winnerProfile?.name || winner.address.slice(0, 6) + "..." + winner.address.slice(-4)}
               </p>
-              <p className="text-sm font-mono text-ink/40 break-all bg-white/80 px-4 py-2 rounded-xl border border-yellow-200">
-                {winner.address}
-              </p>
             </CardContent>
           </Card>
         )}
