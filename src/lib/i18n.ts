@@ -201,6 +201,12 @@ export const translations = {
     lotteryArchived: { fr: "Cette loterie est archivée.", en: "This lottery is archived." },
     confirmComplete: { fr: "Terminer cette loterie ? Les participants ne pourront plus acheter de tickets.", en: "Complete this lottery? Participants will no longer be able to buy tickets." },
     confirmArchive: { fr: "Archiver cette loterie ? Elle ne sera plus visible sur la page d'accueil.", en: "Archive this lottery? It will no longer be visible on the home page." },
+    editDescription: { fr: "Modifier la description", en: "Edit description" },
+    descriptionLabel: { fr: "Description de la loterie", en: "Lottery description" },
+    saveDescription: { fr: "Enregistrer", en: "Save" },
+    cancelEdit: { fr: "Annuler", en: "Cancel" },
+    descriptionUpdated: { fr: "Description mise à jour", en: "Description updated" },
+    descriptionUpdateError: { fr: "Erreur lors de la mise à jour de la description", en: "Error updating description" },
   },
   tickets: {
     purchased: { fr: "Tickets achetés", en: "Purchased tickets" },

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
-import { ArrowUpRight, ChevronDown, Clipboard, Clock, HelpCircle, Lock, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Pencil, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,6 +91,10 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [statusChanging, setStatusChanging] = useState(false);
   const [lotteryStatus, setLotteryStatus] = useState(lottery.status);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState(lottery.description || "");
+  const [currentDescription, setCurrentDescription] = useState(lottery.description || "");
+  const [savingDescription, setSavingDescription] = useState(false);
 
   const ticketNote = `${lottery.title} Ticket`;
 
@@ -258,6 +262,27 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
     }
   };
 
+  const handleSaveDescription = async () => {
+    setSavingDescription(true);
+    try {
+      const res = await fetch(`/api/lotteries/${lottery.slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword, description: descriptionDraft }),
+      });
+      if (res.ok) {
+        setCurrentDescription(descriptionDraft);
+        setEditingDescription(false);
+      } else {
+        alert(l.descriptionUpdateError[locale]);
+      }
+    } catch {
+      alert(l.descriptionUpdateError[locale]);
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
   const handleDraw = async () => {
     setDrawLoading(true);
     setWinner(null);
@@ -348,10 +373,10 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
             <p className="max-w-2xl mx-auto text-lg text-ink/70">
               {(() => {
                 const frDefault = `Achetez un ticket pour ${lottery.ticketPriceCrc} CRC et tentez de gagner le gros lot !`;
-                if (!lottery.description || lottery.description === frDefault) {
+                if (!currentDescription || currentDescription === frDefault) {
                   return l.defaultDesc[locale](lottery.ticketPriceCrc);
                 }
-                return lottery.description;
+                return currentDescription;
               })()}
             </p>
             
@@ -736,6 +761,53 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                     l.performDraw[locale]
                   )}
                 </Button>
+
+                <div className="mt-6 pt-6 border-t border-ink/10">
+                  <h4 className="text-sm font-bold text-ink/60 mb-3 flex items-center gap-2">
+                    <Pencil className="h-4 w-4" />
+                    {l.editDescription[locale]}
+                  </h4>
+                  {editingDescription ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={descriptionDraft}
+                        onChange={(e) => setDescriptionDraft(e.target.value)}
+                        rows={4}
+                        className="w-full rounded-xl border border-ink/20 bg-white px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20 resize-none"
+                        placeholder={l.descriptionLabel[locale]}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleSaveDescription}
+                          disabled={savingDescription}
+                          className="flex-1 bg-ink hover:bg-ink/90 text-white font-semibold h-10"
+                        >
+                          {savingDescription ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            l.saveDescription[locale]
+                          )}
+                        </Button>
+                        <Button
+                          onClick={() => { setEditingDescription(false); setDescriptionDraft(currentDescription); }}
+                          variant="outline"
+                          className="flex-1 border-ink/20 text-ink/60 font-semibold h-10"
+                        >
+                          {l.cancelEdit[locale]}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => { setDescriptionDraft(currentDescription); setEditingDescription(true); }}
+                      variant="outline"
+                      className="w-full border-ink/20 text-ink/70 hover:bg-ink/5 font-semibold"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      {l.editDescription[locale]}
+                    </Button>
+                  )}
+                </div>
 
                 <div className="mt-6 pt-6 border-t border-ink/10">
                   <h4 className="text-sm font-bold text-ink/60 mb-3 flex items-center gap-2">
