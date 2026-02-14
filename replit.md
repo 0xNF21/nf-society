@@ -32,12 +32,14 @@ src/
   components/
     lottery-page.tsx           - Reusable lottery page component (client)
     payment-status.tsx         - Ticket history with skeleton loading
+    language-provider.tsx      - i18n context, useLocale hook, LanguageSwitcher
     ui/                        - Reusable UI components
   lib/
     db/
       index.ts                 - Database connection
       schema.ts                - DB schema (lotteries + participants + draws)
     circles.ts                 - Circles protocol integration
+    i18n.ts                    - Translation strings (FR/EN) organized by page
     bytea.ts / hash.ts / utils.ts - Utilities
 public/                        - Static assets (logo, etc.)
 ```
@@ -74,6 +76,7 @@ public/                        - Static assets (logo, etc.)
 - **Verifiable Draw**: Uses Gnosis block hash as random seed, publicly displays proof
 - **Draw History**: All draws logged in PostgreSQL with full proof data
 - **Organizer Dashboard**: Form-based lottery creation with live preview
+- **Bilingual (FR/EN)**: Full i18n with flag switcher, localStorage persistence
 
 ## Development
 - Dev server runs on port 5000 (0.0.0.0)
