@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 
 const CIRCLES_RPC_URL = process.env.NEXT_PUBLIC_CIRCLES_RPC_URL || "https://rpc.aboutcircles.com/";
-const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
+
+const IPFS_GATEWAYS = [
+  "https://gateway.pinata.cloud/ipfs/",
+  "https://dweb.link/ipfs/",
+  "https://cloudflare-ipfs.com/ipfs/",
+  "https://ipfs.io/ipfs/",
+];
 
 type CirclesProfile = {
   name: string;
@@ -9,7 +15,7 @@ type CirclesProfile = {
 };
 
 const profileCache = new Map<string, { profile: CirclesProfile; timestamp: number }>();
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
 function normalizeAddress(addr: string): string {
   return addr.trim().toLowerCase();
@@ -38,10 +44,10 @@ async function getAvatarCid(address: string): Promise<string | null> {
   }
 }
 
-async function getProfileFromIpfs(cid: string): Promise<CirclesProfile | null> {
+async function fetchFromGateway(gateway: string, cid: string): Promise<CirclesProfile | null> {
   try {
-    const res = await fetch(`${IPFS_GATEWAY}${cid}`, {
-      signal: AbortSignal.timeout(8000),
+    const res = await fetch(`${gateway}${cid}`, {
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -49,22 +55,39 @@ async function getProfileFromIpfs(cid: string): Promise<CirclesProfile | null> {
     if (!name) return null;
 
     let imageUrl: string | null = null;
+    const preferredGateway = IPFS_GATEWAYS[0];
     if (data.previewImageUrl && typeof data.previewImageUrl === "string") {
       if (data.previewImageUrl.startsWith("data:")) {
         imageUrl = data.previewImageUrl;
       } else if (data.previewImageUrl.startsWith("ipfs://")) {
-        imageUrl = `${IPFS_GATEWAY}${data.previewImageUrl.replace("ipfs://", "")}`;
+        imageUrl = `${preferredGateway}${data.previewImageUrl.replace("ipfs://", "")}`;
       } else {
         imageUrl = data.previewImageUrl;
       }
     } else if (data.imageUrl && typeof data.imageUrl === "string") {
-      imageUrl = data.imageUrl;
+      if (data.imageUrl.startsWith("ipfs://")) {
+        imageUrl = `${preferredGateway}${data.imageUrl.replace("ipfs://", "")}`;
+      } else {
+        imageUrl = data.imageUrl;
+      }
     }
 
     return { name, imageUrl };
   } catch {
     return null;
   }
+}
+
+async function getProfileFromIpfs(cid: string): Promise<CirclesProfile | null> {
+  const result = await Promise.any(
+    IPFS_GATEWAYS.map(async (gw) => {
+      const profile = await fetchFromGateway(gw, cid);
+      if (!profile) throw new Error("no profile");
+      return profile;
+    })
+  ).catch(() => null);
+
+  return result;
 }
 
 async function fetchProfile(address: string): Promise<CirclesProfile> {
