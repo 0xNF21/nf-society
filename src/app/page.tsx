@@ -21,7 +21,7 @@ type DrawProof = {
   method: string;
 };
 
-function FaqItem({ question, answer }: { question: string; answer: string }) {
+function FaqItem({ question, children }: { question: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border-b border-ink/5 last:border-0">
@@ -34,7 +34,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
       </button>
       {open && (
         <div className="pb-4 text-sm text-ink/60 leading-relaxed animate-in fade-in slide-in-from-top-1 duration-200">
-          {answer}
+          {children}
         </div>
       )}
     </div>
@@ -58,6 +58,7 @@ export default function Home() {
   const [adminAuth, setAdminAuth] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
 
   const paymentLink = useMemo(() => {
     return generatePaymentLink(LOTTERY_RECIPIENT, TICKET_PRICE, TICKET_NOTE);
@@ -364,43 +365,85 @@ export default function Home() {
           </Card>
         )}
 
-        <Card className="border-2 border-ink/5 shadow-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <HelpCircle className="h-5 w-5 text-indigo-500" />
-              Comment ça marche ?
-            </CardTitle>
-            <CardDescription>Tout ce que vous devez savoir sur la loterie et la transparence du tirage.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="divide-y divide-ink/5">
-              <FaqItem
-                question="Comment participer ?"
-                answer="Envoyez exactement 5 CRC à l'adresse de la loterie en cliquant sur « Acheter mon ticket ». Le paiement se fait via l'application Gnosis/Circles. Une fois le paiement confirmé sur la blockchain, votre ticket apparaît automatiquement dans l'historique."
-              />
-              <FaqItem
-                question="Comment le gagnant est-il choisi ?"
-                answer="Le gagnant est sélectionné grâce au hash (empreinte numérique) du dernier bloc de la blockchain Gnosis au moment du tirage. Ce hash est un nombre imprévisible généré par le réseau blockchain — personne, pas même l'organisateur, ne peut le deviner ou le manipuler à l'avance. On prend les 16 derniers caractères de ce hash, on le convertit en nombre, puis on fait un modulo par le nombre de participants pour obtenir l'index du gagnant."
-              />
-              <FaqItem
-                question="Comment vérifier que le tirage est honnête ?"
-                answer="Après chaque tirage, la preuve complète est affichée publiquement : le numéro de bloc, le hash du bloc, le nombre de participants et l'index sélectionné. Vous pouvez vérifier le hash du bloc sur GnosisScan (le lien est fourni), puis refaire le calcul vous-même : prenez les 16 derniers caractères hexadécimaux du hash, convertissez-les en nombre, et divisez par le nombre de participants. Le reste de cette division donne l'index du gagnant dans la liste."
-              />
-              <FaqItem
-                question="Qui peut effectuer le tirage ?"
-                answer="Seul l'administrateur de la loterie peut déclencher le tirage, via une zone protégée par mot de passe. Cependant, le résultat et sa preuve sont toujours publics et vérifiables par tous."
-              />
-              <FaqItem
-                question="Est-ce qu'on peut acheter plusieurs tickets ?"
-                answer="Chaque adresse Circles ne peut acheter qu'un seul ticket par loterie. Si vous envoyez un deuxième paiement depuis la même adresse, il ne sera pas comptabilisé comme un ticket supplémentaire."
-              />
-              <FaqItem
-                question="Quand a lieu le tirage ?"
-                answer="Le tirage est effectué par l'administrateur une fois que suffisamment de participants ont rejoint la loterie. La date exacte sera communiquée par NF Society."
-              />
+        <div className="border-2 border-ink/5 shadow-xl rounded-3xl overflow-hidden">
+          <button
+            onClick={() => setFaqOpen(!faqOpen)}
+            className="w-full flex items-center justify-between p-6 md:p-8 bg-white hover:bg-sand/20 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <HelpCircle className="h-6 w-6 text-indigo-500" />
+              <div className="text-left">
+                <h2 className="text-lg font-bold text-ink">Comment ça marche ?</h2>
+                <p className="text-sm text-ink/50 mt-0.5">Tout savoir sur la loterie et la transparence du tirage</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <ChevronDown className={`h-5 w-5 text-ink/40 transition-transform duration-300 ${faqOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {faqOpen && (
+            <div className="px-6 md:px-8 pb-6 md:pb-8 bg-white animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="divide-y divide-ink/5">
+                <FaqItem question="Comment participer ?">
+                  <p>Envoyez exactement 5 CRC à l&apos;adresse de la loterie en cliquant sur &laquo; Acheter mon ticket &raquo;. Le paiement se fait via l&apos;application Gnosis/Circles. Une fois le paiement confirmé sur la blockchain, votre ticket apparaît automatiquement dans l&apos;historique.</p>
+                </FaqItem>
+
+                <FaqItem question="Comment le gagnant est-il choisi ?">
+                  <div className="space-y-3">
+                    <p>Le gagnant est sélectionné de manière <strong className="text-ink/80">100% transparente et vérifiable</strong> grâce à la blockchain. Voici le processus exact :</p>
+                    <ol className="list-decimal list-inside space-y-2 ml-1">
+                      <li><strong className="text-ink/70">Récupération du bloc</strong> — Au moment du tirage, le système récupère le dernier bloc validé sur la blockchain Gnosis. Ce bloc contient un &laquo; hash &raquo; (une empreinte numérique unique) qui est généré par le réseau et que <em>personne ne peut prédire ni manipuler</em>.</li>
+                      <li><strong className="text-ink/70">Calcul du gagnant</strong> — On prend les 16 derniers caractères hexadécimaux du hash du bloc. On les convertit en nombre. Puis on fait le calcul : <code className="bg-ink/5 px-1.5 py-0.5 rounded text-xs font-mono">nombre % nombre_de_participants</code>. Le résultat donne la position du gagnant dans la liste.</li>
+                      <li><strong className="text-ink/70">Affichage public</strong> — Le numéro de bloc, le hash complet, le nombre de participants et l&apos;index obtenu sont affichés publiquement pour que chacun puisse vérifier.</li>
+                    </ol>
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs">
+                      <p className="font-semibold text-indigo-700 mb-1">Pourquoi c&apos;est fiable ?</p>
+                      <p className="text-indigo-600/80">Le hash d&apos;un bloc blockchain est créé par des centaines de validateurs indépendants. L&apos;organisateur de la loterie n&apos;a aucun contrôle dessus. C&apos;est comme demander à un notaire impartial de tirer le numéro gagnant.</p>
+                    </div>
+                  </div>
+                </FaqItem>
+
+                <FaqItem question="Comment vérifier le tirage soi-même ?">
+                  <div className="space-y-3">
+                    <p>Après chaque tirage, toutes les informations nécessaires sont affichées publiquement. Voici comment vérifier étape par étape :</p>
+                    <div className="space-y-3">
+                      <div className="bg-sand/30 rounded-xl p-3 border border-ink/5">
+                        <p className="font-semibold text-ink/70 text-xs mb-1">Étape 1 — Vérifier le hash du bloc</p>
+                        <p className="text-xs">Cliquez sur le numéro de bloc affiché dans la preuve (c&apos;est un lien vers GnosisScan). Vérifiez que le hash affiché sur GnosisScan est bien le même que celui affiché sur notre site.</p>
+                      </div>
+                      <div className="bg-sand/30 rounded-xl p-3 border border-ink/5">
+                        <p className="font-semibold text-ink/70 text-xs mb-1">Étape 2 — Refaire le calcul</p>
+                        <p className="text-xs mb-2">Prenez le hash du bloc et gardez seulement les 16 derniers caractères (sans le &laquo; 0x &raquo; du début).</p>
+                        <p className="text-xs mb-2">Exemple : si le hash est <code className="bg-ink/5 px-1 rounded font-mono text-[10px]">0x8fa2...3b9e1a7f0c4d2e8b</code>, prenez <code className="bg-ink/5 px-1 rounded font-mono text-[10px]">3b9e1a7f0c4d2e8b</code></p>
+                        <p className="text-xs">Convertissez ce nombre hexadécimal en décimal. Vous pouvez utiliser un convertisseur en ligne ou taper dans la console de votre navigateur (F12) :</p>
+                        <code className="block bg-ink/5 px-2 py-1.5 rounded font-mono text-[10px] mt-1">BigInt(&quot;0x3b9e1a7f0c4d2e8b&quot;) % BigInt(nombre_de_participants)</code>
+                      </div>
+                      <div className="bg-sand/30 rounded-xl p-3 border border-ink/5">
+                        <p className="font-semibold text-ink/70 text-xs mb-1">Étape 3 — Comparer</p>
+                        <p className="text-xs">Le résultat de votre calcul doit correspondre exactement à l&apos;&laquo; Index sélectionné &raquo; affiché dans la preuve. Cet index correspond à la position du gagnant dans la liste des participants (en partant de 0).</p>
+                      </div>
+                    </div>
+                    <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-xs">
+                      <p className="font-semibold text-green-700 mb-1">En résumé</p>
+                      <p className="text-green-600/80">Si le hash sur GnosisScan correspond et que votre calcul donne le même index que celui affiché, alors le tirage est vérifié : le gagnant a bien été choisi de manière aléatoire et personne n&apos;a pu tricher.</p>
+                    </div>
+                  </div>
+                </FaqItem>
+
+                <FaqItem question="Qui peut effectuer le tirage ?">
+                  <p>Seul l&apos;administrateur de la loterie peut déclencher le tirage, via une zone protégée par mot de passe. Cependant, le résultat et sa preuve sont toujours publics et vérifiables par tous les visiteurs du site.</p>
+                </FaqItem>
+
+                <FaqItem question="Est-ce qu'on peut acheter plusieurs tickets ?">
+                  <p>Chaque adresse Circles ne peut acheter qu&apos;un seul ticket par loterie. Si vous envoyez un deuxième paiement depuis la même adresse, il ne sera pas comptabilisé comme un ticket supplémentaire.</p>
+                </FaqItem>
+
+                <FaqItem question="Quand a lieu le tirage ?">
+                  <p>Le tirage est effectué par l&apos;administrateur une fois que suffisamment de participants ont rejoint la loterie. La date exacte sera communiquée par NF Society.</p>
+                </FaqItem>
+              </div>
+            </div>
+          )}
+        </div>
 
         <footer className="mt-12 pt-8 border-t border-ink/5 flex flex-col items-center gap-4">
           <Button 
