@@ -315,7 +315,13 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
               {lottery.title}
             </h1>
             <p className="max-w-2xl mx-auto text-lg text-ink/70">
-              {lottery.description || l.defaultDesc[locale](lottery.ticketPriceCrc)}
+              {(() => {
+                const frDefault = `Achetez un ticket pour ${lottery.ticketPriceCrc} CRC et tentez de gagner le gros lot !`;
+                if (!lottery.description || lottery.description === frDefault) {
+                  return l.defaultDesc[locale](lottery.ticketPriceCrc);
+                }
+                return lottery.description;
+              })()}
             </p>
             
             <div className="flex items-center justify-center gap-2 mt-6">
