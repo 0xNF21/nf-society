@@ -277,8 +277,9 @@ export default function HomePage() {
           <div className="absolute right-0 top-0">
             <LanguageSwitcher />
           </div>
-          <div className="flex justify-center mb-4">
+          <div className="flex items-center justify-center gap-3 mb-4">
             <Image src="/logo-color.png" alt="Circles" width={160} height={48} className="h-12 w-auto" priority />
+            <img src="/gnosis-logo.png" alt="Gnosis Chain" className="h-10 w-10" />
           </div>
           <div className="flex items-center justify-center gap-4">
             <img src="/nf-society-logo.png" alt="NF Society" className="h-16 w-16 rounded-2xl object-cover" />

@@ -3,8 +3,8 @@ export type Locale = "fr" | "en";
 export const translations = {
   home: {
     subtitle: {
-      fr: "Plateforme de loteries transparentes et vérifiables sur la blockchain Circles",
-      en: "Transparent and verifiable lottery platform on the Circles blockchain",
+      fr: "Plateforme de loteries transparentes et vérifiables sur la blockchain Gnosis",
+      en: "Transparent and verifiable lottery platform on the Gnosis blockchain",
     },
     noLotteries: {
       fr: "Aucune loterie active pour le moment.",
