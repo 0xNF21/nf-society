@@ -104,8 +104,8 @@ export default function Home() {
         const res = await fetch("/api/draw");
         const data = await res.json();
         if (data.draw) {
-          setWinner({ address: data.draw.winnerAddress });
           setDrawProof(data.draw.proof);
+          let profile = null;
           try {
             const profRes = await fetch("/api/profiles", {
               method: "POST",
@@ -115,9 +115,11 @@ export default function Home() {
             if (profRes.ok) {
               const profData = await profRes.json();
               const p = profData.profiles?.[data.draw.winnerAddress.toLowerCase()];
-              if (p && (p.name || p.imageUrl)) setWinnerProfile(p);
+              if (p && (p.name || p.imageUrl)) profile = p;
             }
           } catch {}
+          setWinnerProfile(profile);
+          setWinner({ address: data.draw.winnerAddress });
         }
       } catch {}
     })();
@@ -129,7 +131,6 @@ export default function Home() {
         const res = await fetch("/api/draw/history");
         const data = await res.json();
         if (data.draws && data.draws.length > 0) {
-          setDrawHistory(data.draws);
           const addresses = [...new Set(data.draws.map((d: DrawHistoryItem) => d.winnerAddress))];
           try {
             const profRes = await fetch("/api/profiles", {
@@ -142,6 +143,7 @@ export default function Home() {
               if (profData.profiles) setHistoryProfiles(profData.profiles);
             }
           } catch {}
+          setDrawHistory(data.draws);
         }
       } catch {}
     })();
