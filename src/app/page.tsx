@@ -22,6 +22,7 @@ export default function Home() {
   const [participantList, setParticipantList] = useState<ParticipantEntry[]>([]);
   const [scanning, setScanning] = useState(false);
   const [winner, setWinner] = useState<any>(null);
+  const [winnerProfile, setWinnerProfile] = useState<{ name: string; imageUrl: string | null } | null>(null);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
 
   const paymentLink = useMemo(() => {
@@ -88,7 +89,20 @@ export default function Home() {
     try {
       const res = await fetch("/api/draw", { method: "POST" });
       const data = await res.json();
-      if (data.winner) setWinner(data.winner);
+      if (data.winner) {
+        setWinner(data.winner);
+        setWinnerProfile(null);
+        const profRes = await fetch("/api/profiles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ addresses: [data.winner.address] }),
+        });
+        if (profRes.ok) {
+          const profData = await profRes.json();
+          const p = profData.profiles?.[data.winner.address.toLowerCase()];
+          if (p && (p.name || p.imageUrl)) setWinnerProfile(p);
+        }
+      }
     } catch (err) {
       console.error("Draw failed", err);
     }
@@ -187,12 +201,23 @@ export default function Home() {
                 Gagnant Sélectionné !
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-center pb-8">
-              <p className="text-lg font-mono break-all bg-white p-4 rounded-xl border-2 border-yellow-200">
-                {winner.address}
+            <CardContent className="flex flex-col items-center pb-8 gap-4">
+              {winnerProfile?.imageUrl ? (
+                <img
+                  src={winnerProfile.imageUrl}
+                  alt={winnerProfile.name}
+                  className="h-20 w-20 rounded-full object-cover border-4 border-yellow-300 shadow-lg"
+                />
+              ) : (
+                <div className="h-20 w-20 rounded-full bg-yellow-200 flex items-center justify-center border-4 border-yellow-300">
+                  <Trophy className="h-10 w-10 text-yellow-600" />
+                </div>
+              )}
+              <p className="text-3xl font-bold text-ink">
+                {winnerProfile?.name || winner.address.slice(0, 6) + "..." + winner.address.slice(-4)}
               </p>
-              <p className="text-sm text-ink/60 mt-4 italic">
-                Transaction ID: {winner.transactionHash.slice(0, 20)}...
+              <p className="text-sm font-mono text-ink/40 break-all bg-white/80 px-4 py-2 rounded-xl border border-yellow-200">
+                {winner.address}
               </p>
             </CardContent>
           </Card>
