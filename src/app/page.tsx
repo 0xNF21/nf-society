@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
-import { ArrowUpRight, Clipboard, QrCode, Trophy, Users } from "lucide-react";
+import { ArrowUpRight, Clipboard, QrCode, RefreshCw, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,7 @@ export default function Home() {
   const [scanning, setScanning] = useState(false);
   const [winner, setWinner] = useState<any>(null);
   const [winnerProfile, setWinnerProfile] = useState<{ name: string; imageUrl: string | null } | null>(null);
+  const [drawLoading, setDrawLoading] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
 
   const paymentLink = useMemo(() => {
@@ -86,25 +87,33 @@ export default function Home() {
   };
 
   const handleDraw = async () => {
+    setDrawLoading(true);
+    setWinner(null);
+    setWinnerProfile(null);
     try {
       const res = await fetch("/api/draw", { method: "POST" });
       const data = await res.json();
       if (data.winner) {
+        let profile = null;
+        try {
+          const profRes = await fetch("/api/profiles", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ addresses: [data.winner.address] }),
+          });
+          if (profRes.ok) {
+            const profData = await profRes.json();
+            const p = profData.profiles?.[data.winner.address.toLowerCase()];
+            if (p && (p.name || p.imageUrl)) profile = p;
+          }
+        } catch {}
+        setWinnerProfile(profile);
         setWinner(data.winner);
-        setWinnerProfile(null);
-        const profRes = await fetch("/api/profiles", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ addresses: [data.winner.address] }),
-        });
-        if (profRes.ok) {
-          const profData = await profRes.json();
-          const p = profData.profiles?.[data.winner.address.toLowerCase()];
-          if (p && (p.name || p.imageUrl)) setWinnerProfile(p);
-        }
       }
     } catch (err) {
       console.error("Draw failed", err);
+    } finally {
+      setDrawLoading(false);
     }
   };
 
@@ -238,8 +247,15 @@ export default function Home() {
               <p className="text-sm text-ink/60 mb-6">
                 Cliquez sur le bouton ci-dessous pour choisir aléatoirement un gagnant parmi les {ticketCount} participants.
               </p>
-              <Button onClick={handleDraw} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 shadow-lg shadow-red-200">
-                EFFECTUER LE TIRAGE
+              <Button onClick={handleDraw} disabled={drawLoading} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 shadow-lg shadow-red-200 disabled:opacity-60">
+                {drawLoading ? (
+                  <span className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Tirage en cours...
+                  </span>
+                ) : (
+                  "EFFECTUER LE TIRAGE"
+                )}
               </Button>
             </div>
           )}

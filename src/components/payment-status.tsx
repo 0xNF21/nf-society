@@ -15,11 +15,6 @@ type CirclesProfile = {
   imageUrl: string | null;
 };
 
-function shortenAddress(addr: string): string {
-  if (addr.length <= 14) return addr;
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
-
 function formatDate(dateStr: string): string {
   try {
     const d = new Date(dateStr);
@@ -35,6 +30,19 @@ function formatDate(dateStr: string): string {
   }
 }
 
+function SkeletonRow() {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-ink/5 bg-sand/20 px-3 py-2.5">
+      <div className="h-8 w-8 rounded-full bg-ink/10 animate-pulse shrink-0" />
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="h-3.5 w-24 bg-ink/10 rounded animate-pulse" />
+        <div className="h-2.5 w-20 bg-ink/5 rounded animate-pulse" />
+      </div>
+      <div className="h-3.5 w-12 bg-ink/10 rounded animate-pulse" />
+    </div>
+  );
+}
+
 export function TicketHistory({
   participants,
   loading,
@@ -45,17 +53,25 @@ export function TicketHistory({
   onRefresh: () => void;
 }) {
   const [profiles, setProfiles] = useState<Record<string, CirclesProfile>>({});
+  const [profilesLoaded, setProfilesLoaded] = useState(false);
 
   useEffect(() => {
-    if (participants.length === 0) return;
+    if (participants.length === 0) {
+      setProfilesLoaded(true);
+      return;
+    }
 
     const addresses = participants.map((p) => p.address);
     const needFetch = addresses.filter(
       (a) => !profiles[a.toLowerCase()]
     );
 
-    if (needFetch.length === 0) return;
+    if (needFetch.length === 0) {
+      setProfilesLoaded(true);
+      return;
+    }
 
+    setProfilesLoaded(false);
     let cancelled = false;
 
     (async () => {
@@ -65,13 +81,19 @@ export function TicketHistory({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ addresses: needFetch }),
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (!cancelled) setProfilesLoaded(true);
+          return;
+        }
         const data = await res.json();
         if (cancelled) return;
         if (data.profiles) {
           setProfiles((prev) => ({ ...prev, ...data.profiles }));
         }
-      } catch {}
+      } catch {
+      } finally {
+        if (!cancelled) setProfilesLoaded(true);
+      }
     })();
 
     return () => {
@@ -82,6 +104,8 @@ export function TicketHistory({
   const getProfile = (address: string): CirclesProfile | null => {
     return profiles[address.toLowerCase()] || null;
   };
+
+  const showSkeletons = participants.length > 0 && !profilesLoaded;
 
   return (
     <div className="space-y-4">
@@ -96,11 +120,17 @@ export function TicketHistory({
           <p className="text-sm text-ink/50">Aucun ticket pour le moment.</p>
           <p className="text-xs text-ink/40 mt-1">Cliquez sur Rafraîchir pour vérifier.</p>
         </div>
+      ) : showSkeletons ? (
+        <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+          {participants.map((p) => (
+            <SkeletonRow key={p.transactionHash} />
+          ))}
+        </div>
       ) : (
         <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
           {participants.map((p, i) => {
             const profile = getProfile(p.address);
-            const displayName = profile?.name || shortenAddress(p.address);
+            const displayName = profile?.name || p.address.slice(0, 6) + "..." + p.address.slice(-4);
             const avatarUrl = profile?.imageUrl || null;
 
             return (
