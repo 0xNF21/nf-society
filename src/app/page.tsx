@@ -278,11 +278,14 @@ export default function HomePage() {
             <LanguageSwitcher />
           </div>
           <div className="flex justify-center mb-4">
-            <Image src="/logo-color.png" alt="NF Society" width={160} height={48} className="h-12 w-auto" priority />
+            <Image src="/logo-color.png" alt="Circles" width={160} height={48} className="h-12 w-auto" priority />
           </div>
-          <h1 className="font-display text-4xl font-bold text-ink sm:text-5xl">
-            NF Society
-          </h1>
+          <div className="flex items-center justify-center gap-4">
+            <img src="/nf-society-logo.png" alt="NF Society" className="h-16 w-16 rounded-2xl object-cover" />
+            <h1 className="font-display text-4xl font-bold text-ink sm:text-5xl">
+              NF Society
+            </h1>
+          </div>
           <p className="max-w-2xl mx-auto text-lg text-ink/70">
             {h.subtitle[locale]}
           </p>
