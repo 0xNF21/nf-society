@@ -360,13 +360,13 @@ export default function HomePage() {
 
         <footer className="mt-8 pt-8 border-t border-ink/5 flex flex-col items-center gap-4">
           <div className="flex items-center justify-center gap-3 mb-1">
-            <img src="/gnosis-logo.png" alt="Gnosis" className="h-5 w-5 opacity-40" />
-            <Image src="/logo-color.png" alt="Circles" width={80} height={24} className="h-5 w-auto opacity-40" />
+            <img src="/gnosis-logo.png" alt="Gnosis" className="h-5 w-5 opacity-70" />
+            <Image src="/logo-color.png" alt="Circles" width={80} height={24} className="h-5 w-auto opacity-70" />
           </div>
-          <p className="text-xs text-ink/30">
+          <p className="text-xs text-ink/70">
             {h.builtOn[locale]}
           </p>
-          <p className="text-xs text-ink/20">
+          <p className="text-xs text-ink/50">
             {h.footer[locale]}
           </p>
           <div className="flex items-center gap-4">
