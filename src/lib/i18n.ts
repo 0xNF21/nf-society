@@ -20,6 +20,10 @@ export const translations = {
       fr: "NF Society — Loteries décentralisées et transparentes",
       en: "NF Society — Decentralized and transparent lotteries",
     },
+    builtOn: {
+      fr: "Construit sur la blockchain Gnosis avec l'infrastructure Circles.",
+      en: "Built on Gnosis Chain with Circles infrastructure.",
+    },
     createLottery: { fr: "Créer une loterie", en: "Create a lottery" },
     activeLotteries: { fr: "Loteries actives", en: "Active lotteries" },
     completedLotteries: { fr: "Loteries terminées", en: "Completed lotteries" },
