@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { generatePaymentLink } from "@/lib/circles";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
+import { useLocale, LanguageSwitcher } from "@/components/language-provider";
+import { translations } from "@/lib/i18n";
 
 export type LotteryConfig = {
   id: number;
@@ -63,6 +65,9 @@ function FaqItem({ question, children }: { question: string; children: React.Rea
 }
 
 export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
+  const { locale } = useLocale();
+  const l = translations.lottery;
+
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [qrCode, setQrCode] = useState("");
@@ -213,10 +218,10 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
         setAdminAuth(true);
         setAuthError("");
       } else {
-        setAuthError("Mot de passe incorrect");
+        setAuthError("incorrectPassword");
       }
     } catch {
-      setAuthError("Erreur de connexion");
+      setAuthError("connectionError");
     } finally {
       setAuthLoading(false);
     }
@@ -237,7 +242,7 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
       if (data.error) {
         if (data.error === "Unauthorized") {
           setAdminAuth(false);
-          setAuthError("Session expirée, veuillez vous reconnecter");
+          setAuthError("sessionExpired");
         }
         return;
       }
@@ -303,18 +308,21 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                 <Image src={lottery.logoUrl} alt={lottery.title} width={160} height={48} className="h-12 w-auto" priority />
               </div>
             )}
+            <div className="flex justify-end">
+              <LanguageSwitcher />
+            </div>
             <h1 className="font-display text-4xl font-bold text-ink sm:text-5xl">
               {lottery.title}
             </h1>
             <p className="max-w-2xl mx-auto text-lg text-ink/70">
-              {lottery.description || `Achetez un ticket pour ${lottery.ticketPriceCrc} CRC et tentez de gagner le gros lot !`}
+              {lottery.description || l.defaultDesc[locale](lottery.ticketPriceCrc)}
             </p>
             
             <div className="flex items-center justify-center gap-2 mt-6">
               <div className="bg-sand/50 border border-ink/10 rounded-full px-4 py-2 flex items-center gap-2 shadow-sm">
                 <Users className="h-5 w-5 text-ink/60" />
                 <span className="font-bold text-xl">{ticketCount}</span>
-                <span className="text-ink/60 text-sm">tickets vendus</span>
+                <span className="text-ink/60 text-sm">{l.ticketsSold[locale]}</span>
               </div>
             </div>
           </header>
@@ -322,16 +330,16 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <Card className="h-full border-2 border-ink/5 shadow-xl">
               <CardHeader>
-                <CardTitle>Participer à la loterie</CardTitle>
+                <CardTitle>{l.participateTitle[locale]}</CardTitle>
                 <CardDescription>
-                  Payez {lottery.ticketPriceCrc} CRC pour entrer dans la liste des participants.
+                  {l.participateDesc[locale](lottery.ticketPriceCrc)}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="bg-sand/30 rounded-2xl p-6 text-center border border-ink/5">
                   <span className="text-5xl font-bold text-ink">{lottery.ticketPriceCrc}</span>
                   <span className="text-xl font-semibold text-ink/60 ml-2">CRC</span>
-                  <p className="text-xs text-ink/40 mt-2 uppercase tracking-widest">Prix du ticket</p>
+                  <p className="text-xs text-ink/40 mt-2 uppercase tracking-widest">{l.ticketPrice[locale]}</p>
                 </div>
 
                 <div className="flex flex-col gap-3">
@@ -341,18 +349,18 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                     asChild
                   >
                     <a href={paymentLink} target="_blank" rel="noreferrer">
-                      Acheter mon ticket
+                      {l.buyTicket[locale]}
                       <ArrowUpRight className="h-5 w-5 ml-2" />
                     </a>
                   </Button>
                   <div className="grid grid-cols-2 gap-3">
                     <Button variant="outline" onClick={handleCopy}>
                       <Clipboard className="h-4 w-4 mr-2" />
-                      {copyState === "copied" ? "Copié" : "Copier le lien"}
+                      {copyState === "copied" ? l.copied[locale] : l.copyLink[locale]}
                     </Button>
                     <Button variant="outline" onClick={() => setShowQr((prev) => !prev)}>
                       <QrCode className="h-4 w-4 mr-2" />
-                      {showQr ? "Masquer QR" : "Afficher QR"}
+                      {showQr ? l.hideQr[locale] : l.showQr[locale]}
                     </Button>
                   </div>
                 </div>
@@ -362,9 +370,9 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                     {qrState === "ready" && qrCode ? (
                       <Image src={qrCode} alt="QR Code" width={200} height={200} className="rounded-xl border border-ink/10 bg-white p-2" unoptimized />
                     ) : (
-                      <p>Génération du QR Code...</p>
+                      <p>{l.qrGenerating[locale]}</p>
                     )}
-                    <span>Scannez pour ouvrir dans Gnosis App</span>
+                    <span>{l.qrScan[locale]}</span>
                   </div>
                 )}
               </CardContent>
@@ -372,8 +380,8 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
 
             <Card className="flex h-full flex-col border-2 border-ink/5 shadow-xl">
               <CardHeader>
-                <CardTitle>Historique des tickets</CardTitle>
-                <CardDescription>Liste des paiements confirmés sur la blockchain.</CardDescription>
+                <CardTitle>{l.ticketHistory[locale]}</CardTitle>
+                <CardDescription>{l.ticketHistoryDesc[locale]}</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-1 flex-col justify-between">
                 <TicketHistory
@@ -390,7 +398,7 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
               <CardHeader className="text-center">
                 <CardTitle className="flex items-center justify-center gap-3 text-2xl">
                   <Trophy className="h-8 w-8 text-yellow-600" />
-                  Gagnant du dernier tirage
+                  {l.winnerTitle[locale]}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center pb-8 gap-4">
@@ -413,11 +421,11 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                   <div className="mt-4 w-full max-w-lg bg-white border border-ink/10 rounded-2xl p-5 text-left space-y-3">
                     <div className="flex items-center gap-2 text-sm font-semibold text-green-700">
                       <Shield className="h-4 w-4" />
-                      Preuve de tirage vérifiable
+                      {l.verifiableProof[locale]}
                     </div>
                     <div className="space-y-2 text-xs text-ink/70">
                       <div className="flex justify-between">
-                        <span className="font-medium text-ink/50">Bloc Gnosis</span>
+                        <span className="font-medium text-ink/50">{l.gnosisBlock[locale]}</span>
                         <a
                           href={`https://gnosisscan.io/block/${drawProof.blockNumber}`}
                           target="_blank"
@@ -428,22 +436,22 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                         </a>
                       </div>
                       <div className="flex justify-between items-start gap-4">
-                        <span className="font-medium text-ink/50 shrink-0">Hash du bloc</span>
+                        <span className="font-medium text-ink/50 shrink-0">{l.blockHash[locale]}</span>
                         <span className="font-mono text-[10px] text-ink/60 break-all text-right">
                           {drawProof.blockHash}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="font-medium text-ink/50">Participants</span>
+                        <span className="font-medium text-ink/50">{l.participants[locale]}</span>
                         <span className="font-mono">{drawProof.participantCount}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="font-medium text-ink/50">Index sélectionné</span>
+                        <span className="font-medium text-ink/50">{l.selectedIndex[locale]}</span>
                         <span className="font-mono">{drawProof.selectionIndex}</span>
                       </div>
                       <div className="mt-2 pt-2 border-t border-ink/5">
                         <p className="text-[10px] text-ink/40">
-                          <span className="font-semibold">Méthode :</span> {drawProof.method}
+                          <span className="font-semibold">{l.method[locale]} :</span> {drawProof.method}
                         </p>
                       </div>
                     </div>
@@ -461,8 +469,8 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
               <div className="flex items-center gap-3">
                 <HelpCircle className="h-6 w-6" style={{ color: lottery.accentColor }} />
                 <div className="text-left">
-                  <h2 className="text-lg font-bold text-ink">Comment ça marche ?</h2>
-                  <p className="text-sm text-ink/50 mt-0.5">Tout savoir sur la loterie et la transparence du tirage</p>
+                  <h2 className="text-lg font-bold text-ink">{l.howItWorks[locale]}</h2>
+                  <p className="text-sm text-ink/50 mt-0.5">{l.howItWorksSub[locale]}</p>
                 </div>
               </div>
               <ChevronDown className={`h-5 w-5 text-ink/40 transition-transform duration-300 ${faqOpen ? "rotate-180" : ""}`} />
@@ -471,62 +479,62 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
             {faqOpen && (
               <div className="px-6 md:px-8 pb-6 md:pb-8 bg-white animate-in fade-in slide-in-from-top-2 duration-300">
                 <div className="divide-y divide-ink/5">
-                  <FaqItem question="Comment participer ?">
-                    <p>Envoyez exactement {lottery.ticketPriceCrc} CRC à l&apos;adresse de la loterie en cliquant sur &laquo; Acheter mon ticket &raquo;. Le paiement se fait via l&apos;application Gnosis/Circles. Une fois le paiement confirmé sur la blockchain, votre ticket apparaît automatiquement dans l&apos;historique.</p>
+                  <FaqItem question={l.faq.howToParticipateQ[locale]}>
+                    <p>{l.faq.howToParticipateA[locale](lottery.ticketPriceCrc)}</p>
                   </FaqItem>
 
-                  <FaqItem question="Comment le gagnant est-il choisi ?">
+                  <FaqItem question={l.faq.howWinnerQ[locale]}>
                     <div className="space-y-3">
-                      <p>Le gagnant est sélectionné de manière <strong className="text-ink/80">100% transparente et vérifiable</strong> grâce à la blockchain. Voici le processus exact :</p>
+                      <p>{l.faq.howWinnerIntro[locale]}</p>
                       <ol className="list-decimal list-inside space-y-2 ml-1">
-                        <li><strong className="text-ink/70">Récupération du bloc</strong> — Au moment du tirage, le système récupère le dernier bloc validé sur la blockchain Gnosis. Ce bloc contient un &laquo; hash &raquo; (une empreinte numérique unique) qui est généré par le réseau et que <em>personne ne peut prédire ni manipuler</em>.</li>
-                        <li><strong className="text-ink/70">Calcul du gagnant</strong> — On prend les 16 derniers caractères hexadécimaux du hash du bloc. On les convertit en nombre. Puis on fait le calcul : <code className="bg-ink/5 px-1.5 py-0.5 rounded text-xs font-mono">nombre % nombre_de_participants</code>. Le résultat donne la position du gagnant dans la liste.</li>
-                        <li><strong className="text-ink/70">Affichage public</strong> — Le numéro de bloc, le hash complet, le nombre de participants et l&apos;index obtenu sont affichés publiquement pour que chacun puisse vérifier.</li>
+                        <li><strong className="text-ink/70">{l.faq.howWinnerStep1Title[locale]}</strong> — {l.faq.howWinnerStep1[locale]}</li>
+                        <li><strong className="text-ink/70">{l.faq.howWinnerStep2Title[locale]}</strong> — {l.faq.howWinnerStep2[locale]} <code className="bg-ink/5 px-1.5 py-0.5 rounded text-xs font-mono">nombre % nombre_de_participants</code>{l.faq.howWinnerStep2Result[locale]}</li>
+                        <li><strong className="text-ink/70">{l.faq.howWinnerStep3Title[locale]}</strong> — {l.faq.howWinnerStep3[locale]}</li>
                       </ol>
                       <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs">
-                        <p className="font-semibold text-indigo-700 mb-1">Pourquoi c&apos;est fiable ?</p>
-                        <p className="text-indigo-600/80">Le hash d&apos;un bloc blockchain est créé par des centaines de validateurs indépendants. L&apos;organisateur de la loterie n&apos;a aucun contrôle dessus. C&apos;est comme demander à un notaire impartial de tirer le numéro gagnant.</p>
+                        <p className="font-semibold text-indigo-700 mb-1">{l.faq.whyReliableTitle[locale]}</p>
+                        <p className="text-indigo-600/80">{l.faq.whyReliable[locale]}</p>
                       </div>
                     </div>
                   </FaqItem>
 
-                  <FaqItem question="Comment vérifier le tirage soi-même ?">
+                  <FaqItem question={l.faq.howToVerifyQ[locale]}>
                     <div className="space-y-3">
-                      <p>Après chaque tirage, toutes les informations nécessaires sont affichées publiquement. Voici comment vérifier étape par étape :</p>
+                      <p>{l.faq.howToVerifyIntro[locale]}</p>
                       <div className="space-y-3">
                         <div className="bg-sand/30 rounded-xl p-3 border border-ink/5">
-                          <p className="font-semibold text-ink/70 text-xs mb-1">Étape 1 — Vérifier le hash du bloc</p>
-                          <p className="text-xs">Cliquez sur le numéro de bloc affiché dans la preuve (c&apos;est un lien vers GnosisScan). Vérifiez que le hash affiché sur GnosisScan est bien le même que celui affiché sur notre site.</p>
+                          <p className="font-semibold text-ink/70 text-xs mb-1">{l.faq.verifyStep1Title[locale]}</p>
+                          <p className="text-xs">{l.faq.verifyStep1[locale]}</p>
                         </div>
                         <div className="bg-sand/30 rounded-xl p-3 border border-ink/5">
-                          <p className="font-semibold text-ink/70 text-xs mb-1">Étape 2 — Refaire le calcul</p>
-                          <p className="text-xs mb-2">Prenez le hash du bloc et gardez seulement les 16 derniers caractères (sans le &laquo; 0x &raquo; du début).</p>
-                          <p className="text-xs mb-2">Exemple : si le hash est <code className="bg-ink/5 px-1 rounded font-mono text-[10px]">0x8fa2...3b9e1a7f0c4d2e8b</code>, prenez <code className="bg-ink/5 px-1 rounded font-mono text-[10px]">3b9e1a7f0c4d2e8b</code></p>
-                          <p className="text-xs">Convertissez ce nombre hexadécimal en décimal. Vous pouvez utiliser un convertisseur en ligne ou taper dans la console de votre navigateur (F12) :</p>
+                          <p className="font-semibold text-ink/70 text-xs mb-1">{l.faq.verifyStep2Title[locale]}</p>
+                          <p className="text-xs mb-2">{l.faq.verifyStep2a[locale]}</p>
+                          <p className="text-xs mb-2">{l.faq.verifyStep2Example[locale]} <code className="bg-ink/5 px-1 rounded font-mono text-[10px]">0x8fa2...3b9e1a7f0c4d2e8b</code>, {l.faq.verifyStep2Take[locale]} <code className="bg-ink/5 px-1 rounded font-mono text-[10px]">3b9e1a7f0c4d2e8b</code></p>
+                          <p className="text-xs">{l.faq.verifyStep2Convert[locale]}</p>
                           <code className="block bg-ink/5 px-2 py-1.5 rounded font-mono text-[10px] mt-1">BigInt(&quot;0x3b9e1a7f0c4d2e8b&quot;) % BigInt(nombre_de_participants)</code>
                         </div>
                         <div className="bg-sand/30 rounded-xl p-3 border border-ink/5">
-                          <p className="font-semibold text-ink/70 text-xs mb-1">Étape 3 — Comparer</p>
-                          <p className="text-xs">Le résultat de votre calcul doit correspondre exactement à l&apos;&laquo; Index sélectionné &raquo; affiché dans la preuve. Cet index correspond à la position du gagnant dans la liste des participants (en partant de 0).</p>
+                          <p className="font-semibold text-ink/70 text-xs mb-1">{l.faq.verifyStep3Title[locale]}</p>
+                          <p className="text-xs">{l.faq.verifyStep3[locale]}</p>
                         </div>
                       </div>
                       <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-xs">
-                        <p className="font-semibold text-green-700 mb-1">En résumé</p>
-                        <p className="text-green-600/80">Si le hash sur GnosisScan correspond et que votre calcul donne le même index que celui affiché, alors le tirage est vérifié : le gagnant a bien été choisi de manière aléatoire et personne n&apos;a pu tricher.</p>
+                        <p className="font-semibold text-green-700 mb-1">{l.faq.summaryTitle[locale]}</p>
+                        <p className="text-green-600/80">{l.faq.summary[locale]}</p>
                       </div>
                     </div>
                   </FaqItem>
 
-                  <FaqItem question="Qui peut effectuer le tirage ?">
-                    <p>Seul l&apos;administrateur de la loterie peut déclencher le tirage, via une zone protégée par mot de passe. Cependant, le résultat et sa preuve sont toujours publics et vérifiables par tous les visiteurs du site.</p>
+                  <FaqItem question={l.faq.whoCanDrawQ[locale]}>
+                    <p>{l.faq.whoCanDraw[locale]}</p>
                   </FaqItem>
 
-                  <FaqItem question="Est-ce qu'on peut acheter plusieurs tickets ?">
-                    <p>Chaque adresse Circles ne peut acheter qu&apos;un seul ticket par loterie. Si vous envoyez un deuxième paiement depuis la même adresse, il ne sera pas comptabilisé comme un ticket supplémentaire.</p>
+                  <FaqItem question={l.faq.multipleTicketsQ[locale]}>
+                    <p>{l.faq.multipleTickets[locale]}</p>
                   </FaqItem>
 
-                  <FaqItem question="Quand a lieu le tirage ?">
-                    <p>Le tirage est effectué par l&apos;administrateur une fois que suffisamment de participants ont rejoint la loterie. La date exacte sera communiquée par {lottery.organizer}.</p>
+                  <FaqItem question={l.faq.whenDrawQ[locale]}>
+                    <p>{l.faq.whenDraw[locale](lottery.organizer)}</p>
                   </FaqItem>
                 </div>
               </div>
@@ -541,7 +549,7 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
               >
                 <span className="flex items-center gap-2 font-bold text-ink">
                   <Clock className="h-5 w-5 text-ink/40" />
-                  Historique des tirages ({drawHistory.length})
+                  {l.drawHistory[locale]} ({drawHistory.length})
                 </span>
                 <ChevronDown className={`h-5 w-5 text-ink/40 transition-transform duration-200 ${historyOpen ? "rotate-180" : ""}`} />
               </button>
@@ -550,7 +558,7 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                   {drawHistory.map((draw) => {
                     const prof = historyProfiles[draw.winnerAddress.toLowerCase()];
                     const displayName = prof?.name || `${draw.winnerAddress.slice(0, 6)}...${draw.winnerAddress.slice(-4)}`;
-                    const drawDate = new Date(draw.drawnAt).toLocaleDateString("fr-FR", {
+                    const drawDate = new Date(draw.drawnAt).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
                       day: "numeric",
                       month: "long",
                       year: "numeric",
@@ -574,7 +582,7 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="bg-sand/30 rounded-lg p-2">
-                            <span className="text-ink/40 block">Bloc</span>
+                            <span className="text-ink/40 block">{l.block[locale]}</span>
                             <a
                               href={`https://gnosisscan.io/block/${draw.blockNumber}`}
                               target="_blank"
@@ -585,17 +593,17 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                             </a>
                           </div>
                           <div className="bg-sand/30 rounded-lg p-2">
-                            <span className="text-ink/40 block">Participants</span>
+                            <span className="text-ink/40 block">{l.participants[locale]}</span>
                             <span className="font-mono font-semibold">{draw.participantCount}</span>
                           </div>
                           <div className="bg-sand/30 rounded-lg p-2 col-span-2">
-                            <span className="text-ink/40 block">Hash du bloc</span>
+                            <span className="text-ink/40 block">{l.blockHash[locale]}</span>
                             <span className="font-mono text-[10px] break-all">{draw.blockHash}</span>
                           </div>
                           <div className="bg-sand/30 rounded-lg p-2 col-span-2">
-                            <span className="text-ink/40 block">Index sélectionné</span>
+                            <span className="text-ink/40 block">{l.selectedIndex[locale]}</span>
                             <span className="font-mono font-semibold">{draw.selectionIndex}</span>
-                            <span className="text-ink/30 ml-1">(position {draw.selectionIndex} sur {draw.participantCount})</span>
+                            <span className="text-ink/30 ml-1">{l.position[locale](draw.selectionIndex, draw.participantCount)}</span>
                           </div>
                         </div>
                       </div>
@@ -621,26 +629,26 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
               }}
             >
               <Lock className="h-3 w-3 mr-1" />
-              Zone Admin
+              {l.adminZone[locale]}
             </Button>
 
             {isAdminOpen && !adminAuth && (
               <div className="bg-white border-2 border-ink/10 rounded-3xl p-8 shadow-2xl w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <h3 className="text-lg font-bold text-ink mb-4 flex items-center gap-2">
                   <Lock className="h-5 w-5" />
-                  Authentification requise
+                  {l.authRequired[locale]}
                 </h3>
                 <div className="space-y-4">
                   <input
                     type="password"
-                    placeholder="Mot de passe admin"
+                    placeholder={l.adminPasswordPlaceholder[locale]}
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
                     className="w-full px-4 py-3 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors"
                   />
                   {authError && (
-                    <p className="text-sm text-red-600 font-medium">{authError}</p>
+                    <p className="text-sm text-red-600 font-medium">{authError === "incorrectPassword" ? l.incorrectPassword[locale] : authError === "connectionError" ? l.connectionError[locale] : authError === "sessionExpired" ? l.sessionExpired[locale] : authError}</p>
                   )}
                   <Button
                     onClick={handleAdminLogin}
@@ -650,10 +658,10 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                     {authLoading ? (
                       <span className="flex items-center gap-2">
                         <RefreshCw className="h-4 w-4 animate-spin" />
-                        Vérification...
+                        {l.verifying[locale]}
                       </span>
                     ) : (
-                      "Se connecter"
+                      l.login[locale]
                     )}
                   </Button>
                 </div>
@@ -663,22 +671,22 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
             {isAdminOpen && adminAuth && (
               <div className="bg-white border-2 border-red-100 rounded-3xl p-8 shadow-2xl w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2">
-                  Panneau de Tirage
+                  {l.drawPanel[locale]}
                 </h3>
                 <p className="text-sm text-ink/60 mb-4">
-                  Le tirage utilise le hash du dernier bloc de la blockchain Gnosis comme source d&apos;aléatoire. Le résultat est vérifiable par tous.
+                  {l.drawDescription[locale]}
                 </p>
                 <p className="text-sm text-ink/60 mb-6">
-                  {ticketCount} participant{ticketCount !== 1 ? "s" : ""} dans la loterie.
+                  {l.participantsInLottery[locale](ticketCount)}
                 </p>
                 <Button onClick={handleDraw} disabled={drawLoading} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 shadow-lg shadow-red-200 disabled:opacity-60">
                   {drawLoading ? (
                     <span className="flex items-center gap-2">
                       <RefreshCw className="h-4 w-4 animate-spin" />
-                      Tirage en cours...
+                      {l.drawInProgress[locale]}
                     </span>
                   ) : (
-                    "EFFECTUER LE TIRAGE"
+                    l.performDraw[locale]
                   )}
                 </Button>
               </div>

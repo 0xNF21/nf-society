@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Ticket } from "lucide-react";
+import { useLocale } from "@/components/language-provider";
+import { translations } from "@/lib/i18n";
 
 export type ParticipantEntry = {
   address: string;
@@ -14,21 +16,6 @@ type CirclesProfile = {
   name: string;
   imageUrl: string | null;
 };
-
-function formatDate(dateStr: string): string {
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateStr;
-  }
-}
 
 function SkeletonRow() {
   return (
@@ -54,6 +41,23 @@ export function TicketHistory({
 }) {
   const [profiles, setProfiles] = useState<Record<string, CirclesProfile>>({});
   const [profilesLoaded, setProfilesLoaded] = useState(false);
+  const { locale } = useLocale();
+  const tk = translations.tickets;
+
+  function formatDate(dateStr: string): string {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return dateStr;
+    }
+  }
 
   useEffect(() => {
     if (participants.length === 0) {
@@ -110,15 +114,15 @@ export function TicketHistory({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-ink">Tickets achetés</p>
-        <Badge variant="neutral">{participants.length} ticket{participants.length !== 1 ? "s" : ""}</Badge>
+        <p className="text-sm font-semibold text-ink">{tk.purchased[locale]}</p>
+        <Badge variant="neutral">{participants.length} {participants.length !== 1 ? tk.tickets[locale] : tk.ticket[locale]}</Badge>
       </div>
 
       {participants.length === 0 ? (
         <div className="text-center py-6">
           <Ticket className="h-8 w-8 text-ink/20 mx-auto mb-2" />
-          <p className="text-sm text-ink/50">Aucun ticket pour le moment.</p>
-          <p className="text-xs text-ink/40 mt-1">Cliquez sur Rafraîchir pour vérifier.</p>
+          <p className="text-sm text-ink/50">{tk.noTickets[locale]}</p>
+          <p className="text-xs text-ink/40 mt-1">{tk.noTicketsSub[locale]}</p>
         </div>
       ) : showSkeletons ? (
         <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
@@ -169,7 +173,7 @@ export function TicketHistory({
         className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-indigo-600 bg-indigo-600 text-white font-semibold py-2.5 px-4 text-sm hover:bg-indigo-700 transition-colors disabled:opacity-60"
       >
         <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        {loading ? "Recherche en cours..." : "Rafraîchir les tickets"}
+        {loading ? tk.searching[locale] : tk.refresh[locale]}
       </button>
     </div>
   );

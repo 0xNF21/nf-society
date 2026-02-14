@@ -6,6 +6,8 @@ import Image from "next/image";
 import { ArrowLeft, Check, Palette, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLocale, LanguageSwitcher } from "@/components/language-provider";
+import { translations } from "@/lib/i18n";
 
 type FormData = {
   title: string;
@@ -42,6 +44,8 @@ export default function DashboardPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const { locale } = useLocale();
+  const d = translations.dashboard;
 
   const handleAuth = async () => {
     if (!password.trim()) return;
@@ -56,10 +60,10 @@ export default function DashboardPage() {
       if (res.ok) {
         setAuthed(true);
       } else {
-        setAuthError("Mot de passe incorrect");
+        setAuthError(d.incorrectPassword[locale]);
       }
     } catch {
-      setAuthError("Erreur de connexion");
+      setAuthError(d.connectionError[locale]);
     } finally {
       setAuthLoading(false);
     }
@@ -72,13 +76,13 @@ export default function DashboardPage() {
     setSuccess(null);
 
     if (!form.title.trim() || !form.organizer.trim() || !form.recipientAddress.trim()) {
-      setError("Titre, organisateur et adresse du destinataire sont requis.");
+      setError(d.validationError[locale]);
       setSubmitting(false);
       return;
     }
 
     if (!/^0x[a-fA-F0-9]{40}$/.test(form.recipientAddress.trim())) {
-      setError("L'adresse du destinataire doit être une adresse Ethereum valide (0x...).");
+      setError(d.addressError[locale]);
       setSubmitting(false);
       return;
     }
@@ -110,7 +114,7 @@ export default function DashboardPage() {
         setForm(defaultForm);
       }
     } catch {
-      setError("Erreur lors de la création");
+      setError(d.createError[locale]);
     } finally {
       setSubmitting(false);
     }
@@ -124,19 +128,22 @@ export default function DashboardPage() {
     return (
       <main className="px-4 py-10 md:py-16">
         <div className="mx-auto max-w-md">
-          <div className="text-center mb-8">
+          <div className="text-center mb-8 relative">
+            <div className="absolute right-0 top-0">
+              <LanguageSwitcher />
+            </div>
             <Link href="/" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6">
               <ArrowLeft className="h-4 w-4" />
-              Retour à l'accueil
+              {d.backToHome[locale]}
             </Link>
-            <h1 className="font-display text-3xl font-bold text-ink mt-4">Dashboard Organisateur</h1>
-            <p className="text-ink/50 mt-2">Connectez-vous pour créer une nouvelle loterie</p>
+            <h1 className="font-display text-3xl font-bold text-ink mt-4">{d.title[locale]}</h1>
+            <p className="text-ink/50 mt-2">{d.loginSubtitle[locale]}</p>
           </div>
           <Card className="border-2 border-ink/5 shadow-xl">
             <CardContent className="pt-6 space-y-4">
               <input
                 type="password"
-                placeholder="Mot de passe administrateur"
+                placeholder={d.adminPasswordPlaceholder[locale]}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAuth()}
@@ -147,10 +154,10 @@ export default function DashboardPage() {
                 {authLoading ? (
                   <span className="flex items-center gap-2">
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    Vérification...
+                    {d.verifying[locale]}
                   </span>
                 ) : (
-                  "Se connecter"
+                  d.login[locale]
                 )}
               </Button>
             </CardContent>
@@ -167,16 +174,19 @@ export default function DashboardPage() {
           <div>
             <Link href="/" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
               <ArrowLeft className="h-4 w-4" />
-              Retour à l'accueil
+              {d.backToHome[locale]}
             </Link>
-            <h1 className="font-display text-3xl font-bold text-ink">Créer une loterie</h1>
-            <p className="text-ink/50 mt-1">Configurez les paramètres de votre nouvelle loterie</p>
+            <h1 className="font-display text-3xl font-bold text-ink">{d.createTitle[locale]}</h1>
+            <p className="text-ink/50 mt-1">{d.createSubtitle[locale]}</p>
           </div>
-          <div
-            className="h-12 w-12 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: form.primaryColor + "20" }}
-          >
-            <Sparkles className="h-6 w-6" style={{ color: form.primaryColor }} />
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <div
+              className="h-12 w-12 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: form.primaryColor + "20" }}
+            >
+              <Sparkles className="h-6 w-6" style={{ color: form.primaryColor }} />
+            </div>
           </div>
         </div>
 
@@ -184,10 +194,10 @@ export default function DashboardPage() {
           <div className="mb-6 bg-green-50 border-2 border-green-200 rounded-2xl p-5 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="flex items-center gap-2 text-green-700 font-semibold mb-2">
               <Check className="h-5 w-5" />
-              Loterie créée avec succès !
+              {d.successTitle[locale]}
             </div>
             <p className="text-sm text-green-600">
-              Votre loterie est accessible à :{" "}
+              {d.successLink[locale]}{" "}
               <Link href={`/loterie/${success}`} className="underline font-medium hover:text-green-800">
                 /loterie/{success}
               </Link>
@@ -199,35 +209,35 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <Card className="border-2 border-ink/5 shadow-lg">
               <CardHeader>
-                <CardTitle className="text-lg">Informations générales</CardTitle>
+                <CardTitle className="text-lg">{d.generalInfo[locale]}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-ink/70 mb-1.5">Titre de la loterie *</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.lotteryTitle[locale]}</label>
                   <input
                     type="text"
                     value={form.title}
                     onChange={(e) => updateField("title", e.target.value)}
-                    placeholder="Ex: Loterie du Printemps"
+                    placeholder={d.lotteryTitlePlaceholder[locale]}
                     className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-marine transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink/70 mb-1.5">Organisateur *</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.organizer[locale]}</label>
                   <input
                     type="text"
                     value={form.organizer}
                     onChange={(e) => updateField("organizer", e.target.value)}
-                    placeholder="Ex: NF Society DAO"
+                    placeholder={d.organizerPlaceholder[locale]}
                     className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-marine transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink/70 mb-1.5">Description</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.description[locale]}</label>
                   <textarea
                     value={form.description}
                     onChange={(e) => updateField("description", e.target.value)}
-                    placeholder="Décrivez votre loterie en quelques mots..."
+                    placeholder={d.descriptionPlaceholder[locale]}
                     rows={3}
                     className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-marine transition-colors resize-none"
                   />
@@ -237,12 +247,12 @@ export default function DashboardPage() {
 
             <Card className="border-2 border-ink/5 shadow-lg">
               <CardHeader>
-                <CardTitle className="text-lg">Paramètres du jeu</CardTitle>
+                <CardTitle className="text-lg">{d.gameSettings[locale]}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-ink/70 mb-1.5">Prix du ticket (CRC)</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.ticketPrice[locale]}</label>
                     <input
                       type="number"
                       min="1"
@@ -252,7 +262,7 @@ export default function DashboardPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-ink/70 mb-1.5">Commission DAO (%)</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.daoCommission[locale]}</label>
                     <input
                       type="number"
                       min="0"
@@ -264,7 +274,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink/70 mb-1.5">Adresse du destinataire (Circles) *</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.recipientAddress[locale]}</label>
                   <input
                     type="text"
                     value={form.recipientAddress}
@@ -272,7 +282,7 @@ export default function DashboardPage() {
                     placeholder="0x..."
                     className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm font-mono focus:outline-none focus:border-marine transition-colors"
                   />
-                  <p className="text-xs text-ink/30 mt-1">Les paiements seront envoyés à cette adresse</p>
+                  <p className="text-xs text-ink/30 mt-1">{d.recipientNote[locale]}</p>
                 </div>
               </CardContent>
             </Card>
@@ -281,13 +291,13 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Palette className="h-5 w-5 text-ink/40" />
-                  Style visuel
+                  {d.visualStyle[locale]}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-ink/70 mb-1.5">Couleur primaire</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.primaryColor[locale]}</label>
                     <div className="flex items-center gap-3">
                       <input
                         type="color"
@@ -304,7 +314,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-ink/70 mb-1.5">Couleur accent</label>
+                    <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.accentColor[locale]}</label>
                     <div className="flex items-center gap-3">
                       <input
                         type="color"
@@ -322,7 +332,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink/70 mb-1.5">URL du logo</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.logoUrl[locale]}</label>
                   <input
                     type="text"
                     value={form.logoUrl}
@@ -332,7 +342,7 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink/70 mb-1.5">Thème</label>
+                  <label className="block text-sm font-medium text-ink/70 mb-1.5">{d.theme[locale]}</label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
@@ -343,7 +353,7 @@ export default function DashboardPage() {
                           : "border-ink/10 text-ink/50 hover:border-ink/20"
                       }`}
                     >
-                      Clair
+                      {d.themeLight[locale]}
                     </button>
                     <button
                       type="button"
@@ -354,13 +364,13 @@ export default function DashboardPage() {
                           : "border-ink/10 text-ink/50 hover:border-ink/20"
                       }`}
                     >
-                      Sombre
+                      {d.themeDark[locale]}
                     </button>
                   </div>
                 </div>
 
                 <div className="mt-4 p-4 rounded-2xl border-2 border-dashed border-ink/10">
-                  <p className="text-xs text-ink/40 mb-3 font-medium">Aperçu</p>
+                  <p className="text-xs text-ink/40 mb-3 font-medium">{d.preview[locale]}</p>
                   <div className="flex items-center gap-3">
                     <div
                       className="h-10 w-10 rounded-xl flex items-center justify-center"
@@ -369,8 +379,8 @@ export default function DashboardPage() {
                       <Sparkles className="h-5 w-5" style={{ color: form.primaryColor }} />
                     </div>
                     <div>
-                      <p className="font-bold text-sm">{form.title || "Titre de la loterie"}</p>
-                      <p className="text-xs text-ink/40">par {form.organizer || "Organisateur"}</p>
+                      <p className="font-bold text-sm">{form.title || d.defaultTitle[locale]}</p>
+                      <p className="text-xs text-ink/40">{d.by[locale]} {form.organizer || d.defaultOrganizer[locale]}</p>
                     </div>
                   </div>
                   <div className="flex gap-2 mt-3">
@@ -406,10 +416,10 @@ export default function DashboardPage() {
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <RefreshCw className="h-5 w-5 animate-spin" />
-                  Création en cours...
+                  {d.creating[locale]}
                 </span>
               ) : (
-                "Créer la loterie"
+                d.createButton[locale]
               )}
             </Button>
           </div>
