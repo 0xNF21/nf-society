@@ -18,10 +18,6 @@ export default async function LotteriePage({ params }: { params: { slug: string 
 
   const row = result[0];
 
-  if (row.status !== "active") {
-    notFound();
-  }
-
   const config: LotteryConfig = {
     id: row.id,
     slug: row.slug,
@@ -35,6 +31,7 @@ export default async function LotteriePage({ params }: { params: { slug: string 
     logoUrl: row.logoUrl,
     theme: row.theme,
     commissionPercent: row.commissionPercent,
+    status: row.status,
   };
 
   return <LotteryPage lottery={config} />;

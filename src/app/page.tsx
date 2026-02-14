@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Ticket, Users, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, Ticket, Trophy, Users, Sparkles } from "lucide-react";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
@@ -21,13 +21,9 @@ type LotteryCard = {
   status: string;
 };
 
-type ParticipantCount = {
-  lotteryId: number;
-  count: number;
-};
-
 export default function HomePage() {
-  const [lotteries, setLotteries] = useState<LotteryCard[]>([]);
+  const [activeLotteries, setActiveLotteries] = useState<LotteryCard[]>([]);
+  const [completedLotteries, setCompletedLotteries] = useState<LotteryCard[]>([]);
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const { locale } = useLocale();
@@ -36,14 +32,19 @@ export default function HomePage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/lotteries?status=active");
+        const res = await fetch("/api/lotteries?status=visible");
         const data = await res.json();
-        const list = Array.isArray(data) ? data : data.lotteries || [];
+        const list: LotteryCard[] = Array.isArray(data) ? data : data.lotteries || [];
+
+        const active = list.filter((l) => l.status === "active");
+        const completed = list.filter((l) => l.status === "completed");
+        setActiveLotteries(active);
+        setCompletedLotteries(completed);
+
         if (list.length > 0) {
-          setLotteries(list);
           const countsMap: Record<number, number> = {};
           await Promise.all(
-            list.map(async (l: LotteryCard) => {
+            list.map(async (l) => {
               try {
                 const pRes = await fetch(`/api/participants?lotteryId=${l.id}`);
                 const pData = await pRes.json();
@@ -61,6 +62,80 @@ export default function HomePage() {
       }
     })();
   }, []);
+
+  const renderLotteryCard = (lottery: LotteryCard, isCompleted: boolean) => (
+    <Link
+      key={lottery.id}
+      href={`/loterie/${lottery.slug}`}
+      className={`group rounded-3xl border-2 p-6 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col ${
+        isCompleted
+          ? "border-ink/5 bg-white/50 opacity-80"
+          : "border-ink/5 bg-white/80 backdrop-blur-sm hover:border-ink/10"
+      }`}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {lottery.logoUrl ? (
+            <img
+              src={lottery.logoUrl}
+              alt={lottery.title}
+              className={`h-10 w-10 rounded-xl object-contain ${isCompleted ? "grayscale" : ""}`}
+            />
+          ) : (
+            <div
+              className="h-10 w-10 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: lottery.primaryColor + "20" }}
+            >
+              <Sparkles className="h-5 w-5" style={{ color: lottery.primaryColor }} />
+            </div>
+          )}
+          <div>
+            <h2 className="font-display text-lg font-bold text-ink group-hover:text-ink/80 transition-colors">
+              {lottery.title}
+            </h2>
+            <p className="text-xs text-ink/40">{h.by[locale]} {lottery.organizer}</p>
+          </div>
+        </div>
+        {isCompleted && (
+          <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-lg">
+            <CheckCircle2 className="h-3 w-3" />
+            {h.completed[locale]}
+          </span>
+        )}
+      </div>
+
+      {lottery.description && (
+        <p className="text-sm text-ink/60 mb-4 line-clamp-2 flex-1">
+          {lottery.description}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between mt-auto pt-4 border-t border-ink/5">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <span
+              className="text-lg font-bold"
+              style={{ color: lottery.primaryColor }}
+            >
+              {lottery.ticketPriceCrc}
+            </span>
+            <span className="text-xs text-ink/40 font-medium">CRC</span>
+          </div>
+          <div className="flex items-center gap-1 text-ink/40">
+            <Users className="h-3.5 w-3.5" />
+            <span className="text-xs font-medium">{counts[lottery.id] || 0}</span>
+          </div>
+        </div>
+        <div
+          className="flex items-center gap-1 text-sm font-semibold group-hover:gap-2 transition-all"
+          style={{ color: lottery.primaryColor }}
+        >
+          {isCompleted ? h.viewResults[locale] : h.participate[locale]}
+          <ArrowRight className="h-4 w-4" />
+        </div>
+      </div>
+    </Link>
+  );
 
   return (
     <main className="px-4 py-10 md:py-16">
@@ -90,77 +165,37 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-        ) : lotteries.length === 0 ? (
+        ) : activeLotteries.length === 0 && completedLotteries.length === 0 ? (
           <div className="text-center py-16">
             <Ticket className="h-12 w-12 text-ink/20 mx-auto mb-4" />
             <p className="text-lg text-ink/50">{h.noLotteries[locale]}</p>
             <p className="text-sm text-ink/30 mt-2">{h.noLotteriesSub[locale]}</p>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {lotteries.map((lottery) => (
-              <Link
-                key={lottery.id}
-                href={`/loterie/${lottery.slug}`}
-                className="group rounded-3xl border-2 border-ink/5 bg-white/80 backdrop-blur-sm p-6 shadow-sm hover:shadow-xl hover:border-ink/10 transition-all duration-300 flex flex-col"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    {lottery.logoUrl ? (
-                      <img
-                        src={lottery.logoUrl}
-                        alt={lottery.title}
-                        className="h-10 w-10 rounded-xl object-contain"
-                      />
-                    ) : (
-                      <div
-                        className="h-10 w-10 rounded-xl flex items-center justify-center"
-                        style={{ backgroundColor: lottery.primaryColor + "20" }}
-                      >
-                        <Sparkles className="h-5 w-5" style={{ color: lottery.primaryColor }} />
-                      </div>
-                    )}
-                    <div>
-                      <h2 className="font-display text-lg font-bold text-ink group-hover:text-ink/80 transition-colors">
-                        {lottery.title}
-                      </h2>
-                      <p className="text-xs text-ink/40">{h.by[locale]} {lottery.organizer}</p>
-                    </div>
-                  </div>
+          <div className="space-y-12">
+            {activeLotteries.length > 0 && (
+              <section>
+                <h2 className="font-display text-xl font-bold text-ink mb-5 flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-indigo-500" />
+                  {h.activeLotteries[locale]}
+                </h2>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {activeLotteries.map((lottery) => renderLotteryCard(lottery, false))}
                 </div>
+              </section>
+            )}
 
-                {lottery.description && (
-                  <p className="text-sm text-ink/60 mb-4 line-clamp-2 flex-1">
-                    {lottery.description}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between mt-auto pt-4 border-t border-ink/5">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="text-lg font-bold"
-                        style={{ color: lottery.primaryColor }}
-                      >
-                        {lottery.ticketPriceCrc}
-                      </span>
-                      <span className="text-xs text-ink/40 font-medium">CRC</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-ink/40">
-                      <Users className="h-3.5 w-3.5" />
-                      <span className="text-xs font-medium">{counts[lottery.id] || 0}</span>
-                    </div>
-                  </div>
-                  <div
-                    className="flex items-center gap-1 text-sm font-semibold group-hover:gap-2 transition-all"
-                    style={{ color: lottery.primaryColor }}
-                  >
-                    {h.participate[locale]}
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
+            {completedLotteries.length > 0 && (
+              <section>
+                <h2 className="font-display text-xl font-bold text-ink/60 mb-5 flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-amber-500" />
+                  {h.completedLotteries[locale]}
+                </h2>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {completedLotteries.map((lottery) => renderLotteryCard(lottery, true))}
                 </div>
-              </Link>
-            ))}
+              </section>
+            )}
           </div>
         )}
 

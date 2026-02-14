@@ -24,6 +24,7 @@ export type LotteryConfig = {
   logoUrl: string | null;
   theme: string;
   commissionPercent: number;
+  status: string;
 };
 
 type DrawProof = {
@@ -88,6 +89,8 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
   const [drawHistory, setDrawHistory] = useState<DrawHistoryItem[]>([]);
   const [historyProfiles, setHistoryProfiles] = useState<Record<string, { name: string; imageUrl: string | null }>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [statusChanging, setStatusChanging] = useState(false);
+  const [lotteryStatus, setLotteryStatus] = useState(lottery.status);
 
   const ticketNote = `${lottery.title} Ticket`;
 
@@ -227,6 +230,34 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    const confirmMsg = newStatus === "completed"
+      ? l.confirmComplete[locale]
+      : newStatus === "archived"
+        ? l.confirmArchive[locale]
+        : null;
+
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+
+    setStatusChanging(true);
+    try {
+      const res = await fetch(`/api/lotteries/${lottery.slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword, status: newStatus }),
+      });
+      if (res.ok) {
+        setLotteryStatus(newStatus);
+      } else {
+        alert(l.statusUpdateError[locale]);
+      }
+    } catch {
+      alert(l.statusUpdateError[locale]);
+    } finally {
+      setStatusChanging(false);
+    }
+  };
+
   const handleDraw = async () => {
     setDrawLoading(true);
     setWinner(null);
@@ -333,8 +364,18 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
             </div>
           </header>
 
+          {lotteryStatus !== "active" && (
+            <div className={`rounded-2xl p-4 text-center font-medium ${
+              lotteryStatus === "completed"
+                ? "bg-amber-50 border-2 border-amber-200 text-amber-800"
+                : "bg-gray-50 border-2 border-gray-200 text-gray-600"
+            }`}>
+              {lotteryStatus === "completed" ? l.lotteryCompleted[locale] : l.lotteryArchived[locale]}
+            </div>
+          )}
+
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <Card className="h-full border-2 border-ink/5 shadow-xl">
+            <Card className={`h-full border-2 border-ink/5 shadow-xl ${lotteryStatus !== "active" ? "opacity-60 pointer-events-none" : ""}`}>
               <CardHeader>
                 <CardTitle>{l.participateTitle[locale]}</CardTitle>
                 <CardDescription>
@@ -695,6 +736,55 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                     l.performDraw[locale]
                   )}
                 </Button>
+
+                <div className="mt-6 pt-6 border-t border-ink/10">
+                  <h4 className="text-sm font-bold text-ink/60 mb-3 flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    {l.manageLottery[locale]}
+                  </h4>
+                  <div className="space-y-2">
+                    {lotteryStatus === "active" && (
+                      <Button
+                        onClick={() => handleStatusChange("completed")}
+                        disabled={statusChanging}
+                        variant="outline"
+                        className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold"
+                      >
+                        {l.markCompleted[locale]}
+                      </Button>
+                    )}
+                    {lotteryStatus === "completed" && (
+                      <>
+                        <Button
+                          onClick={() => handleStatusChange("active")}
+                          disabled={statusChanging}
+                          variant="outline"
+                          className="w-full border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+                        >
+                          {l.reactivateLottery[locale]}
+                        </Button>
+                        <Button
+                          onClick={() => handleStatusChange("archived")}
+                          disabled={statusChanging}
+                          variant="outline"
+                          className="w-full border-gray-300 text-gray-500 hover:bg-gray-50 font-semibold"
+                        >
+                          {l.archiveLottery[locale]}
+                        </Button>
+                      </>
+                    )}
+                    {lotteryStatus === "archived" && (
+                      <Button
+                        onClick={() => handleStatusChange("active")}
+                        disabled={statusChanging}
+                        variant="outline"
+                        className="w-full border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+                      >
+                        {l.reactivateLottery[locale]}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </footer>

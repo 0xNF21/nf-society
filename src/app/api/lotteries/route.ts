@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lotteries } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,6 +11,10 @@ export async function GET(req: NextRequest) {
     let results;
     if (status === "active") {
       results = await db.select().from(lotteries).where(eq(lotteries.status, "active"));
+    } else if (status === "completed") {
+      results = await db.select().from(lotteries).where(eq(lotteries.status, "completed"));
+    } else if (status === "visible") {
+      results = await db.select().from(lotteries).where(ne(lotteries.status, "archived"));
     } else {
       results = await db.select().from(lotteries);
     }
