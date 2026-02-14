@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
-import { ArrowUpRight, ChevronDown, Clipboard, HelpCircle, Lock, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Clipboard, Clock, HelpCircle, Lock, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,16 @@ type DrawProof = {
   participantCount: number;
   selectionIndex: number;
   method: string;
+};
+
+type DrawHistoryItem = {
+  id: number;
+  winnerAddress: string;
+  blockNumber: number;
+  blockHash: string;
+  participantCount: number;
+  selectionIndex: number;
+  drawnAt: string;
 };
 
 function FaqItem({ question, children }: { question: string; children: React.ReactNode }) {
@@ -59,6 +69,9 @@ export default function Home() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
+  const [drawHistory, setDrawHistory] = useState<DrawHistoryItem[]>([]);
+  const [historyProfiles, setHistoryProfiles] = useState<Record<string, { name: string; imageUrl: string | null }>>({});
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const paymentLink = useMemo(() => {
     return generatePaymentLink(LOTTERY_RECIPIENT, TICKET_PRICE, TICKET_NOTE);
@@ -103,6 +116,30 @@ export default function Home() {
               const profData = await profRes.json();
               const p = profData.profiles?.[data.draw.winnerAddress.toLowerCase()];
               if (p && (p.name || p.imageUrl)) setWinnerProfile(p);
+            }
+          } catch {}
+        }
+      } catch {}
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/draw/history");
+        const data = await res.json();
+        if (data.draws && data.draws.length > 0) {
+          setDrawHistory(data.draws);
+          const addresses = [...new Set(data.draws.map((d: DrawHistoryItem) => d.winnerAddress))];
+          try {
+            const profRes = await fetch("/api/profiles", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ addresses }),
+            });
+            if (profRes.ok) {
+              const profData = await profRes.json();
+              if (profData.profiles) setHistoryProfiles(profData.profiles);
             }
           } catch {}
         }
@@ -204,6 +241,25 @@ export default function Home() {
         if (data.proof) setDrawProof(data.proof);
         setWinnerProfile(profile);
         setWinner(data.winner);
+        try {
+          const histRes = await fetch("/api/draw/history");
+          const histData = await histRes.json();
+          if (histData.draws) {
+            setDrawHistory(histData.draws);
+            const addrs = [...new Set(histData.draws.map((d: DrawHistoryItem) => d.winnerAddress))];
+            try {
+              const hp = await fetch("/api/profiles", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ addresses: addrs }),
+              });
+              if (hp.ok) {
+                const hpData = await hp.json();
+                if (hpData.profiles) setHistoryProfiles(hpData.profiles);
+              }
+            } catch {}
+          }
+        } catch {}
       }
     } catch (err) {
       console.error("Draw failed", err);
@@ -444,6 +500,79 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {drawHistory.length > 0 && (
+          <div className="w-full max-w-2xl mt-8">
+            <button
+              className="w-full flex items-center justify-between px-6 py-4 bg-white border-2 border-ink/10 rounded-3xl shadow-sm hover:shadow-md transition-all group"
+              onClick={() => setHistoryOpen(!historyOpen)}
+            >
+              <span className="flex items-center gap-2 font-bold text-ink">
+                <Clock className="h-5 w-5 text-ink/40" />
+                Historique des tirages ({drawHistory.length})
+              </span>
+              <ChevronDown className={`h-5 w-5 text-ink/40 transition-transform duration-200 ${historyOpen ? "rotate-180" : ""}`} />
+            </button>
+            {historyOpen && (
+              <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                {drawHistory.map((draw) => {
+                  const prof = historyProfiles[draw.winnerAddress.toLowerCase()];
+                  const displayName = prof?.name || `${draw.winnerAddress.slice(0, 6)}...${draw.winnerAddress.slice(-4)}`;
+                  const drawDate = new Date(draw.drawnAt).toLocaleDateString("fr-FR", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                  return (
+                    <div key={draw.id} className="bg-white border border-ink/10 rounded-2xl p-4 shadow-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        {prof?.imageUrl ? (
+                          <img src={prof.imageUrl} alt="" className="w-10 h-10 rounded-full border-2 border-amber-200" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center border-2 border-amber-200">
+                            <Trophy className="h-5 w-5 text-amber-600" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-ink truncate">{displayName}</p>
+                          <p className="text-xs text-ink/40">{drawDate}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-sand/30 rounded-lg p-2">
+                          <span className="text-ink/40 block">Bloc</span>
+                          <a
+                            href={`https://gnosisscan.io/block/${draw.blockNumber}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-blue-600 hover:underline"
+                          >
+                            #{draw.blockNumber}
+                          </a>
+                        </div>
+                        <div className="bg-sand/30 rounded-lg p-2">
+                          <span className="text-ink/40 block">Participants</span>
+                          <span className="font-mono font-semibold">{draw.participantCount}</span>
+                        </div>
+                        <div className="bg-sand/30 rounded-lg p-2 col-span-2">
+                          <span className="text-ink/40 block">Hash du bloc</span>
+                          <span className="font-mono text-[10px] break-all">{draw.blockHash}</span>
+                        </div>
+                        <div className="bg-sand/30 rounded-lg p-2 col-span-2">
+                          <span className="text-ink/40 block">Index sélectionné</span>
+                          <span className="font-mono font-semibold">{draw.selectionIndex}</span>
+                          <span className="text-ink/30 ml-1">(position {draw.selectionIndex} sur {draw.participantCount})</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         <footer className="mt-12 pt-8 border-t border-ink/5 flex flex-col items-center gap-4">
           <Button 
