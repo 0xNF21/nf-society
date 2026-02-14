@@ -34,10 +34,12 @@ export function TicketHistory({
   participants,
   loading,
   onRefresh,
+  ticketPrice,
 }: {
   participants: ParticipantEntry[];
   loading: boolean;
   onRefresh: () => void;
+  ticketPrice?: number;
 }) {
   const [profiles, setProfiles] = useState<Record<string, CirclesProfile>>({});
   const [profilesLoaded, setProfilesLoaded] = useState(false);
@@ -160,7 +162,7 @@ export function TicketHistory({
                   </p>
                   <p className="text-ink/40 text-[10px]">{formatDate(p.paidAt)}</p>
                 </div>
-                <span className="text-ink/60 font-semibold whitespace-nowrap">5 CRC</span>
+                <span className="text-ink/60 font-semibold whitespace-nowrap">{ticketPrice ?? 5} CRC</span>
               </div>
             );
           })}

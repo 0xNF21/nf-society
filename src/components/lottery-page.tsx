@@ -460,6 +460,7 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
                   participants={participantList}
                   loading={scanning}
                   onRefresh={scanAndRefresh}
+                  ticketPrice={lottery.ticketPriceCrc}
                 />
               </CardContent>
             </Card>
