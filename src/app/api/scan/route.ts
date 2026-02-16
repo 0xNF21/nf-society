@@ -52,8 +52,15 @@ export async function POST(req: NextRequest) {
       if (registeredTxHashes.has(txHash)) continue;
       if (registeredAddresses.has(addr)) continue;
 
-      const eventTimestamp = parseInt(payment.timestamp, 16) || parseInt(payment.timestamp, 10) || 0;
-      if (eventTimestamp < LOTTERY_START_TIMESTAMP) continue;
+      const hasTimestamp = payment.timestamp && payment.timestamp !== "";
+      const hasBlockNumber = payment.blockNumber && payment.blockNumber !== "";
+
+      if (hasTimestamp) {
+        const eventTimestamp = parseInt(payment.timestamp, 16) || parseInt(payment.timestamp, 10) || 0;
+        if (eventTimestamp < LOTTERY_START_TIMESTAMP) continue;
+      } else if (!hasBlockNumber) {
+        continue;
+      }
 
       try {
         const val = BigInt(payment.value);
@@ -62,8 +69,13 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const rawTs = parseInt(payment.timestamp, 16) || parseInt(payment.timestamp, 10) || 0;
-      const paidAt = new Date(rawTs * 1000);
+      let paidAt: Date;
+      if (hasTimestamp) {
+        const rawTs = parseInt(payment.timestamp, 16) || parseInt(payment.timestamp, 10) || 0;
+        paidAt = new Date(rawTs * 1000);
+      } else {
+        paidAt = new Date();
+      }
 
       try {
         await db.insert(participants).values({
