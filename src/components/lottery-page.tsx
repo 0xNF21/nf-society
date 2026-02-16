@@ -121,7 +121,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
 
   useEffect(() => {
     scanAndRefresh();
-    const interval = setInterval(scanAndRefresh, 30000);
+    const interval = setInterval(scanAndRefresh, 60000);
     return () => clearInterval(interval);
   }, [scanAndRefresh]);
 
