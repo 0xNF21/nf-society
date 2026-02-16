@@ -46,6 +46,50 @@ function padAddress(addr: string): string {
   return "0x" + clean.padStart(64, "0");
 }
 
+async function fetchBlockTimestamps(blockNumbers: string[]): Promise<Map<string, number>> {
+  const unique = [...new Set(blockNumbers.filter(b => b && b !== ""))];
+  if (unique.length === 0) return new Map();
+
+  const results = new Map<string, number>();
+  const batchSize = 20;
+
+  for (let i = 0; i < unique.length; i += batchSize) {
+    const batch = unique.slice(i, i + batchSize);
+    const requests = batch.map((blockNum, idx) => ({
+      jsonrpc: "2.0",
+      id: idx + 1,
+      method: "eth_getBlockByNumber",
+      params: [blockNum, false],
+    }));
+
+    try {
+      const response = await fetch(GNOSIS_RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requests),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) continue;
+
+      const payload = await response.json();
+      const responses = Array.isArray(payload) ? payload : [payload];
+
+      for (let j = 0; j < responses.length; j++) {
+        const res = responses[j];
+        if (res?.result?.timestamp) {
+          const ts = parseInt(res.result.timestamp, 16);
+          if (ts > 0) results.set(batch[j], ts);
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return results;
+}
+
 function parseStreamCompletedData(data: string): bigint {
   const dataClean = data.slice(2);
   if (dataClean.length < 192) return 0n;
@@ -248,7 +292,22 @@ export async function checkAllNewPayments(
   ]);
 
   const exactWei = BigInt(exactAmountCRC) * WEI_PER_CRC;
-  return deduplicateEvents(streamEvents, transferEvents, exactWei, normalized);
+  const events = deduplicateEvents(streamEvents, transferEvents, exactWei, normalized);
+
+  const blockNumbers = events
+    .map(e => e.blockNumber)
+    .filter(b => b && b !== "");
+
+  if (blockNumbers.length > 0) {
+    const timestamps = await fetchBlockTimestamps(blockNumbers);
+    for (const event of events) {
+      if (event.blockNumber && timestamps.has(event.blockNumber)) {
+        event.timestamp = timestamps.get(event.blockNumber)!.toString();
+      }
+    }
+  }
+
+  return events;
 }
 
 function aggregateTransfersByTx(

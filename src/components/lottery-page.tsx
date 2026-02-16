@@ -65,7 +65,7 @@ function FaqItem({ question, children }: { question: string; children: React.Rea
   );
 }
 
-export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
+export default function LotteryPage({ lottery, initialParticipants, initialCount }: { lottery: LotteryConfig; initialParticipants?: ParticipantEntry[]; initialCount?: number }) {
   const { locale } = useLocale();
   const l = translations.lottery;
 
@@ -73,8 +73,8 @@ export default function LotteryPage({ lottery }: { lottery: LotteryConfig }) {
   const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [qrCode, setQrCode] = useState("");
   const [showQr, setShowQr] = useState(false);
-  const [ticketCount, setTicketCount] = useState<number>(0);
-  const [participantList, setParticipantList] = useState<ParticipantEntry[]>([]);
+  const [ticketCount, setTicketCount] = useState<number>(initialCount ?? 0);
+  const [participantList, setParticipantList] = useState<ParticipantEntry[]>(initialParticipants ?? []);
   const [scanning, setScanning] = useState(false);
   const [winner, setWinner] = useState<any>(null);
   const [winnerProfile, setWinnerProfile] = useState<{ name: string; imageUrl: string | null } | null>(null);

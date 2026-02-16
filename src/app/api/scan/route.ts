@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       const hasBlockNumber = payment.blockNumber && payment.blockNumber !== "";
 
       if (hasTimestamp) {
-        const eventTimestamp = parseInt(payment.timestamp, 16) || parseInt(payment.timestamp, 10) || 0;
+        const eventTimestamp = parseInt(payment.timestamp, 10) || parseInt(payment.timestamp, 16) || 0;
         if (eventTimestamp < LOTTERY_START_TIMESTAMP) continue;
       } else if (!hasBlockNumber) {
         continue;
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
       let paidAt: Date;
       if (hasTimestamp) {
-        const rawTs = parseInt(payment.timestamp, 16) || parseInt(payment.timestamp, 10) || 0;
+        const rawTs = parseInt(payment.timestamp, 10) || parseInt(payment.timestamp, 16) || 0;
         paidAt = new Date(rawTs * 1000);
       } else {
         paidAt = new Date();

@@ -19,24 +19,18 @@ export function useLocale() {
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("fr");
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("nf-locale") as Locale | null;
     if (saved === "en" || saved === "fr") {
       setLocaleState(saved);
     }
-    setMounted(true);
   }, []);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
     localStorage.setItem("nf-locale", l);
   }, []);
-
-  if (!mounted) {
-    return <>{children}</>;
-  }
 
   return (
     <LanguageContext.Provider value={{ locale, setLocale }}>
