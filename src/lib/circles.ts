@@ -2,8 +2,9 @@ const DEFAULT_CIRCLES_RPC_URL = "https://rpc.aboutcircles.com/";
 const DEFAULT_RECIPIENT_ADDRESS = "0xbf57dc790ba892590c640dc27b26b2665d30104f";
 const GNOSIS_RPC_URL = "https://rpc.gnosis.gateway.fm";
 const CIRCLES_HUB_ADDRESS = "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8";
+const STREAM_COMPLETED_TOPIC = "0xcfe53a731d24ac31b725405f3dca8a4d23512d3e1ade2359fbbe7982bec0fd42";
 const TRANSFER_SINGLE_TOPIC = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62";
-const LOTTERY_START_BLOCK = "0x2AA0000";
+const LOTTERY_START_BLOCK = "0x2A80000";
 
 export type CirclesTransferEvent = {
   transactionHash: string;
@@ -34,21 +35,10 @@ export function generatePaymentLink(
   return `https://app.gnosis.io/transfer/${recipientAddress}/crc?data=${encodedData}&amount=${amountCRC}`;
 }
 
-type EventPayload = {
-  event: string;
-  values: Record<string, unknown>;
-};
-
 function normalizeAddress(value: string): string | null {
   const trimmed = value.trim().toLowerCase();
   if (!trimmed) return null;
   return trimmed.startsWith("0x") ? trimmed : `0x${trimmed}`;
-}
-
-function addressesMatch(a: string, b: string): boolean {
-  const left = normalizeAddress(a);
-  const right = normalizeAddress(b);
-  return Boolean(left && right && left === right);
 }
 
 function padAddress(addr: string): string {
@@ -56,31 +46,20 @@ function padAddress(addr: string): string {
   return "0x" + clean.padStart(64, "0");
 }
 
-function mapStreamCompletedEvents(events: EventPayload[] = []): CirclesTransferEvent[] {
-  return events
-    .filter((item) => item.event === "CrcV2_StreamCompleted")
-    .map((item) => {
-      const v = item.values ?? {};
-      const from = String(v.from ?? "");
-      const to = String(v.to ?? "");
-      const operator = String(v.operator ?? "");
-      const amount = String(v.amount ?? "0");
-      return {
-        transactionHash: String(v.transactionHash ?? ""),
-        from,
-        to,
-        operator,
-        value: amount,
-        blockNumber: String(v.blockNumber ?? ""),
-        timestamp: String(v.timestamp ?? ""),
-        transactionIndex: String(v.transactionIndex ?? ""),
-        logIndex: String(v.logIndex ?? ""),
-        sender: normalizeAddress(from) ?? from,
-      };
-    });
+function parseStreamCompletedData(data: string): bigint {
+  const dataClean = data.slice(2);
+  if (dataClean.length < 192) return 0n;
+  const offset2 = parseInt(dataClean.slice(64, 128), 16) * 2;
+  const arrayLen = parseInt(dataClean.slice(offset2, offset2 + 64), 16);
+  let totalAmount = 0n;
+  for (let i = 0; i < arrayLen; i++) {
+    const start = offset2 + 64 + i * 64;
+    totalAmount += BigInt("0x" + dataClean.slice(start, start + 64));
+  }
+  return totalAmount;
 }
 
-async function fetchStreamCompletedEvents(
+async function fetchStreamCompletedFromChain(
   recipientAddress: string
 ): Promise<CirclesTransferEvent[]> {
   const normalized = normalizeAddress(recipientAddress);
@@ -89,26 +68,65 @@ async function fetchStreamCompletedEvents(
   const body = {
     jsonrpc: "2.0",
     id: 1,
-    method: "circles_events",
-    params: [normalized, null, null, ["CrcV2_StreamCompleted"]]
+    method: "eth_getLogs",
+    params: [{
+      fromBlock: LOTTERY_START_BLOCK,
+      toBlock: "latest",
+      address: CIRCLES_HUB_ADDRESS,
+      topics: [
+        STREAM_COMPLETED_TOPIC,
+        null,
+        null,
+        padAddress(normalized),
+      ],
+    }],
   };
 
   try {
-    const response = await fetch(circlesConfig.rpcUrl, {
+    const response = await fetch(GNOSIS_RPC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) return [];
 
     const payload = await response.json();
-    if (payload.error) return [];
+    if (payload.error) {
+      console.error("StreamCompleted eth_getLogs error:", payload.error);
+      return [];
+    }
 
-    const result = Array.isArray(payload.result) ? payload.result : (payload.result?.events ?? []);
-    return mapStreamCompletedEvents(Array.isArray(result) ? result : []);
-  } catch {
+    const logs = Array.isArray(payload.result) ? payload.result : [];
+    const results: CirclesTransferEvent[] = [];
+
+    for (const log of logs) {
+      const topics = log.topics || [];
+      if (topics.length < 4) continue;
+
+      const operator = "0x" + (topics[1] || "").slice(26);
+      const sender = "0x" + (topics[2] || "").slice(26);
+      const receiver = "0x" + (topics[3] || "").slice(26);
+      const totalAmount = parseStreamCompletedData(log.data || "0x");
+
+      results.push({
+        transactionHash: log.transactionHash || "",
+        from: sender.toLowerCase(),
+        to: receiver.toLowerCase(),
+        operator: operator.toLowerCase(),
+        value: totalAmount.toString(),
+        blockNumber: log.blockNumber || "",
+        timestamp: "",
+        transactionIndex: log.transactionIndex || "",
+        logIndex: log.logIndex || "",
+        sender: sender.toLowerCase(),
+      });
+    }
+
+    return results;
+  } catch (err) {
+    console.error("fetchStreamCompletedFromChain error:", err);
     return [];
   }
 }
@@ -148,7 +166,7 @@ async function fetchTransferSingleFromChain(
 
     const payload = await response.json();
     if (payload.error) {
-      console.error("eth_getLogs error:", payload.error);
+      console.error("TransferSingle eth_getLogs error:", payload.error);
       return [];
     }
 
@@ -201,7 +219,7 @@ export async function checkPaymentReceived(
   if (!normalized) return null;
 
   const [streamEvents, transferEvents] = await Promise.all([
-    fetchStreamCompletedEvents(normalized),
+    fetchStreamCompletedFromChain(normalized),
     fetchTransferSingleFromChain(normalized),
   ]);
 
@@ -225,7 +243,7 @@ export async function checkAllNewPayments(
   if (!normalized || exactAmountCRC <= 0) return [];
 
   const [streamEvents, transferEvents] = await Promise.all([
-    fetchStreamCompletedEvents(normalized),
+    fetchStreamCompletedFromChain(normalized),
     fetchTransferSingleFromChain(normalized),
   ]);
 
@@ -240,7 +258,9 @@ function aggregateTransfersByTx(
   const txMap = new Map<string, { total: bigint; event: CirclesTransferEvent }>();
 
   for (const event of events) {
-    if (!addressesMatch(event.to, recipientAddress)) continue;
+    const toNorm = normalizeAddress(event.to);
+    const recipNorm = normalizeAddress(recipientAddress);
+    if (!toNorm || !recipNorm || toNorm !== recipNorm) continue;
     const txKey = event.transactionHash.toLowerCase();
     let val: bigint;
     try { val = BigInt(event.value); } catch { continue; }
@@ -271,7 +291,6 @@ function deduplicateEvents(
   const results: CirclesTransferEvent[] = [];
 
   for (const event of streamEvents) {
-    if (!addressesMatch(event.to, recipientAddress)) continue;
     try {
       if (BigInt(event.value) !== exactWei) continue;
     } catch { continue; }
