@@ -49,7 +49,7 @@ export default async function LotteriePage({ params }: { params: { slug: string 
   const initialParticipants = participantRows.map((p) => ({
     address: p.address,
     transactionHash: p.transactionHash,
-    paidAt: p.paidAt ? p.paidAt.toISOString() : null,
+    paidAt: p.paidAt ? p.paidAt.toISOString() : "",
   }));
 
   return <LotteryPage lottery={config} initialParticipants={initialParticipants} initialCount={participantRows.length} />;
