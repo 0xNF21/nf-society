@@ -19,7 +19,9 @@ import {
   Star,
   Clock,
   DollarSign,
+  Wallet,
 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
@@ -56,6 +58,23 @@ type DaoData = {
   totalMembers: number;
   totalAffiliates: number;
   activeAffiliates5d: number;
+  fetchedAt: number;
+};
+
+type TreasuryHolding = {
+  symbol: string;
+  name: string;
+  balance: number;
+  price: number;
+  valueUsd: number;
+  color: string;
+};
+
+type TreasuryData = {
+  address: string;
+  chain: string;
+  holdings: TreasuryHolding[];
+  totalUsd: number;
   fetchedAt: number;
 };
 
@@ -188,6 +207,7 @@ export default function DashboardDaoPage() {
   const [error, setError] = useState<string | null>(null);
   const [inactiveFilter, setInactiveFilter] = useState("5d");
   const [crcPrice, setCrcPrice] = useState<number | null>(null);
+  const [treasury, setTreasury] = useState<TreasuryData | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   async function fetchProfiles(addresses: string[]) {
@@ -218,6 +238,16 @@ export default function DashboardDaoPage() {
     } catch {}
   }
 
+  async function fetchTreasury() {
+    try {
+      const res = await fetch("/api/treasury");
+      if (res.ok) {
+        const json = await res.json();
+        if (!json.error) setTreasury(json);
+      }
+    } catch {}
+  }
+
   async function loadData(isRefresh = false) {
     if (isRefresh) {
       setRefreshing(true);
@@ -226,7 +256,7 @@ export default function DashboardDaoPage() {
     }
     setError(null);
     try {
-      const [res] = await Promise.all([fetch("/api/dao"), fetchCrcPrice()]);
+      const [res] = await Promise.all([fetch("/api/dao"), fetchCrcPrice(), fetchTreasury()]);
       if (!res.ok) throw new Error("API error");
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -381,6 +411,108 @@ export default function DashboardDaoPage() {
                 label={t.crcPrice[locale]}
               />
             </div>
+
+            {(() => {
+              const crcValueUsd = crcPrice ? totalCRC * crcPrice : 0;
+              const allHoldings: Array<{ symbol: string; name: string; valueUsd: number; balance: number; price: number; color: string }> = [];
+              if (crcValueUsd > 0) {
+                allHoldings.push({
+                  symbol: "CRC",
+                  name: "Circles",
+                  valueUsd: crcValueUsd,
+                  balance: totalCRC,
+                  price: crcPrice || 0,
+                  color: "#10B981",
+                });
+              }
+              if (treasury?.holdings) {
+                allHoldings.push(...treasury.holdings);
+              }
+              const grandTotal = allHoldings.reduce((s, h) => s + h.valueUsd, 0);
+
+              if (allHoldings.length > 0) {
+                return (
+                  <div className="rounded-2xl border border-ink/5 bg-white shadow-sm p-5 mb-0">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                        <Wallet className="h-5 w-5 text-emerald-500" />
+                      </div>
+                      <div>
+                        <h2 className="font-display text-lg font-bold text-ink">{t.totalTreasury[locale]}</h2>
+                        <p className="text-2xl font-bold text-emerald-600">${grandTotal.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-center justify-center">
+                        <div className="w-full max-w-[240px] aspect-square">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={allHoldings.map((h) => ({
+                                  name: h.symbol,
+                                  value: h.valueUsd,
+                                  color: h.color,
+                                }))}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={50}
+                                outerRadius={90}
+                                paddingAngle={2}
+                                dataKey="value"
+                              >
+                                {allHoldings.map((h, i) => (
+                                  <Cell key={i} fill={h.color} stroke="white" strokeWidth={2} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: any) => [`$${Number(value).toFixed(2)}`, ""]}
+                                contentStyle={{
+                                  borderRadius: "12px",
+                                  border: "1px solid rgba(0,0,0,0.05)",
+                                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                  fontSize: "12px",
+                                }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {allHoldings
+                          .sort((a, b) => b.valueUsd - a.valueUsd)
+                          .map((h) => {
+                            const pct = grandTotal > 0 ? ((h.valueUsd / grandTotal) * 100) : 0;
+                            return (
+                              <div key={h.symbol} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                                <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: h.color }} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-bold text-ink">{h.symbol}</span>
+                                    <span className="text-sm font-bold text-ink">${h.valueUsd.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-ink/40">{h.balance < 1 ? h.balance.toFixed(6) : h.balance.toFixed(2)} {h.symbol}</span>
+                                    <span className="text-[10px] text-ink/40">{pct.toFixed(1)}%</span>
+                                  </div>
+                                  <div className="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: h.color }} />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                    {treasury && (
+                      <p className="text-[10px] text-ink/20 mt-3 text-center">
+                        {t.ethTreasury[locale]}: {shortenAddress(treasury.address)} (Ethereum) • CRC: {shortenAddress(data.treasuryAddress)} (Gnosis)
+                      </p>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="space-y-4">

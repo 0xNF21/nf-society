@@ -348,6 +348,8 @@ export const translations = {
     crcPrice: { fr: "Cours CRC", en: "CRC Price" },
     crcPriceDesc: { fr: "Prix du CRC en USD via CoW Swap (Gnosis Chain)", en: "CRC price in USD via CoW Swap (Gnosis Chain)" },
     treasuryValue: { fr: "Valeur trésorerie", en: "Treasury value" },
+    totalTreasury: { fr: "Trésorerie totale", en: "Total Treasury" },
+    ethTreasury: { fr: "Trésorerie ETH", en: "ETH Treasury" },
   },
 } as const;
 
