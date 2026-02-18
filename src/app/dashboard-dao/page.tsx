@@ -295,7 +295,7 @@ export default function DashboardDaoPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <Link href="/" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
             <ArrowLeft className="h-4 w-4" />
@@ -358,190 +358,199 @@ export default function DashboardDaoPage() {
               <StatCard icon={<Flame className="h-4 w-4 text-red-500" />} value={`${data.totalBurned}`} label={t.crcBurned[locale]} />
             </div>
 
-            <Accordion
-              title={t.latestClaims[locale]}
-              icon={<Clock className="h-5 w-5 text-emerald-500" />}
-              badge={data.latestClaims.length}
-              defaultOpen
-            >
-              <p className="text-xs text-ink/40 mb-3">
-                {t.latestClaimsDesc[locale]}
-              </p>
-              {data.latestClaims.length === 0 ? (
-                <p className="text-sm text-ink/40 py-8 text-center">{t.noContributions[locale]}</p>
-              ) : (
-                <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
-                  {data.latestClaims.map((claim, idx) => (
-                    <div key={`${claim.address}-${claim.timestamp}-${idx}`} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
-                      <div className="flex-1 min-w-0">
-                        <ProfileAvatar address={claim.address} profiles={profiles} size="sm" />
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-bold text-emerald-600">
-                          +{claim.amount.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
-                        </p>
-                        <p className="text-[10px] text-ink/30">
-                          {formatTimeAgo(claim.timestamp, locale)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Accordion>
-
-            <Accordion
-              title={t.weeklyTop[locale]}
-              icon={<Star className="h-5 w-5 text-yellow-500" />}
-              badge={data.weeklyContributions.length}
-              defaultOpen
-            >
-              <p className="text-xs text-ink/40 mb-3">
-                {t.weeklyTopDesc[locale]}
-              </p>
-              {data.weeklyContributions.length === 0 ? (
-                <p className="text-sm text-ink/40 py-8 text-center">{t.noWeeklyContributions[locale]}</p>
-              ) : (
-                <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
-                  {data.weeklyContributions.map((contrib, idx) => (
-                    <div key={contrib.address} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
-                      <span className="text-sm font-bold text-ink/20 w-6 text-right flex-shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <ProfileAvatar address={contrib.address} profiles={profiles} size="sm" />
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-bold text-yellow-600">
-                          {contrib.weeklyCRC.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Accordion>
-
-            <Accordion
-              title={t.topContributors[locale]}
-              icon={<Trophy className="h-5 w-5 text-amber-500" />}
-              badge={data.contributions.length}
-            >
-              <p className="text-xs text-ink/40 mb-3">
-                {t.contributorsDesc[locale]}
-              </p>
-              {data.contributions.length === 0 ? (
-                <p className="text-sm text-ink/40 py-8 text-center">{t.noContributions[locale]}</p>
-              ) : (
-                <div className="space-y-1 max-h-96 overflow-y-auto pr-1">
-                  {data.contributions.map((contrib, idx) => (
-                    <div key={contrib.address} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
-                      <span className="text-sm font-bold text-ink/20 w-6 text-right flex-shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <ProfileAvatar address={contrib.address} profiles={profiles} size="sm" />
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-bold text-amber-600">
-                          {contrib.totalCRC.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
-                        </p>
-                        {contrib.lastContributionTs > 0 && (
-                          <p className="text-[10px] text-ink/30">
-                            {formatTimeAgo(contrib.lastContributionTs, locale)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Accordion>
-
-            <Accordion
-              title={t.members[locale]}
-              icon={<Users className="h-5 w-5 text-emerald-500" />}
-              badge={data.totalMembers}
-            >
-              <p className="text-xs text-ink/40 mb-3">
-                {data.totalMembers} {t.totalMembers[locale]}
-              </p>
-              <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
-                {data.members.map((addr) => {
-                  const trust = data.memberTrust[addr];
-                  return (
-                    <div key={addr} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
-                      <ProfileAvatar address={addr} profiles={profiles} size="sm" />
-                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        {trust?.trustedByGroup && trust?.trustsGroup ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium">{t.mutual[locale]}</span>
-                        ) : trust?.trustedByGroup ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">{t.trustedByGroup[locale]}</span>
-                        ) : (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">{t.trustsGroup[locale]}</span>
-                        )}
-                        <a
-                          href={`https://circles.garden/profile/${addr}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-ink/20 hover:text-ink/50 transition-colors"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Accordion>
-
-            <Accordion
-              title={t.inactiveMembers[locale]}
-              icon={<UserX className="h-5 w-5 text-red-400" />}
-              badge={totalInactive}
-            >
-              <InactiveFilter locale={locale} selected={inactiveFilter} onChange={setInactiveFilter} />
-              {(() => {
-                const filtered = getFilteredInactive();
-                const contribMap = new Map(
-                  data.contributions.map((c) => [c.address, c])
-                );
-                if (filtered.length === 0) {
-                  return (
-                    <div className="py-6 text-center text-sm text-ink/40 flex items-center justify-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-emerald-400" />
-                      {t.allActive[locale]}
-                    </div>
-                  );
-                }
-                return (
-                  <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
-                    {filtered.map((addr) => {
-                      const contrib = contribMap.get(addr);
-                      return (
-                        <div key={addr} className="flex items-center justify-between py-2 px-3 rounded-xl bg-red-50/30 hover:bg-red-50/60 transition-colors">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <XCircle className="h-3.5 w-3.5 text-red-300 flex-shrink-0" />
-                            <ProfileAvatar address={addr} profiles={profiles} size="sm" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <Accordion
+                  title={t.topContributors[locale]}
+                  icon={<Trophy className="h-5 w-5 text-amber-500" />}
+                  badge={data.contributions.length}
+                  defaultOpen
+                >
+                  <p className="text-xs text-ink/40 mb-3">
+                    {t.contributorsDesc[locale]}
+                  </p>
+                  {data.contributions.length === 0 ? (
+                    <p className="text-sm text-ink/40 py-8 text-center">{t.noContributions[locale]}</p>
+                  ) : (
+                    <div className="space-y-1 max-h-96 overflow-y-auto pr-1">
+                      {data.contributions.map((contrib, idx) => (
+                        <div key={contrib.address} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                          <span className="text-sm font-bold text-ink/20 w-6 text-right flex-shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <ProfileAvatar address={contrib.address} profiles={profiles} size="sm" />
                           </div>
-                          <div className="text-right flex-shrink-0 ml-2">
-                            {contrib && contrib.lastContributionTs > 0 ? (
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-sm font-bold text-amber-600">
+                              {contrib.totalCRC.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
+                            </p>
+                            {contrib.lastContributionTs > 0 && (
                               <p className="text-[10px] text-ink/30">
-                                {t.lastContribution[locale]}: {formatTimeAgo(contrib.lastContributionTs, locale)}
-                              </p>
-                            ) : (
-                              <p className="text-[10px] text-red-400 font-medium">
-                                {t.never[locale]}
+                                {formatTimeAgo(contrib.lastContributionTs, locale)}
                               </p>
                             )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Accordion>
+
+                <Accordion
+                  title={t.weeklyTop[locale]}
+                  icon={<Star className="h-5 w-5 text-yellow-500" />}
+                  badge={data.weeklyContributions.length}
+                  defaultOpen
+                >
+                  <p className="text-xs text-ink/40 mb-3">
+                    {t.weeklyTopDesc[locale]}
+                  </p>
+                  {data.weeklyContributions.length === 0 ? (
+                    <p className="text-sm text-ink/40 py-8 text-center">{t.noWeeklyContributions[locale]}</p>
+                  ) : (
+                    <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                      {data.weeklyContributions.map((contrib, idx) => (
+                        <div key={contrib.address} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                          <span className="text-sm font-bold text-ink/20 w-6 text-right flex-shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <ProfileAvatar address={contrib.address} profiles={profiles} size="sm" />
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-sm font-bold text-yellow-600">
+                              {contrib.weeklyCRC.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Accordion>
+
+                <Accordion
+                  title={t.latestClaims[locale]}
+                  icon={<Clock className="h-5 w-5 text-emerald-500" />}
+                  badge={data.latestClaims.length}
+                  defaultOpen
+                >
+                  <p className="text-xs text-ink/40 mb-3">
+                    {t.latestClaimsDesc[locale]}
+                  </p>
+                  {data.latestClaims.length === 0 ? (
+                    <p className="text-sm text-ink/40 py-8 text-center">{t.noContributions[locale]}</p>
+                  ) : (
+                    <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                      {data.latestClaims.map((claim, idx) => (
+                        <div key={`${claim.address}-${claim.timestamp}-${idx}`} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <ProfileAvatar address={claim.address} profiles={profiles} size="sm" />
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-sm font-bold text-emerald-600">
+                              +{claim.amount.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
+                            </p>
+                            <p className="text-[10px] text-ink/30">
+                              {formatTimeAgo(claim.timestamp, locale)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Accordion>
+              </div>
+
+              <div className="space-y-4">
+                <Accordion
+                  title={t.members[locale]}
+                  icon={<Users className="h-5 w-5 text-emerald-500" />}
+                  badge={data.totalMembers}
+                  defaultOpen
+                >
+                  <p className="text-xs text-ink/40 mb-3">
+                    {data.totalMembers} {t.totalMembers[locale]}
+                  </p>
+                  <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                    {data.members.map((addr) => {
+                      const trust = data.memberTrust[addr];
+                      return (
+                        <div key={addr} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                          <ProfileAvatar address={addr} profiles={profiles} size="sm" />
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                            {trust?.trustedByGroup && trust?.trustsGroup ? (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium">{t.mutual[locale]}</span>
+                            ) : trust?.trustedByGroup ? (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">{t.trustedByGroup[locale]}</span>
+                            ) : (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">{t.trustsGroup[locale]}</span>
+                            )}
+                            <a
+                              href={`https://circles.garden/profile/${addr}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-ink/20 hover:text-ink/50 transition-colors"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                );
-              })()}
-            </Accordion>
+                </Accordion>
+
+                <Accordion
+                  title={t.inactiveMembers[locale]}
+                  icon={<UserX className="h-5 w-5 text-red-400" />}
+                  badge={totalInactive}
+                  defaultOpen
+                >
+                  <InactiveFilter locale={locale} selected={inactiveFilter} onChange={setInactiveFilter} />
+                  {(() => {
+                    const filtered = getFilteredInactive();
+                    const contribMap = new Map(
+                      data.contributions.map((c) => [c.address, c])
+                    );
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="py-6 text-center text-sm text-ink/40 flex items-center justify-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-emerald-400" />
+                          {t.allActive[locale]}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                        {filtered.map((addr) => {
+                          const contrib = contribMap.get(addr);
+                          return (
+                            <div key={addr} className="flex items-center justify-between py-2 px-3 rounded-xl bg-red-50/30 hover:bg-red-50/60 transition-colors">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <XCircle className="h-3.5 w-3.5 text-red-300 flex-shrink-0" />
+                                <ProfileAvatar address={addr} profiles={profiles} size="sm" />
+                              </div>
+                              <div className="text-right flex-shrink-0 ml-2">
+                                {contrib && contrib.lastContributionTs > 0 ? (
+                                  <p className="text-[10px] text-ink/30">
+                                    {t.lastContribution[locale]}: {formatTimeAgo(contrib.lastContributionTs, locale)}
+                                  </p>
+                                ) : (
+                                  <p className="text-[10px] text-red-400 font-medium">
+                                    {t.never[locale]}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </Accordion>
+              </div>
+            </div>
 
             <footer className="text-center space-y-2 pt-4 pb-8">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-ink/30">
