@@ -65,6 +65,7 @@ public/                        - Static assets (logo, etc.)
 - `/dashboard` - Admin dashboard for creating new lotteries
 - `/dashboard-dao` - DAO dashboard (members, trust network, contributions, inactive tracking)
 - `/api/dao` - GET DAO data (members, trust relations, contributions from Circles SDK)
+- `/api/treasury/history` - GET historical price performance (24h/7d/30d/1y/all) via DeFi Llama
 - `/api/lotteries` - GET (list), POST (create with password)
 - `/api/lotteries/:slug` - GET (single), PUT (update with password)
 - `/api/scan?lotteryId=X` - Scan blockchain for payments
