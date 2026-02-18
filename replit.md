@@ -25,7 +25,7 @@ src/
       profiles/route.ts        - Circles profile fetching
       scan/route.ts            - Blockchain payment scanner (lottery-aware)
     dashboard/page.tsx         - Organizer dashboard for creating lotteries
-    dashboard-dao/page.tsx     - DAO dashboard (placeholder, under construction)
+    dashboard-dao/page.tsx     - DAO dashboard (members, trust network, contributions, inactive tracking)
     loterie/[slug]/page.tsx    - Dynamic lottery page (server component)
     loteries/page.tsx          - Lottery listing page (active/completed/archived)
     globals.css                - Global styles
@@ -61,7 +61,8 @@ public/                        - Static assets (logo, etc.)
 - `/loteries` - Lottery listing page (active/completed/archived)
 - `/loterie/:slug` - Individual lottery page with custom theming
 - `/dashboard` - Admin dashboard for creating new lotteries
-- `/dashboard-dao` - DAO dashboard (under construction)
+- `/dashboard-dao` - DAO dashboard (members, trust network, contributions, inactive tracking)
+- `/api/dao` - GET DAO data (members, trust relations, contributions from Circles SDK)
 - `/api/lotteries` - GET (list), POST (create with password)
 - `/api/lotteries/:slug` - GET (single), PUT (update with password)
 - `/api/scan?lotteryId=X` - Scan blockchain for payments
@@ -81,6 +82,7 @@ public/                        - Static assets (logo, etc.)
 - **Draw History**: All draws logged in PostgreSQL with full proof data
 - **Organizer Dashboard**: Form-based lottery creation with live preview
 - **Bilingual (FR/EN)**: Full i18n with flag switcher, localStorage persistence
+- **DAO Dashboard**: Live member list, trust network visualization, contribution rankings, inactive member tracking via Circles SDK (@aboutcircles/sdk-rpc)
 
 ## Development
 - Dev server runs on port 5000 (0.0.0.0)
