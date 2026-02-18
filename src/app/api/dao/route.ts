@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    const allAffiliates = [...new Set([...members, ...contributions.map((c) => c.address)])];
+    const allAffiliates = [...new Set(contributions.map((c) => c.address))];
 
     const inactive: {
       fiveDays: string[];
