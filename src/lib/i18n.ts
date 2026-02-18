@@ -358,6 +358,12 @@ export const translations = {
     currentValue: { fr: "Valeur actuelle", en: "Current Value" },
     unrealizedPnl: { fr: "P&L non réalisé", en: "Unrealized P&L" },
     noAcquisitionData: { fr: "Pas de données d'achat", en: "No acquisition data" },
+    perf24h: { fr: "24h", en: "24h" },
+    perf7d: { fr: "7j", en: "7d" },
+    perf30d: { fr: "30j", en: "30d" },
+    perf1y: { fr: "1a", en: "1y" },
+    perfAll: { fr: "Tout", en: "All" },
+    walletPerformance: { fr: "Performance du portefeuille", en: "Wallet Performance" },
   },
 } as const;
 

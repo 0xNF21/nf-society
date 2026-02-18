@@ -216,6 +216,8 @@ export default function DashboardDaoPage() {
   const [inactiveFilter, setInactiveFilter] = useState("5d");
   const [crcPrice, setCrcPrice] = useState<number | null>(null);
   const [treasury, setTreasury] = useState<TreasuryData | null>(null);
+  const [treasuryHistory, setTreasuryHistory] = useState<any>(null);
+  const [perfPeriod, setPerfPeriod] = useState("30d");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   async function fetchProfiles(addresses: string[]) {
@@ -256,6 +258,16 @@ export default function DashboardDaoPage() {
     } catch {}
   }
 
+  async function fetchTreasuryHistory() {
+    try {
+      const res = await fetch("/api/treasury/history");
+      if (res.ok) {
+        const json = await res.json();
+        if (!json.error) setTreasuryHistory(json);
+      }
+    } catch {}
+  }
+
   async function loadData(isRefresh = false) {
     if (isRefresh) {
       setRefreshing(true);
@@ -264,7 +276,7 @@ export default function DashboardDaoPage() {
     }
     setError(null);
     try {
-      const [res] = await Promise.all([fetch("/api/dao"), fetchCrcPrice(), fetchTreasury()]);
+      const [res] = await Promise.all([fetch("/api/dao"), fetchCrcPrice(), fetchTreasury(), fetchTreasuryHistory()]);
       if (!res.ok) throw new Error("API error");
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -431,7 +443,7 @@ export default function DashboardDaoPage() {
                   balance: totalCRC,
                   price: crcPrice || 0,
                   color: "#10B981",
-                  iconUrl: null,
+                  iconUrl: "/crc-logo.png",
                   acquisitionPrice: null,
                   acquiredAt: null,
                 });
@@ -445,112 +457,205 @@ export default function DashboardDaoPage() {
               const totalCostBasis = treasury?.totalCostBasis || 0;
 
               if (allHoldings.length > 0) {
+                const pieData = allHoldings.map((h) => ({
+                  name: h.symbol,
+                  value: h.valueUsd,
+                  color: h.color,
+                  iconUrl: h.iconUrl,
+                }));
+
+                const CustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, index }: any) => {
+                  const RADIAN = Math.PI / 180;
+                  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                  const h = allHoldings[index];
+                  if (!h) return null;
+                  return (
+                    <g>
+                      {h.iconUrl ? (
+                        <image href={h.iconUrl} x={x - 10} y={y - 16} width={20} height={20} style={{ borderRadius: "50%" }} />
+                      ) : (
+                        <text x={x} y={y - 6} fill="white" textAnchor="middle" fontSize={9} fontWeight="bold">{h.symbol}</text>
+                      )}
+                      <text x={x} y={y + 12} fill="white" textAnchor="middle" fontSize={8} fontWeight="bold">
+                        ${h.valueUsd.toFixed(0)}
+                      </text>
+                    </g>
+                  );
+                };
+
                 return (
-                  <div className="rounded-2xl border border-ink/5 bg-white shadow-sm p-5 mb-0">
-                    <div className="flex items-center justify-between mb-4">
+                  <div className="rounded-2xl border border-ink/5 bg-white shadow-sm p-6 mb-0">
+                    <div className="flex items-center justify-between mb-5">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                          <Wallet className="h-5 w-5 text-emerald-500" />
+                        <div className="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                          <Wallet className="h-6 w-6 text-emerald-500" />
                         </div>
                         <div>
-                          <h2 className="font-display text-lg font-bold text-ink">{t.totalTreasury[locale]}</h2>
-                          <p className="text-2xl font-bold text-emerald-600">${grandTotal.toFixed(2)}</p>
+                          <h2 className="font-display text-xl font-bold text-ink">{t.totalTreasury[locale]}</h2>
+                          <p className="text-3xl font-bold text-emerald-600">${grandTotal.toFixed(2)}</p>
                         </div>
                       </div>
-                      {totalPnl !== null && totalPnl !== undefined && (
-                        <div className={`text-right px-3 py-1.5 rounded-xl ${totalPnl >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
-                          <div className="flex items-center gap-1 justify-end">
-                            {totalPnl >= 0 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
-                            <span className={`text-sm font-bold ${totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    </div>
+
+                    {totalPnl !== null && totalPnl !== undefined && (
+                      <div className={`rounded-2xl p-6 mb-5 ${totalPnl >= 0 ? "bg-emerald-50 border border-emerald-100" : "bg-red-50 border border-red-100"}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-lg font-bold text-gray-900">{t.portfolioPnl[locale]}</span>
+                          <div className="flex items-center gap-2">
+                            {totalPnl >= 0 ? <TrendingUp className="h-6 w-6 text-emerald-500" /> : <TrendingDown className="h-6 w-6 text-red-500" />}
+                            <span className={`text-3xl font-black ${totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                               {totalPnl >= 0 ? "+" : ""}{totalPnlPercent?.toFixed(1)}%
                             </span>
                           </div>
-                          <p className={`text-xs ${totalPnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                            {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)} USD
-                          </p>
-                          <p className="text-[9px] text-ink/30">{t.costBasis[locale]}: ${totalCostBasis.toFixed(2)}</p>
                         </div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-900 font-semibold mb-1">{t.costBasis[locale]}</p>
+                            <p className="text-2xl font-black text-gray-900">${totalCostBasis.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-900 font-semibold mb-1">{t.currentValue[locale]}</p>
+                            <p className="text-2xl font-black text-gray-900">${(totalCostBasis + totalPnl).toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-900 font-semibold mb-1">{t.unrealizedPnl[locale]}</p>
+                            <p className={`text-2xl font-black ${totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                              {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)} $
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {treasuryHistory && (
+                      <div className="rounded-xl border border-gray-100 p-4 mb-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-base font-bold text-gray-900">{t.walletPerformance[locale]}</span>
+                          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                            {["24h", "7d", "30d", "1y", "all"].map((p) => (
+                              <button
+                                key={p}
+                                onClick={() => setPerfPeriod(p)}
+                                className={`px-3 py-1.5 text-sm font-bold rounded-md transition-all ${perfPeriod === p ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                              >
+                                {(t as any)[`perf${p === "24h" ? "24h" : p === "7d" ? "7d" : p === "30d" ? "30d" : p === "1y" ? "1y" : "All"}`]?.[locale] || p}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {treasuryHistory.performance?.[perfPeriod] ? (
+                          <div className="flex items-center gap-3">
+                            <span className={`text-2xl font-black ${treasuryHistory.performance[perfPeriod].changePercent >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                              {treasuryHistory.performance[perfPeriod].changePercent >= 0 ? "+" : ""}{treasuryHistory.performance[perfPeriod].changePercent.toFixed(2)}%
+                            </span>
+                            <span className="text-sm text-gray-400">
+                              (${treasuryHistory.performance[perfPeriod].totalUsd.toFixed(2)} → ${treasuryHistory.currentTotalUsd?.toFixed(2)})
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400">—</p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="flex items-center justify-center">
-                        <div className="w-full max-w-[240px] aspect-square">
+                        <div className="w-full max-w-[280px] aspect-square">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
-                                data={allHoldings.map((h) => ({
-                                  name: h.symbol,
-                                  value: h.valueUsd,
-                                  color: h.color,
-                                }))}
+                                data={pieData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={50}
-                                outerRadius={90}
+                                innerRadius={55}
+                                outerRadius={110}
                                 paddingAngle={2}
                                 dataKey="value"
+                                label={CustomPieLabel}
+                                labelLine={false}
                               >
-                                {allHoldings.map((h, i) => (
-                                  <Cell key={i} fill={h.color} stroke="white" strokeWidth={2} />
+                                {pieData.map((entry, i) => (
+                                  <Cell key={i} fill={entry.color} stroke="white" strokeWidth={2} />
                                 ))}
                               </Pie>
                               <Tooltip
-                                formatter={(value: any) => [`$${Number(value).toFixed(2)}`, ""]}
-                                contentStyle={{
-                                  borderRadius: "12px",
-                                  border: "1px solid rgba(0,0,0,0.05)",
-                                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                  fontSize: "12px",
+                                content={({ active, payload }: any) => {
+                                  if (!active || !payload?.length) return null;
+                                  const d = payload[0].payload;
+                                  const h = allHoldings.find((hh) => hh.symbol === d.name);
+                                  return (
+                                    <div className="bg-white rounded-xl border border-gray-100 shadow-lg p-3 flex items-center gap-3">
+                                      {h?.iconUrl ? (
+                                        <img src={h.iconUrl} alt={h.symbol} className="h-8 w-8 rounded-full" />
+                                      ) : (
+                                        <div className="h-8 w-8 rounded-full flex items-center justify-center" style={{ backgroundColor: d.color + "30" }}>
+                                          <span className="text-xs font-bold" style={{ color: d.color }}>{d.name}</span>
+                                        </div>
+                                      )}
+                                      <div>
+                                        <p className="font-bold text-gray-900 text-base">{d.name}</p>
+                                        <p className="text-lg font-black text-gray-900">${Number(d.value).toFixed(2)}</p>
+                                      </div>
+                                    </div>
+                                  );
                                 }}
                               />
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         {allHoldings
                           .sort((a, b) => b.valueUsd - a.valueUsd)
                           .map((h) => {
                             const pct = grandTotal > 0 ? ((h.valueUsd / grandTotal) * 100) : 0;
                             const tokenPnl = h.acquisitionPrice ? ((h.price - h.acquisitionPrice) / h.acquisitionPrice) * 100 : null;
+                            const tokenPerfVal = treasuryHistory?.perToken?.[h.symbol]?.[perfPeriod];
                             return (
-                              <div key={h.symbol} className="flex items-center gap-2.5 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                              <div key={h.symbol} className="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-50 transition-colors">
                                 {h.iconUrl ? (
-                                  <img src={h.iconUrl} alt={h.symbol} className="h-6 w-6 rounded-full flex-shrink-0" />
+                                  <img src={h.iconUrl} alt={h.symbol} className="h-10 w-10 rounded-full flex-shrink-0" />
                                 ) : (
-                                  <div className="h-6 w-6 rounded-full flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: h.color + "20" }}>
-                                    <span className="text-[8px] font-bold" style={{ color: h.color }}>{h.symbol.slice(0, 2)}</span>
+                                  <div className="h-10 w-10 rounded-full flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: h.color + "20" }}>
+                                    <span className="text-sm font-bold" style={{ color: h.color }}>{h.symbol.slice(0, 2)}</span>
                                   </div>
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-sm font-bold text-ink">{h.symbol}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xl font-black text-gray-900">{h.symbol}</span>
                                       {tokenPnl !== null && (
-                                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${tokenPnl >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
+                                        <span className={`text-base font-bold px-2.5 py-1 rounded-full ${tokenPnl >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
                                           {tokenPnl >= 0 ? "+" : ""}{tokenPnl.toFixed(1)}%
                                         </span>
                                       )}
+                                      {tokenPerfVal !== undefined && (
+                                        <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${tokenPerfVal >= 0 ? "bg-blue-50 text-blue-600" : "bg-orange-50 text-orange-600"}`}>
+                                          {perfPeriod}: {tokenPerfVal >= 0 ? "+" : ""}{tokenPerfVal.toFixed(1)}%
+                                        </span>
+                                      )}
                                     </div>
-                                    <span className="text-sm font-bold text-ink">${h.valueUsd.toFixed(2)}</span>
+                                    <span className="text-xl font-black text-gray-900">${h.valueUsd.toFixed(2)}</span>
                                   </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-ink/40">
+                                  <div className="flex items-center justify-between mt-1">
+                                    <span className="text-base font-semibold text-gray-900">
                                       {h.balance < 1 ? h.balance.toFixed(6) : h.balance.toFixed(2)} @ ${h.price < 1 ? h.price.toFixed(4) : h.price.toFixed(2)}
                                     </span>
-                                    <span className="text-[10px] text-ink/40">{pct.toFixed(1)}%</span>
+                                    <span className="text-base font-semibold text-gray-900">{pct.toFixed(1)}%</span>
                                   </div>
                                   {h.acquisitionPrice && (
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[9px] text-ink/25">
+                                    <div className="flex items-center justify-between mt-1">
+                                      <span className="text-base font-semibold text-gray-900">
                                         {t.acquisitionPrice[locale]}: ${h.acquisitionPrice < 1 ? h.acquisitionPrice.toFixed(4) : h.acquisitionPrice.toFixed(2)}
                                       </span>
-                                      <span className={`text-[9px] font-medium ${tokenPnl !== null && tokenPnl >= 0 ? "text-emerald-500" : "text-red-400"}`}>
+                                      <span className={`text-base font-bold ${tokenPnl !== null && tokenPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                                         {tokenPnl !== null ? `${tokenPnl >= 0 ? "+" : ""}$${(h.valueUsd - h.acquisitionPrice * h.balance).toFixed(2)}` : ""}
                                       </span>
                                     </div>
                                   )}
-                                  <div className="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                  <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden">
                                     <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: h.color }} />
                                   </div>
                                 </div>
@@ -560,7 +665,7 @@ export default function DashboardDaoPage() {
                       </div>
                     </div>
                     {treasury && (
-                      <p className="text-[10px] text-ink/20 mt-3 text-center">
+                      <p className="text-xs text-ink/30 mt-4 text-center">
                         {t.ethTreasury[locale]}: {shortenAddress(treasury.address)} (Ethereum) • CRC: {shortenAddress(data.treasuryAddress)} (Gnosis)
                       </p>
                     )}

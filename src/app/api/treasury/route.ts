@@ -183,7 +183,7 @@ export async function GET() {
         price: ethPrice,
         valueUsd: ethBalance * ethPrice,
         color: TOKEN_COLORS.ETH,
-        iconUrl: null,
+        iconUrl: "/eth-logo.png",
         acquisitionPrice: acquisitions["ETH"]?.costBasis || null,
         acquiredAt: acquisitions["ETH"]?.acquiredAt || null,
       });
@@ -227,6 +227,11 @@ export async function GET() {
       const color = TOKEN_COLORS[symbol] || DEFAULT_COLORS[colorIdx % DEFAULT_COLORS.length];
       colorIdx++;
 
+      let iconUrl = token.token?.icon_url || null;
+      if (symbol === "WETH" || symbol === "ETH") {
+        iconUrl = "/eth-logo.png";
+      }
+
       holdings.push({
         symbol,
         name: token.token?.name || symbol,
@@ -235,7 +240,7 @@ export async function GET() {
         price,
         valueUsd,
         color,
-        iconUrl: token.token?.icon_url || null,
+        iconUrl,
         acquisitionPrice: acquisitions[symbol]?.costBasis || null,
         acquiredAt: acquisitions[symbol]?.acquiredAt || null,
       });
