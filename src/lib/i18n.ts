@@ -345,6 +345,9 @@ export const translations = {
     weeklyTop: { fr: "Top de la semaine", en: "Top of the Week" },
     weeklyTopDesc: { fr: "Classement des contributeurs sur les 7 derniers jours", en: "Contributors ranked over the last 7 days" },
     noWeeklyContributions: { fr: "Aucune contribution cette semaine.", en: "No contributions this week." },
+    crcPrice: { fr: "Cours CRC", en: "CRC Price" },
+    crcPriceDesc: { fr: "Prix du CRC en USD via CoW Swap (Gnosis Chain)", en: "CRC price in USD via CoW Swap (Gnosis Chain)" },
+    treasuryValue: { fr: "Valeur trésorerie", en: "Treasury value" },
   },
 } as const;
 

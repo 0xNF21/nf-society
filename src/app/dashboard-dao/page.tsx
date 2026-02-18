@@ -18,6 +18,7 @@ import {
   Flame,
   Star,
   Clock,
+  DollarSign,
 } from "lucide-react";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
@@ -186,6 +187,7 @@ export default function DashboardDaoPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inactiveFilter, setInactiveFilter] = useState("5d");
+  const [crcPrice, setCrcPrice] = useState<number | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   async function fetchProfiles(addresses: string[]) {
@@ -206,6 +208,16 @@ export default function DashboardDaoPage() {
     }
   }
 
+  async function fetchCrcPrice() {
+    try {
+      const res = await fetch("/api/crc-price");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.price) setCrcPrice(json.price);
+      }
+    } catch {}
+  }
+
   async function loadData(isRefresh = false) {
     if (isRefresh) {
       setRefreshing(true);
@@ -214,7 +226,7 @@ export default function DashboardDaoPage() {
     }
     setError(null);
     try {
-      const res = await fetch("/api/dao");
+      const [res] = await Promise.all([fetch("/api/dao"), fetchCrcPrice()]);
       if (!res.ok) throw new Error("API error");
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -352,12 +364,22 @@ export default function DashboardDaoPage() {
 
         {data && !loading && (
           <div className="space-y-4">
-            <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
               <StatCard icon={<Users className="h-4 w-4 text-emerald-500" />} value={data.totalMembers} label={t.members[locale]} />
               <StatCard icon={<Users className="h-4 w-4 text-blue-500" />} value={data.totalAffiliates} label={t.affiliates[locale]} />
               <StatCard icon={<Users className="h-4 w-4 text-green-500" />} value={data.activeAffiliates5d} label={t.activeAffiliates[locale]} />
-              <StatCard icon={<Trophy className="h-4 w-4 text-amber-500" />} value={`${Math.round(totalCRC).toLocaleString()}`} label={t.totalCrc[locale]} />
+              <StatCard
+                icon={<Trophy className="h-4 w-4 text-amber-500" />}
+                value={`${Math.round(totalCRC).toLocaleString()}`}
+                label={t.totalCrc[locale]}
+                sub={crcPrice ? `≈ $${(totalCRC * crcPrice).toFixed(2)}` : undefined}
+              />
               <StatCard icon={<Flame className="h-4 w-4 text-red-500" />} value={`${data.totalBurned}`} label={t.crcBurned[locale]} />
+              <StatCard
+                icon={<DollarSign className="h-4 w-4 text-green-600" />}
+                value={crcPrice ? `$${crcPrice.toFixed(4)}` : "—"}
+                label={t.crcPrice[locale]}
+              />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -606,12 +628,13 @@ function formatTimeAgo(ts: number, locale: "fr" | "en"): string {
   return "now";
 }
 
-function StatCard({ icon, value, label }: { icon: React.ReactNode; value: number | string; label: string }) {
+function StatCard({ icon, value, label, sub }: { icon: React.ReactNode; value: number | string; label: string; sub?: string }) {
   return (
     <div className="rounded-2xl border border-ink/5 bg-white p-4 shadow-sm flex items-center gap-3">
       <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">{icon}</div>
       <div>
         <p className="text-xl font-bold text-ink">{value}</p>
+        {sub && <p className="text-xs font-semibold text-green-600">{sub}</p>}
         <p className="text-[10px] text-ink/40">{label}</p>
       </div>
     </div>
