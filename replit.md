@@ -25,10 +25,12 @@ src/
       profiles/route.ts        - Circles profile fetching
       scan/route.ts            - Blockchain payment scanner (lottery-aware)
     dashboard/page.tsx         - Organizer dashboard for creating lotteries
+    dashboard-dao/page.tsx     - DAO dashboard (placeholder, under construction)
     loterie/[slug]/page.tsx    - Dynamic lottery page (server component)
+    loteries/page.tsx          - Lottery listing page (active/completed/archived)
     globals.css                - Global styles
     layout.tsx                 - Root layout
-    page.tsx                   - Home page (listing of active lotteries)
+    page.tsx                   - Landing page (hub: Loteries + Dashboard DAO)
   components/
     lottery-page.tsx           - Reusable lottery page component (client)
     payment-status.tsx         - Ticket history with skeleton loading
@@ -55,9 +57,11 @@ public/                        - Static assets (logo, etc.)
 - `NEXT_PUBLIC_CIRCLES_RPC_URL` - Circles RPC endpoint (default: https://rpc.aboutcircles.com/)
 
 ## Key Routes
-- `/` - Home page listing all active lotteries
+- `/` - Landing page (hub with links to Loteries + Dashboard DAO)
+- `/loteries` - Lottery listing page (active/completed/archived)
 - `/loterie/:slug` - Individual lottery page with custom theming
 - `/dashboard` - Admin dashboard for creating new lotteries
+- `/dashboard-dao` - DAO dashboard (under construction)
 - `/api/lotteries` - GET (list), POST (create with password)
 - `/api/lotteries/:slug` - GET (single), PUT (update with password)
 - `/api/scan?lotteryId=X` - Scan blockchain for payments
