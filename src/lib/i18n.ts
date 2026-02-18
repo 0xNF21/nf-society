@@ -325,6 +325,17 @@ export const translations = {
     groupAddress: { fr: "Adresse du groupe", en: "Group address" },
     treasuryAddress: { fr: "Adresse de la trésorerie", en: "Treasury address" },
     back: { fr: "Retour", en: "Back" },
+    affiliates: { fr: "Affiliés", en: "Affiliates" },
+    contributorsDesc: { fr: "Classement par montant CRC envoyé à la trésorerie", en: "Ranked by CRC amount sent to treasury" },
+    since5days: { fr: "5 jours", en: "5 days" },
+    since2weeks: { fr: "2 semaines", en: "2 weeks" },
+    since1month: { fr: "+1 mois", en: "+1 month" },
+    neverContributed: { fr: "Jamais contribué", en: "Never contributed" },
+    allInactive: { fr: "Tous", en: "All" },
+    allActive: { fr: "Tous les membres sont actifs !", en: "All members are active!" },
+    refresh: { fr: "Actualiser", en: "Refresh" },
+    refreshData: { fr: "Actualiser les données", en: "Refresh data" },
+    lastUpdate: { fr: "Dernière mise à jour", en: "Last update" },
   },
 } as const;
 

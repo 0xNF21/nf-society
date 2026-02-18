@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -15,6 +15,8 @@ import {
   CheckCircle,
   XCircle,
   UserX,
+  ChevronDown,
+  Clock,
 } from "lucide-react";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
@@ -27,17 +29,29 @@ type DaoData = {
   memberRelations: Array<{ from: string; to: string }>;
   contributions: Array<{
     address: string;
-    totalAmount: number;
-    lastContribution: string;
-    count: number;
+    totalCRC: number;
+    lastContributionTs: number;
+    isMember: boolean;
   }>;
+  allAffiliates: string[];
+  inactive: {
+    fiveDays: string[];
+    twoWeeks: string[];
+    oneMonth: string[];
+    never: string[];
+  };
   totalMembers: number;
+  totalAffiliates: number;
+  fetchedAt: number;
 };
 
 type Profile = {
   name?: string;
+  imageUrl?: string | null;
   avatarUrl?: string;
 };
+
+const AUTO_REFRESH_MS = 60 * 60 * 1000;
 
 function shortenAddress(addr: string): string {
   if (!addr || addr.length < 10) return addr;
@@ -51,32 +65,99 @@ function ProfileAvatar({
 }: {
   address: string;
   profiles: Record<string, Profile>;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md";
 }) {
   const profile = profiles[address.toLowerCase()];
-  const sizeClass = size === "lg" ? "h-10 w-10" : size === "md" ? "h-8 w-8" : "h-6 w-6";
-  const textSize = size === "lg" ? "text-sm" : size === "md" ? "text-xs" : "text-[10px]";
+  const imgUrl = profile?.avatarUrl || profile?.imageUrl;
+  const sizeClass = size === "md" ? "h-8 w-8" : "h-6 w-6";
+  const textSize = size === "md" ? "text-xs" : "text-[10px]";
 
   return (
     <div className="flex items-center gap-2 min-w-0">
-      {profile?.avatarUrl ? (
-        <img
-          src={profile.avatarUrl}
-          alt=""
-          className={`${sizeClass} rounded-full object-cover flex-shrink-0`}
-        />
+      {imgUrl ? (
+        <img src={imgUrl} alt="" className={`${sizeClass} rounded-full object-cover flex-shrink-0`} />
       ) : (
-        <div
-          className={`${sizeClass} rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0`}
-        >
-          <span className={`${textSize} font-bold text-emerald-600`}>
-            {address.slice(2, 4).toUpperCase()}
-          </span>
+        <div className={`${sizeClass} rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0`}>
+          <span className={`${textSize} font-bold text-emerald-600`}>{address.slice(2, 4).toUpperCase()}</span>
         </div>
       )}
       <span className="truncate text-sm font-medium text-ink">
         {profile?.name || shortenAddress(address)}
       </span>
+    </div>
+  );
+}
+
+function Accordion({
+  title,
+  icon,
+  badge,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  badge?: string | number;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div className="rounded-2xl border border-ink/5 bg-white shadow-sm overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-5 hover:bg-slate-50/50 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          {icon}
+          <span className="font-display text-lg font-bold text-ink">{title}</span>
+          {badge !== undefined && (
+            <span className="text-xs font-semibold bg-ink/5 text-ink/50 px-2.5 py-0.5 rounded-full">
+              {badge}
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`h-5 w-5 text-ink/30 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="px-5 pb-5 pt-0">{children}</div>}
+    </div>
+  );
+}
+
+function InactiveFilter({
+  locale,
+  selected,
+  onChange,
+}: {
+  locale: "fr" | "en";
+  selected: string;
+  onChange: (v: string) => void;
+}) {
+  const t = translations.dao;
+  const options = [
+    { value: "5d", label: t.since5days[locale] },
+    { value: "2w", label: t.since2weeks[locale] },
+    { value: "1m", label: t.since1month[locale] },
+    { value: "never", label: t.neverContributed[locale] },
+    { value: "all", label: t.allInactive[locale] },
+  ];
+
+  return (
+    <div className="flex flex-wrap gap-2 mb-4">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
+            selected === opt.value
+              ? "bg-red-100 text-red-700 shadow-sm"
+              : "bg-ink/5 text-ink/40 hover:bg-ink/10 hover:text-ink/60"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -88,76 +169,118 @@ export default function DashboardDaoPage() {
   const [data, setData] = useState<DaoData | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inactiveFilter, setInactiveFilter] = useState("5d");
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  async function fetchProfiles(addresses: string[]) {
+    const batchSize = 30;
+    for (let i = 0; i < addresses.length; i += batchSize) {
+      const batch = addresses.slice(i, i + batchSize);
+      try {
+        const profileRes = await fetch("/api/profiles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ addresses: batch }),
+        });
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          setProfiles((prev) => ({ ...prev, ...(profileData.profiles || {}) }));
+        }
+      } catch {}
+    }
+  }
+
+  async function loadData(isRefresh = false) {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const res = await fetch("/api/dao");
+      if (!res.ok) throw new Error("API error");
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setData(json);
+      setLoading(false);
+      setRefreshing(false);
+
+      const allAddresses = new Set<string>();
+      (json.members || []).forEach((m: string) => allAddresses.add(m));
+      (json.contributions || []).forEach((c: any) => allAddresses.add(c.address));
+      (json.allAffiliates || []).forEach((a: string) => allAddresses.add(a));
+      fetchProfiles([...allAddresses]);
+    } catch (err: any) {
+      setError(err.message || "Unknown error");
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/dao");
-        if (!res.ok) throw new Error("API error");
-        const json = await res.json();
-        if (json.error) throw new Error(json.error);
-        if (cancelled) return;
-        setData(json);
-        setLoading(false);
-
-        const allAddresses = new Set<string>();
-        (json.members || []).forEach((m: string) => allAddresses.add(m));
-        (json.contributions || []).forEach((c: any) => allAddresses.add(c.address));
-        const addressList = [...allAddresses];
-
-        if (addressList.length > 0 && !cancelled) {
-          const batchSize = 30;
-          for (let i = 0; i < addressList.length; i += batchSize) {
-            if (cancelled) return;
-            const batch = addressList.slice(i, i + batchSize);
-            try {
-              const profileRes = await fetch("/api/profiles", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ addresses: batch }),
-              });
-              if (profileRes.ok && !cancelled) {
-                const profileData = await profileRes.json();
-                setProfiles((prev) => ({ ...prev, ...(profileData.profiles || {}) }));
-              }
-            } catch {}
-          }
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          setError(err.message || "Unknown error");
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
+    loadData();
+    intervalRef.current = setInterval(() => loadData(true), AUTO_REFRESH_MS);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, []);
 
-  const contributorSet = new Set(
-    data?.contributions?.map((c) => c.address.toLowerCase()) || []
-  );
-  const inactiveMembers =
-    data?.members.filter((m) => !contributorSet.has(m.toLowerCase())) || [];
+  function getFilteredInactive(): string[] {
+    if (!data?.inactive) return [];
+    switch (inactiveFilter) {
+      case "5d":
+        return data.inactive.fiveDays;
+      case "2w":
+        return data.inactive.twoWeeks;
+      case "1m":
+        return data.inactive.oneMonth;
+      case "never":
+        return data.inactive.never;
+      case "all":
+        return [
+          ...data.inactive.fiveDays,
+          ...data.inactive.twoWeeks,
+          ...data.inactive.oneMonth,
+          ...data.inactive.never,
+        ];
+      default:
+        return data.inactive.fiveDays;
+    }
+  }
+
+  const totalInactive = data
+    ? (data.inactive.fiveDays.length + data.inactive.twoWeeks.length + data.inactive.oneMonth.length + data.inactive.never.length)
+    : 0;
+
+  const totalCRC = data
+    ? data.contributions.reduce((sum, c) => sum + c.totalCRC, 0)
+    : 0;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors"
-          >
+          <Link href="/" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
             <ArrowLeft className="h-4 w-4" />
             {t.back[locale]}
           </Link>
-          <LanguageSwitcher />
+          <div className="flex items-center gap-3">
+            {data && (
+              <button
+                onClick={() => loadData(true)}
+                disabled={refreshing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-ink/40 hover:text-ink/70 hover:bg-ink/5 transition-colors disabled:opacity-50"
+                title={t.refreshData[locale]}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                {t.refresh[locale]}
+              </button>
+            )}
+            <LanguageSwitcher />
+          </div>
         </div>
 
         <header className="text-center mb-10">
@@ -183,7 +306,7 @@ export default function DashboardDaoPage() {
             <p className="text-ink/60">{t.error[locale]}</p>
             <p className="text-sm text-ink/40">{error}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => loadData()}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 transition-colors"
             >
               <RefreshCw className="h-4 w-4" />
@@ -193,191 +316,168 @@ export default function DashboardDaoPage() {
         )}
 
         {data && !loading && (
-          <div className="space-y-8">
-            <div className="grid gap-4 md:grid-cols-3">
-              <StatCard
-                icon={<Users className="h-5 w-5 text-emerald-500" />}
-                value={data.totalMembers}
-                label={t.members[locale]}
-              />
-              <StatCard
-                icon={<Network className="h-5 w-5 text-blue-500" />}
-                value={data.memberRelations.length}
-                label={t.trustRelations[locale]}
-              />
-              <StatCard
-                icon={<Trophy className="h-5 w-5 text-amber-500" />}
-                value={data.contributions.length}
-                label={t.totalContributions[locale]}
-              />
+          <div className="space-y-4">
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+              <StatCard icon={<Users className="h-4 w-4 text-emerald-500" />} value={data.totalMembers} label={t.members[locale]} />
+              <StatCard icon={<Users className="h-4 w-4 text-blue-500" />} value={data.totalAffiliates} label={t.affiliates[locale]} />
+              <StatCard icon={<Network className="h-4 w-4 text-violet-500" />} value={data.memberRelations.length} label={t.trustRelations[locale]} />
+              <StatCard icon={<Trophy className="h-4 w-4 text-amber-500" />} value={`${Math.round(totalCRC)}`} label="CRC" />
             </div>
 
-            <div className="grid gap-8 lg:grid-cols-2">
-              <section className="rounded-2xl border border-ink/5 bg-white p-6 shadow-sm">
-                <h2 className="font-display text-lg font-bold text-ink flex items-center gap-2 mb-1">
-                  <Users className="h-5 w-5 text-emerald-500" />
-                  {t.members[locale]}
-                </h2>
-                <p className="text-xs text-ink/40 mb-4">
-                  {data.totalMembers} {t.totalMembers[locale]}
-                </p>
-                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                  {data.members.map((addr) => {
-                    const trust = data.memberTrust[addr];
-                    return (
-                      <div
-                        key={addr}
-                        className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors"
-                      >
-                        <ProfileAvatar address={addr} profiles={profiles} size="sm" />
-                        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                          {trust?.trustedByGroup && trust?.trustsGroup ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium">
-                              {t.mutual[locale]}
-                            </span>
-                          ) : trust?.trustedByGroup ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">
-                              {t.trustedByGroup[locale]}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">
-                              {t.trustsGroup[locale]}
-                            </span>
-                          )}
-                          <a
-                            href={`https://circles.garden/profile/${addr}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-ink/20 hover:text-ink/50 transition-colors"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <section className="rounded-2xl border border-ink/5 bg-white p-6 shadow-sm">
-                <h2 className="font-display text-lg font-bold text-ink flex items-center gap-2 mb-1">
-                  <Trophy className="h-5 w-5 text-amber-500" />
-                  {t.topContributors[locale]}
-                </h2>
-                <p className="text-xs text-ink/40 mb-4">
-                  {locale === "fr"
-                    ? "Classement par nombre de transactions vers la trésorerie"
-                    : "Ranked by number of transactions to treasury"}
-                </p>
-                {data.contributions.length === 0 ? (
-                  <p className="text-sm text-ink/40 py-8 text-center">
-                    {t.noContributions[locale]}
-                  </p>
-                ) : (
-                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                    {data.contributions.map((contrib, idx) => (
-                      <div
-                        key={contrib.address}
-                        className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors"
-                      >
-                        <span className="text-sm font-bold text-ink/30 w-6 text-right flex-shrink-0">
-                          {idx + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <ProfileAvatar
-                            address={contrib.address}
-                            profiles={profiles}
-                            size="sm"
-                          />
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xs font-semibold text-ink">
-                            {contrib.count} {t.transactions[locale]}
-                          </p>
-                          {contrib.totalAmount > 0 && (
-                            <p className="text-[10px] text-ink/40">
-                              {contrib.totalAmount} CRC
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
-
-            <section className="rounded-2xl border border-ink/5 bg-white p-6 shadow-sm">
-              <h2 className="font-display text-lg font-bold text-ink flex items-center gap-2 mb-1">
-                <Network className="h-5 w-5 text-blue-500" />
-                {t.trustNetwork[locale]}
-              </h2>
-              <p className="text-xs text-ink/40 mb-4">
-                {data.memberRelations.length} {t.trustRelations[locale]}
+            <Accordion
+              title={t.members[locale]}
+              icon={<Users className="h-5 w-5 text-emerald-500" />}
+              badge={data.totalMembers}
+            >
+              <p className="text-xs text-ink/40 mb-3">
+                {data.totalMembers} {t.totalMembers[locale]}
               </p>
-              <TrustNetworkViz
-                members={data.members}
-                relations={data.memberRelations}
-                profiles={profiles}
-              />
-            </section>
-
-            <section className="rounded-2xl border border-ink/5 bg-white p-6 shadow-sm">
-              <h2 className="font-display text-lg font-bold text-ink flex items-center gap-2 mb-1">
-                <UserX className="h-5 w-5 text-red-400" />
-                {t.inactiveMembers[locale]}
-              </h2>
-              <p className="text-xs text-ink/40 mb-4">
-                {t.inactiveDesc[locale]} ({inactiveMembers.length})
-              </p>
-              {inactiveMembers.length === 0 ? (
-                <div className="py-6 text-center text-sm text-ink/40 flex items-center justify-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-emerald-400" />
-                  {locale === "fr"
-                    ? "Tous les membres ont contribué !"
-                    : "All members have contributed!"}
-                </div>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-                  {inactiveMembers.map((addr) => (
-                    <div
-                      key={addr}
-                      className="flex items-center gap-2 py-2 px-3 rounded-xl bg-red-50/50"
-                    >
-                      <XCircle className="h-3.5 w-3.5 text-red-300 flex-shrink-0" />
+              <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                {data.members.map((addr) => {
+                  const trust = data.memberTrust[addr];
+                  return (
+                    <div key={addr} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
                       <ProfileAvatar address={addr} profiles={profiles} size="sm" />
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        {trust?.trustedByGroup && trust?.trustsGroup ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium">{t.mutual[locale]}</span>
+                        ) : trust?.trustedByGroup ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">{t.trustedByGroup[locale]}</span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">{t.trustsGroup[locale]}</span>
+                        )}
+                        <a
+                          href={`https://circles.garden/profile/${addr}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-ink/20 hover:text-ink/50 transition-colors"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Accordion>
+
+            <Accordion
+              title={t.topContributors[locale]}
+              icon={<Trophy className="h-5 w-5 text-amber-500" />}
+              badge={data.contributions.length}
+              defaultOpen
+            >
+              <p className="text-xs text-ink/40 mb-3">
+                {t.contributorsDesc[locale]}
+              </p>
+              {data.contributions.length === 0 ? (
+                <p className="text-sm text-ink/40 py-8 text-center">{t.noContributions[locale]}</p>
+              ) : (
+                <div className="space-y-1 max-h-96 overflow-y-auto pr-1">
+                  {data.contributions.map((contrib, idx) => (
+                    <div key={contrib.address} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                      <span className="text-sm font-bold text-ink/20 w-6 text-right flex-shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <ProfileAvatar address={contrib.address} profiles={profiles} size="sm" />
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-amber-600">
+                          {contrib.totalCRC.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
+                        </p>
+                        {contrib.lastContributionTs > 0 && (
+                          <p className="text-[10px] text-ink/30">
+                            {formatTimeAgo(contrib.lastContributionTs, locale)}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
-            </section>
+            </Accordion>
+
+            <Accordion
+              title={t.trustNetwork[locale]}
+              icon={<Network className="h-5 w-5 text-blue-500" />}
+              badge={data.memberRelations.length}
+            >
+              <p className="text-xs text-ink/40 mb-3">
+                {data.memberRelations.length} {t.trustRelations[locale]}
+              </p>
+              <TrustNetworkViz members={data.members} relations={data.memberRelations} profiles={profiles} />
+            </Accordion>
+
+            <Accordion
+              title={t.inactiveMembers[locale]}
+              icon={<UserX className="h-5 w-5 text-red-400" />}
+              badge={totalInactive}
+            >
+              <InactiveFilter locale={locale} selected={inactiveFilter} onChange={setInactiveFilter} />
+              {(() => {
+                const filtered = getFilteredInactive();
+                const contribMap = new Map(
+                  data.contributions.map((c) => [c.address, c])
+                );
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-6 text-center text-sm text-ink/40 flex items-center justify-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-400" />
+                      {t.allActive[locale]}
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                    {filtered.map((addr) => {
+                      const contrib = contribMap.get(addr);
+                      return (
+                        <div key={addr} className="flex items-center justify-between py-2 px-3 rounded-xl bg-red-50/30 hover:bg-red-50/60 transition-colors">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <XCircle className="h-3.5 w-3.5 text-red-300 flex-shrink-0" />
+                            <ProfileAvatar address={addr} profiles={profiles} size="sm" />
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            {contrib && contrib.lastContributionTs > 0 ? (
+                              <p className="text-[10px] text-ink/30">
+                                {t.lastContribution[locale]}: {formatTimeAgo(contrib.lastContributionTs, locale)}
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-red-400 font-medium">
+                                {t.never[locale]}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </Accordion>
 
             <footer className="text-center space-y-2 pt-4 pb-8">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-ink/30">
                 <span>
                   {t.groupAddress[locale]}:{" "}
-                  <a
-                    href={`https://gnosisscan.io/address/${data.groupAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono hover:text-ink/50 transition-colors"
-                  >
+                  <a href={`https://gnosisscan.io/address/${data.groupAddress}`} target="_blank" rel="noopener noreferrer" className="font-mono hover:text-ink/50 transition-colors">
                     {shortenAddress(data.groupAddress)}
                   </a>
                 </span>
                 <span className="hidden sm:inline">|</span>
                 <span>
                   {t.treasuryAddress[locale]}:{" "}
-                  <a
-                    href={`https://gnosisscan.io/address/${data.treasuryAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono hover:text-ink/50 transition-colors"
-                  >
+                  <a href={`https://gnosisscan.io/address/${data.treasuryAddress}`} target="_blank" rel="noopener noreferrer" className="font-mono hover:text-ink/50 transition-colors">
                     {shortenAddress(data.treasuryAddress)}
                   </a>
                 </span>
               </div>
+              {data.fetchedAt && (
+                <p className="text-[10px] text-ink/20">
+                  {t.lastUpdate[locale]}: {new Date(data.fetchedAt).toLocaleTimeString(locale === "fr" ? "fr-FR" : "en-US")}
+                </p>
+              )}
             </footer>
           </div>
         )}
@@ -386,23 +486,34 @@ export default function DashboardDaoPage() {
   );
 }
 
-function StatCard({
-  icon,
-  value,
-  label,
-}: {
-  icon: React.ReactNode;
-  value: number;
-  label: string;
-}) {
+function formatTimeAgo(ts: number, locale: "fr" | "en"): string {
+  const now = Date.now() / 1000;
+  const diff = now - ts;
+  const days = Math.floor(diff / 86400);
+  const hours = Math.floor(diff / 3600);
+  const minutes = Math.floor(diff / 60);
+
+  if (locale === "fr") {
+    if (days > 30) return `il y a ${Math.floor(days / 30)} mois`;
+    if (days > 0) return `il y a ${days}j`;
+    if (hours > 0) return `il y a ${hours}h`;
+    if (minutes > 0) return `il y a ${minutes}min`;
+    return "maintenant";
+  }
+  if (days > 30) return `${Math.floor(days / 30)}mo ago`;
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return "now";
+}
+
+function StatCard({ icon, value, label }: { icon: React.ReactNode; value: number | string; label: string }) {
   return (
-    <div className="rounded-2xl border border-ink/5 bg-white p-5 shadow-sm flex items-center gap-4">
-      <div className="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">
-        {icon}
-      </div>
+    <div className="rounded-2xl border border-ink/5 bg-white p-4 shadow-sm flex items-center gap-3">
+      <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">{icon}</div>
       <div>
-        <p className="text-2xl font-bold text-ink">{value}</p>
-        <p className="text-xs text-ink/40">{label}</p>
+        <p className="text-xl font-bold text-ink">{value}</p>
+        <p className="text-[10px] text-ink/40">{label}</p>
       </div>
     </div>
   );
@@ -425,10 +536,7 @@ function TrustNetworkViz({
     connectionCount[r.to] = (connectionCount[r.to] || 0) + 1;
   }
 
-  const sorted = [...members].sort(
-    (a, b) => (connectionCount[b] || 0) - (connectionCount[a] || 0)
-  );
-
+  const sorted = [...members].sort((a, b) => (connectionCount[b] || 0) - (connectionCount[a] || 0));
   const topN = 20;
   const top = sorted.slice(0, topN);
 
@@ -440,6 +548,7 @@ function TrustNetworkViz({
           const maxCount = connectionCount[sorted[0]] || 1;
           const intensity = Math.max(0.2, count / maxCount);
           const profile = profiles[addr.toLowerCase()];
+          const imgUrl = profile?.avatarUrl || profile?.imageUrl;
           return (
             <div
               key={addr}
@@ -450,33 +559,23 @@ function TrustNetworkViz({
                 backgroundColor: `rgba(16, 185, 129, ${intensity * 0.08})`,
               }}
             >
-              {profile?.avatarUrl ? (
-                <img
-                  src={profile.avatarUrl}
-                  alt=""
-                  className="h-5 w-5 rounded-full object-cover"
-                />
+              {imgUrl ? (
+                <img src={imgUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
               ) : (
                 <div className="h-5 w-5 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <span className="text-[8px] font-bold text-emerald-600">
-                    {addr.slice(2, 4).toUpperCase()}
-                  </span>
+                  <span className="text-[8px] font-bold text-emerald-600">{addr.slice(2, 4).toUpperCase()}</span>
                 </div>
               )}
               <span className="text-xs font-medium text-ink truncate max-w-24">
                 {profile?.name || shortenAddress(addr)}
               </span>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-1.5">
-                {count}
-              </span>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-1.5">{count}</span>
             </div>
           );
         })}
       </div>
       {members.length > topN && (
-        <p className="text-xs text-ink/30 text-center">
-          +{members.length - topN} more
-        </p>
+        <p className="text-xs text-ink/30 text-center">+{members.length - topN} {members.length - topN > 1 ? "more" : "more"}</p>
       )}
     </div>
   );

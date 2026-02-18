@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     try {
       const memberSet = new Set(members);
       for (const member of members) {
-        const rels = await rpc.trust.getAggregatedTrustRelations(member);
+        const rels = await rpc.trust.getAggregatedTrustRelations(member as `0x${string}`);
         for (const rel of rels) {
           const other = (rel.objectAvatar || "").toLowerCase();
           if (memberSet.has(other) && other !== NF_GROUP_ADDRESS && other !== member) {
@@ -74,59 +74,50 @@ export async function GET(req: NextRequest) {
       console.error("Error fetching member relations:", e);
     }
 
-    let contributions: Array<{ address: string; totalAmount: number; lastContribution: string; count: number }> = [];
-    try {
-      const txQuery = rpc.transaction.getTransactionHistory(NF_TREASURY_ADDRESS, 100);
-      let hasMore = await txQuery.queryNextPage();
-      const allTx: any[] = [];
+    let contributions = await getContributions(rpc);
 
-      while (hasMore) {
-        if (txQuery.currentPage?.results) {
-          allTx.push(...txQuery.currentPage.results);
-        }
-        hasMore = await txQuery.queryNextPage();
+    const memberSetForContribs = new Set(members);
+    for (const c of contributions) {
+      c.isMember = memberSetForContribs.has(c.address);
+    }
+
+    const now = Date.now();
+    const fiveDaysMs = 5 * 24 * 60 * 60 * 1000;
+    const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
+    const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
+
+    const memberSet = new Set(members);
+    const contributorMap: Record<string, { totalCRC: number; lastContributionTs: number }> = {};
+    for (const c of contributions) {
+      contributorMap[c.address] = {
+        totalCRC: c.totalCRC,
+        lastContributionTs: c.lastContributionTs,
+      };
+    }
+
+    const allAffiliates = [...new Set([...members, ...contributions.map((c) => c.address)])];
+
+    const inactive: {
+      fiveDays: string[];
+      twoWeeks: string[];
+      oneMonth: string[];
+      never: string[];
+    } = { fiveDays: [], twoWeeks: [], oneMonth: [], never: [] };
+
+    for (const addr of allAffiliates) {
+      const contrib = contributorMap[addr];
+      if (!contrib || contrib.lastContributionTs === 0) {
+        inactive.never.push(addr);
+        continue;
       }
-
-      if (allTx.length > 0) {
-        const contribMap: Record<string, { total: number; last: string; count: number }> = {};
-
-        for (const tx of allTx) {
-          const from = (tx.from || "").toLowerCase();
-          const to = (tx.to || "").toLowerCase();
-          if (to !== NF_TREASURY_ADDRESS) continue;
-
-          const amount = parseFloat(tx.timeCircles || "0");
-
-          if (!contribMap[from]) {
-            contribMap[from] = { total: 0, last: "", count: 0 };
-          }
-          contribMap[from].total += amount;
-          contribMap[from].count += 1;
-          const ts = tx.timestamp?.toString() || "";
-          if (ts > contribMap[from].last) {
-            contribMap[from].last = ts;
-          }
-        }
-
-        contributions = Object.entries(contribMap)
-          .map(([address, d]) => ({
-            address,
-            totalAmount: Math.round(d.total * 100) / 100,
-            lastContribution: d.last,
-            count: d.count,
-          }))
-          .sort((a, b) => b.count - a.count);
-      }
-
-      if (contributions.length === 0) {
-        contributions = await getContributionsFromChain();
-      }
-    } catch (e) {
-      console.error("Error fetching contributions:", e);
-      try {
-        contributions = await getContributionsFromChain();
-      } catch (e2) {
-        console.error("Fallback chain contributions also failed:", e2);
+      const lastTs = contrib.lastContributionTs * 1000;
+      const elapsed = now - lastTs;
+      if (elapsed > oneMonthMs) {
+        inactive.oneMonth.push(addr);
+      } else if (elapsed > twoWeeksMs) {
+        inactive.twoWeeks.push(addr);
+      } else if (elapsed > fiveDaysMs) {
+        inactive.fiveDays.push(addr);
       }
     }
 
@@ -137,7 +128,11 @@ export async function GET(req: NextRequest) {
       memberTrust,
       memberRelations,
       contributions,
+      allAffiliates,
+      inactive,
       totalMembers: members.length,
+      totalAffiliates: allAffiliates.length,
+      fetchedAt: Date.now(),
     });
   } catch (error: any) {
     console.error("DAO API error:", error);
@@ -148,11 +143,69 @@ export async function GET(req: NextRequest) {
   }
 }
 
+async function getContributions(rpc: CirclesRpc): Promise<Array<{
+  address: string;
+  totalCRC: number;
+  lastContributionTs: number;
+  isMember: boolean;
+}>> {
+  try {
+    const txQuery = rpc.transaction.getTransactionHistory(NF_TREASURY_ADDRESS, 100);
+    let hasMore = await txQuery.queryNextPage();
+    const allTx: any[] = [];
+
+    while (hasMore) {
+      if (txQuery.currentPage?.results) {
+        allTx.push(...txQuery.currentPage.results);
+      }
+      hasMore = await txQuery.queryNextPage();
+    }
+
+    if (allTx.length > 0) {
+      const contribMap: Record<string, { total: number; lastTs: number }> = {};
+
+      for (const tx of allTx) {
+        const from = (tx.from || "").toLowerCase();
+        const to = (tx.to || "").toLowerCase();
+        if (to !== NF_TREASURY_ADDRESS) continue;
+
+        const amount = Math.abs(parseFloat(tx.timeCircles || "0"));
+        if (amount === 0) continue;
+
+        const ts = parseInt(tx.timestamp?.toString() || "0") || 0;
+
+        if (!contribMap[from]) {
+          contribMap[from] = { total: 0, lastTs: 0 };
+        }
+        contribMap[from].total += amount;
+        if (ts > contribMap[from].lastTs) {
+          contribMap[from].lastTs = ts;
+        }
+      }
+
+      const results = Object.entries(contribMap)
+        .map(([address, d]) => ({
+          address,
+          totalCRC: Math.round(d.total * 100) / 100,
+          lastContributionTs: d.lastTs,
+          isMember: false,
+        }))
+        .sort((a, b) => b.totalCRC - a.totalCRC);
+
+      if (results.length > 0) return results;
+    }
+  } catch (e) {
+    console.error("Error fetching contributions from SDK:", e);
+  }
+
+  return await getContributionsFromChain();
+}
+
 async function getContributionsFromChain(): Promise<Array<{
   address: string;
-  totalAmount: number;
-  lastContribution: string;
-  count: number;
+  totalCRC: number;
+  lastContributionTs: number;
+  isMember: boolean;
 }>> {
   const transferTopic = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62";
   const treasuryPadded = "0x" + NF_TREASURY_ADDRESS.slice(2).padStart(64, "0");
@@ -188,7 +241,7 @@ async function getContributionsFromChain(): Promise<Array<{
     }
   }
 
-  const contribMap: Record<string, { total: bigint; last: number; count: number }> = {};
+  const contribMap: Record<string, { total: bigint; lastTs: number }> = {};
   for (const log of logs) {
     const from = "0x" + log.topics[2].slice(26).toLowerCase();
     const dataHex = log.data || "0x";
@@ -197,19 +250,18 @@ async function getContributionsFromChain(): Promise<Array<{
     const ts = blockTimestamps[log.blockNumber] || 0;
 
     if (!contribMap[from]) {
-      contribMap[from] = { total: 0n, last: 0, count: 0 };
+      contribMap[from] = { total: 0n, lastTs: 0 };
     }
     contribMap[from].total += value;
-    contribMap[from].count += 1;
-    if (ts > contribMap[from].last) contribMap[from].last = ts;
+    if (ts > contribMap[from].lastTs) contribMap[from].lastTs = ts;
   }
 
   return Object.entries(contribMap)
     .map(([address, d]) => ({
       address,
-      totalAmount: Number(d.total / BigInt(10 ** 18)),
-      lastContribution: d.last > 0 ? new Date(d.last * 1000).toISOString() : "",
-      count: d.count,
+      totalCRC: Math.round(Number(d.total * 100n / BigInt(10 ** 18))) / 100,
+      lastContributionTs: d.lastTs,
+      isMember: false,
     }))
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => b.totalCRC - a.totalCRC);
 }
