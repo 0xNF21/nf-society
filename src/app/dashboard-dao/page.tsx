@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   BarChart3,
   Users,
-  Network,
   Trophy,
   AlertCircle,
   Loader2,
@@ -16,6 +15,8 @@ import {
   XCircle,
   UserX,
   ChevronDown,
+  Flame,
+  Star,
   Clock,
 } from "lucide-react";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
@@ -26,7 +27,6 @@ type DaoData = {
   treasuryAddress: string;
   members: string[];
   memberTrust: Record<string, { trustedByGroup: boolean; trustsGroup: boolean }>;
-  memberRelations: Array<{ from: string; to: string }>;
   contributions: Array<{
     address: string;
     totalCRC: number;
@@ -38,8 +38,20 @@ type DaoData = {
     fiveDays: string[];
     twoWeeks: string[];
     oneMonth: string[];
+    twoMonths: string[];
     never: string[];
   };
+  totalBurned: number;
+  weeklyContributions: Array<{
+    address: string;
+    weeklyCRC: number;
+    isMember: boolean;
+  }>;
+  latestClaims: Array<{
+    address: string;
+    amount: number;
+    timestamp: number;
+  }>;
   totalMembers: number;
   totalAffiliates: number;
   fetchedAt: number;
@@ -139,6 +151,7 @@ function InactiveFilter({
     { value: "5d", label: t.since5days[locale] },
     { value: "2w", label: t.since2weeks[locale] },
     { value: "1m", label: t.since1month[locale] },
+    { value: "2m", label: t.since2months[locale] },
     { value: "never", label: t.neverContributed[locale] },
     { value: "all", label: t.allInactive[locale] },
   ];
@@ -212,6 +225,8 @@ export default function DashboardDaoPage() {
       (json.members || []).forEach((m: string) => allAddresses.add(m));
       (json.contributions || []).forEach((c: any) => allAddresses.add(c.address));
       (json.allAffiliates || []).forEach((a: string) => allAddresses.add(a));
+      (json.weeklyContributions || []).forEach((c: any) => allAddresses.add(c.address));
+      (json.latestClaims || []).forEach((c: any) => allAddresses.add(c.address));
       fetchProfiles([...allAddresses]);
     } catch (err: any) {
       setError(err.message || "Unknown error");
@@ -230,29 +245,48 @@ export default function DashboardDaoPage() {
 
   function getFilteredInactive(): string[] {
     if (!data?.inactive) return [];
+    let list: string[];
     switch (inactiveFilter) {
       case "5d":
-        return data.inactive.fiveDays;
+        list = data.inactive.fiveDays;
+        break;
       case "2w":
-        return data.inactive.twoWeeks;
+        list = data.inactive.twoWeeks;
+        break;
       case "1m":
-        return data.inactive.oneMonth;
+        list = data.inactive.oneMonth;
+        break;
+      case "2m":
+        list = data.inactive.twoMonths;
+        break;
       case "never":
-        return data.inactive.never;
+        list = data.inactive.never;
+        break;
       case "all":
-        return [
+        list = [
           ...data.inactive.fiveDays,
           ...data.inactive.twoWeeks,
           ...data.inactive.oneMonth,
+          ...data.inactive.twoMonths,
           ...data.inactive.never,
         ];
+        break;
       default:
-        return data.inactive.fiveDays;
+        list = data.inactive.fiveDays;
     }
+
+    const contribMap = new Map(
+      data.contributions.map((c) => [c.address, c])
+    );
+    return [...list].sort((a, b) => {
+      const aTs = contribMap.get(a)?.lastContributionTs || 0;
+      const bTs = contribMap.get(b)?.lastContributionTs || 0;
+      return aTs - bTs;
+    });
   }
 
   const totalInactive = data
-    ? (data.inactive.fiveDays.length + data.inactive.twoWeeks.length + data.inactive.oneMonth.length + data.inactive.never.length)
+    ? (data.inactive.fiveDays.length + data.inactive.twoWeeks.length + data.inactive.oneMonth.length + (data.inactive.twoMonths?.length || 0) + data.inactive.never.length)
     : 0;
 
   const totalCRC = data
@@ -320,9 +354,109 @@ export default function DashboardDaoPage() {
             <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
               <StatCard icon={<Users className="h-4 w-4 text-emerald-500" />} value={data.totalMembers} label={t.members[locale]} />
               <StatCard icon={<Users className="h-4 w-4 text-blue-500" />} value={data.totalAffiliates} label={t.affiliates[locale]} />
-              <StatCard icon={<Network className="h-4 w-4 text-violet-500" />} value={data.memberRelations.length} label={t.trustRelations[locale]} />
-              <StatCard icon={<Trophy className="h-4 w-4 text-amber-500" />} value={`${Math.round(totalCRC)}`} label="CRC" />
+              <StatCard icon={<Trophy className="h-4 w-4 text-amber-500" />} value={`${Math.round(totalCRC).toLocaleString()}`} label={t.totalCrc[locale]} />
+              <StatCard icon={<Flame className="h-4 w-4 text-red-500" />} value={`${data.totalBurned}`} label={t.crcBurned[locale]} />
             </div>
+
+            <Accordion
+              title={t.latestClaims[locale]}
+              icon={<Clock className="h-5 w-5 text-emerald-500" />}
+              badge={data.latestClaims.length}
+              defaultOpen
+            >
+              <p className="text-xs text-ink/40 mb-3">
+                {t.latestClaimsDesc[locale]}
+              </p>
+              {data.latestClaims.length === 0 ? (
+                <p className="text-sm text-ink/40 py-8 text-center">{t.noContributions[locale]}</p>
+              ) : (
+                <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                  {data.latestClaims.map((claim, idx) => (
+                    <div key={`${claim.address}-${claim.timestamp}-${idx}`} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <ProfileAvatar address={claim.address} profiles={profiles} size="sm" />
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-emerald-600">
+                          +{claim.amount.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
+                        </p>
+                        <p className="text-[10px] text-ink/30">
+                          {formatTimeAgo(claim.timestamp, locale)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Accordion>
+
+            <Accordion
+              title={t.weeklyTop[locale]}
+              icon={<Star className="h-5 w-5 text-yellow-500" />}
+              badge={data.weeklyContributions.length}
+              defaultOpen
+            >
+              <p className="text-xs text-ink/40 mb-3">
+                {t.weeklyTopDesc[locale]}
+              </p>
+              {data.weeklyContributions.length === 0 ? (
+                <p className="text-sm text-ink/40 py-8 text-center">{t.noWeeklyContributions[locale]}</p>
+              ) : (
+                <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                  {data.weeklyContributions.map((contrib, idx) => (
+                    <div key={contrib.address} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                      <span className="text-sm font-bold text-ink/20 w-6 text-right flex-shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <ProfileAvatar address={contrib.address} profiles={profiles} size="sm" />
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-yellow-600">
+                          {contrib.weeklyCRC.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Accordion>
+
+            <Accordion
+              title={t.topContributors[locale]}
+              icon={<Trophy className="h-5 w-5 text-amber-500" />}
+              badge={data.contributions.length}
+            >
+              <p className="text-xs text-ink/40 mb-3">
+                {t.contributorsDesc[locale]}
+              </p>
+              {data.contributions.length === 0 ? (
+                <p className="text-sm text-ink/40 py-8 text-center">{t.noContributions[locale]}</p>
+              ) : (
+                <div className="space-y-1 max-h-96 overflow-y-auto pr-1">
+                  {data.contributions.map((contrib, idx) => (
+                    <div key={contrib.address} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                      <span className="text-sm font-bold text-ink/20 w-6 text-right flex-shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <ProfileAvatar address={contrib.address} profiles={profiles} size="sm" />
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-amber-600">
+                          {contrib.totalCRC.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
+                        </p>
+                        {contrib.lastContributionTs > 0 && (
+                          <p className="text-[10px] text-ink/30">
+                            {formatTimeAgo(contrib.lastContributionTs, locale)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Accordion>
 
             <Accordion
               title={t.members[locale]}
@@ -359,54 +493,6 @@ export default function DashboardDaoPage() {
                   );
                 })}
               </div>
-            </Accordion>
-
-            <Accordion
-              title={t.topContributors[locale]}
-              icon={<Trophy className="h-5 w-5 text-amber-500" />}
-              badge={data.contributions.length}
-              defaultOpen
-            >
-              <p className="text-xs text-ink/40 mb-3">
-                {t.contributorsDesc[locale]}
-              </p>
-              {data.contributions.length === 0 ? (
-                <p className="text-sm text-ink/40 py-8 text-center">{t.noContributions[locale]}</p>
-              ) : (
-                <div className="space-y-1 max-h-96 overflow-y-auto pr-1">
-                  {data.contributions.map((contrib, idx) => (
-                    <div key={contrib.address} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
-                      <span className="text-sm font-bold text-ink/20 w-6 text-right flex-shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <ProfileAvatar address={contrib.address} profiles={profiles} size="sm" />
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-bold text-amber-600">
-                          {contrib.totalCRC.toFixed(2)} <span className="text-[10px] font-normal text-ink/40">CRC</span>
-                        </p>
-                        {contrib.lastContributionTs > 0 && (
-                          <p className="text-[10px] text-ink/30">
-                            {formatTimeAgo(contrib.lastContributionTs, locale)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Accordion>
-
-            <Accordion
-              title={t.trustNetwork[locale]}
-              icon={<Network className="h-5 w-5 text-blue-500" />}
-              badge={data.memberRelations.length}
-            >
-              <p className="text-xs text-ink/40 mb-3">
-                {data.memberRelations.length} {t.trustRelations[locale]}
-              </p>
-              <TrustNetworkViz members={data.members} relations={data.memberRelations} profiles={profiles} />
             </Accordion>
 
             <Accordion
@@ -494,13 +580,15 @@ function formatTimeAgo(ts: number, locale: "fr" | "en"): string {
   const minutes = Math.floor(diff / 60);
 
   if (locale === "fr") {
-    if (days > 30) return `il y a ${Math.floor(days / 30)} mois`;
+    if (days > 60) return `il y a ${Math.floor(days / 30)} mois`;
+    if (days > 30) return `il y a 1 mois`;
     if (days > 0) return `il y a ${days}j`;
     if (hours > 0) return `il y a ${hours}h`;
     if (minutes > 0) return `il y a ${minutes}min`;
     return "maintenant";
   }
-  if (days > 30) return `${Math.floor(days / 30)}mo ago`;
+  if (days > 60) return `${Math.floor(days / 30)}mo ago`;
+  if (days > 30) return `1mo ago`;
   if (days > 0) return `${days}d ago`;
   if (hours > 0) return `${hours}h ago`;
   if (minutes > 0) return `${minutes}m ago`;
@@ -515,68 +603,6 @@ function StatCard({ icon, value, label }: { icon: React.ReactNode; value: number
         <p className="text-xl font-bold text-ink">{value}</p>
         <p className="text-[10px] text-ink/40">{label}</p>
       </div>
-    </div>
-  );
-}
-
-function TrustNetworkViz({
-  members,
-  relations,
-  profiles,
-}: {
-  members: string[];
-  relations: Array<{ from: string; to: string }>;
-  profiles: Record<string, Profile>;
-}) {
-  if (members.length === 0) return null;
-
-  const connectionCount: Record<string, number> = {};
-  for (const r of relations) {
-    connectionCount[r.from] = (connectionCount[r.from] || 0) + 1;
-    connectionCount[r.to] = (connectionCount[r.to] || 0) + 1;
-  }
-
-  const sorted = [...members].sort((a, b) => (connectionCount[b] || 0) - (connectionCount[a] || 0));
-  const topN = 20;
-  const top = sorted.slice(0, topN);
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        {top.map((addr) => {
-          const count = connectionCount[addr] || 0;
-          const maxCount = connectionCount[sorted[0]] || 1;
-          const intensity = Math.max(0.2, count / maxCount);
-          const profile = profiles[addr.toLowerCase()];
-          const imgUrl = profile?.avatarUrl || profile?.imageUrl;
-          return (
-            <div
-              key={addr}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-ink/5 bg-white shadow-sm hover:shadow-md transition-shadow"
-              title={`${profile?.name || addr}: ${count} connections`}
-              style={{
-                borderColor: `rgba(16, 185, 129, ${intensity})`,
-                backgroundColor: `rgba(16, 185, 129, ${intensity * 0.08})`,
-              }}
-            >
-              {imgUrl ? (
-                <img src={imgUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
-              ) : (
-                <div className="h-5 w-5 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <span className="text-[8px] font-bold text-emerald-600">{addr.slice(2, 4).toUpperCase()}</span>
-                </div>
-              )}
-              <span className="text-xs font-medium text-ink truncate max-w-24">
-                {profile?.name || shortenAddress(addr)}
-              </span>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-1.5">{count}</span>
-            </div>
-          );
-        })}
-      </div>
-      {members.length > topN && (
-        <p className="text-xs text-ink/30 text-center">+{members.length - topN} {members.length - topN > 1 ? "more" : "more"}</p>
-      )}
     </div>
   );
 }
