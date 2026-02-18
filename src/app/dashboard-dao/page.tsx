@@ -54,6 +54,7 @@ type DaoData = {
   }>;
   totalMembers: number;
   totalAffiliates: number;
+  activeAffiliates5d: number;
   fetchedAt: number;
 };
 
@@ -351,9 +352,10 @@ export default function DashboardDaoPage() {
 
         {data && !loading && (
           <div className="space-y-4">
-            <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
               <StatCard icon={<Users className="h-4 w-4 text-emerald-500" />} value={data.totalMembers} label={t.members[locale]} />
               <StatCard icon={<Users className="h-4 w-4 text-blue-500" />} value={data.totalAffiliates} label={t.affiliates[locale]} />
+              <StatCard icon={<Users className="h-4 w-4 text-green-500" />} value={data.activeAffiliates5d} label={t.activeAffiliates[locale]} />
               <StatCard icon={<Trophy className="h-4 w-4 text-amber-500" />} value={`${Math.round(totalCRC).toLocaleString()}`} label={t.totalCrc[locale]} />
               <StatCard icon={<Flame className="h-4 w-4 text-red-500" />} value={`${data.totalBurned}`} label={t.crcBurned[locale]} />
             </div>

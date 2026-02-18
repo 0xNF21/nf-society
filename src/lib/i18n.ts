@@ -339,6 +339,7 @@ export const translations = {
     lastUpdate: { fr: "Dernière mise à jour", en: "Last update" },
     totalCrc: { fr: "CRC total", en: "Total CRC" },
     crcBurned: { fr: "CRC brûlés", en: "CRC Burned" },
+    activeAffiliates: { fr: "Actifs (5j)", en: "Active (5d)" },
     latestClaims: { fr: "Dernières contributions", en: "Latest Claims" },
     latestClaimsDesc: { fr: "Derniers envois de CRC vers la trésorerie", en: "Latest CRC transfers to treasury" },
     weeklyTop: { fr: "Top de la semaine", en: "Top of the Week" },

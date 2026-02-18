@@ -129,6 +129,11 @@ export async function GET(req: NextRequest) {
         timestamp: tx.ts,
       }));
 
+    const fiveDaysAgoTs = (now - fiveDaysMs) / 1000;
+    const activeAffiliates5d = contributions.filter(
+      (c) => c.lastContributionTs >= fiveDaysAgoTs
+    ).length;
+
     return NextResponse.json({
       groupAddress: NF_GROUP_ADDRESS,
       treasuryAddress: NF_TREASURY_ADDRESS,
@@ -142,6 +147,7 @@ export async function GET(req: NextRequest) {
       latestClaims,
       totalMembers: members.length,
       totalAffiliates: allAffiliates.length,
+      activeAffiliates5d,
       fetchedAt: Date.now(),
     });
   } catch (error: any) {
