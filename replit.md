@@ -24,7 +24,7 @@ src/
       participants/route.ts    - Participants list (lottery-aware)
       profiles/route.ts        - Circles profile fetching
       scan/route.ts            - Blockchain payment scanner (lottery-aware)
-      treasury/route.ts        - ETH treasury token balances + prices (DeFi Llama)
+      treasury/route.ts        - ETH treasury via Blockscout (dynamic tokens, PNL, acquisition prices)
       crc-price/route.ts       - CRC/USD price via CoW Swap
     dashboard/page.tsx         - Organizer dashboard for creating lotteries
     dashboard-dao/page.tsx     - DAO dashboard (members, trust network, contributions, inactive tracking)
@@ -85,7 +85,8 @@ public/                        - Static assets (logo, etc.)
 - **Organizer Dashboard**: Form-based lottery creation with live preview
 - **Bilingual (FR/EN)**: Full i18n with flag switcher, localStorage persistence
 - **DAO Dashboard**: Live member list, trust network visualization, contribution rankings, inactive member tracking via Circles SDK (@aboutcircles/sdk-rpc)
-- **Treasury Overview**: Combined CRC (Gnosis) + ETH tokens (Ethereum) treasury with pie chart, powered by DeFi Llama + CoW Swap APIs
+- **Treasury Overview**: Combined CRC (Gnosis) + ETH tokens (Ethereum) treasury with pie chart, auto-detected via Blockscout API (spam filtered), icons from CoinGecko, prices from DeFi Llama
+- **Portfolio PNL**: Acquisition prices extracted from on-chain DEX swap history (Balancer, 1inch, Curve), per-token and global unrealized P&L with percentage badges
 - **CRC Price Tracking**: Live CRC/USD price via CoW Swap API, displayed in stat cards with USD equivalents
 
 ## Development

@@ -350,6 +350,14 @@ export const translations = {
     treasuryValue: { fr: "Valeur trésorerie", en: "Treasury value" },
     totalTreasury: { fr: "Trésorerie totale", en: "Total Treasury" },
     ethTreasury: { fr: "Trésorerie ETH", en: "ETH Treasury" },
+    portfolioPnl: { fr: "Performance", en: "Performance" },
+    acquisitionPrice: { fr: "Prix d'achat", en: "Acquisition Price" },
+    currentPrice: { fr: "Prix actuel", en: "Current Price" },
+    pnlLabel: { fr: "P&L", en: "P&L" },
+    costBasis: { fr: "Coût total", en: "Cost Basis" },
+    currentValue: { fr: "Valeur actuelle", en: "Current Value" },
+    unrealizedPnl: { fr: "P&L non réalisé", en: "Unrealized P&L" },
+    noAcquisitionData: { fr: "Pas de données d'achat", en: "No acquisition data" },
   },
 } as const;
 

@@ -20,6 +20,8 @@ import {
   Clock,
   DollarSign,
   Wallet,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
@@ -68,6 +70,9 @@ type TreasuryHolding = {
   price: number;
   valueUsd: number;
   color: string;
+  iconUrl?: string | null;
+  acquisitionPrice?: number | null;
+  acquiredAt?: string | null;
 };
 
 type TreasuryData = {
@@ -75,6 +80,9 @@ type TreasuryData = {
   chain: string;
   holdings: TreasuryHolding[];
   totalUsd: number;
+  totalCostBasis?: number;
+  totalPnl?: number | null;
+  totalPnlPercent?: number | null;
   fetchedAt: number;
 };
 
@@ -414,7 +422,7 @@ export default function DashboardDaoPage() {
 
             {(() => {
               const crcValueUsd = crcPrice ? totalCRC * crcPrice : 0;
-              const allHoldings: Array<{ symbol: string; name: string; valueUsd: number; balance: number; price: number; color: string }> = [];
+              const allHoldings: TreasuryHolding[] = [];
               if (crcValueUsd > 0) {
                 allHoldings.push({
                   symbol: "CRC",
@@ -423,24 +431,46 @@ export default function DashboardDaoPage() {
                   balance: totalCRC,
                   price: crcPrice || 0,
                   color: "#10B981",
+                  iconUrl: null,
+                  acquisitionPrice: null,
+                  acquiredAt: null,
                 });
               }
               if (treasury?.holdings) {
                 allHoldings.push(...treasury.holdings);
               }
               const grandTotal = allHoldings.reduce((s, h) => s + h.valueUsd, 0);
+              const totalPnl = treasury?.totalPnl;
+              const totalPnlPercent = treasury?.totalPnlPercent;
+              const totalCostBasis = treasury?.totalCostBasis || 0;
 
               if (allHoldings.length > 0) {
                 return (
                   <div className="rounded-2xl border border-ink/5 bg-white shadow-sm p-5 mb-0">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                        <Wallet className="h-5 w-5 text-emerald-500" />
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                          <Wallet className="h-5 w-5 text-emerald-500" />
+                        </div>
+                        <div>
+                          <h2 className="font-display text-lg font-bold text-ink">{t.totalTreasury[locale]}</h2>
+                          <p className="text-2xl font-bold text-emerald-600">${grandTotal.toFixed(2)}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h2 className="font-display text-lg font-bold text-ink">{t.totalTreasury[locale]}</h2>
-                        <p className="text-2xl font-bold text-emerald-600">${grandTotal.toFixed(2)}</p>
-                      </div>
+                      {totalPnl !== null && totalPnl !== undefined && (
+                        <div className={`text-right px-3 py-1.5 rounded-xl ${totalPnl >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
+                          <div className="flex items-center gap-1 justify-end">
+                            {totalPnl >= 0 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
+                            <span className={`text-sm font-bold ${totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                              {totalPnl >= 0 ? "+" : ""}{totalPnlPercent?.toFixed(1)}%
+                            </span>
+                          </div>
+                          <p className={`text-xs ${totalPnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                            {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)} USD
+                          </p>
+                          <p className="text-[9px] text-ink/30">{t.costBasis[locale]}: ${totalCostBasis.toFixed(2)}</p>
+                        </div>
+                      )}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="flex items-center justify-center">
@@ -477,23 +507,49 @@ export default function DashboardDaoPage() {
                           </ResponsiveContainer>
                         </div>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         {allHoldings
                           .sort((a, b) => b.valueUsd - a.valueUsd)
                           .map((h) => {
                             const pct = grandTotal > 0 ? ((h.valueUsd / grandTotal) * 100) : 0;
+                            const tokenPnl = h.acquisitionPrice ? ((h.price - h.acquisitionPrice) / h.acquisitionPrice) * 100 : null;
                             return (
-                              <div key={h.symbol} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
-                                <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: h.color }} />
+                              <div key={h.symbol} className="flex items-center gap-2.5 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors">
+                                {h.iconUrl ? (
+                                  <img src={h.iconUrl} alt={h.symbol} className="h-6 w-6 rounded-full flex-shrink-0" />
+                                ) : (
+                                  <div className="h-6 w-6 rounded-full flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: h.color + "20" }}>
+                                    <span className="text-[8px] font-bold" style={{ color: h.color }}>{h.symbol.slice(0, 2)}</span>
+                                  </div>
+                                )}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-sm font-bold text-ink">{h.symbol}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-sm font-bold text-ink">{h.symbol}</span>
+                                      {tokenPnl !== null && (
+                                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${tokenPnl >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
+                                          {tokenPnl >= 0 ? "+" : ""}{tokenPnl.toFixed(1)}%
+                                        </span>
+                                      )}
+                                    </div>
                                     <span className="text-sm font-bold text-ink">${h.valueUsd.toFixed(2)}</span>
                                   </div>
                                   <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-ink/40">{h.balance < 1 ? h.balance.toFixed(6) : h.balance.toFixed(2)} {h.symbol}</span>
+                                    <span className="text-[10px] text-ink/40">
+                                      {h.balance < 1 ? h.balance.toFixed(6) : h.balance.toFixed(2)} @ ${h.price < 1 ? h.price.toFixed(4) : h.price.toFixed(2)}
+                                    </span>
                                     <span className="text-[10px] text-ink/40">{pct.toFixed(1)}%</span>
                                   </div>
+                                  {h.acquisitionPrice && (
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[9px] text-ink/25">
+                                        {t.acquisitionPrice[locale]}: ${h.acquisitionPrice < 1 ? h.acquisitionPrice.toFixed(4) : h.acquisitionPrice.toFixed(2)}
+                                      </span>
+                                      <span className={`text-[9px] font-medium ${tokenPnl !== null && tokenPnl >= 0 ? "text-emerald-500" : "text-red-400"}`}>
+                                        {tokenPnl !== null ? `${tokenPnl >= 0 ? "+" : ""}$${(h.valueUsd - h.acquisitionPrice * h.balance).toFixed(2)}` : ""}
+                                      </span>
+                                    </div>
+                                  )}
                                   <div className="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                                     <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: h.color }} />
                                   </div>
