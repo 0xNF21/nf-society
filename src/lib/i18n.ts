@@ -1,6 +1,40 @@
 export type Locale = "fr" | "en";
 
 export const translations = {
+  landing: {
+    subtitle: {
+      fr: "Plateforme communautaire du DAO NF Society",
+      en: "NF Society DAO community platform",
+    },
+    lotteriesTitle: {
+      fr: "Loteries",
+      en: "Lotteries",
+    },
+    lotteriesDesc: {
+      fr: "Loteries transparentes et vérifiables sur la blockchain Gnosis avec paiements Circles.",
+      en: "Transparent and verifiable lotteries on Gnosis blockchain with Circles payments.",
+    },
+    lotteriesAction: {
+      fr: "Accéder aux loteries",
+      en: "Go to lotteries",
+    },
+    daoTitle: {
+      fr: "Dashboard DAO",
+      en: "DAO Dashboard",
+    },
+    daoDesc: {
+      fr: "Tableau de bord pour suivre l'activité, la trésorerie et les membres du DAO NF Society.",
+      en: "Dashboard to track activity, treasury and members of the NF Society DAO.",
+    },
+    daoAction: {
+      fr: "Accéder au dashboard",
+      en: "Go to dashboard",
+    },
+    footer: {
+      fr: "NF Society — Propulsé par Gnosis Chain & Circles",
+      en: "NF Society — Powered by Gnosis Chain & Circles",
+    },
+  },
   home: {
     subtitleBefore: {
       fr: "Plateforme de loteries transparentes et vérifiables sur la blockchain",
