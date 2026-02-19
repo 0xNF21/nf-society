@@ -444,7 +444,7 @@ export default function DashboardDaoPage() {
                   price: crcPrice || 0,
                   color: "#10B981",
                   iconUrl: "/crc-logo.png",
-                  acquisitionPrice: null,
+                  acquisitionPrice: 0,
                   acquiredAt: null,
                 });
               }
@@ -452,9 +452,13 @@ export default function DashboardDaoPage() {
                 allHoldings.push(...treasury.holdings);
               }
               const grandTotal = allHoldings.reduce((s, h) => s + h.valueUsd, 0);
-              const totalPnl = treasury?.totalPnl;
-              const totalPnlPercent = treasury?.totalPnlPercent;
-              const totalCostBasis = treasury?.totalCostBasis || 0;
+
+              const trackedHoldings = allHoldings.filter((h) => h.acquisitionPrice !== null && h.acquisitionPrice !== undefined);
+              const totalCostBasis = trackedHoldings.reduce((sum, h) => sum + (h.acquisitionPrice || 0) * h.balance, 0);
+              const trackedCurrentValue = trackedHoldings.reduce((sum, h) => sum + h.valueUsd, 0);
+              const hasPnlData = trackedHoldings.length > 0;
+              const totalPnl = hasPnlData ? trackedCurrentValue - totalCostBasis : null;
+              const totalPnlPercent = hasPnlData && totalCostBasis > 0 ? ((trackedCurrentValue - totalCostBasis) / totalCostBasis) * 100 : null;
 
               if (allHoldings.length > 0) {
                 const pieData = allHoldings.map((h) => ({
@@ -474,11 +478,11 @@ export default function DashboardDaoPage() {
                   return (
                     <g>
                       {h.iconUrl ? (
-                        <image href={h.iconUrl} x={x - 10} y={y - 16} width={20} height={20} style={{ borderRadius: "50%" }} />
+                        <image href={h.iconUrl} x={x - 14} y={y - 20} width={28} height={28} style={{ borderRadius: "50%" }} />
                       ) : (
-                        <text x={x} y={y - 6} fill="white" textAnchor="middle" fontSize={9} fontWeight="bold">{h.symbol}</text>
+                        <text x={x} y={y - 6} fill="white" textAnchor="middle" fontSize={11} fontWeight="bold">{h.symbol}</text>
                       )}
-                      <text x={x} y={y + 12} fill="white" textAnchor="middle" fontSize={8} fontWeight="bold">
+                      <text x={x} y={y + 16} fill="white" textAnchor="middle" fontSize={10} fontWeight="bold">
                         ${h.valueUsd.toFixed(0)}
                       </text>
                     </g>
@@ -486,42 +490,44 @@ export default function DashboardDaoPage() {
                 };
 
                 return (
-                  <div className="rounded-2xl border border-ink/5 bg-white shadow-sm p-6 mb-0">
-                    <div className="flex items-center justify-between mb-5">
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                          <Wallet className="h-6 w-6 text-emerald-500" />
+                  <div className="rounded-2xl border border-ink/5 bg-white shadow-sm p-4 mb-0">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-9 w-9 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                          <Wallet className="h-4.5 w-4.5 text-emerald-500" />
                         </div>
                         <div>
-                          <h2 className="font-display text-xl font-bold text-ink">{t.totalTreasury[locale]}</h2>
-                          <p className="text-3xl font-bold text-emerald-600">${grandTotal.toFixed(2)}</p>
+                          <h2 className="font-display text-base font-bold text-ink">{t.totalTreasury[locale]}</h2>
+                          <p className="text-2xl font-bold text-emerald-600">${grandTotal.toFixed(2)}</p>
                         </div>
                       </div>
                     </div>
 
                     {totalPnl !== null && totalPnl !== undefined && (
-                      <div className={`rounded-2xl p-6 mb-5 ${totalPnl >= 0 ? "bg-emerald-50 border border-emerald-100" : "bg-red-50 border border-red-100"}`}>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-lg font-bold text-gray-900">{t.portfolioPnl[locale]}</span>
-                          <div className="flex items-center gap-2">
-                            {totalPnl >= 0 ? <TrendingUp className="h-6 w-6 text-emerald-500" /> : <TrendingDown className="h-6 w-6 text-red-500" />}
-                            <span className={`text-3xl font-black ${totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                              {totalPnl >= 0 ? "+" : ""}{totalPnlPercent?.toFixed(1)}%
+                      <div className={`rounded-xl p-4 mb-3 ${totalPnl >= 0 ? "bg-emerald-50 border border-emerald-100" : "bg-red-50 border border-red-100"}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-bold text-gray-900">{t.portfolioPnl[locale]}</span>
+                          <div className="flex items-center gap-1.5">
+                            {totalPnl >= 0 ? <TrendingUp className="h-4 w-4 text-emerald-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
+                            <span className={`text-xl font-black ${totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                              {totalPnlPercent !== null && totalPnlPercent !== undefined
+                                ? `${totalPnl >= 0 ? "+" : ""}${totalPnlPercent.toFixed(1)}%`
+                                : `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)}`}
                             </span>
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-3 gap-3">
                           <div>
-                            <p className="text-sm text-gray-900 font-semibold mb-1">{t.costBasis[locale]}</p>
-                            <p className="text-2xl font-black text-gray-900">${totalCostBasis.toFixed(2)}</p>
+                            <p className="text-xs text-gray-900 font-semibold mb-0.5">{t.costBasis[locale]}</p>
+                            <p className="text-lg font-black text-gray-900">${totalCostBasis.toFixed(2)}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-900 font-semibold mb-1">{t.currentValue[locale]}</p>
-                            <p className="text-2xl font-black text-gray-900">${(totalCostBasis + totalPnl).toFixed(2)}</p>
+                            <p className="text-xs text-gray-900 font-semibold mb-0.5">{t.currentValue[locale]}</p>
+                            <p className="text-lg font-black text-gray-900">${(totalCostBasis + totalPnl).toFixed(2)}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-900 font-semibold mb-1">{t.unrealizedPnl[locale]}</p>
-                            <p className={`text-2xl font-black ${totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                            <p className="text-xs text-gray-900 font-semibold mb-0.5">{t.unrealizedPnl[locale]}</p>
+                            <p className={`text-lg font-black ${totalPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                               {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)} $
                             </p>
                           </div>
@@ -530,15 +536,15 @@ export default function DashboardDaoPage() {
                     )}
 
                     {treasuryHistory && (
-                      <div className="rounded-xl border border-gray-100 p-4 mb-5">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-base font-bold text-gray-900">{t.walletPerformance[locale]}</span>
+                      <div className="rounded-xl border border-gray-100 p-3 mb-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-bold text-gray-900">{t.walletPerformance[locale]}</span>
                           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
                             {["24h", "7d", "30d", "1y", "all"].map((p) => (
                               <button
                                 key={p}
                                 onClick={() => setPerfPeriod(p)}
-                                className={`px-3 py-1.5 text-sm font-bold rounded-md transition-all ${perfPeriod === p ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                                className={`px-2 py-1 text-xs font-bold rounded-md transition-all ${perfPeriod === p ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
                               >
                                 {(t as any)[`perf${p === "24h" ? "24h" : p === "7d" ? "7d" : p === "30d" ? "30d" : p === "1y" ? "1y" : "All"}`]?.[locale] || p}
                               </button>
@@ -546,31 +552,31 @@ export default function DashboardDaoPage() {
                           </div>
                         </div>
                         {treasuryHistory.performance?.[perfPeriod] ? (
-                          <div className="flex items-center gap-3">
-                            <span className={`text-2xl font-black ${treasuryHistory.performance[perfPeriod].changePercent >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xl font-black ${treasuryHistory.performance[perfPeriod].changePercent >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                               {treasuryHistory.performance[perfPeriod].changePercent >= 0 ? "+" : ""}{treasuryHistory.performance[perfPeriod].changePercent.toFixed(2)}%
                             </span>
-                            <span className="text-sm text-gray-400">
+                            <span className="text-xs text-gray-400">
                               (${treasuryHistory.performance[perfPeriod].totalUsd.toFixed(2)} → ${treasuryHistory.currentTotalUsd?.toFixed(2)})
                             </span>
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-400">—</p>
+                          <p className="text-xs text-gray-400">—</p>
                         )}
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="flex items-center justify-center">
-                        <div className="w-full max-w-[280px] aspect-square">
+                        <div className="w-full max-w-[360px] aspect-square">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
                                 data={pieData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={55}
-                                outerRadius={110}
+                                innerRadius={70}
+                                outerRadius={140}
                                 paddingAngle={2}
                                 dataKey="value"
                                 label={CustomPieLabel}
@@ -611,7 +617,9 @@ export default function DashboardDaoPage() {
                           .sort((a, b) => b.valueUsd - a.valueUsd)
                           .map((h) => {
                             const pct = grandTotal > 0 ? ((h.valueUsd / grandTotal) * 100) : 0;
-                            const tokenPnl = h.acquisitionPrice ? ((h.price - h.acquisitionPrice) / h.acquisitionPrice) * 100 : null;
+                            const hasAcq = h.acquisitionPrice !== null && h.acquisitionPrice !== undefined;
+                            const acqP = h.acquisitionPrice ?? -1;
+                            const tokenPnl = hasAcq && acqP > 0 ? ((h.price - acqP) / acqP) * 100 : (hasAcq && acqP === 0 ? 100 : null);
                             const tokenPerfVal = treasuryHistory?.perToken?.[h.symbol]?.[perfPeriod];
                             return (
                               <div key={h.symbol} className="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-slate-50 transition-colors">
@@ -645,13 +653,13 @@ export default function DashboardDaoPage() {
                                     </span>
                                     <span className="text-base font-semibold text-gray-900">{pct.toFixed(1)}%</span>
                                   </div>
-                                  {h.acquisitionPrice && (
+                                  {hasAcq && (
                                     <div className="flex items-center justify-between mt-1">
                                       <span className="text-base font-semibold text-gray-900">
-                                        {t.acquisitionPrice[locale]}: ${h.acquisitionPrice < 1 ? h.acquisitionPrice.toFixed(4) : h.acquisitionPrice.toFixed(2)}
+                                        {t.acquisitionPrice[locale]}: ${h.acquisitionPrice === 0 ? "0.00" : (h.acquisitionPrice! < 1 ? h.acquisitionPrice!.toFixed(4) : h.acquisitionPrice!.toFixed(2))}
                                       </span>
                                       <span className={`text-base font-bold ${tokenPnl !== null && tokenPnl >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                                        {tokenPnl !== null ? `${tokenPnl >= 0 ? "+" : ""}$${(h.valueUsd - h.acquisitionPrice * h.balance).toFixed(2)}` : ""}
+                                        {tokenPnl !== null ? `${tokenPnl >= 0 ? "+" : ""}$${(h.valueUsd - (h.acquisitionPrice || 0) * h.balance).toFixed(2)}` : ""}
                                       </span>
                                     </div>
                                   )}

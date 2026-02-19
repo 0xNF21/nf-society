@@ -23,6 +23,22 @@ export async function GET() {
       return NextResponse.json(historyCache.data);
     }
 
+    let acquisitionDates: Record<string, number> = {};
+    try {
+      const treasuryRes = await fetch(
+        `http://localhost:5000/api/treasury`,
+        { signal: AbortSignal.timeout(30000) }
+      );
+      if (treasuryRes.ok) {
+        const treasuryData = await treasuryRes.json();
+        for (const h of treasuryData.holdings || []) {
+          if (h.acquiredAt) {
+            acquisitionDates[h.symbol] = Math.floor(new Date(h.acquiredAt).getTime() / 1000);
+          }
+        }
+      }
+    } catch {}
+
     const [tokensRes, ethBalRes] = await Promise.all([
       fetch(`${BLOCKSCOUT_BASE}/addresses/${TREASURY_ADDRESS}/token-balances`, { signal: AbortSignal.timeout(15000) }),
       fetch(`${BLOCKSCOUT_BASE}/addresses/${TREASURY_ADDRESS}`, { signal: AbortSignal.timeout(15000) }),
@@ -74,6 +90,10 @@ export async function GET() {
       "1y": now - 365 * 86400,
     };
 
+    const earliestAcquisition = Object.values(acquisitionDates).length > 0
+      ? Math.min(...Object.values(acquisitionDates))
+      : 0;
+
     const allIds = llamaKeys.join(",");
     let currentPrices: Record<string, number> = {};
     try {
@@ -95,9 +115,13 @@ export async function GET() {
     const performance: Record<string, { totalUsd: number; changePercent: number }> = {};
 
     const periodFetches = Object.entries(periods).map(async ([period, timestamp]) => {
+      const effectiveTimestamp = earliestAcquisition > 0 && timestamp < earliestAcquisition
+        ? earliestAcquisition
+        : timestamp;
+
       try {
         const res = await fetch(
-          `https://coins.llama.fi/prices/historical/${timestamp}/${allIds}`,
+          `https://coins.llama.fi/prices/historical/${effectiveTimestamp}/${allIds}`,
           { signal: AbortSignal.timeout(10000) }
         );
         if (res.ok) {
@@ -127,11 +151,16 @@ export async function GET() {
       const currentPrice = currentPrices[key] || 0;
       if (!currentPrice) continue;
       perToken[symbol] = {};
+      const tokenAcqTime = acquisitionDates[symbol] || 0;
 
       const tokenPeriodFetches = Object.entries(periods).map(async ([period, timestamp]) => {
+        const effectiveTimestamp = tokenAcqTime > 0 && timestamp < tokenAcqTime
+          ? tokenAcqTime
+          : timestamp;
+
         try {
           const res = await fetch(
-            `https://coins.llama.fi/prices/historical/${timestamp}/${key}`,
+            `https://coins.llama.fi/prices/historical/${effectiveTimestamp}/${key}`,
             { signal: AbortSignal.timeout(8000) }
           );
           if (res.ok) {
@@ -157,6 +186,7 @@ export async function GET() {
       currentTotalUsd,
       performance,
       perToken,
+      acquisitionDates,
       fetchedAt: Date.now(),
     };
 
