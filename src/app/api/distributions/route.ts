@@ -7,6 +7,38 @@ const BLOCKSCOUT_BASE = "https://arbitrum.blockscout.com/api/v2";
 let distributionCache: { data: any; fetchedAt: number } | null = null;
 const CACHE_TTL_MS = 2 * 60 * 60 * 1000;
 
+export const dynamic = "force-dynamic";
+
+async function fetchAllTokenTransfers(): Promise<any[]> {
+  const allItems: any[] = [];
+  let url: string | null = `${BLOCKSCOUT_BASE}/addresses/${DISTRIBUTOR_ADDRESS}/token-transfers`;
+
+  while (url) {
+    const res = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) throw new Error(`Blockscout error: ${res.status}`);
+
+    const json = await res.json();
+    const items = json.items || [];
+    allItems.push(...items);
+
+    if (json.next_page_params) {
+      const params = new URLSearchParams();
+      for (const [key, val] of Object.entries(json.next_page_params)) {
+        params.set(key, String(val));
+      }
+      url = `${BLOCKSCOUT_BASE}/addresses/${DISTRIBUTOR_ADDRESS}/token-transfers?${params.toString()}`;
+    } else {
+      url = null;
+    }
+  }
+
+  return allItems;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const refresh = request.nextUrl.searchParams.get("refresh") === "true";
@@ -15,15 +47,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(distributionCache.data);
     }
 
-    const res = await fetch(
-      `${BLOCKSCOUT_BASE}/addresses/${DISTRIBUTOR_ADDRESS}/token-transfers`,
-      { signal: AbortSignal.timeout(15000) }
-    );
-
-    if (!res.ok) throw new Error(`Blockscout error: ${res.status}`);
-
-    const json = await res.json();
-    const items = json.items || [];
+    const items = await fetchAllTokenTransfers();
 
     const fromAddr = DISTRIBUTOR_ADDRESS.toLowerCase();
     const peanutAddr = PEANUT_V4_ADDRESS.toLowerCase();
