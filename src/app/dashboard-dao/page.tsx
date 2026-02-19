@@ -22,6 +22,7 @@ import {
   Wallet,
   TrendingUp,
   TrendingDown,
+  Send,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
@@ -220,6 +221,8 @@ export default function DashboardDaoPage() {
   const [perfPeriod, setPerfPeriod] = useState("30d");
   const [pnlOpen, setPnlOpen] = useState(true);
   const [chartOpen, setChartOpen] = useState(true);
+  const [distributions, setDistributions] = useState<{ totalUsd: number; transferCount: number; fetchedAt: number } | null>(null);
+  const [distributionsRefreshing, setDistributionsRefreshing] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   async function fetchProfiles(addresses: string[]) {
@@ -270,6 +273,20 @@ export default function DashboardDaoPage() {
     } catch {}
   }
 
+  async function fetchDistributions(refresh = false) {
+    try {
+      if (refresh) setDistributionsRefreshing(true);
+      const url = refresh ? "/api/distributions?refresh=true" : "/api/distributions";
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (!json.error) setDistributions(json);
+      }
+    } catch {} finally {
+      setDistributionsRefreshing(false);
+    }
+  }
+
   async function loadData(isRefresh = false) {
     if (isRefresh) {
       setRefreshing(true);
@@ -278,7 +295,7 @@ export default function DashboardDaoPage() {
     }
     setError(null);
     try {
-      const [res] = await Promise.all([fetch("/api/dao", { cache: "no-store" }), fetchCrcPrice(), fetchTreasury(), fetchTreasuryHistory()]);
+      const [res] = await Promise.all([fetch("/api/dao", { cache: "no-store" }), fetchCrcPrice(), fetchTreasury(), fetchTreasuryHistory(), fetchDistributions()]);
       if (!res.ok) throw new Error("API error");
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -433,6 +450,29 @@ export default function DashboardDaoPage() {
                 label={t.crcPrice[locale]}
               />
             </div>
+
+            {distributions && (
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-purple-500/20 p-2 rounded-lg">
+                    <Send className="h-5 w-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-zinc-400">{t.distributedToMembers[locale]}</p>
+                    <p className="text-xl font-bold text-white">${distributions.totalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-xs text-zinc-500">{distributions.transferCount} {t.transfers[locale]} — via Peanut Protocol (Arbitrum)</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => fetchDistributions(true)}
+                  disabled={distributionsRefreshing}
+                  className="text-zinc-400 hover:text-white transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw className={`h-4 w-4 ${distributionsRefreshing ? "animate-spin" : ""}`} />
+                </button>
+              </div>
+            )}
 
             {(() => {
               const crcValueUsd = crcPrice ? totalCRC * crcPrice : 0;

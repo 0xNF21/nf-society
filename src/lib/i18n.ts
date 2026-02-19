@@ -364,6 +364,9 @@ export const translations = {
     perf1y: { fr: "1a", en: "1y" },
     perfAll: { fr: "Tout", en: "All" },
     walletPerformance: { fr: "Performance du portefeuille", en: "Wallet Performance" },
+    distributedToMembers: { fr: "$ Distribué aux membres", en: "$ Distributed to Members" },
+    distributedDesc: { fr: "Total distribué via Peanut Protocol (Arbitrum)", en: "Total distributed via Peanut Protocol (Arbitrum)" },
+    transfers: { fr: "transferts", en: "transfers" },
   },
 } as const;
 
