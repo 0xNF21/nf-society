@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 const TREASURY_ADDRESS = "0x2f233f212fe999edcdd300478dbddff5b609510a";
 const BLOCKSCOUT_BASE = "https://eth.blockscout.com/api/v2";
+const CRC_POOL_ADDRESS = "0x582f85e3fdd6efe0ccf71d1fa6b1b87d8e64ce7d";
+const GECKO_TERMINAL_BASE = "https://api.geckoterminal.com/api/v2";
 
 let historyCache: { data: any; fetchedAt: number } | null = null;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -36,6 +38,27 @@ export async function GET() {
             acquisitionDates[h.symbol] = Math.floor(new Date(h.acquiredAt).getTime() / 1000);
           }
         }
+      }
+    } catch {}
+
+    let crcBalance = 0;
+    try {
+      const daoRes = await fetch(`http://localhost:5000/api/dao`, { signal: AbortSignal.timeout(30000) });
+      if (daoRes.ok) {
+        const daoData = await daoRes.json();
+        crcBalance = (daoData.contributions || []).reduce((sum: number, c: any) => sum + (c.totalCRC || 0), 0);
+      }
+    } catch {}
+
+    let crcOhlcv: Array<[number, number, number, number, number, number]> = [];
+    try {
+      const ohlcvRes = await fetch(
+        `${GECKO_TERMINAL_BASE}/networks/xdai/pools/${CRC_POOL_ADDRESS}/ohlcv/day?limit=365&aggregate=1`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (ohlcvRes.ok) {
+        const ohlcvData = await ohlcvRes.json();
+        crcOhlcv = ohlcvData.data?.attributes?.ohlcv_list || [];
       }
     } catch {}
 
@@ -106,10 +129,27 @@ export async function GET() {
       }
     } catch {}
 
+    const crcCurrentPrice = crcOhlcv.length > 0 ? crcOhlcv[0][3] : 0;
+    const crcCurrentValueUsd = crcBalance * crcCurrentPrice;
+
     let currentTotalUsd = 0;
     for (const key of llamaKeys) {
       const price = currentPrices[key] || 0;
       currentTotalUsd += tokenBalances[key] * price;
+    }
+    currentTotalUsd += crcCurrentValueUsd;
+
+    const crcOldestTimestamp = crcOhlcv.length > 0 ? crcOhlcv[crcOhlcv.length - 1][0] : 0;
+
+    function getCrcPriceAtTimestamp(ts: number): number | null {
+      if (crcOhlcv.length === 0) return null;
+      if (ts < crcOldestTimestamp) return null;
+      for (const candle of crcOhlcv) {
+        if (candle[0] <= ts) {
+          return candle[3];
+        }
+      }
+      return null;
     }
 
     const performance: Record<string, { totalUsd: number; changePercent: number }> = {};
@@ -131,10 +171,18 @@ export async function GET() {
             const historicalPrice = (data.coins?.[key] as any)?.price || 0;
             historicalTotalUsd += tokenBalances[key] * historicalPrice;
           }
+          const crcHistoricalPrice = getCrcPriceAtTimestamp(timestamp);
+          let periodCurrentTotal = currentTotalUsd;
+          if (crcHistoricalPrice !== null) {
+            historicalTotalUsd += crcBalance * crcHistoricalPrice;
+          } else {
+            periodCurrentTotal -= crcCurrentValueUsd;
+          }
+
           if (historicalTotalUsd > 0) {
             performance[period] = {
               totalUsd: historicalTotalUsd,
-              changePercent: ((currentTotalUsd - historicalTotalUsd) / historicalTotalUsd) * 100,
+              changePercent: ((periodCurrentTotal - historicalTotalUsd) / historicalTotalUsd) * 100,
             };
           }
         }
@@ -182,11 +230,29 @@ export async function GET() {
       }
     }
 
+    if (crcCurrentPrice > 0 && crcOhlcv.length > 0) {
+      perToken["CRC"] = {};
+      for (const [period, timestamp] of Object.entries(periods)) {
+        const historicalCrcPrice = getCrcPriceAtTimestamp(timestamp);
+        if (historicalCrcPrice !== null && historicalCrcPrice > 0) {
+          perToken["CRC"][period] = ((crcCurrentPrice - historicalCrcPrice) / historicalCrcPrice) * 100;
+        }
+      }
+      if (perToken["CRC"]["1y"] !== undefined) {
+        perToken["CRC"]["all"] = perToken["CRC"]["1y"];
+      } else if (perToken["CRC"]["30d"] !== undefined) {
+        perToken["CRC"]["all"] = perToken["CRC"]["30d"];
+      }
+    }
+
     const result = {
       currentTotalUsd,
       performance,
       perToken,
       acquisitionDates,
+      crcBalance,
+      crcCurrentPrice,
+      crcCurrentValueUsd,
       fetchedAt: Date.now(),
     };
 

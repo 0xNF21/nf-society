@@ -542,23 +542,18 @@ export default function DashboardDaoPage() {
                                     ))}
                                   </div>
                                 </div>
-                                {(() => {
-                                  const perf = treasuryHistory.performance?.[perfPeriod];
-                                  if (!perf) return <p className="text-[10px] text-gray-400">—</p>;
-                                  const historicalTotal = perf.totalUsd;
-                                  const currentTotal = treasuryHistory.currentTotalUsd || 0;
-                                  const changePercent = historicalTotal > 0 ? ((currentTotal - historicalTotal) / historicalTotal) * 100 : (currentTotal > 0 ? 100 : 0);
-                                  return (
-                                    <div className="flex items-center gap-2">
-                                      <span className={`text-lg font-black ${changePercent >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                                        {changePercent >= 0 ? "+" : ""}{changePercent.toFixed(2)}%
-                                      </span>
-                                      <span className="text-[10px] text-gray-400">
-                                        (${historicalTotal.toFixed(2)} → ${currentTotal.toFixed(2)})
-                                      </span>
-                                    </div>
-                                  );
-                                })()}
+                                {treasuryHistory.performance?.[perfPeriod] ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-lg font-black ${treasuryHistory.performance[perfPeriod].changePercent >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                      {treasuryHistory.performance[perfPeriod].changePercent >= 0 ? "+" : ""}{treasuryHistory.performance[perfPeriod].changePercent.toFixed(2)}%
+                                    </span>
+                                    <span className="text-[10px] text-gray-400">
+                                      (${treasuryHistory.performance[perfPeriod].totalUsd.toFixed(2)} → ${treasuryHistory.currentTotalUsd?.toFixed(2)})
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <p className="text-[10px] text-gray-400">—</p>
+                                )}
                               </div>
                             )}
                           </div>
