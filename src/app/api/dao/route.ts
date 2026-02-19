@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CirclesRpc } from "@aboutcircles/sdk-rpc";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 const CIRCLES_RPC_URL = process.env.NEXT_PUBLIC_CIRCLES_RPC_URL || "https://rpc.aboutcircles.com/";
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 const NF_GROUP_ADDRESS = "0x7dd9f44c7f1a6788221a92305f9e7ea790675e9b";
@@ -17,6 +20,7 @@ async function gnosisRpc(method: string, params: any[]) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
     signal: AbortSignal.timeout(15000),
+    cache: "no-store",
   });
   const data = await res.json();
   return data.result;
