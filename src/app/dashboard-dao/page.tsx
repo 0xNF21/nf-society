@@ -573,15 +573,15 @@ export default function DashboardDaoPage() {
                         <div className="mt-1">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="flex items-center justify-center">
-                              <div className="w-full max-w-[300px] aspect-square">
+                              <div className="w-full aspect-square">
                                 <ResponsiveContainer width="100%" height="100%">
                                   <PieChart>
                                     <Pie
                                       data={pieData}
                                       cx="50%"
                                       cy="50%"
-                                      innerRadius={55}
-                                      outerRadius={115}
+                                      innerRadius="35%"
+                                      outerRadius="70%"
                                       paddingAngle={2}
                                       dataKey="value"
                                       label={({ cx, cy, midAngle, innerRadius, outerRadius, index }: any) => {
@@ -593,8 +593,8 @@ export default function DashboardDaoPage() {
                                         if (!h) return null;
                                         return (
                                           <g>
-                                            <text x={x} y={y - 4} fill="white" textAnchor="middle" fontSize={10} fontWeight="bold">{h.symbol}</text>
-                                            <text x={x} y={y + 10} fill="white" textAnchor="middle" fontSize={9} fontWeight="bold">
+                                            <text x={x} y={y - 5} fill="white" textAnchor="middle" fontSize={12} fontWeight="bold">{h.symbol}</text>
+                                            <text x={x} y={y + 11} fill="white" textAnchor="middle" fontSize={11} fontWeight="bold">
                                               ${h.valueUsd.toFixed(0)}
                                             </text>
                                           </g>
