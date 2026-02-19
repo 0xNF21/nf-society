@@ -478,8 +478,8 @@ export default function DashboardDaoPage() {
                           <Wallet className="h-4 w-4 text-emerald-500" />
                         </div>
                         <div>
-                          <h2 className="font-display text-sm font-bold text-ink">{t.totalTreasury[locale]}</h2>
-                          <p className="text-xl font-bold text-emerald-600">${grandTotal.toFixed(2)}</p>
+                          <h2 className="font-display text-lg font-bold text-ink">{t.totalTreasury[locale]}</h2>
+                          <p className="text-3xl font-bold text-emerald-600">${grandTotal.toFixed(2)}</p>
                         </div>
                       </div>
                     </div>
@@ -490,8 +490,8 @@ export default function DashboardDaoPage() {
                           onClick={() => setPnlOpen(!pnlOpen)}
                           className="w-full flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-50/50 transition-colors"
                         >
-                          <span className="text-xs font-bold text-gray-900">{t.portfolioPnl[locale]}</span>
-                          <ChevronDown className={`h-4 w-4 text-ink/30 transition-transform duration-200 ${pnlOpen ? "rotate-180" : ""}`} />
+                          <span className="text-base font-bold text-gray-900">{t.portfolioPnl[locale]}</span>
+                          <ChevronDown className={`h-5 w-5 text-ink/30 transition-transform duration-200 ${pnlOpen ? "rotate-180" : ""}`} />
                         </button>
                         {pnlOpen && (
                           <div className="mt-1 space-y-2">
@@ -566,8 +566,8 @@ export default function DashboardDaoPage() {
                         onClick={() => setChartOpen(!chartOpen)}
                         className="w-full flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-50/50 transition-colors"
                       >
-                        <span className="text-xs font-bold text-gray-900">{locale === "fr" ? "Répartition" : "Breakdown"}</span>
-                        <ChevronDown className={`h-4 w-4 text-ink/30 transition-transform duration-200 ${chartOpen ? "rotate-180" : ""}`} />
+                        <span className="text-base font-bold text-gray-900">{locale === "fr" ? "Répartition" : "Breakdown"}</span>
+                        <ChevronDown className={`h-5 w-5 text-ink/30 transition-transform duration-200 ${chartOpen ? "rotate-180" : ""}`} />
                       </button>
                       {chartOpen && (
                         <div className="mt-1">
