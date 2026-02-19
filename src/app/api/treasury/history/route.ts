@@ -152,7 +152,7 @@ export async function GET() {
       return null;
     }
 
-    const performance: Record<string, { totalUsd: number; changePercent: number }> = {};
+    const performance: Record<string, { totalUsd: number; currentTotalUsd: number; changePercent: number }> = {};
 
     const periodFetches = Object.entries(periods).map(async ([period, timestamp]) => {
       const effectiveTimestamp = earliestAcquisition > 0 && timestamp < earliestAcquisition
@@ -172,17 +172,15 @@ export async function GET() {
             historicalTotalUsd += tokenBalances[key] * historicalPrice;
           }
           const crcHistoricalPrice = getCrcPriceAtTimestamp(timestamp);
-          let periodCurrentTotal = currentTotalUsd;
           if (crcHistoricalPrice !== null) {
             historicalTotalUsd += crcBalance * crcHistoricalPrice;
-          } else {
-            periodCurrentTotal -= crcCurrentValueUsd;
           }
 
           if (historicalTotalUsd > 0) {
             performance[period] = {
               totalUsd: historicalTotalUsd,
-              changePercent: ((periodCurrentTotal - historicalTotalUsd) / historicalTotalUsd) * 100,
+              currentTotalUsd,
+              changePercent: ((currentTotalUsd - historicalTotalUsd) / historicalTotalUsd) * 100,
             };
           }
         }
@@ -191,7 +189,7 @@ export async function GET() {
 
     await Promise.all(periodFetches);
 
-    performance["all"] = performance["1y"] || performance["30d"] || { totalUsd: currentTotalUsd, changePercent: 0 };
+    performance["all"] = performance["1y"] || performance["30d"] || { totalUsd: currentTotalUsd, currentTotalUsd, changePercent: 0 };
 
     const perToken: Record<string, Record<string, number>> = {};
     for (const key of llamaKeys) {

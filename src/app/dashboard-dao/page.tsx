@@ -548,7 +548,7 @@ export default function DashboardDaoPage() {
                                       {treasuryHistory.performance[perfPeriod].changePercent >= 0 ? "+" : ""}{treasuryHistory.performance[perfPeriod].changePercent.toFixed(2)}%
                                     </span>
                                     <span className="text-[10px] text-gray-400">
-                                      (${treasuryHistory.performance[perfPeriod].totalUsd.toFixed(2)} → ${treasuryHistory.currentTotalUsd?.toFixed(2)})
+                                      (${treasuryHistory.performance[perfPeriod].totalUsd.toFixed(2)} → ${(treasuryHistory.performance[perfPeriod].currentTotalUsd || treasuryHistory.currentTotalUsd)?.toFixed(2)})
                                     </span>
                                   </div>
                                 ) : (
