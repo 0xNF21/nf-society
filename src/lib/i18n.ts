@@ -368,6 +368,22 @@ export const translations = {
     distributedDesc: { fr: "Total distribué via Peanut Protocol (Arbitrum)", en: "Total distributed via Peanut Protocol (Arbitrum)" },
     transfers: { fr: "transferts", en: "transfers" },
   },
+  exchange: {
+    title: { fr: "Échanger des CRC", en: "Exchange CRC" },
+    description: {
+      fr: "Envoyez vos CRC personnels au Safe et recevez automatiquement des CRC NF Society (demurrage) en retour. Ratio 1:1.",
+      en: "Send your personal CRC to the Safe and automatically receive NF Society CRC (demurrage) in return. 1:1 ratio.",
+    },
+    sendTo: { fr: "Envoyer vos CRC à cette adresse", en: "Send your CRC to this address" },
+    availableBalance: { fr: "Solde NF CRC disponible", en: "Available NF CRC balance" },
+    checkExchange: { fr: "Vérifier l'échange", en: "Check exchange" },
+    scanning: { fr: "Vérification...", en: "Checking..." },
+    noNewPayments: { fr: "Aucun nouveau paiement détecté", en: "No new payments detected" },
+    exchangesDone: { fr: "échange(s) effectué(s)", en: "exchange(s) completed" },
+    exchangesFailed: { fr: "échoué(s)", en: "failed" },
+    scanError: { fr: "Erreur lors de la vérification", en: "Error during verification" },
+    recentExchanges: { fr: "Échanges récents", en: "Recent exchanges" },
+  },
   payout: {
     title: { fr: "Système de Paiement", en: "Payout System" },
     status: { fr: "Statut", en: "Status" },

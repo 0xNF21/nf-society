@@ -5,6 +5,7 @@ import Image from "next/image";
 import { ArrowRight, BarChart3, Ticket } from "lucide-react";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
+import ExchangeSection from "@/components/exchange-section";
 
 export default function LandingPage() {
   const { locale } = useLocale();
@@ -71,6 +72,8 @@ export default function LandingPage() {
               </span>
             </Link>
           </div>
+
+          <ExchangeSection />
 
           <footer className="text-center space-y-3 mt-4">
             <div className="flex items-center justify-center gap-3">
