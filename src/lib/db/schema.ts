@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, uniqueIndex, numeric } from "drizzle-orm/pg-core";
 
 export const lotteries = pgTable("lotteries", {
   id: serial("id").primaryKey(),
@@ -38,4 +38,20 @@ export const draws = pgTable("draws", {
   participantAddresses: text("participant_addresses").notNull(),
   selectionIndex: integer("selection_index").notNull(),
   drawnAt: timestamp("drawn_at").defaultNow().notNull(),
+});
+
+export const payouts = pgTable("payouts", {
+  id: serial("id").primaryKey(),
+  gameType: text("game_type").notNull(),
+  gameId: text("game_id").notNull().unique(),
+  recipientAddress: text("recipient_address").notNull(),
+  amountCrc: integer("amount_crc").notNull(),
+  reason: text("reason"),
+  wrapTxHash: text("wrap_tx_hash"),
+  transferTxHash: text("transfer_tx_hash"),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

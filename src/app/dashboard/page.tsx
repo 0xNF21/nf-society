@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Check, Palette, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Palette, RefreshCw, Sparkles, Wallet, AlertCircle, CheckCircle, XCircle, Send, ChevronDown, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
@@ -424,7 +424,278 @@ export default function DashboardPage() {
             </Button>
           </div>
         </form>
+
+        <div className="mt-12 border-t border-ink/10 pt-8">
+          <PayoutManager password={password} locale={locale} />
+        </div>
       </div>
     </main>
+  );
+}
+
+const statusColors: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800",
+  wrapping: "bg-blue-100 text-blue-800",
+  sending: "bg-blue-100 text-blue-800",
+  success: "bg-green-100 text-green-800",
+  failed: "bg-red-100 text-red-800",
+};
+
+const statusIcons: Record<string, React.ReactNode> = {
+  pending: <AlertCircle className="h-3 w-3" />,
+  wrapping: <Loader2 className="h-3 w-3 animate-spin" />,
+  sending: <Loader2 className="h-3 w-3 animate-spin" />,
+  success: <CheckCircle className="h-3 w-3" />,
+  failed: <XCircle className="h-3 w-3" />,
+};
+
+function PayoutManager({ password, locale }: { password: string; locale: "fr" | "en" }) {
+  const p = translations.payout;
+  const [payoutStatus, setPayoutStatus] = useState<any>(null);
+  const [payoutList, setPayoutList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState<number | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({ gameType: "reward", recipientAddress: "", amountCrc: "", reason: "" });
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [manualResult, setManualResult] = useState<any>(null);
+
+  async function fetchPayoutData() {
+    setLoading(true);
+    try {
+      const [statusRes, listRes] = await Promise.all([
+        fetch("/api/payout/status", { cache: "no-store" }),
+        fetch(`/api/payout?limit=20&password=${encodeURIComponent(password)}`, { cache: "no-store" }),
+      ]);
+      if (statusRes.ok) setPayoutStatus(await statusRes.json());
+      if (listRes.ok) {
+        const data = await listRes.json();
+        setPayoutList(data.payouts || []);
+      }
+    } catch {}
+    setLoading(false);
+  }
+
+  useEffect(() => { fetchPayoutData(); }, []);
+
+  async function handleRetry(payoutId: number) {
+    setRetrying(payoutId);
+    try {
+      await fetch("/api/payout/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payoutId, password }),
+      });
+      await fetchPayoutData();
+    } catch {}
+    setRetrying(null);
+  }
+
+  async function handleManualPayout(e: React.FormEvent) {
+    e.preventDefault();
+    setManualSubmitting(true);
+    setManualResult(null);
+    try {
+      const res = await fetch("/api/payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          gameType: manualForm.gameType,
+          gameId: `manual-${Date.now()}`,
+          recipientAddress: manualForm.recipientAddress.trim().toLowerCase(),
+          amountCrc: parseInt(manualForm.amountCrc) || 0,
+          reason: manualForm.reason || undefined,
+        }),
+      });
+      const data = await res.json();
+      setManualResult(data);
+      if (data.success) {
+        setManualForm({ gameType: "reward", recipientAddress: "", amountCrc: "", reason: "" });
+        await fetchPayoutData();
+      }
+    } catch (err: any) {
+      setManualResult({ success: false, error: err.message });
+    }
+    setManualSubmitting(false);
+  }
+
+  const shortAddr = (addr: string) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "—";
+  const gnosisScanTx = (hash: string) => `https://gnosisscan.io/tx/${hash}`;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-xl font-bold text-ink flex items-center gap-2">
+          <Wallet className="h-5 w-5" />
+          {p.title[locale]}
+        </h2>
+        <button onClick={fetchPayoutData} className="text-ink/40 hover:text-ink/60 transition-colors">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      {payoutStatus && !payoutStatus.configured && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+              <div className="space-y-2">
+                <p className="font-semibold text-amber-800">{p.notConfigured[locale]}</p>
+                <p className="text-sm text-amber-700">{p.missingVars[locale]}: {payoutStatus.missingVars?.join(", ")}</p>
+                <button onClick={() => setShowSetup(!showSetup)} className="text-sm text-amber-800 underline flex items-center gap-1">
+                  {p.setupGuide[locale]}
+                  <ChevronDown className={`h-3 w-3 transition-transform ${showSetup ? "rotate-180" : ""}`} />
+                </button>
+                {showSetup && (
+                  <div className="text-xs text-amber-700 space-y-1 mt-2 bg-amber-100 rounded-lg p-3">
+                    <p>{p.setupStep1[locale]}</p>
+                    <p>{p.setupStep2[locale]}</p>
+                    <p>{p.setupStep3[locale]}</p>
+                    <p>{p.setupStep4[locale]}</p>
+                    <p>{p.setupStep5[locale]}</p>
+                    <p>{p.setupStep6[locale]}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {payoutStatus?.configured && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-ink/40 text-xs">{p.status[locale]}</p>
+                <p className="font-semibold text-green-600 flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3" /> {p.configured[locale]}
+                </p>
+              </div>
+              <div>
+                <p className="text-ink/40 text-xs">{p.botGas[locale]}</p>
+                <p className="font-semibold">{Number(payoutStatus.botXdaiBalance || 0).toFixed(4)}</p>
+              </div>
+              <div>
+                <p className="text-ink/40 text-xs">{p.botWallet[locale]}</p>
+                <p className="font-mono text-xs">{shortAddr(payoutStatus.botAddress || "")}</p>
+              </div>
+              <div>
+                <p className="text-ink/40 text-xs">{p.safeBalance[locale]} (ERC-20)</p>
+                <p className="font-semibold">{Number(payoutStatus.safeBalance?.erc20 || 0).toFixed(2)} CRC</p>
+              </div>
+              <div>
+                <p className="text-ink/40 text-xs">{p.safeAddress[locale]}</p>
+                <p className="font-mono text-xs">{shortAddr(payoutStatus.safeAddress || "")}</p>
+              </div>
+              <div>
+                <p className="text-ink/40 text-xs">{p.safeBalance[locale]} (ERC-1155)</p>
+                <p className="font-semibold">{Number(payoutStatus.safeBalance?.erc1155 || 0).toFixed(2)} CRC</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {payoutStatus?.configured && (
+        <Card>
+          <CardContent className="p-4">
+            <button onClick={() => setManualOpen(!manualOpen)} className="w-full flex items-center justify-between text-sm font-semibold text-ink">
+              <span className="flex items-center gap-2"><Send className="h-4 w-4" /> {p.manualPayout[locale]}</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${manualOpen ? "rotate-180" : ""}`} />
+            </button>
+            {manualOpen && (
+              <form onSubmit={handleManualPayout} className="mt-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-ink/40">{p.gameType[locale]}</label>
+                    <select value={manualForm.gameType} onChange={(e) => setManualForm(f => ({ ...f, gameType: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                      <option value="lottery">Lottery</option>
+                      <option value="lootbox">Lootbox</option>
+                      <option value="game">Game</option>
+                      <option value="reward">Reward</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-ink/40">{p.amount[locale]} (CRC)</label>
+                    <input type="number" min="1" value={manualForm.amountCrc} onChange={(e) => setManualForm(f => ({ ...f, amountCrc: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-ink/40">{p.recipient[locale]}</label>
+                  <input type="text" placeholder="0x..." value={manualForm.recipientAddress} onChange={(e) => setManualForm(f => ({ ...f, recipientAddress: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm font-mono" required />
+                </div>
+                <div>
+                  <label className="text-xs text-ink/40">{p.reason[locale]}</label>
+                  <input type="text" value={manualForm.reason} onChange={(e) => setManualForm(f => ({ ...f, reason: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                {manualResult && (
+                  <div className={`text-sm p-2 rounded-lg ${manualResult.success ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                    {manualResult.success ? `${p.success[locale]} — Tx: ${manualResult.transferTxHash?.slice(0, 12)}...` : manualResult.error}
+                  </div>
+                )}
+                <Button type="submit" disabled={manualSubmitting} className="w-full" size="sm">
+                  {manualSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : p.triggerPayout[locale]}
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">{p.payouts[locale]}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
+          {payoutList.length === 0 ? (
+            <p className="text-sm text-ink/40 text-center py-4">{p.noPayout[locale]}</p>
+          ) : (
+            <div className="space-y-2">
+              {payoutList.map((po: any) => (
+                <div key={po.id} className="bg-ink/5 rounded-lg p-3 text-sm space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[po.status] || "bg-gray-100 text-gray-600"}`}>
+                        {statusIcons[po.status]}
+                        {(p as any)[po.status]?.[locale] || po.status}
+                      </span>
+                      <span className="text-xs text-ink/40">{po.gameType}</span>
+                    </div>
+                    <span className="font-semibold">{po.amountCrc} CRC</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-ink/40">
+                    <span className="font-mono">{shortAddr(po.recipientAddress)}</span>
+                    <span>{new Date(po.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  {po.reason && <p className="text-xs text-ink/50">{po.reason}</p>}
+                  <div className="flex items-center gap-2 text-xs">
+                    {po.wrapTxHash && (
+                      <a href={gnosisScanTx(po.wrapTxHash)} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-0.5">
+                        {p.wrapTx[locale]} <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    {po.transferTxHash && (
+                      <a href={gnosisScanTx(po.transferTxHash)} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-0.5">
+                        {p.transferTx[locale]} <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    {po.status === "failed" && po.attempts < 3 && (
+                      <button onClick={() => handleRetry(po.id)} disabled={retrying === po.id} className="text-amber-600 hover:underline flex items-center gap-0.5">
+                        {retrying === po.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                        {p.retry[locale]}
+                      </button>
+                    )}
+                  </div>
+                  {po.errorMessage && <p className="text-xs text-red-500">{po.errorMessage}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

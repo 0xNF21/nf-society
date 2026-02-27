@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { participants, draws } from "@/lib/db/schema";
+import { participants, draws, lotteries } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
+import { getPayoutConfig, executePayout } from "@/lib/payout";
 
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
 
     const addresses = allParticipants.map((p) => p.address).join(",");
 
-    await db.insert(draws).values({
+    const [insertedDraw] = await db.insert(draws).values({
       lotteryId,
       winnerAddress: winner.address,
       blockNumber: block.number,
@@ -123,7 +124,34 @@ export async function POST(req: NextRequest) {
       participantCount: allParticipants.length,
       participantAddresses: addresses,
       selectionIndex: winnerIndex,
-    });
+    }).returning();
+
+    let payoutResult = null;
+    const config = getPayoutConfig();
+    if (config.configured) {
+      try {
+        const [lottery] = await db.select().from(lotteries).where(eq(lotteries.id, lotteryId)).limit(1);
+        if (lottery) {
+          const totalPot = lottery.ticketPriceCrc * allParticipants.length;
+          const commission = Math.floor(totalPot * (lottery.commissionPercent / 100));
+          const prizeAmount = totalPot - commission;
+
+          if (prizeAmount > 0) {
+            payoutResult = await executePayout({
+              gameType: "lottery",
+              gameId: `lottery-${lotteryId}-draw-${insertedDraw.id}`,
+              recipientAddress: winner.address,
+              amountCrc: prizeAmount,
+              reason: `${lottery.title} — winner draw #${insertedDraw.id}`,
+            });
+            console.log(`[Draw] Auto-payout result:`, payoutResult.status);
+          }
+        }
+      } catch (payoutError: any) {
+        console.error("[Draw] Auto-payout failed (draw still valid):", payoutError.message);
+        payoutResult = { success: false, error: payoutError.message };
+      }
+    }
 
     return NextResponse.json({
       winner,
@@ -135,6 +163,7 @@ export async function POST(req: NextRequest) {
         method:
           "Winner = BigInt(last 16 hex chars of blockHash) % participantCount",
       },
+      payout: payoutResult,
     });
   } catch (error: any) {
     console.error("Draw error:", error);
