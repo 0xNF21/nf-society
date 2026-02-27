@@ -371,8 +371,8 @@ export const translations = {
   exchange: {
     title: { fr: "Échanger des CRC", en: "Exchange CRC" },
     description: {
-      fr: "Envoyez vos CRC personnels au Safe et recevez automatiquement des CRC NF Society (demurrage) en retour. Ratio 1:1.",
-      en: "Send your personal CRC to the Safe and automatically receive NF Society CRC (demurrage) in return. 1:1 ratio.",
+      fr: "Envoyez vos CRC personnels au Group Mint Handler pour recevoir automatiquement des CRC NF Society en retour. Le protocole Circles gère tout.",
+      en: "Send your personal CRC to the Group Mint Handler to automatically receive NF Society CRC in return. The Circles protocol handles everything.",
     },
     sendCrc: { fr: "Envoyer mes CRC", en: "Send my CRC" },
     copyLink: { fr: "Copier le lien", en: "Copy link" },
@@ -380,14 +380,6 @@ export const translations = {
     showQr: { fr: "Afficher QR", en: "Show QR" },
     hideQr: { fr: "Masquer QR", en: "Hide QR" },
     scanQr: { fr: "Scannez pour ouvrir dans l'app Circles", en: "Scan to open in Circles app" },
-    availableBalance: { fr: "Solde NF CRC disponible", en: "Available NF CRC balance" },
-    checkExchange: { fr: "Vérifier l'échange", en: "Check exchange" },
-    scanning: { fr: "Vérification...", en: "Checking..." },
-    noNewPayments: { fr: "Aucun nouveau paiement détecté", en: "No new payments detected" },
-    exchangesDone: { fr: "échange(s) effectué(s)", en: "exchange(s) completed" },
-    exchangesFailed: { fr: "échoué(s)", en: "failed" },
-    scanError: { fr: "Erreur lors de la vérification", en: "Error during verification" },
-    recentExchanges: { fr: "Échanges récents", en: "Recent exchanges" },
   },
   payout: {
     title: { fr: "Système de Paiement", en: "Payout System" },

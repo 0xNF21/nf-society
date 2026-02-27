@@ -24,7 +24,6 @@ src/
       lotteries/route.ts       - CRUD: list/create lotteries
       lotteries/[id]/route.ts  - CRUD: get/update single lottery
       participants/route.ts    - Participants list (lottery-aware)
-      exchange/route.ts        - CRC exchange: scan incoming, send NF CRC back
       payout/route.ts          - Generic payout: POST trigger, GET list
       payout/retry/route.ts    - Retry failed payouts
       payout/status/route.ts   - Bot wallet & Safe balance status
@@ -42,7 +41,7 @@ src/
     page.tsx                   - Landing page (hub: Loteries + Dashboard DAO)
   components/
     lottery-page.tsx           - Reusable lottery page component (client)
-    exchange-section.tsx       - CRC exchange component (QR code, scan, history)
+    exchange-section.tsx       - CRC exchange component (QR code + link to mint handler)
     payment-status.tsx         - Ticket history with skeleton loading
     language-provider.tsx      - i18n context, useLocale hook, LanguageSwitcher
     ui/                        - Reusable UI components
@@ -88,7 +87,6 @@ public/                        - Static assets (logo, etc.)
 - `/api/participants?lotteryId=X` - List participants
 - `/api/draw?lotteryId=X` - GET latest draw, POST execute draw (auto-payout if configured)
 - `/api/draw/history?lotteryId=X` - Draw history
-- `/api/exchange` - POST scan & auto-exchange incoming CRC, GET list recent exchanges
 - `/api/payout` - GET list payouts, POST trigger generic payout
 - `/api/payout/retry` - POST retry failed payout
 - `/api/payout/status` - GET bot wallet & Safe balance info
@@ -112,13 +110,14 @@ public/                        - Static assets (logo, etc.)
 - **CRC Price Tracking**: Live CRC/USD price via CoW Swap API, displayed in stat cards with USD equivalents
 - **Automated Payout System**: Generic payout engine via Gnosis Safe + Zodiac Roles Modifier. Supports any game type (lottery, lootbox, game, reward). Auto-wraps CRC to ERC20 and transfers to recipients. Double-payout prevention via unique gameId. Retry logic (max 3 attempts). Full audit trail in PostgreSQL.
 - **Payout Admin Dashboard**: Bot status, Safe balance, payout list with status badges, manual payout form, retry buttons, tx hash links to Gnosisscan, setup guide for Zodiac configuration
-- **CRC Exchange**: QR code on landing page to exchange personal CRC → NF Society CRC (demurrage) at 1:1 ratio. Auto-detects incoming payments via StreamCompleted events, sends NF CRC ERC-20 back to sender via Zodiac Roles Modifier. Duplicate prevention via unique tx hash tracking.
+- **CRC Exchange**: QR code on landing page to exchange personal CRC → NF Society group CRC via the Circles protocol group mint handler (`0x1163c2192E26703d6b27E05D270226F481178dEF`). Fully on-chain, no bot needed — the protocol mints group CRC automatically when users send personal CRC to the handler.
 
 ## Payout System Architecture
 - **Gnosis Safe**: `0x960A0784640fD6581D221A56df1c60b65b5ebB6f` (NF Society Relayer) — central treasury holding CRC tokens on Gnosis Chain
 - **Zodiac Roles Modifier**: `0xF4D577F5Fb6994bc20291733ADF9566BfEBaA3aa` — installed as module on the Safe, restricts bot to only wrap() and transfer() on the NF CRC ERC20 wrapper contract
 - **Bot Wallet**: `0x11796C513331A5b9433C57B87c910bbF06815dDF` — dedicated wallet with private key in Replit secrets, assigned role 1 in the Zodiac Roles Modifier
 - **ERC20 Wrapper**: `0x734fb1c312dba2baa442e7d9ce55fd7a59c4e9ee` (NF Society CRC, demurrage)
+- **Group Mint Handler**: `0x1163c2192E26703d6b27E05D270226F481178dEF` — Circles v2 handler for minting NF Society group CRC from personal CRC
 - **Flow**: Draw winner → wrap CRC ERC-1155 → ERC-20 via Roles Modifier → transfer ERC-20 to winner via Roles Modifier
 - **Setup**: Safe owner deploys Roles Modifier via Zodiac Safe App → assigns role to bot via assignRoles() → allows ERC20 wrapper target via allowTarget() → sets default role via setDefaultRole()
 
