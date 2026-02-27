@@ -1,16 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { QRCodeSVG } from "qrcode.react";
-import { RefreshCw, ArrowDownUp, CheckCircle, XCircle, Loader2, Copy, Check } from "lucide-react";
+import { RefreshCw, ArrowDownUp, CheckCircle, XCircle, Loader2, Copy, Check, QrCode } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
-import { translations, Locale } from "@/lib/i18n";
+import { translations } from "@/lib/i18n";
+import { generatePaymentLink } from "@/lib/circles";
 
 const SAFE_ADDRESS = "0x960A0784640fD6581D221A56df1c60b65b5ebB6f";
-
-function generateCirclesPaymentLink(): string {
-  return `https://circles.garden/profile/${SAFE_ADDRESS}`;
-}
 
 type Exchange = {
   id: number;
@@ -39,6 +35,33 @@ export default function ExchangeSection() {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [qrCode, setQrCode] = useState<string>("");
+  const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+
+  const paymentLink = generatePaymentLink(SAFE_ADDRESS, 1, "Exchange CRC → NF Society CRC");
+
+  useEffect(() => {
+    if (!showQr || !paymentLink) return;
+    let active = true;
+    setQrState("loading");
+    (async () => {
+      try {
+        const { toDataURL } = await import("qrcode");
+        const url = await toDataURL(paymentLink, { width: 220, margin: 1 });
+        if (active) {
+          setQrCode(url);
+          setQrState("ready");
+        }
+      } catch {
+        if (active) {
+          setQrCode("");
+          setQrState("error");
+        }
+      }
+    })();
+    return () => { active = false; };
+  }, [showQr, paymentLink]);
 
   async function loadExchanges() {
     try {
@@ -77,13 +100,11 @@ export default function ExchangeSection() {
     setScanning(false);
   }
 
-  function copyAddress() {
-    navigator.clipboard.writeText(SAFE_ADDRESS);
+  function handleCopy() {
+    navigator.clipboard.writeText(paymentLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
-
-  const paymentLink = generateCirclesPaymentLink();
 
   return (
     <div className="w-full rounded-3xl border-2 border-ink/5 bg-white/80 backdrop-blur-sm p-8 shadow-sm">
@@ -101,37 +122,61 @@ export default function ExchangeSection() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-ink/5">
-          <QRCodeSVG
-            value={paymentLink}
-            size={180}
-            bgColor="#ffffff"
-            fgColor="#000000"
-            level="M"
-            includeMargin={false}
-          />
-        </div>
-
-        <div className="space-y-2 w-full max-w-sm">
-          <p className="text-xs text-ink/40">{t.sendTo[locale]}</p>
-          <button
-            onClick={copyAddress}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-ink/5 hover:bg-ink/10 transition-colors text-xs font-mono text-ink/70"
+        <div className="flex items-center gap-3">
+          <a
+            href={paymentLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition-colors"
           >
-            {shortenAddress(SAFE_ADDRESS)}
-            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+            <ArrowDownUp className="h-4 w-4" />
+            {t.sendCrc[locale]}
+          </a>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl border-2 border-ink/10 text-ink/60 hover:bg-ink/5 transition-colors text-sm"
+          >
+            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            {copied ? t.copied[locale] : t.copyLink[locale]}
           </button>
         </div>
 
+        <button
+          onClick={() => setShowQr(!showQr)}
+          className="flex items-center gap-2 text-xs text-ink/40 hover:text-ink/60 transition-colors"
+        >
+          <QrCode className="h-4 w-4" />
+          {showQr ? t.hideQr[locale] : t.showQr[locale]}
+        </button>
+
+        {showQr && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-ink/5">
+            {qrState === "loading" && (
+              <div className="w-[220px] h-[220px] flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-ink/30" />
+              </div>
+            )}
+            {qrState === "ready" && qrCode && (
+              <img src={qrCode} alt="QR Code" className="w-[220px] h-[220px]" />
+            )}
+            {qrState === "error" && (
+              <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">
+                QR Error
+              </div>
+            )}
+            <p className="text-xs text-ink/40 mt-2">{t.scanQr[locale]}</p>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 text-xs text-ink/40">
           <span>{t.availableBalance[locale]}:</span>
-          <span className="font-semibold text-ink/70">{parseFloat(safeBalance).toFixed(2)} NF CRC</span>
+          <span className="font-semibold text-ink/70">{parseFloat(safeBalance || "0").toFixed(2)} NF CRC</span>
         </div>
 
         <button
           onClick={handleScan}
           disabled={scanning}
-          className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-amber-500 text-white font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-6 py-3 rounded-2xl border-2 border-amber-200 text-amber-600 font-semibold hover:bg-amber-50 transition-colors disabled:opacity-50"
         >
           {scanning ? (
             <Loader2 className="h-4 w-4 animate-spin" />

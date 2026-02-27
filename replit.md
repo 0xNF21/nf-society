@@ -24,6 +24,7 @@ src/
       lotteries/route.ts       - CRUD: list/create lotteries
       lotteries/[id]/route.ts  - CRUD: get/update single lottery
       participants/route.ts    - Participants list (lottery-aware)
+      exchange/route.ts        - CRC exchange: scan incoming, send NF CRC back
       payout/route.ts          - Generic payout: POST trigger, GET list
       payout/retry/route.ts    - Retry failed payouts
       payout/status/route.ts   - Bot wallet & Safe balance status
@@ -41,6 +42,7 @@ src/
     page.tsx                   - Landing page (hub: Loteries + Dashboard DAO)
   components/
     lottery-page.tsx           - Reusable lottery page component (client)
+    exchange-section.tsx       - CRC exchange component (QR code, scan, history)
     payment-status.tsx         - Ticket history with skeleton loading
     language-provider.tsx      - i18n context, useLocale hook, LanguageSwitcher
     ui/                        - Reusable UI components
@@ -60,6 +62,7 @@ public/                        - Static assets (logo, etc.)
 - **participants**: id, lottery_id (FK), address, transaction_hash, paid_at, created_at (unique constraint: lottery_id + address)
 - **draws**: id, lottery_id (FK), winner_address, block_number, block_hash, participant_count, participant_addresses, selection_index, drawn_at
 - **payouts**: id, game_type, game_id (unique), recipient_address, amount_crc, reason, wrap_tx_hash, transfer_tx_hash, status (pending/wrapping/sending/success/failed), attempts, error_message, created_at, updated_at
+- **exchanges**: id, sender_address, amount_crc (wei), amount_human, incoming_tx_hash (unique), outgoing_tx_hash, status (detected/sending/success/failed), error_message, created_at
 
 ## Environment Variables
 - `ADMIN_PASSWORD` (secret) - Password for admin zone access, draw authorization, and lottery creation
@@ -85,6 +88,7 @@ public/                        - Static assets (logo, etc.)
 - `/api/participants?lotteryId=X` - List participants
 - `/api/draw?lotteryId=X` - GET latest draw, POST execute draw (auto-payout if configured)
 - `/api/draw/history?lotteryId=X` - Draw history
+- `/api/exchange` - POST scan & auto-exchange incoming CRC, GET list recent exchanges
 - `/api/payout` - GET list payouts, POST trigger generic payout
 - `/api/payout/retry` - POST retry failed payout
 - `/api/payout/status` - GET bot wallet & Safe balance info
@@ -108,6 +112,7 @@ public/                        - Static assets (logo, etc.)
 - **CRC Price Tracking**: Live CRC/USD price via CoW Swap API, displayed in stat cards with USD equivalents
 - **Automated Payout System**: Generic payout engine via Gnosis Safe + Zodiac Roles Modifier. Supports any game type (lottery, lootbox, game, reward). Auto-wraps CRC to ERC20 and transfers to recipients. Double-payout prevention via unique gameId. Retry logic (max 3 attempts). Full audit trail in PostgreSQL.
 - **Payout Admin Dashboard**: Bot status, Safe balance, payout list with status badges, manual payout form, retry buttons, tx hash links to Gnosisscan, setup guide for Zodiac configuration
+- **CRC Exchange**: QR code on landing page to exchange personal CRC → NF Society CRC (demurrage) at 1:1 ratio. Auto-detects incoming payments via StreamCompleted events, sends NF CRC ERC-20 back to sender via Zodiac Roles Modifier. Duplicate prevention via unique tx hash tracking.
 
 ## Payout System Architecture
 - **Gnosis Safe**: `0x960A0784640fD6581D221A56df1c60b65b5ebB6f` (NF Society Relayer) — central treasury holding CRC tokens on Gnosis Chain
