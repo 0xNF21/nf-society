@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ArrowUpRight, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Pencil, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -358,15 +359,21 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     >
       <main className="px-4 py-10 md:py-16">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/loteries"
+              className="text-sm text-ink/50 hover:text-ink/80 transition-colors font-medium"
+            >
+              {l.backToLotteries[locale]}
+            </Link>
+            <LanguageSwitcher />
+          </div>
           <header className="space-y-4 text-center">
             {lottery.logoUrl && (
               <div className="flex justify-center mb-4">
                 <Image src={lottery.logoUrl} alt={lottery.title} width={160} height={48} className="h-12 w-auto" priority />
               </div>
             )}
-            <div className="flex justify-end">
-              <LanguageSwitcher />
-            </div>
             <h1 className="font-display text-4xl font-bold text-ink sm:text-5xl">
               {lottery.title}
             </h1>

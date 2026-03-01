@@ -80,6 +80,7 @@ export const translations = {
     confirmArchive: { fr: "Archiver cette loterie ?", en: "Archive this lottery?" },
   },
   lottery: {
+    backToLotteries: { fr: "← Loteries", en: "← Lotteries" },
     ticketsSold: { fr: "tickets vendus", en: "tickets sold" },
     participateTitle: { fr: "Participer à la loterie", en: "Join the lottery" },
     participateDesc: {
