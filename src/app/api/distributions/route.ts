@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const DISTRIBUTOR_ADDRESS = "0xDC195f7e711C66d9B01615cD6adc4CAffe6Ac7Ad";
-const PEANUT_V4_ADDRESS = "0x43B90099a203957F1adf35Dde15ac88b3e323e75";
 const BLOCKSCOUT_BASE = "https://arbitrum.blockscout.com/api/v2";
 
 let distributionCache: { data: any; fetchedAt: number } | null = null;
@@ -50,12 +49,9 @@ export async function GET(request: NextRequest) {
     const items = await fetchAllTokenTransfers();
 
     const fromAddr = DISTRIBUTOR_ADDRESS.toLowerCase();
-    const peanutAddr = PEANUT_V4_ADDRESS.toLowerCase();
 
-    const peanutTransfers = items.filter(
-      (t: any) =>
-        t.from?.hash?.toLowerCase() === fromAddr &&
-        t.to?.hash?.toLowerCase() === peanutAddr
+    const outgoing = items.filter(
+      (t: any) => t.from?.hash?.toLowerCase() === fromAddr
     );
 
     let totalUsd = 0;
@@ -64,9 +60,10 @@ export async function GET(request: NextRequest) {
       token: string;
       timestamp: string;
       txHash: string;
+      recipient: string;
     }> = [];
 
-    for (const t of peanutTransfers) {
+    for (const t of outgoing) {
       const decimals = Number(t.token?.decimals || 6);
       const amount = Number(t.total?.value || 0) / 10 ** decimals;
       totalUsd += amount;
@@ -75,6 +72,7 @@ export async function GET(request: NextRequest) {
         token: t.token?.symbol || "USDC",
         timestamp: t.timestamp,
         txHash: t.tx_hash,
+        recipient: t.to?.hash || "",
       });
     }
 

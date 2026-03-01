@@ -391,10 +391,10 @@ export default function DashboardDaoPage() {
               <button
                 onClick={() => loadData(true)}
                 disabled={refreshing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-ink/40 hover:text-ink/70 hover:bg-ink/5 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-black hover:bg-ink/10 transition-colors disabled:opacity-50"
                 title={t.refreshData[locale]}
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                 {t.refresh[locale]}
               </button>
             )}
