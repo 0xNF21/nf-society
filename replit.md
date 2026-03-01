@@ -29,7 +29,7 @@ src/
       payout/status/route.ts   - Bot wallet & Safe balance status
       profiles/route.ts        - Circles profile fetching
       scan/route.ts            - Blockchain payment scanner (lottery-aware)
-      treasury/route.ts        - ETH treasury via Blockscout (dynamic tokens, PNL, acquisition prices)
+      treasury/route.ts        - Multi-chain treasury via Blockscout (Ethereum + Gnosis Chain, dynamic tokens, PNL, acquisition prices)
       treasury/history/route.ts - Historical performance (24h/7d/30d/1y/all)
       crc-price/route.ts       - CRC/USD price via CoW Swap
     dashboard/page.tsx         - Organizer dashboard (lottery creation + payout management)
@@ -105,7 +105,7 @@ public/                        - Static assets (logo, etc.)
 - **Organizer Dashboard**: Form-based lottery creation with live preview + payout management
 - **Bilingual (FR/EN)**: Full i18n with flag switcher, localStorage persistence
 - **DAO Dashboard**: Live member list, trust network visualization, contribution rankings, inactive member tracking via Circles SDK (@aboutcircles/sdk-rpc)
-- **Treasury Overview**: Combined CRC (Gnosis) + ETH tokens (Ethereum) treasury with pie chart, auto-detected via Blockscout API (spam filtered), icons from CoinGecko, prices from DeFi Llama
+- **Treasury Overview**: Multi-chain treasury (Ethereum `0x2f233f...` + Gnosis Chain `0xbf57dc...`) with pie chart, chain badges (ETH/GC), auto-detected via Blockscout API (spam filtered), icons from CoinGecko, prices from DeFi Llama
 - **Portfolio PNL**: Acquisition prices extracted from on-chain DEX swap history (Balancer, 1inch, Curve), per-token and global unrealized P&L with percentage badges
 - **CRC Price Tracking**: Live CRC/USD price via CoW Swap API, displayed in stat cards with USD equivalents
 - **Automated Payout System**: Generic payout engine via Gnosis Safe + Zodiac Roles Modifier. Supports any game type (lottery, lootbox, game, reward). Auto-wraps CRC to ERC20 and transfers to recipients. Double-payout prevention via unique gameId. Retry logic (max 3 attempts). Full audit trail in PostgreSQL.

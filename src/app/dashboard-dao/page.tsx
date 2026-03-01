@@ -72,12 +72,15 @@ type TreasuryHolding = {
   valueUsd: number;
   color: string;
   iconUrl?: string | null;
+  chain?: "ethereum" | "gnosis";
+  walletAddress?: string;
   acquisitionPrice?: number | null;
   acquiredAt?: string | null;
 };
 
 type TreasuryData = {
   address: string;
+  addresses?: { ethereum: string; gnosis: string };
   chain: string;
   holdings: TreasuryHolding[];
   totalUsd: number;
@@ -682,14 +685,21 @@ export default function DashboardDaoPage() {
                                   const tokenPnl = hasAcq && acqP > 0 ? ((h.price - acqP) / acqP) * 100 : (hasAcq && acqP === 0 ? 100 : null);
                                   const tokenPerfVal = treasuryHistory?.perToken?.[h.symbol]?.[perfPeriod];
                                   return (
-                                    <div key={h.symbol} className="flex items-center gap-2.5 py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors">
-                                      {h.iconUrl ? (
-                                        <img src={h.iconUrl} alt={h.symbol} className="h-8 w-8 rounded-full flex-shrink-0" />
-                                      ) : (
-                                        <div className="h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: h.color + "20" }}>
-                                          <span className="text-xs font-bold" style={{ color: h.color }}>{h.symbol.slice(0, 2)}</span>
-                                        </div>
-                                      )}
+                                    <div key={`${h.chain || "eth"}-${h.symbol}`} className="flex items-center gap-2.5 py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors">
+                                      <div className="relative flex-shrink-0">
+                                        {h.iconUrl ? (
+                                          <img src={h.iconUrl} alt={h.symbol} className="h-8 w-8 rounded-full" />
+                                        ) : (
+                                          <div className="h-8 w-8 rounded-full flex items-center justify-center" style={{ backgroundColor: h.color + "20" }}>
+                                            <span className="text-xs font-bold" style={{ color: h.color }}>{h.symbol.slice(0, 2)}</span>
+                                          </div>
+                                        )}
+                                        {h.chain && (
+                                          <span className={`absolute -bottom-0.5 -right-0.5 text-[8px] font-black px-1 py-px rounded-full border border-white ${h.chain === "gnosis" ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
+                                            {h.chain === "gnosis" ? "GC" : "ETH"}
+                                          </span>
+                                        )}
+                                      </div>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between">
                                           <div className="flex items-center gap-1.5">
@@ -737,7 +747,7 @@ export default function DashboardDaoPage() {
                     </div>
                     {treasury && (
                       <p className="text-[10px] text-ink/30 mt-3 text-center">
-                        {t.ethTreasury[locale]}: {shortenAddress(treasury.address)} (Ethereum) • CRC: {shortenAddress(data.treasuryAddress)} (Gnosis)
+                        {t.ethTreasury[locale]}: {shortenAddress(treasury.addresses?.ethereum || treasury.address)} (Ethereum) • Gnosis: {shortenAddress(treasury.addresses?.gnosis || data.treasuryAddress)} (Gnosis Chain)
                       </p>
                     )}
                   </div>
