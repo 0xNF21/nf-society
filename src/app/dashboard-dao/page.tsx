@@ -298,7 +298,7 @@ export default function DashboardDaoPage() {
     }
     setError(null);
     try {
-      const [res] = await Promise.all([fetch("/api/dao", { cache: "no-store" }), fetchCrcPrice(), fetchTreasury(), fetchTreasuryHistory(), fetchDistributions()]);
+      const [res] = await Promise.all([fetch("/api/dao", { cache: "no-store" }), fetchCrcPrice(), fetchTreasury(), fetchTreasuryHistory(), fetchDistributions(isRefresh)]);
       if (!res.ok) throw new Error("API error");
       const json = await res.json();
       if (json.error) throw new Error(json.error);
