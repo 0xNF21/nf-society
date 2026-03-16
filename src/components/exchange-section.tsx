@@ -4,9 +4,8 @@ import { useState, useEffect } from "react";
 import { ArrowDownUp, Loader2, Copy, Check, QrCode } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
-import { generatePaymentLink } from "@/lib/circles";
 
-const MINT_HANDLER_ADDRESS = "0x1163c2192E26703d6b27E05D270226F481178dEF";
+const PAYMENT_LINK = "https://app.gnosis.io/transfer/0x1163c2192E26703d6b27E05D270226F481178dEF/crc?data=0xf3f5858942140fd2894eeb8b74cd0ed72d24fc6675d352a2884b1be2f32256fe";
 
 export default function ExchangeSection() {
   const { locale } = useLocale();
@@ -16,7 +15,7 @@ export default function ExchangeSection() {
   const [qrCode, setQrCode] = useState<string>("");
   const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
-  const paymentLink = generatePaymentLink(MINT_HANDLER_ADDRESS, 1, "Mint NF Society CRC");
+  const paymentLink = PAYMENT_LINK;
 
   useEffect(() => {
     if (!showQr || !paymentLink) return;
