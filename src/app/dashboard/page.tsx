@@ -70,6 +70,7 @@ export default function DashboardPage() {
   const [lbList, setLbList] = useState<any[]>([]);
   const [lbListLoading, setLbListLoading] = useState(false);
   const [lbDeleting, setLbDeleting] = useState<number | null>(null);
+  const [lbConfirmDelete, setLbConfirmDelete] = useState<number | null>(null);
 
   const { locale } = useLocale();
   const d = translations.dashboard;
@@ -164,14 +165,14 @@ export default function DashboardPage() {
     setLbListLoading(false);
   };
 
-  const handleLbDelete = async (id: number, title: string) => {
-    if (!window.confirm(`Supprimer la lootbox "${title}" ?`)) return;
+  const handleLbDelete = async (id: number) => {
     setLbDeleting(id);
     try {
       await fetch(`/api/lootboxes/${id}`, {
         method: "DELETE",
         headers: { "x-admin-password": password },
       });
+      setLbConfirmDelete(null);
       await fetchLbList();
     } catch {}
     setLbDeleting(null);
@@ -703,13 +704,30 @@ export default function DashboardPage() {
                       <span className={`text-xs px-2 py-0.5 rounded-full ${lb.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {lb.status}
                       </span>
-                      <button
-                        onClick={() => handleLbDelete(lb.id, lb.title)}
-                        disabled={lbDeleting === lb.id}
-                        className="p-1.5 rounded-lg text-ink/30 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-                      >
-                        {lbDeleting === lb.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      </button>
+                      {lbConfirmDelete === lb.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleLbDelete(lb.id)}
+                            disabled={lbDeleting === lb.id}
+                            className="px-2 py-1 rounded-lg text-xs font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                          >
+                            {lbDeleting === lb.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Oui"}
+                          </button>
+                          <button
+                            onClick={() => setLbConfirmDelete(null)}
+                            className="px-2 py-1 rounded-lg text-xs font-semibold bg-ink/5 text-ink/50 hover:bg-ink/10 transition-colors"
+                          >
+                            Non
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setLbConfirmDelete(lb.id)}
+                          className="p-1.5 rounded-lg text-ink/30 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
