@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Copy, Check, Loader2, QrCode, Trophy, Zap } from "lucide-react";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
+import { getRewardTable } from "@/lib/lootbox";
 
 type LootboxData = {
   id: number;
@@ -44,13 +45,13 @@ function getRewardTier(reward: number, price: number): { label: string; color: s
 function RewardTable({ priceCrc, accentColor }: { priceCrc: number; accentColor: string }) {
   const t = translations.lootbox;
   const { locale } = useLocale();
-  const rows = [
-    { prob: "60%", reward: Math.round(priceCrc * 0.7), tier: "" },
-    { prob: "25%", reward: Math.round(priceCrc * 0.9), tier: "" },
-    { prob: "10%", reward: Math.round(priceCrc * 1.4), tier: "💎" },
-    { prob: "4%",  reward: Math.round(priceCrc * 3.0), tier: "✨" },
-    { prob: "1%",  reward: Math.round(priceCrc * 7.0), tier: "🔥" },
-  ];
+  const table = getRewardTable(priceCrc);
+  const tiers = ["", "", "💎", "✨", "🔥"];
+  const rows = table.map((e, i) => ({
+    prob: `${Math.round(e.probability * 100)}%`,
+    reward: e.reward,
+    tier: tiers[i],
+  }));
   return (
     <div className="w-full rounded-2xl overflow-hidden border border-ink/10 bg-white/60 backdrop-blur-sm shadow-sm">
       <div className="px-4 py-2.5 text-xs font-bold text-ink/40 uppercase tracking-widest bg-ink/[0.03] flex justify-between">

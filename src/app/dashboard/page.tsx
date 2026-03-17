@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
+import { getRewardTable, computeRtp } from "@/lib/lootbox";
 
 type FormData = {
   title: string;
@@ -645,14 +646,22 @@ export default function DashboardPage() {
                     <p className="text-xs text-ink/40 mt-1">Safe NF Society : 0x960A0784640fD6581D221A56df1c60b65b5ebB6f</p>
                   </div>
 
-                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-800">
-                    <strong>Table de récompenses (RTP ~98%) :</strong>{" "}
-                    60% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 0.7)} CRC &nbsp;|&nbsp;
-                    25% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 0.9)} CRC &nbsp;|&nbsp;
-                    10% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 1.4)} CRC &nbsp;|&nbsp;
-                    4% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 3.0)} CRC &nbsp;|&nbsp;
-                    1% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 7.0)} CRC 🎉
-                  </div>
+                  {(() => {
+                    const price = parseInt(lbForm.pricePerOpenCrc) || 10;
+                    const table = getRewardTable(price);
+                    const rtp = computeRtp(price);
+                    return (
+                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-800">
+                        <strong>RTP : {(rtp * 100).toFixed(1)}%</strong>{" — "}
+                        {table.map((e, i) => (
+                          <span key={i}>
+                            {Math.round(e.probability * 100)}% → {e.reward} CRC
+                            {i < table.length - 1 ? <>&nbsp;|&nbsp;</> : " 🎉"}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
