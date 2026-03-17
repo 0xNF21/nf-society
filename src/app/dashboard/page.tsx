@@ -567,7 +567,7 @@ export default function DashboardPage() {
                       type="text"
                       value={lbForm.description}
                       onChange={(e) => updateLbField("description", e.target.value)}
-                      placeholder="Ouvre pour 10 CRC, gagne jusqu'à 70 CRC instantanément !"
+                      placeholder="Ouvre pour 10 CRC, gagne jusqu&apos;à 70 CRC instantanément !"
                       className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400 transition-colors"
                     />
                   </div>
@@ -700,6 +700,7 @@ function PayoutManager({ password, locale }: { password: string; locale: "fr" | 
     setLoading(false);
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchPayoutData(); }, []);
 
   async function handleRetry(payoutId: number) {
