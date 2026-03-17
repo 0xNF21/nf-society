@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lootboxes } from "@/lib/db/schema";
+import { lootboxes, lootboxOpens } from "@/lib/db/schema";
 import { eq, or } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
@@ -64,11 +64,17 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
     const { id } = params;
     const isNumeric = /^\d+$/.test(id);
-    const [deleted] = isNumeric
-      ? await db.delete(lootboxes).where(eq(lootboxes.id, parseInt(id))).returning()
-      : await db.delete(lootboxes).where(eq(lootboxes.slug, id)).returning();
 
-    if (!deleted) return NextResponse.json({ error: "Lootbox not found" }, { status: 404 });
+    const results = isNumeric
+      ? await db.select().from(lootboxes).where(eq(lootboxes.id, parseInt(id))).limit(1)
+      : await db.select().from(lootboxes).where(eq(lootboxes.slug, id)).limit(1);
+
+    if (results.length === 0) return NextResponse.json({ error: "Lootbox not found" }, { status: 404 });
+
+    const lootbox = results[0];
+    await db.delete(lootboxOpens).where(eq(lootboxOpens.lootboxId, lootbox.id));
+    const [deleted] = await db.delete(lootboxes).where(eq(lootboxes.id, lootbox.id)).returning();
+
     return NextResponse.json(deleted);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

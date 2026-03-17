@@ -168,13 +168,19 @@ export default function DashboardPage() {
   const handleLbDelete = async (id: number) => {
     setLbDeleting(id);
     try {
-      await fetch(`/api/lootboxes/${id}`, {
+      const res = await fetch(`/api/lootboxes/${id}`, {
         method: "DELETE",
         headers: { "x-admin-password": password },
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setLbError(`Suppression impossible : ${data.error || res.statusText}`);
+      }
       setLbConfirmDelete(null);
       await fetchLbList();
-    } catch {}
+    } catch (err: any) {
+      setLbError(`Erreur : ${err.message}`);
+    }
     setLbDeleting(null);
   };
 
