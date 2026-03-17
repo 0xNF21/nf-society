@@ -42,6 +42,7 @@ src/
   components/
     lottery-page.tsx           - Reusable lottery page component (client)
     exchange-section.tsx       - CRC exchange component (QR code + link to mint handler)
+    lootbox-page.tsx           - Reusable lootbox page component (client)
     payment-status.tsx         - Ticket history with skeleton loading
     language-provider.tsx      - i18n context, useLocale hook, LanguageSwitcher
     ui/                        - Reusable UI components
@@ -52,6 +53,8 @@ src/
     circles.ts                 - Circles protocol integration
     payout.ts                  - Generic payout engine (Safe + Zodiac Roles Modifier)
     i18n.ts                    - Translation strings (FR/EN) organized by page
+    game-data.ts               - Game data encode/decode (JSON ↔ hex for Gnosis App checkout data)
+    lootbox.ts                 - Lootbox reward table + RTP calculation (98%, multiples of 10 CRC only)
     bytea.ts / hash.ts / utils.ts - Utilities
 public/                        - Static assets (logo, etc.)
 ```
@@ -98,6 +101,7 @@ public/                        - Static assets (logo, etc.)
 - **White Label**: Each lottery has custom colors, logo, and theme (light/dark)
 - **Dynamic Routes**: `/loterie/:slug` loads lottery-specific design
 - **Payment Detection**: CrcV2_StreamCompleted events for accurate sender identification
+- **Game Data Encoding**: Gnosis App checkout links include hex-encoded JSON game data (`{game, id, v}`) for automatic payment routing to the correct game. Backend decodes transaction input data and filters payments by game type/slug. Backward compatible with address-only detection.
 - **Profile Integration**: Circles avatars + names via circles_getAvatarInfo + IPFS
 - **Skeleton Loading**: No flash of raw addresses while profiles load
 - **Admin Authentication**: Password-protected admin zone (server-side verification)

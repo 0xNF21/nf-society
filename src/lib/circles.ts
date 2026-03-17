@@ -1,3 +1,5 @@
+import { encodeGameData } from "@/lib/game-data";
+
 const DEFAULT_CIRCLES_RPC_URL = "https://rpc.aboutcircles.com/";
 const DEFAULT_RECIPIENT_ADDRESS = "0xbf57dc790ba892590c640dc27b26b2665d30104f";
 const GNOSIS_RPC_URL = "https://rpc.gnosis.gateway.fm";
@@ -17,6 +19,7 @@ export type CirclesTransferEvent = {
   transactionIndex: string;
   logIndex: string;
   sender: string;
+  gameData?: { game: string; id: string; v: number } | null;
 };
 
 export const circlesConfig = {
@@ -33,6 +36,16 @@ export function generatePaymentLink(
 ): string {
   const encodedData = encodeURIComponent(data);
   return `https://app.gnosis.io/transfer/${recipientAddress}/crc?data=${encodedData}&amount=${amountCRC}`;
+}
+
+export function generateGamePaymentLink(
+  recipientAddress: string,
+  amountCRC: number,
+  gameType: string,
+  gameSlug: string,
+): string {
+  const hexData = encodeGameData({ game: gameType, id: gameSlug, v: 1 });
+  return `https://app.gnosis.io/transfer/${recipientAddress}/crc?data=${encodeURIComponent(hexData)}&amount=${amountCRC}`;
 }
 
 function normalizeAddress(value: string): string | null {
@@ -279,6 +292,74 @@ export async function checkPaymentReceived(
   return null;
 }
 
+async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { game: string; id: string; v: number }>> {
+  const { decodeGameData } = await import("@/lib/game-data");
+  const results = new Map<string, { game: string; id: string; v: number }>();
+  if (txHashes.length === 0) return results;
+
+  const batchSize = 20;
+  for (let i = 0; i < txHashes.length; i += batchSize) {
+    const batch = txHashes.slice(i, i + batchSize);
+    const requests = batch.map((hash, idx) => ({
+      jsonrpc: "2.0",
+      id: idx + 1,
+      method: "eth_getTransactionByHash",
+      params: [hash],
+    }));
+
+    try {
+      const response = await fetch(GNOSIS_RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requests),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) continue;
+
+      const payload = await response.json();
+      const responses = Array.isArray(payload) ? payload : [payload];
+
+      for (let j = 0; j < responses.length; j++) {
+        const res = responses[j];
+        const input = res?.result?.input;
+        if (!input || input.length < 10) continue;
+
+        const inputData = input.slice(10);
+        const hexStr = inputData.replace(/^0+/, "");
+        if (hexStr.length < 2) continue;
+
+        for (let offset = 0; offset < inputData.length - 4; offset += 2) {
+          const byte = parseInt(inputData.slice(offset, offset + 2), 16);
+          if (byte === 0x7b) {
+            const remaining = inputData.slice(offset);
+            try {
+              const bytes = new Uint8Array(remaining.length / 2);
+              for (let k = 0; k < remaining.length; k += 2) {
+                bytes[k / 2] = parseInt(remaining.slice(k, k + 2), 16);
+              }
+              const text = new TextDecoder().decode(bytes);
+              const jsonEnd = text.indexOf("}");
+              if (jsonEnd === -1) continue;
+              const jsonStr = text.slice(0, jsonEnd + 1);
+              const decoded = decodeGameData(jsonStr);
+              if (decoded) {
+                results.set(batch[j].toLowerCase(), decoded);
+                break;
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return results;
+}
+
 export async function checkAllNewPayments(
   exactAmountCRC: number,
   recipientAddress: string
@@ -304,6 +385,15 @@ export async function checkAllNewPayments(
       if (event.blockNumber && timestamps.has(event.blockNumber)) {
         event.timestamp = timestamps.get(event.blockNumber)!.toString();
       }
+    }
+  }
+
+  const txHashes = [...new Set(events.map(e => e.transactionHash).filter(h => h))];
+  if (txHashes.length > 0) {
+    const gameDataMap = await fetchTxInputGameData(txHashes);
+    for (const event of events) {
+      const txKey = event.transactionHash.toLowerCase();
+      event.gameData = gameDataMap.get(txKey) || null;
     }
   }
 

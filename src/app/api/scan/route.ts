@@ -56,6 +56,10 @@ export async function POST(req: NextRequest) {
       if (globalClaimedTxHashes.has(txHash)) continue;
       if (registeredAddresses.has(addr)) continue;
 
+      if (payment.gameData) {
+        if (payment.gameData.game !== "lottery" || payment.gameData.id !== lottery.slug) continue;
+      }
+
       const hasTimestamp = payment.timestamp && payment.timestamp !== "";
       const hasBlockNumber = payment.blockNumber && payment.blockNumber !== "";
 

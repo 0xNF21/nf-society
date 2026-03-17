@@ -41,7 +41,10 @@ export async function POST(req: NextRequest) {
       if (knownTxHashes.has(txHash)) continue;
       if (globalClaimedTxHashes.has(txHash)) continue;
 
-      // Verify exact price match
+      if (payment.gameData) {
+        if (payment.gameData.game !== "lootbox" || payment.gameData.id !== lootbox.slug) continue;
+      }
+
       try {
         const val = BigInt(payment.value);
         if (val !== priceWei) continue;

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft, Copy, Check, Loader2, QrCode, Trophy, Zap } from "lucide-react";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { getRewardTable } from "@/lib/lootbox";
+import { generateGamePaymentLink } from "@/lib/circles";
 
 type LootboxData = {
   id: number;
@@ -257,6 +258,10 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const animTimers = useRef<NodeJS.Timeout[]>([]);
 
   const paymentAddress = lootbox.recipientAddress;
+  const paymentLink = useMemo(
+    () => generateGamePaymentLink(lootbox.recipientAddress, lootbox.pricePerOpenCrc, "lootbox", lootbox.slug),
+    [lootbox.recipientAddress, lootbox.pricePerOpenCrc, lootbox.slug]
+  );
   const { primaryColor, accentColor } = lootbox;
 
   useEffect(() => {
@@ -352,17 +357,17 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
     (async () => {
       try {
         const { toDataURL } = await import("qrcode");
-        const url = await toDataURL(paymentAddress, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } });
+        const url = await toDataURL(paymentLink, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } });
         if (active) { setQrCode(url); setQrState("ready"); }
       } catch {
         if (active) { setQrCode(""); setQrState("error"); }
       }
     })();
     return () => { active = false; };
-  }, [showQr, paymentAddress]);
+  }, [showQr, paymentLink]);
 
   function handleCopy() {
-    navigator.clipboard.writeText(paymentAddress);
+    navigator.clipboard.writeText(paymentLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -427,14 +432,23 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
           <div className="rounded-2xl border border-ink/10 bg-white/60 backdrop-blur-sm p-6 shadow-sm space-y-4">
             <p className="text-ink/50 text-sm text-center">{t.sendInstructions[locale]}</p>
 
+            <a
+              href={paymentLink}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 shadow-sm w-full"
+              style={{ backgroundColor: accentColor }}
+            >
+              {locale === "fr" ? "Payer avec Circles" : "Pay with Circles"}
+            </a>
+
             <div className="flex gap-3 w-full">
               <button
                 onClick={handleCopy}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 shadow-sm"
-                style={{ backgroundColor: accentColor }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-ink/15 text-ink/60 hover:text-ink hover:border-ink/30 hover:bg-white/80 transition-all text-sm font-medium"
               >
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? t.copied[locale] : t.copyAddress[locale]}
+                {copied ? t.copied[locale] : (locale === "fr" ? "Copier le lien" : "Copy link")}
               </button>
               <button
                 onClick={() => setShowQr(!showQr)}

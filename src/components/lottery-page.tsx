@@ -7,7 +7,7 @@ import { ArrowUpRight, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Pencil, 
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { generatePaymentLink } from "@/lib/circles";
+import { generatePaymentLink, generateGamePaymentLink } from "@/lib/circles";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
@@ -97,11 +97,9 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const [currentDescription, setCurrentDescription] = useState(lottery.description || "");
   const [savingDescription, setSavingDescription] = useState(false);
 
-  const ticketNote = `${lottery.title} Ticket`;
-
   const paymentLink = useMemo(() => {
-    return generatePaymentLink(lottery.recipientAddress, lottery.ticketPriceCrc, ticketNote);
-  }, [lottery.recipientAddress, lottery.ticketPriceCrc, ticketNote]);
+    return generateGamePaymentLink(lottery.recipientAddress, lottery.ticketPriceCrc, "lottery", lottery.slug);
+  }, [lottery.recipientAddress, lottery.ticketPriceCrc, lottery.slug]);
 
   const lotteryQuery = `lotteryId=${lottery.id}`;
 
