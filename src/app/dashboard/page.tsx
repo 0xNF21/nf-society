@@ -574,7 +574,7 @@ export default function DashboardPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-ink/70 mb-1.5">Prix d'ouverture (CRC)</label>
+                      <label className="block text-sm font-medium text-ink/70 mb-1.5">Prix d&apos;ouverture (CRC)</label>
                       <input
                         type="number"
                         min="1"
