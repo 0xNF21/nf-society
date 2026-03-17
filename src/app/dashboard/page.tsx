@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Check, Palette, RefreshCw, Sparkles, Wallet, AlertCircle, CheckCircle, XCircle, Send, ChevronDown, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Palette, RefreshCw, Sparkles, Wallet, AlertCircle, CheckCircle, XCircle, Send, ChevronDown, ExternalLink, Loader2, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
@@ -35,6 +35,24 @@ const defaultForm: FormData = {
   commissionPercent: "5",
 };
 
+type LbFormData = {
+  title: string;
+  slug: string;
+  description: string;
+  pricePerOpenCrc: string;
+  recipientAddress: string;
+  accentColor: string;
+};
+
+const defaultLbForm: LbFormData = {
+  title: "",
+  slug: "",
+  description: "",
+  pricePerOpenCrc: "10",
+  recipientAddress: "",
+  accentColor: "#F59E0B",
+};
+
 export default function DashboardPage() {
   const [form, setForm] = useState<FormData>(defaultForm);
   const [password, setPassword] = useState("");
@@ -44,6 +62,12 @@ export default function DashboardPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  const [lbForm, setLbForm] = useState<LbFormData>(defaultLbForm);
+  const [lbSubmitting, setLbSubmitting] = useState(false);
+  const [lbSuccess, setLbSuccess] = useState<string | null>(null);
+  const [lbError, setLbError] = useState("");
+
   const { locale } = useLocale();
   const d = translations.dashboard;
 
@@ -122,6 +146,65 @@ export default function DashboardPage() {
 
   const updateField = (field: keyof FormData, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateLbField = (field: keyof LbFormData, value: string) => {
+    setLbForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLbSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLbSubmitting(true);
+    setLbError("");
+    setLbSuccess(null);
+
+    if (!lbForm.title.trim() || !lbForm.slug.trim() || !lbForm.recipientAddress.trim()) {
+      setLbError("Titre, slug et adresse de réception sont requis.");
+      setLbSubmitting(false);
+      return;
+    }
+
+    if (!/^[a-z0-9-]+$/.test(lbForm.slug.trim())) {
+      setLbError("Le slug doit contenir uniquement des lettres minuscules, chiffres et tirets.");
+      setLbSubmitting(false);
+      return;
+    }
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(lbForm.recipientAddress.trim())) {
+      setLbError("Adresse Ethereum invalide.");
+      setLbSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/lootboxes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": password,
+        },
+        body: JSON.stringify({
+          slug: lbForm.slug.trim(),
+          title: lbForm.title.trim(),
+          description: lbForm.description.trim() || null,
+          pricePerOpenCrc: parseInt(lbForm.pricePerOpenCrc) || 10,
+          recipientAddress: lbForm.recipientAddress.trim().toLowerCase(),
+          accentColor: lbForm.accentColor,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        setLbError(data.error);
+      } else if (data.slug) {
+        setLbSuccess(data.slug);
+        setLbForm(defaultLbForm);
+      }
+    } catch {
+      setLbError("Erreur lors de la création.");
+    } finally {
+      setLbSubmitting(false);
+    }
   };
 
   if (!authed) {
@@ -424,6 +507,146 @@ export default function DashboardPage() {
             </Button>
           </div>
         </form>
+
+        <div className="mt-12 border-t border-ink/10 pt-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-10 w-10 rounded-2xl bg-amber-100 flex items-center justify-center">
+              <Gift className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="font-display text-xl font-bold text-ink">Créer une lootbox</h2>
+              <p className="text-sm text-ink/50">Lootbox avec payout automatique (RTP ~98%)</p>
+            </div>
+          </div>
+
+          {lbSuccess && (
+            <div className="mb-6 bg-green-50 border-2 border-green-200 rounded-2xl p-5 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2 text-green-700 font-semibold mb-2">
+                <Check className="h-5 w-5" />
+                Lootbox créée avec succès !
+              </div>
+              <p className="text-sm text-green-600">
+                Disponible sur{" "}
+                <Link href={`/lootbox/${lbSuccess}`} className="underline font-medium hover:text-green-800">
+                  /lootbox/{lbSuccess}
+                </Link>
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleLbSubmit}>
+            <div className="space-y-4">
+              <Card className="border-2 border-ink/5 shadow-lg">
+                <CardContent className="pt-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-ink/70 mb-1.5">Titre</label>
+                      <input
+                        type="text"
+                        value={lbForm.title}
+                        onChange={(e) => updateLbField("title", e.target.value)}
+                        placeholder="Lootbox Bronze"
+                        className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink/70 mb-1.5">Slug (URL)</label>
+                      <input
+                        type="text"
+                        value={lbForm.slug}
+                        onChange={(e) => updateLbField("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                        placeholder="lootbox-bronze"
+                        className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400 transition-colors font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-ink/70 mb-1.5">Description (optionnel)</label>
+                    <input
+                      type="text"
+                      value={lbForm.description}
+                      onChange={(e) => updateLbField("description", e.target.value)}
+                      placeholder="Ouvre pour 10 CRC, gagne jusqu'à 70 CRC instantanément !"
+                      className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400 transition-colors"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-ink/70 mb-1.5">Prix d'ouverture (CRC)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={lbForm.pricePerOpenCrc}
+                        onChange={(e) => updateLbField("pricePerOpenCrc", e.target.value)}
+                        className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink/70 mb-1.5">Couleur accent</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={lbForm.accentColor}
+                          onChange={(e) => updateLbField("accentColor", e.target.value)}
+                          className="h-10 w-12 rounded-lg border-2 border-ink/10 cursor-pointer"
+                        />
+                        <span className="text-sm font-mono text-ink/50">{lbForm.accentColor}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-ink/70 mb-1.5">Adresse de réception (Safe)</label>
+                    <input
+                      type="text"
+                      value={lbForm.recipientAddress}
+                      onChange={(e) => updateLbField("recipientAddress", e.target.value)}
+                      placeholder="0x..."
+                      className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400 transition-colors font-mono"
+                    />
+                    <p className="text-xs text-ink/40 mt-1">Safe NF Society : 0x960A0784640fD6581D221A56df1c60b65b5ebB6f</p>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-800">
+                    <strong>Table de récompenses (RTP ~98%) :</strong>{" "}
+                    60% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 0.7)} CRC &nbsp;|&nbsp;
+                    25% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 0.9)} CRC &nbsp;|&nbsp;
+                    10% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 1.4)} CRC &nbsp;|&nbsp;
+                    4% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 3.0)} CRC &nbsp;|&nbsp;
+                    1% → {Math.round((parseInt(lbForm.pricePerOpenCrc) || 10) * 7.0)} CRC 🎉
+                  </div>
+                </CardContent>
+              </Card>
+
+              {lbError && (
+                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 text-sm text-red-600">
+                  {lbError}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={lbSubmitting}
+                className="w-full h-12 text-lg font-semibold shadow-lg"
+                style={{ backgroundColor: lbForm.accentColor }}
+              >
+                {lbSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <RefreshCw className="h-5 w-5 animate-spin" />
+                    Création en cours...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Gift className="h-5 w-5" />
+                    Créer la lootbox
+                  </span>
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
 
         <div className="mt-12 border-t border-ink/10 pt-8">
           <PayoutManager password={password} locale={locale} />
