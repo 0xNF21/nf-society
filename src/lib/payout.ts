@@ -10,7 +10,7 @@ const NF_TOKEN_ID = BigInt(NF_GROUP_ADDRESS);
 const MAX_RETRY_ATTEMPTS = 3;
 
 const ROLES_MOD_ABI = [
-  "function execTransactionWithRole(address to, uint256 value, bytes data, uint8 operation, uint16 roleId, bool shouldRevert) external returns (bool success)",
+  "function execTransactionWithRole(address to, uint256 value, bytes data, uint8 operation, bytes32 roleKey, bool shouldRevert) external returns (bool success)",
 ];
 
 const ERC1155_ABI = [
@@ -53,8 +53,12 @@ function getBotWallet() {
   return new ethers.Wallet(process.env.BOT_PRIVATE_KEY!, provider);
 }
 
-function getRoleId(): number {
-  return parseInt(process.env.ROLE_KEY || "1", 10);
+function getRoleKey(): string {
+  const key = process.env.ROLE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000001";
+  if (key.startsWith("0x")) {
+    return key.padEnd(66, "0").slice(0, 66);
+  }
+  return "0x" + BigInt(key).toString(16).padStart(64, "0");
 }
 
 export async function getSafeCrcBalance(): Promise<{ erc1155: bigint; erc20: bigint }> {
@@ -84,14 +88,14 @@ async function execViaRolesMod(
   if (!rolesModAddress) throw new Error("ROLES_MODIFIER_ADDRESS not configured");
 
   const rolesMod = new ethers.Contract(rolesModAddress, ROLES_MOD_ABI, wallet);
-  const roleId = getRoleId();
+  const roleKey = getRoleKey();
 
   const tx = await rolesMod.execTransactionWithRole(
     targetAddress,
     value,
     calldata,
     0,
-    roleId,
+    roleKey,
     true,
   );
 
