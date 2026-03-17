@@ -1,34 +1,10 @@
-const TARGET_RTP = 0.98;
-
 const PROBS = [0.60, 0.25, 0.10, 0.04, 0.01];
-const MULTIPLIERS = [0.7, 0.9, 1.4, 3.0, 7.0];
+const MULTIPLIERS = [0.7, 0.9, 1.4, 3.0, 7.5];
 
 export type RewardEntry = { probability: number; reward: number };
 
 export function getRewardTable(priceCrc: number): RewardEntry[] {
-  const rewards = MULTIPLIERS.map(m => Math.max(1, Math.floor(priceCrc * m)));
-
-  const calcRtp = () =>
-    PROBS.reduce((sum, p, i) => sum + p * rewards[i], 0) / priceCrc;
-
-  let rtp = calcRtp();
-  while (rtp < TARGET_RTP) {
-    let bestIdx = -1;
-    let bestDiff = Infinity;
-    for (let i = 0; i < rewards.length; i++) {
-      const bump = PROBS[i] / priceCrc;
-      const newRtp = rtp + bump;
-      const diff = Math.abs(TARGET_RTP - newRtp);
-      if (newRtp <= TARGET_RTP && diff < bestDiff) {
-        bestDiff = diff;
-        bestIdx = i;
-      }
-    }
-    if (bestIdx === -1) break;
-    rewards[bestIdx]++;
-    rtp = calcRtp();
-  }
-
+  const rewards = MULTIPLIERS.map(m => Math.round(priceCrc * m));
   return PROBS.map((p, i) => ({ probability: p, reward: rewards[i] }));
 }
 

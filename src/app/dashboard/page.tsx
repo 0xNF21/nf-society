@@ -50,7 +50,7 @@ const defaultLbForm: LbFormData = {
   slug: "",
   description: "",
   pricePerOpenCrc: "10",
-  recipientAddress: "",
+  recipientAddress: "0x960A0784640fD6581D221A56df1c60b65b5ebB6f",
   accentColor: "#F59E0B",
 };
 
@@ -612,13 +612,15 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-ink/70 mb-1.5">Prix d&apos;ouverture (CRC)</label>
-                      <input
-                        type="number"
-                        min="1"
+                      <select
                         value={lbForm.pricePerOpenCrc}
                         onChange={(e) => updateLbField("pricePerOpenCrc", e.target.value)}
-                        className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400 transition-colors"
-                      />
+                        className="w-full px-4 py-2.5 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400 transition-colors bg-white"
+                      >
+                        {[10, 20, 30, 40, 50, 100].map(v => (
+                          <option key={v} value={v}>{v} CRC</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-ink/70 mb-1.5">Couleur accent</label>

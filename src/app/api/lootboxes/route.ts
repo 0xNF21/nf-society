@@ -26,6 +26,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "slug, title and recipientAddress are required" }, { status: 400 });
     }
 
+    const price = pricePerOpenCrc || 10;
+    if (price < 10 || price % 10 !== 0) {
+      return NextResponse.json({ error: "Price must be a multiple of 10 CRC (10, 20, 30, ...)" }, { status: 400 });
+    }
+
     const [created] = await db.insert(lootboxes).values({
       slug,
       title,
