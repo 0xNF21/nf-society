@@ -301,16 +301,21 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
     );
   }, [clearAnimTimers]);
 
+  const initialLoadDone = useRef(false);
+
   const fetchOpens = useCallback(async () => {
     try {
       const res = await fetch(`/api/lootbox-opens?lootboxId=${lootbox.id}`, { cache: "no-store" });
       if (!res.ok) return;
       const data: LootboxOpen[] = await res.json();
 
-      if (data.length > prevOpenCount.current && prevOpenCount.current > 0) {
+      if (!initialLoadDone.current) {
+        initialLoadDone.current = true;
+        prevOpenCount.current = data.length;
+      } else if (data.length > prevOpenCount.current) {
         runAnimation(data[0]);
+        prevOpenCount.current = data.length;
       }
-      prevOpenCount.current = data.length;
       setOpens(data);
 
       const addresses = [...new Set(data.map(o => o.playerAddress))];
