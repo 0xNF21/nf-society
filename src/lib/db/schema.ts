@@ -82,6 +82,16 @@ export const lootboxOpens = pgTable("lootbox_opens", {
   openedAt: timestamp("opened_at").defaultNow().notNull(),
 });
 
+export const claimedPayments = pgTable("claimed_payments", {
+  id: serial("id").primaryKey(),
+  txHash: text("tx_hash").notNull().unique(),
+  gameType: text("game_type").notNull(),
+  gameId: integer("game_id").notNull(),
+  playerAddress: text("player_address").notNull(),
+  amountCrc: integer("amount_crc").notNull(),
+  claimedAt: timestamp("claimed_at").defaultNow().notNull(),
+});
+
 export const exchanges = pgTable("exchanges", {
   id: serial("id").primaryKey(),
   senderAddress: text("sender_address").notNull(),

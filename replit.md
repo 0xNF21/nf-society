@@ -61,6 +61,7 @@ public/                        - Static assets (logo, etc.)
 - **participants**: id, lottery_id (FK), address, transaction_hash, paid_at, created_at (unique constraint: lottery_id + address)
 - **draws**: id, lottery_id (FK), winner_address, block_number, block_hash, participant_count, participant_addresses, selection_index, drawn_at
 - **payouts**: id, game_type, game_id (unique), recipient_address, amount_crc, reason, wrap_tx_hash, transfer_tx_hash, status (pending/wrapping/sending/success/failed), attempts, error_message, created_at, updated_at
+- **claimed_payments**: id, tx_hash (unique), game_type (lottery/lootbox), game_id, player_address, amount_crc, claimed_at — prevents double-claiming of payments across game types sharing the same Safe recipient
 - **exchanges**: id, sender_address, amount_crc (wei), amount_human, incoming_tx_hash (unique), outgoing_tx_hash, status (detected/sending/success/failed), error_message, created_at
 
 ## Environment Variables

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { participants, lotteries } from "@/lib/db/schema";
+import { participants, lotteries, claimedPayments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 
@@ -42,6 +42,9 @@ export async function POST(req: NextRequest) {
       existingParticipants.map((p) => p.address.toLowerCase())
     );
 
+    const allClaimed = await db.select().from(claimedPayments);
+    const globalClaimedTxHashes = new Set(allClaimed.map((c) => c.txHash.toLowerCase()));
+
     const newPayments = await checkAllNewPayments(ticketPriceCrc, recipientAddress);
 
     let added = 0;
@@ -50,6 +53,7 @@ export async function POST(req: NextRequest) {
       const addr = payment.sender.toLowerCase();
 
       if (registeredTxHashes.has(txHash)) continue;
+      if (globalClaimedTxHashes.has(txHash)) continue;
       if (registeredAddresses.has(addr)) continue;
 
       const hasTimestamp = payment.timestamp && payment.timestamp !== "";
@@ -84,9 +88,19 @@ export async function POST(req: NextRequest) {
           transactionHash: txHash,
           paidAt,
         }).onConflictDoNothing();
+
+        await db.insert(claimedPayments).values({
+          txHash,
+          gameType: "lottery",
+          gameId: lotteryId,
+          playerAddress: addr,
+          amountCrc: ticketPriceCrc,
+        }).onConflictDoNothing();
+
         added++;
         registeredAddresses.add(addr);
         registeredTxHashes.add(txHash);
+        globalClaimedTxHashes.add(txHash);
       } catch {
         continue;
       }

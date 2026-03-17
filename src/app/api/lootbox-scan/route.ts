@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lootboxes, lootboxOpens } from "@/lib/db/schema";
+import { lootboxes, lootboxOpens, claimedPayments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { executePayout } from "@/lib/payout";
@@ -44,9 +44,11 @@ export async function POST(req: NextRequest) {
     const priceCrc = lootbox.pricePerOpenCrc;
     const priceWei = BigInt(priceCrc) * WEI_PER_CRC;
 
-    // Load existing tx hashes to avoid re-processing
     const existingOpens = await db.select().from(lootboxOpens).where(eq(lootboxOpens.lootboxId, lootboxId));
     const knownTxHashes = new Set(existingOpens.map((o) => o.transactionHash.toLowerCase()));
+
+    const allClaimed = await db.select().from(claimedPayments);
+    const globalClaimedTxHashes = new Set(allClaimed.map((c) => c.txHash.toLowerCase()));
 
     const newPayments = await checkAllNewPayments(priceCrc, lootbox.recipientAddress);
 
@@ -57,6 +59,7 @@ export async function POST(req: NextRequest) {
       const playerAddress = payment.sender.toLowerCase();
 
       if (knownTxHashes.has(txHash)) continue;
+      if (globalClaimedTxHashes.has(txHash)) continue;
 
       // Verify exact price match
       try {
@@ -87,7 +90,16 @@ export async function POST(req: NextRequest) {
         }).onConflictDoNothing();
 
         knownTxHashes.add(txHash);
+        globalClaimedTxHashes.add(txHash);
         opened.push({ playerAddress, rewardCrc, transactionHash: txHash });
+
+        await db.insert(claimedPayments).values({
+          txHash,
+          gameType: "lootbox",
+          gameId: lootboxId,
+          playerAddress,
+          amountCrc: priceCrc,
+        }).onConflictDoNothing();
 
         // Trigger payout via Safe bot
         // Ici sera connecté : bot backend payout via Safe + Zodiac Roles Modifier
