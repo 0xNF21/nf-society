@@ -54,3 +54,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const password = req.headers.get("x-admin-password");
+    if (password !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = params;
+    const isNumeric = /^\d+$/.test(id);
+    const [deleted] = isNumeric
+      ? await db.delete(lootboxes).where(eq(lootboxes.id, parseInt(id))).returning()
+      : await db.delete(lootboxes).where(eq(lootboxes.slug, id)).returning();
+
+    if (!deleted) return NextResponse.json({ error: "Lootbox not found" }, { status: 404 });
+    return NextResponse.json(deleted);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

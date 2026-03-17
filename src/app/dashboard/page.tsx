@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Check, Palette, RefreshCw, Sparkles, Wallet, AlertCircle, CheckCircle, XCircle, Send, ChevronDown, ExternalLink, Loader2, Gift } from "lucide-react";
+import { ArrowLeft, Check, Palette, RefreshCw, Sparkles, Wallet, AlertCircle, CheckCircle, XCircle, Send, ChevronDown, ExternalLink, Loader2, Gift, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
@@ -67,6 +67,9 @@ export default function DashboardPage() {
   const [lbSubmitting, setLbSubmitting] = useState(false);
   const [lbSuccess, setLbSuccess] = useState<string | null>(null);
   const [lbError, setLbError] = useState("");
+  const [lbList, setLbList] = useState<any[]>([]);
+  const [lbListLoading, setLbListLoading] = useState(false);
+  const [lbDeleting, setLbDeleting] = useState<number | null>(null);
 
   const { locale } = useLocale();
   const d = translations.dashboard;
@@ -152,6 +155,28 @@ export default function DashboardPage() {
     setLbForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const fetchLbList = async () => {
+    setLbListLoading(true);
+    try {
+      const res = await fetch("/api/lootboxes", { cache: "no-store" });
+      if (res.ok) setLbList(await res.json());
+    } catch {}
+    setLbListLoading(false);
+  };
+
+  const handleLbDelete = async (id: number, title: string) => {
+    if (!window.confirm(`Supprimer la lootbox "${title}" ?`)) return;
+    setLbDeleting(id);
+    try {
+      await fetch(`/api/lootboxes/${id}`, {
+        method: "DELETE",
+        headers: { "x-admin-password": password },
+      });
+      await fetchLbList();
+    } catch {}
+    setLbDeleting(null);
+  };
+
   const handleLbSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLbSubmitting(true);
@@ -199,6 +224,7 @@ export default function DashboardPage() {
       } else if (data.slug) {
         setLbSuccess(data.slug);
         setLbForm(defaultLbForm);
+        fetchLbList();
       }
     } catch {
       setLbError("Erreur lors de la création.");
@@ -206,6 +232,9 @@ export default function DashboardPage() {
       setLbSubmitting(false);
     }
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (authed) fetchLbList(); }, [authed]);
 
   if (!authed) {
     return (
@@ -646,6 +675,47 @@ export default function DashboardPage() {
               </Button>
             </div>
           </form>
+
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg font-bold text-ink">Lootboxes existantes</h3>
+              <button onClick={fetchLbList} className="text-xs text-ink/40 hover:text-ink/60 transition-colors flex items-center gap-1">
+                <RefreshCw className={`h-3 w-3 ${lbListLoading ? "animate-spin" : ""}`} />
+                Actualiser
+              </button>
+            </div>
+            {lbList.length === 0 ? (
+              <p className="text-sm text-ink/40 text-center py-6">Aucune lootbox</p>
+            ) : (
+              <div className="space-y-2">
+                {lbList.map((lb: any) => (
+                  <div key={lb.id} className="flex items-center justify-between bg-white/80 border border-ink/5 rounded-xl p-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 text-lg" style={{ backgroundColor: (lb.accentColor || "#F59E0B") + "15" }}>
+                        🎁
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-ink truncate">{lb.title}</p>
+                        <p className="text-xs text-ink/40 font-mono">/lootbox/{lb.slug} — {lb.pricePerOpenCrc} CRC</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${lb.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {lb.status}
+                      </span>
+                      <button
+                        onClick={() => handleLbDelete(lb.id, lb.title)}
+                        disabled={lbDeleting === lb.id}
+                        className="p-1.5 rounded-lg text-ink/30 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        {lbDeleting === lb.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-12 border-t border-ink/10 pt-8">
