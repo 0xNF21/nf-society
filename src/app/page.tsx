@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, BarChart3, Ticket } from "lucide-react";
+import { ArrowRight, BarChart3, Ticket, Gift } from "lucide-react";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import ExchangeSection from "@/components/exchange-section";
@@ -33,7 +33,7 @@ export default function LandingPage() {
             </p>
           </header>
 
-          <div className="grid gap-6 w-full md:grid-cols-2">
+          <div className="grid gap-6 w-full md:grid-cols-2 lg:grid-cols-3">
             <Link
               href="/loteries"
               className="group relative rounded-3xl border-2 border-ink/5 bg-white/80 backdrop-blur-sm p-8 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all duration-300 flex flex-col items-center text-center gap-4"
@@ -49,6 +49,25 @@ export default function LandingPage() {
               </p>
               <span className="mt-auto flex items-center gap-2 text-sm font-semibold text-indigo-500 group-hover:gap-3 transition-all">
                 {t.lotteriesAction[locale]}
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </Link>
+
+            <Link
+              href="/lootboxes"
+              className="group relative rounded-3xl border-2 border-ink/5 bg-white/80 backdrop-blur-sm p-8 shadow-sm hover:shadow-xl hover:border-amber-200 transition-all duration-300 flex flex-col items-center text-center gap-4"
+            >
+              <div className="h-16 w-16 rounded-2xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                <Gift className="h-8 w-8 text-amber-500" />
+              </div>
+              <h2 className="font-display text-2xl font-bold text-ink">
+                {translations.landingLootbox.title[locale]}
+              </h2>
+              <p className="text-sm text-ink/50 leading-relaxed">
+                {translations.landingLootbox.desc[locale]}
+              </p>
+              <span className="mt-auto flex items-center gap-2 text-sm font-semibold text-amber-500 group-hover:gap-3 transition-all">
+                {translations.landingLootbox.action[locale]}
                 <ArrowRight className="h-4 w-4" />
               </span>
             </Link>

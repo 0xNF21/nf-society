@@ -418,6 +418,25 @@ export const translations = {
     setupStep5: { fr: "5. Assigner le rôle à l'adresse du wallet bot", en: "5. Assign the role to the bot wallet address" },
     setupStep6: { fr: "6. Configurer les variables : SAFE_ADDRESS, ROLES_MODIFIER_ADDRESS, ROLE_KEY, BOT_PRIVATE_KEY", en: "6. Set env vars: SAFE_ADDRESS, ROLES_MODIFIER_ADDRESS, ROLE_KEY, BOT_PRIVATE_KEY" },
   },
+  lootbox: {
+    backToLootboxes: { fr: "← Lootboxes", en: "← Lootboxes" },
+    price: { fr: "Prix", en: "Price" },
+    probability: { fr: "Probabilité", en: "Probability" },
+    reward: { fr: "Gain", en: "Reward" },
+    won: { fr: "a gagné", en: "won" },
+    sendInstructions: { fr: "Envoie exactement le prix en CRC pour ouvrir une lootbox", en: "Send exactly the price in CRC to open a lootbox" },
+    copyAddress: { fr: "Copier l'adresse", en: "Copy address" },
+    copied: { fr: "Copié !", en: "Copied!" },
+    scanQr: { fr: "Scanner pour payer", en: "Scan to pay" },
+    rewardTable: { fr: "Table des gains", en: "Reward table" },
+    recentOpens: { fr: "Dernières ouvertures", en: "Recent opens" },
+    noOpens: { fr: "Aucune ouverture pour l'instant — sois le premier !", en: "No opens yet — be the first!" },
+  },
+  landingLootbox: {
+    title: { fr: "Lootboxes", en: "Lootboxes" },
+    desc: { fr: "Envoie des CRC, ouvre ta lootbox et gagne instantanément. RTP ~98%.", en: "Send CRC, open your lootbox and win instantly. ~98% RTP." },
+    action: { fr: "Accéder aux lootboxes", en: "Go to lootboxes" },
+  },
 } as const;
 
 export function t(section: string, key: string, locale: Locale): string {

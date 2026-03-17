@@ -1,0 +1,120 @@
+Je veux créer une mini application web complète appelée "NF Society Lootbox".
+
+Stack :
+- Frontend : HTML + CSS + JavaScript
+- Backend : Node.js avec Express
+- Pas de base de données (utiliser mémoire simple)
+
+Objectif :
+Créer une lootbox interactive avec un visuel de boîte bronze + système de récompense avec un RTP proche de 98%.
+
+-------------------------------------
+🎮 FRONTEND
+-------------------------------------
+
+Créer une interface moderne avec :
+
+- Fond sombre (style web3 / gaming)
+- Une lootbox bronze au centre de l'écran
+- Bouton : "Open Lootbox (10 NF-CRC)"
+- Zone pour afficher le résultat
+- Animation d'ouverture simple (scale + rotation + glow)
+
+La lootbox doit ressembler à :
+- Une boîte bronze (couleur marron/or)
+- Style légèrement cartoon / web3
+- Ombre + effet glow au hover
+
+-------------------------------------
+🎁 SYSTÈME DE RÉCOMPENSE
+-------------------------------------
+
+Prix lootbox : 10 NF-CRC
+
+Distribution (RTP ~98%) :
+
+- 60% → 7 NF-CRC
+- 25% → 9 NF-CRC
+- 10% → 14 NF-CRC
+- 4%  → 30 NF-CRC
+- 1%  → 70 NF-CRC
+
+Créer une fonction JavaScript :
+
+getRandomReward()
+
+qui retourne un montant selon ces probabilités.
+
+-------------------------------------
+⚙️ BACKEND
+-------------------------------------
+
+Créer une API Express :
+
+POST /open-lootbox
+
+Cette route :
+- génère un reward aléatoire
+- retourne { reward: X }
+
+-------------------------------------
+🔁 LOGIQUE FRONT
+-------------------------------------
+
+Quand l’utilisateur clique :
+
+1. Désactiver le bouton
+2. Jouer une animation d’ouverture
+3. Appeler /open-lootbox
+4. Afficher le gain :
+   "You won X NF-CRC"
+5. Réactiver le bouton
+
+-------------------------------------
+🎨 STYLE
+-------------------------------------
+
+- Police moderne (type Inter)
+- Couleurs :
+  fond : #0f172a
+  bouton : #f59e0b
+  texte : blanc
+
+Ajouter animation :
+- hover sur lootbox
+- ouverture avec glow
+
+-------------------------------------
+🤖 SIMULATION WEB3
+-------------------------------------
+
+Ajouter un commentaire clair dans le code :
+
+// Ici sera connecté plus tard :
+// - paiement QR Circles
+// - détection paiement
+// - bot backend payout via Safe
+
+-------------------------------------
+📁 STRUCTURE
+-------------------------------------
+
+/project
+  server.js
+  /public
+    index.html
+    style.css
+    script.js
+
+-------------------------------------
+🎯 BONUS
+-------------------------------------
+
+Ajouter :
+- historique des 5 derniers gains
+- message rare si gain > 30 :
+  "🔥 JACKPOT!"
+
+-------------------------------------
+
+Le code doit être propre, commenté et prêt à être étendu pour intégrer un bot Circles plus tard.
