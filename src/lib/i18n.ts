@@ -414,7 +414,7 @@ export const translations = {
     setupStep1: { fr: "1. Créer un Safe sur Gnosis Chain via app.safe.global", en: "1. Create a Safe on Gnosis Chain via app.safe.global" },
     setupStep2: { fr: "2. Dans Safe Apps → Zodiac → ajouter Roles Modifier", en: "2. In Safe Apps → Zodiac → add Roles Modifier" },
     setupStep3: { fr: "3. Configurer un rôle sur roles.gnosisguild.org", en: "3. Configure a role on roles.gnosisguild.org" },
-    setupStep4: { fr: "4. Autoriser wrap() et transfer() sur le wrapper ERC20 NF CRC", en: "4. Allow wrap() and transfer() on the NF CRC ERC20 wrapper" },
+    setupStep4: { fr: "4. Autoriser safeTransferFrom() sur le Circles Hub v2 (0xc12C1E50...)", en: "4. Allow safeTransferFrom() on the Circles Hub v2 (0xc12C1E50...)" },
     setupStep5: { fr: "5. Assigner le rôle à l'adresse du wallet bot", en: "5. Assign the role to the bot wallet address" },
     setupStep6: { fr: "6. Configurer les variables : SAFE_ADDRESS, ROLES_MODIFIER_ADDRESS, ROLE_KEY, BOT_PRIVATE_KEY", en: "6. Set env vars: SAFE_ADDRESS, ROLES_MODIFIER_ADDRESS, ROLE_KEY, BOT_PRIVATE_KEY" },
   },

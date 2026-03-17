@@ -15,7 +15,7 @@ export async function GET() {
       });
     }
 
-    let safeBalance = { erc1155: "0", erc20: "0" };
+    let safeBalance = { erc1155: "0" };
     let botXdaiBalance = "0";
     let error: string | undefined;
 
@@ -23,7 +23,6 @@ export async function GET() {
       const balance = await getSafeCrcBalance();
       safeBalance = {
         erc1155: ethers.formatEther(balance.erc1155),
-        erc20: ethers.formatEther(balance.erc20),
       };
       botXdaiBalance = await getBotXdaiBalance();
     } catch (e: any) {

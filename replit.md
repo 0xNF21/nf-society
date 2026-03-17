@@ -114,12 +114,11 @@ public/                        - Static assets (logo, etc.)
 
 ## Payout System Architecture
 - **Gnosis Safe**: `0x960A0784640fD6581D221A56df1c60b65b5ebB6f` (NF Society Relayer) — central treasury holding CRC tokens on Gnosis Chain
-- **Zodiac Roles Modifier**: `0xF4D577F5Fb6994bc20291733ADF9566BfEBaA3aa` — installed as module on the Safe, restricts bot to only wrap() and transfer() on the NF CRC ERC20 wrapper contract
+- **Zodiac Roles Modifier**: `0xF4D577F5Fb6994bc20291733ADF9566BfEBaA3aa` — installed as module on the Safe, restricts bot to only safeTransferFrom() on the Circles Hub v2
 - **Bot Wallet**: `0x11796C513331A5b9433C57B87c910bbF06815dDF` — dedicated wallet with private key in Replit secrets, assigned role 1 in the Zodiac Roles Modifier
-- **ERC20 Wrapper**: `0x734fb1c312dba2baa442e7d9ce55fd7a59c4e9ee` (NF Society CRC, demurrage)
 - **Group Mint Handler**: `0x1163c2192E26703d6b27E05D270226F481178dEF` — Circles v2 handler for minting NF Society group CRC from personal CRC
-- **Flow**: Draw winner → wrap CRC ERC-1155 → ERC-20 via Roles Modifier → transfer ERC-20 to winner via Roles Modifier
-- **Setup**: Safe owner deploys Roles Modifier via Zodiac Safe App → assigns role to bot via assignRoles() → allows ERC20 wrapper target via allowTarget() → sets default role via setDefaultRole()
+- **Flow**: Draw winner → `safeTransferFrom()` ERC-1155 directly from Safe to winner via Roles Modifier (no wrapping needed)
+- **Setup**: Safe owner deploys Roles Modifier via Zodiac Safe App → assigns role to bot → allows `safeTransferFrom()` on Circles Hub v2 (`0xc12C1E50...`)
 
 ## Development
 - Dev server runs on port 5000 (0.0.0.0)

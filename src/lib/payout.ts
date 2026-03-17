@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 const CIRCLES_HUB_V2 = "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8";
 const NF_GROUP_ADDRESS = "0x7dd9f44c7f1a6788221a92305f9e7ea790675e9b";
-const NF_CRC_ERC20_WRAPPER = "0x734fb1c312dba2baa442e7d9ce55fd7a59c4e9ee";
+const NF_TOKEN_ID = BigInt(NF_GROUP_ADDRESS);
 const MAX_RETRY_ATTEMPTS = 3;
 
 const ROLES_MOD_ABI = [
@@ -15,13 +15,7 @@ const ROLES_MOD_ABI = [
 
 const ERC1155_ABI = [
   "function balanceOf(address account, uint256 id) view returns (uint256)",
-];
-
-const ERC20_WRAPPER_ABI = [
-  "function wrap(address to, uint256 underlyingAmount) returns (uint256 wrappedAmount)",
-  "function transfer(address to, uint256 amount) returns (bool)",
-  "function balanceOf(address account) view returns (uint256)",
-  "function decimals() view returns (uint8)",
+  "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)",
 ];
 
 export type PayoutConfig = {
@@ -69,13 +63,9 @@ export async function getSafeCrcBalance(): Promise<{ erc1155: bigint; erc20: big
   if (!safeAddress) throw new Error("SAFE_ADDRESS not configured");
 
   const hub = new ethers.Contract(CIRCLES_HUB_V2, ERC1155_ABI, provider);
-  const tokenId = BigInt(NF_GROUP_ADDRESS);
-  const erc1155Balance = await hub.balanceOf(safeAddress, tokenId);
+  const erc1155Balance = await hub.balanceOf(safeAddress, NF_TOKEN_ID);
 
-  const wrapper = new ethers.Contract(NF_CRC_ERC20_WRAPPER, ERC20_WRAPPER_ABI, provider);
-  const erc20Balance = await wrapper.balanceOf(safeAddress);
-
-  return { erc1155: erc1155Balance, erc20: erc20Balance };
+  return { erc1155: erc1155Balance, erc20: 0n };
 }
 
 export async function getBotXdaiBalance(): Promise<string> {
@@ -112,20 +102,18 @@ async function execViaRolesMod(
   return receipt;
 }
 
-async function wrapCrc(amountWei: bigint): Promise<string> {
+async function transferErc1155(recipient: string, amountWei: bigint): Promise<string> {
   const safeAddress = process.env.SAFE_ADDRESS!;
-  const wrapperInterface = new ethers.Interface(ERC20_WRAPPER_ABI);
-  const calldata = wrapperInterface.encodeFunctionData("wrap", [safeAddress, amountWei]);
+  const hubInterface = new ethers.Interface(ERC1155_ABI);
+  const calldata = hubInterface.encodeFunctionData("safeTransferFrom", [
+    safeAddress,
+    recipient,
+    NF_TOKEN_ID,
+    amountWei,
+    "0x",
+  ]);
 
-  const receipt = await execViaRolesMod(NF_CRC_ERC20_WRAPPER, calldata);
-  return receipt.hash;
-}
-
-async function transferErc20(recipient: string, amountWei: bigint): Promise<string> {
-  const wrapperInterface = new ethers.Interface(ERC20_WRAPPER_ABI);
-  const calldata = wrapperInterface.encodeFunctionData("transfer", [recipient, amountWei]);
-
-  const receipt = await execViaRolesMod(NF_CRC_ERC20_WRAPPER, calldata);
+  const receipt = await execViaRolesMod(CIRCLES_HUB_V2, calldata);
   return receipt.hash;
 }
 
@@ -194,7 +182,6 @@ export async function executePayout(request: PayoutRequest): Promise<PayoutResul
   }
 
   const amountWei = ethers.parseEther(String(request.amountCrc));
-
   const currentAttempt = payoutRecord.attempts + 1;
 
   await db.update(payouts).set({
@@ -204,27 +191,8 @@ export async function executePayout(request: PayoutRequest): Promise<PayoutResul
 
   try {
     const balance = await getSafeCrcBalance();
-    if (balance.erc1155 < amountWei && balance.erc20 < amountWei) {
-      throw new Error(`Insufficient Safe balance. ERC-1155: ${ethers.formatEther(balance.erc1155)}, ERC-20: ${ethers.formatEther(balance.erc20)}, needed: ${request.amountCrc}`);
-    }
-
-    let wrapTxHash: string | undefined;
-    if (balance.erc20 >= amountWei) {
-      console.log(`[Payout] Safe has enough ERC-20 balance, skipping wrap`);
-    } else {
-      await db.update(payouts).set({
-        status: "wrapping",
-        updatedAt: new Date(),
-      }).where(eq(payouts.id, payoutRecord.id));
-
-      console.log(`[Payout] Wrapping ${request.amountCrc} CRC to ERC-20...`);
-      wrapTxHash = await wrapCrc(amountWei);
-      console.log(`[Payout] Wrap tx: ${wrapTxHash}`);
-
-      await db.update(payouts).set({
-        wrapTxHash,
-        updatedAt: new Date(),
-      }).where(eq(payouts.id, payoutRecord.id));
+    if (balance.erc1155 < amountWei) {
+      throw new Error(`Insufficient Safe balance. ERC-1155: ${ethers.formatEther(balance.erc1155)} CRC, needed: ${request.amountCrc}`);
     }
 
     await db.update(payouts).set({
@@ -232,8 +200,8 @@ export async function executePayout(request: PayoutRequest): Promise<PayoutResul
       updatedAt: new Date(),
     }).where(eq(payouts.id, payoutRecord.id));
 
-    console.log(`[Payout] Transferring ${request.amountCrc} CRC ERC-20 to ${request.recipientAddress}...`);
-    const transferTxHash = await transferErc20(request.recipientAddress, amountWei);
+    console.log(`[Payout] Transferring ${request.amountCrc} CRC ERC-1155 to ${request.recipientAddress}...`);
+    const transferTxHash = await transferErc1155(request.recipientAddress, amountWei);
     console.log(`[Payout] Transfer tx: ${transferTxHash}`);
 
     await db.update(payouts).set({
@@ -246,7 +214,6 @@ export async function executePayout(request: PayoutRequest): Promise<PayoutResul
       success: true,
       payoutId: payoutRecord.id,
       status: "success",
-      wrapTxHash,
       transferTxHash,
     };
   } catch (error: any) {
