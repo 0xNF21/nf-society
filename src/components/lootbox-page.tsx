@@ -175,7 +175,9 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
           });
           if (res2.ok) {
             const profileData = await res2.json();
-            setProfiles((prev) => ({ ...prev, ...profileData }));
+            if (profileData.profiles) {
+              setProfiles((prev) => ({ ...prev, ...profileData.profiles }));
+            }
           }
         } catch {}
       }
