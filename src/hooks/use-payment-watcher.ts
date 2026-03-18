@@ -9,6 +9,7 @@ interface PaymentWatchOptions {
   minAmountCRC: number;
   recipientAddress?: string;
   intervalMs?: number;
+  excludeTxHashes?: string[];
 }
 
 export function usePaymentWatcher({
@@ -16,15 +17,20 @@ export function usePaymentWatcher({
   dataValue,
   minAmountCRC,
   recipientAddress,
-  intervalMs = 5000
+  intervalMs = 5000,
+  excludeTxHashes = [],
 }: PaymentWatchOptions) {
   const [status, setStatus] = useState<PaymentWatchStatus>("idle");
   const [payment, setPayment] = useState<CirclesTransferEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Stable key: only restart the effect when hashes actually change
+  const excludeKey = excludeTxHashes.join(",");
+
   useEffect(() => {
     setPayment(null);
     setError(null);
+
     if (!enabled || !minAmountCRC) {
       setStatus("idle");
       return;
@@ -32,19 +38,14 @@ export function usePaymentWatcher({
 
     let cancelled = false;
     let timeoutId: NodeJS.Timeout | null = null;
+    const knownHashes = new Set<string>(excludeTxHashes.map(h => h.toLowerCase()));
 
     const poll = async () => {
       if (cancelled) return;
-      setStatus((prev) => (prev === "confirmed" ? prev : "waiting"));
+      setStatus(prev => (prev === "confirmed" ? prev : "waiting"));
 
       try {
-        const res = await fetch("/api/participants");
-        const data = await res.json();
-        const registeredTxHashes = new Set<string>(
-          (data.registeredTxHashes || []).map((h: string) => h.toLowerCase())
-        );
-
-        const found = await checkPaymentReceived(dataValue, minAmountCRC, recipientAddress, registeredTxHashes);
+        const found = await checkPaymentReceived(dataValue, minAmountCRC, recipientAddress, knownHashes);
 
         if (cancelled) return;
 
@@ -68,11 +69,10 @@ export function usePaymentWatcher({
 
     return () => {
       cancelled = true;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [enabled, dataValue, minAmountCRC, recipientAddress, intervalMs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, dataValue, minAmountCRC, recipientAddress, intervalMs, excludeKey]);
 
   return { status, payment, error };
 }
