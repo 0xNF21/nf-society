@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Check, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Pencil, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
+import { ArrowUpRight, CheckCircle, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Loader2, Pencil, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { generatePaymentLink, generateGamePaymentLink } from "@/lib/circles";
+import { encodeGameData } from "@/lib/game-data";
+import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
-import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 
 export type LotteryConfig = {
   id: number;
@@ -98,17 +99,29 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const [currentDescription, setCurrentDescription] = useState(lottery.description || "");
   const [savingDescription, setSavingDescription] = useState(false);
   const [watchingPayment, setWatchingPayment] = useState(false);
+  const [showConfirmed, setShowConfirmed] = useState(false);
+  const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const paymentLink = useMemo(() => {
     return generateGamePaymentLink(lottery.recipientAddress, lottery.ticketPriceCrc, "lottery", lottery.slug);
   }, [lottery.recipientAddress, lottery.ticketPriceCrc, lottery.slug]);
 
+  const dataValue = useMemo(
+    () => encodeGameData({ game: "lottery", id: lottery.slug, v: 1 }),
+    [lottery.slug]
+  );
+
+  const excludeTxHashes = useMemo(
+    () => participantList.map(p => p.transactionHash),
+    [participantList]
+  );
+
   const { status: paymentStatus } = usePaymentWatcher({
-    enabled: watchingPayment,
-    dataValue: paymentLink,
+    enabled: watchingPayment && lotteryStatus === "active",
+    dataValue,
     minAmountCRC: lottery.ticketPriceCrc,
     recipientAddress: lottery.recipientAddress,
-    excludeTxHashes: participantList.map((p) => p.transactionHash),
+    excludeTxHashes,
   });
 
   const lotteryQuery = `lotteryId=${lottery.id}`;
@@ -129,18 +142,20 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   }, [lotteryQuery]);
 
   useEffect(() => {
+    if (paymentStatus === "confirmed") {
+      setWatchingPayment(false);
+      setShowConfirmed(true);
+      scanAndRefresh();
+      if (confirmedTimerRef.current) clearTimeout(confirmedTimerRef.current);
+      confirmedTimerRef.current = setTimeout(() => setShowConfirmed(false), 4000);
+    }
+  }, [paymentStatus, scanAndRefresh]);
+
+  useEffect(() => {
     scanAndRefresh();
     const interval = setInterval(scanAndRefresh, 60000);
     return () => clearInterval(interval);
   }, [scanAndRefresh]);
-
-  useEffect(() => {
-    if (paymentStatus === "confirmed") {
-      scanAndRefresh();
-      const t = setTimeout(() => setWatchingPayment(false), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [paymentStatus, scanAndRefresh]);
 
   useEffect(() => {
     (async () => {
@@ -443,7 +458,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                     style={{ backgroundColor: lottery.primaryColor }}
                     asChild
                   >
-                    <a href={paymentLink} target="_blank" rel="noreferrer" onClick={() => setWatchingPayment(true)}>
+                    <a href={paymentLink} target="_blank" rel="noreferrer" onClick={async () => { await scanAndRefresh(); setWatchingPayment(true); }}>
                       {l.buyTicket[locale]}
                       <ArrowUpRight className="h-5 w-5 ml-2" />
                     </a>
@@ -453,28 +468,28 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                       <Clipboard className="h-4 w-4 mr-2" />
                       {copyState === "copied" ? l.copied[locale] : l.copyLink[locale]}
                     </Button>
-                    <Button variant="outline" onClick={() => { setShowQr((prev) => !prev); setWatchingPayment(true); }}>
+                    <Button variant="outline" onClick={async () => { const next = !showQr; setShowQr(next); if (next) { await scanAndRefresh(); setWatchingPayment(true); } }}>
                       <QrCode className="h-4 w-4 mr-2" />
                       {showQr ? l.hideQr[locale] : l.showQr[locale]}
                     </Button>
                   </div>
                 </div>
 
-                {watchingPayment && (
-                  <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-xl animate-in fade-in duration-200 ${
-                    paymentStatus === "confirmed"
-                      ? "bg-green-50 text-green-700"
+                {(watchingPayment || showConfirmed) && (
+                  <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                    showConfirmed
+                      ? "bg-green-50 border border-green-200 text-green-700"
                       : paymentStatus === "error"
-                        ? "bg-red-50 text-red-600"
-                        : "bg-ink/5 text-ink/50"
+                        ? "bg-red-50 border border-red-200 text-red-600"
+                        : "bg-sand/40 border border-ink/10 text-ink/60"
                   }`}>
-                    {paymentStatus === "confirmed"
-                      ? <Check className="h-4 w-4 shrink-0" />
-                      : <RefreshCw className="h-4 w-4 shrink-0 animate-spin" />
-                    }
-                    {paymentStatus === "confirmed" && (locale === "fr" ? "Paiement détecté ! Mise à jour..." : "Payment detected! Updating...")}
-                    {paymentStatus === "error" && (locale === "fr" ? "Erreur de détection" : "Detection error")}
-                    {paymentStatus === "waiting" && (locale === "fr" ? "En attente du paiement..." : "Waiting for payment...")}
+                    {showConfirmed ? (
+                      <><CheckCircle className="h-4 w-4 shrink-0 text-green-600" />{locale === "fr" ? "Paiement détecté ! Mise à jour en cours..." : "Payment detected! Updating..."}</>
+                    ) : paymentStatus === "error" ? (
+                      <><span className="h-4 w-4 shrink-0">⚠️</span>{locale === "fr" ? "Erreur de détection" : "Detection error"}</>
+                    ) : (
+                      <><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{locale === "fr" ? "En attente du paiement..." : "Waiting for payment..."}</>
+                    )}
                   </div>
                 )}
 

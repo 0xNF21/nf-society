@@ -5,3 +5,8 @@ out
 .env.local
 .env.*.local
 .DS_Store
+.local/
+.claude/worktrees/
+nf_society_export.sql
+tsconfig.tsbuildinfo
+attached_assets/

@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, Check, Loader2, QrCode, Trophy, Zap } from "lucide-react";
+import { ArrowLeft, CheckCircle, Copy, Check, Loader2, QrCode, Trophy, Zap, Volume2, VolumeX, HelpCircle, X } from "lucide-react";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { getRewardTable } from "@/lib/lootbox";
 import { generateGamePaymentLink } from "@/lib/circles";
+import { encodeGameData } from "@/lib/game-data";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
+import { playRollingSound, playRevealSound, setSoundMuted, isSoundMuted } from "@/lib/sounds";
 
 type LootboxData = {
   id: number;
@@ -36,19 +38,20 @@ function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-function getRewardTier(reward: number, price: number): { label: string; color: string; isJackpot: boolean; isMega: boolean } {
+function getRewardTier(reward: number, price: number): { label: string; color: string; isJackpot: boolean; isMega: boolean; isLegendary: boolean; isRare: boolean } {
   const ratio = reward / price;
-  if (ratio >= 7) return { label: "JACKPOT 🔥", color: "#EF4444", isJackpot: true, isMega: false };
-  if (ratio >= 3) return { label: "MEGA ✨", color: "#7C3AED", isJackpot: false, isMega: true };
-  if (ratio >= 1.4) return { label: "RARE 💎", color: "#2563EB", isJackpot: false, isMega: false };
-  return { label: "", color: "#6B7280", isJackpot: false, isMega: false };
+  if (ratio >= 7)   return { label: "JACKPOT 🔥",    color: "#F59E0B", isJackpot: true,  isMega: false, isLegendary: false, isRare: false };
+  if (ratio >= 3)   return { label: "LEGENDARY ⚡",  color: "#EF4444", isJackpot: false, isMega: false, isLegendary: true,  isRare: false };
+  if (ratio >= 1.4) return { label: "MEGA ✨",        color: "#7C3AED", isJackpot: false, isMega: true,  isLegendary: false, isRare: false };
+  if (ratio >= 0.85) return { label: "RARE 💎",       color: "#2563EB", isJackpot: false, isMega: false, isLegendary: false, isRare: true  };
+  return { label: "", color: "#6B7280", isJackpot: false, isMega: false, isLegendary: false, isRare: false };
 }
 
 function RewardTable({ priceCrc, accentColor }: { priceCrc: number; accentColor: string }) {
   const t = translations.lootbox;
   const { locale } = useLocale();
   const table = getRewardTable(priceCrc);
-  const tiers = ["", "", "💎", "✨", "🔥"];
+  const tiers = ["", "💎", "✨", "⚡", "🔥"];
   const rows = table.map((e, i) => ({
     prob: `${Math.round(e.probability * 100)}%`,
     reward: e.reward,
@@ -70,168 +73,313 @@ function RewardTable({ priceCrc, accentColor }: { priceCrc: number; accentColor:
   );
 }
 
-type AnimPhase = "idle" | "shaking" | "opening" | "revealing";
+type AnimPhase = "idle" | "rolling" | "revealing";
 
-function LootboxVisual({
+const CARD_WIDTH = 140;
+const VIEWPORT_WIDTH = 500;
+const WINNER_INDEX = 38;
+const TOTAL_CARDS = 45;
+
+type SlotCard = { reward: number; tier: ReturnType<typeof getRewardTier> };
+
+function buildRail(winnerReward: number, priceCrc: number): SlotCard[] {
+  const table = getRewardTable(priceCrc);
+  // Weighted random pick for filler cards
+  const pick = (): SlotCard => {
+    const r = Math.random();
+    let cumul = 0;
+    for (const entry of table) {
+      cumul += entry.probability;
+      if (r < cumul) return { reward: entry.reward, tier: getRewardTier(entry.reward, priceCrc) };
+    }
+    return { reward: table[0].reward, tier: getRewardTier(table[0].reward, priceCrc) };
+  };
+  const cards: SlotCard[] = [];
+  for (let i = 0; i < TOTAL_CARDS; i++) {
+    if (i === WINNER_INDEX) {
+      cards.push({ reward: winnerReward, tier: getRewardTier(winnerReward, priceCrc) });
+    } else {
+      cards.push(pick());
+    }
+  }
+  return cards;
+}
+
+const BOX_S = 58;
+const BOX_HALF = BOX_S / 2;
+
+function darkenHex(hex: string, factor: number): string {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.round(((num >> 16) & 255) * factor);
+  const g = Math.round(((num >> 8) & 255) * factor);
+  const b = Math.round((num & 255) * factor);
+  return `rgb(${r},${g},${b})`;
+}
+
+function BoxImage({ card, isWinner, isRevealing }: {
+  card: SlotCard; isWinner?: boolean; isRevealing?: boolean;
+}) {
+  const { tier } = card;
+  const [imgError, setImgError] = useState(false);
+  const emoji = tier.isJackpot ? "🔥" : tier.isLegendary ? "⚡" : tier.isMega ? "✨" : tier.isRare ? "💎" : "📦";
+  const imgSrc = tier.isJackpot ? "/lootbox/jackpot.png"
+    : tier.isLegendary ? "/lootbox/legendary.png"
+    : tier.isMega ? "/lootbox/mega.png"
+    : tier.isRare ? "/lootbox/rare.png"
+    : "/lootbox/common.png";
+  const glowColor = tier.color || "#9CA3AF";
+
+  return (
+    <div style={{ width: CARD_WIDTH - 10, height: 180, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, flexShrink: 0 }}>
+      <div style={{
+        width: 130, height: 130,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        animation: isRevealing && isWinner ? "box-winner-bounce 0.6s ease-in-out 3" : undefined,
+        transformOrigin: "center center",
+      }}>
+        {imgError ? (
+          <div style={{
+            width: 80, height: 80, borderRadius: 12,
+            background: `linear-gradient(135deg, ${glowColor}33, ${glowColor}88)`,
+            border: `2px solid ${glowColor}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 32,
+          }}>{emoji}</div>
+        ) : (
+          <img
+            src={imgSrc}
+            alt={tier.label || "common"}
+            onError={() => setImgError(true)}
+            style={{
+              width: 130, height: 130,
+              objectFit: "contain",
+              filter: isRevealing && isWinner
+                ? `drop-shadow(0 0 14px ${glowColor}) drop-shadow(0 0 6px ${glowColor})`
+                : undefined,
+            }}
+          />
+        )}
+      </div>
+      <div style={{ textAlign: "center", lineHeight: 1.2 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: tier.color || "#374151" }}>{card.reward}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: tier.color || "#9CA3AF", marginLeft: 2 }}>CRC</span>
+      </div>
+    </div>
+  );
+}
+
+function SlotMachine({
   phase,
   accentColor,
   primaryColor,
   rewardCrc,
+  priceCrc,
   tier,
 }: {
   phase: AnimPhase;
   accentColor: string;
   primaryColor: string;
   rewardCrc?: number;
+  priceCrc: number;
   tier?: ReturnType<typeof getRewardTier> | null;
 }) {
-  const isShaking = phase === "shaking";
-  const isOpening = phase === "opening" || phase === "revealing";
-  const isRevealing = phase === "revealing";
   const isJackpotOrMega = tier?.isJackpot || tier?.isMega;
+  const isRolling = phase === "rolling";
+  const isRevealing = phase === "revealing";
+  const isActive = isRolling || isRevealing;
+
+  // Mesure la largeur réelle du conteneur (responsive)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [vpWidth, setVpWidth] = useState(500);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setVpWidth(el.offsetWidth);
+    const obs = new ResizeObserver(([entry]) => setVpWidth(entry.contentRect.width));
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  // Rail is built once per animation (when rewardCrc changes)
+  const cardRailRef = useRef<SlotCard[]>([]);
+  const prevReward = useRef<number | undefined>(undefined);
+  if (rewardCrc !== undefined && rewardCrc !== prevReward.current) {
+    cardRailRef.current = buildRail(rewardCrc, priceCrc);
+    prevReward.current = rewardCrc;
+  }
+  const rail = cardRailRef.current;
+
+  // DOM ref for the rail strip — driven imperatively
+  const railDomRef = useRef<HTMLDivElement>(null);
+
+  // finalX via ref pour ne pas relancer l'animation si l'écran est redimensionné
+  const ITEM_W = CARD_WIDTH - 10; // 130px
+  const GAP = 8;
+  const RAIL_PAD = 4;
+  const finalXRef = useRef(0);
+  finalXRef.current = -(RAIL_PAD + WINNER_INDEX * (ITEM_W + GAP) + ITEM_W / 2 - vpWidth / 2);
+
+  // Trigger CS:GO-style ease-out — dépend uniquement de `phase`
+  useEffect(() => {
+    if (phase !== "rolling") return;
+    const el = railDomRef.current;
+    if (!el) return;
+    el.style.transition = "none";
+    el.style.transform = "translateX(0px)";
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 7s cubic-bezier(0.07, 0.9, 0.1, 1.0)";
+        el.style.transform = `translateX(${finalXRef.current}px)`;
+      });
+    });
+  }, [phase]); // pas finalX dans les deps → pas de restart au resize
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: 200, height: 220 }}>
+    <div className="flex flex-col items-center gap-3 w-full">
       <style>{`
-        @keyframes lootbox-shake {
-          0%, 100% { transform: translateX(0) rotate(0deg); }
-          10% { transform: translateX(-4px) rotate(-2deg); }
-          20% { transform: translateX(4px) rotate(2deg); }
-          30% { transform: translateX(-6px) rotate(-3deg); }
-          40% { transform: translateX(6px) rotate(3deg); }
-          50% { transform: translateX(-8px) rotate(-4deg); }
-          60% { transform: translateX(8px) rotate(4deg); }
-          70% { transform: translateX(-6px) rotate(-3deg); }
-          80% { transform: translateX(6px) rotate(3deg); }
-          90% { transform: translateX(-4px) rotate(-2deg); }
+        @keyframes winner-pulse {
+          0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+          50% { transform: scale(1.12); box-shadow: 0 0 24px 6px ${accentColor}66; }
         }
-        @keyframes lid-fly {
-          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-          40% { transform: translateY(-80px) rotate(-25deg); opacity: 1; }
-          100% { transform: translateY(-140px) rotate(-45deg); opacity: 0; }
-        }
-        @keyframes light-burst {
-          0% { opacity: 0; transform: scale(0.3); }
-          50% { opacity: 1; transform: scale(1.2); }
-          100% { opacity: 0.6; transform: scale(1); }
-        }
-        @keyframes particle-1 { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(-50px,-70px) scale(0); opacity:0; } }
-        @keyframes particle-2 { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(50px,-80px) scale(0); opacity:0; } }
-        @keyframes particle-3 { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(-70px,-30px) scale(0); opacity:0; } }
-        @keyframes particle-4 { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(70px,-40px) scale(0); opacity:0; } }
-        @keyframes particle-5 { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(-30px,-90px) scale(0); opacity:0; } }
-        @keyframes particle-6 { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(40px,-60px) scale(0); opacity:0; } }
-        @keyframes particle-7 { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(-60px,-50px) scale(0); opacity:0; } }
-        @keyframes particle-8 { 0% { transform: translate(0,0) scale(1); opacity:1; } 100% { transform: translate(60px,-20px) scale(0); opacity:0; } }
+        @keyframes confetti-1 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-60px,-80px) scale(0);opacity:0} }
+        @keyframes confetti-2 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(60px,-90px) scale(0);opacity:0} }
+        @keyframes confetti-3 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-90px,-30px) scale(0);opacity:0} }
+        @keyframes confetti-4 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(90px,-50px) scale(0);opacity:0} }
+        @keyframes confetti-5 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-40px,-100px) scale(0);opacity:0} }
+        @keyframes confetti-6 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(50px,-70px) scale(0);opacity:0} }
         @keyframes reward-pop {
-          0% { transform: scale(0) rotate(-10deg); opacity: 0; }
-          60% { transform: scale(1.3) rotate(3deg); opacity: 1; }
-          80% { transform: scale(0.95) rotate(-1deg); }
+          0%   { transform: scale(0) rotate(-8deg); opacity: 0; }
+          60%  { transform: scale(1.2) rotate(2deg); opacity: 1; }
+          80%  { transform: scale(0.97) rotate(-1deg); }
           100% { transform: scale(1) rotate(0deg); opacity: 1; }
         }
-        .lootbox-idle {
-          filter: drop-shadow(0 8px 24px rgba(0,0,0,0.08));
-          transition: filter 0.3s, transform 0.3s;
+        @keyframes box-winner-bounce {
+          0%, 100% { transform: scale(1); }
+          50%       { transform: scale(1.25); }
         }
-        .lootbox-idle:hover {
-          filter: drop-shadow(0 12px 32px rgba(0,0,0,0.14));
-          transform: translateY(-2px);
+        @keyframes csgo-indicator-top {
+          0%, 100% { transform: translateY(0); opacity: 1; }
+          50%       { transform: translateY(-3px); opacity: 0.7; }
+        }
+        @keyframes csgo-indicator-bottom {
+          0%, 100% { transform: translateY(0); opacity: 1; }
+          50%       { transform: translateY(3px); opacity: 0.7; }
         }
       `}</style>
 
-      <div
-        className={!isShaking && !isOpening ? "lootbox-idle" : ""}
-        style={{
-          animation: isShaking ? "lootbox-shake 0.6s ease-in-out infinite" : undefined,
-          filter: isOpening ? `drop-shadow(0 0 30px ${accentColor}88)` : undefined,
-        }}
-      >
-        <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="20" y="80" width="120" height="70" rx="8" fill={primaryColor} />
-          <rect x="20" y="80" width="120" height="70" rx="8" fill="url(#boxGrad)" />
-          <rect x="70" y="80" width="20" height="70" fill={accentColor} opacity="0.7" />
-          <rect x="70" y="80" width="20" height="70" fill="url(#ribbonGrad)" opacity="0.5" />
+      {/* Wrapper — ref pour mesure largeur, triangles ici (hors overflow:hidden) */}
+      <div ref={containerRef} className="relative w-full">
 
-          <g style={{
-            animation: isOpening ? "lid-fly 0.8s ease-out forwards" : undefined,
-            transformOrigin: "80px 55px",
-          }}>
-            <rect x="15" y="55" width="130" height="32" rx="6" fill={accentColor} />
-            <rect x="15" y="55" width="130" height="32" rx="6" fill="url(#lidGrad)" />
-            <rect x="15" y="65" width="130" height="14" fill={accentColor} opacity="0.7" />
-            <rect x="70" y="55" width="20" height="32" fill={accentColor} opacity="0.7" />
-            <ellipse cx="55" cy="52" rx="22" ry="14" fill={accentColor} transform="rotate(-20 55 52)" />
-            <ellipse cx="105" cy="52" rx="22" ry="14" fill={accentColor} transform="rotate(20 105 52)" />
-            <circle cx="80" cy="50" r="10" fill={primaryColor} />
-          </g>
+        {/* Triangle TOP — pointe vers le bas ▼, collé sur le bord supérieur */}
+        <div className="absolute left-1/2 pointer-events-none"
+          style={{
+            top: 0, zIndex: 30,
+            transform: "translateX(-50%)",
+            width: 0, height: 0,
+            borderLeft: "11px solid transparent",
+            borderRight: "11px solid transparent",
+            borderTop: "13px solid #F59E0B",
+            animation: isRolling ? "csgo-indicator-top 0.6s ease-in-out infinite" : undefined,
+          }}
+        />
+        {/* Triangle BOTTOM — pointe vers le haut ▲, collé sur le bord inférieur */}
+        <div className="absolute left-1/2 pointer-events-none"
+          style={{
+            bottom: 0, zIndex: 30,
+            transform: "translateX(-50%)",
+            width: 0, height: 0,
+            borderLeft: "11px solid transparent",
+            borderRight: "11px solid transparent",
+            borderBottom: "13px solid #F59E0B",
+            animation: isRolling ? "csgo-indicator-bottom 0.6s ease-in-out infinite" : undefined,
+          }}
+        />
 
-          <defs>
-            <linearGradient id="boxGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="white" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="black" stopOpacity="0.2" />
-            </linearGradient>
-            <linearGradient id="lidGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="white" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="black" stopOpacity="0.1" />
-            </linearGradient>
-            <linearGradient id="ribbonGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="white" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="black" stopOpacity="0.1" />
-            </linearGradient>
-          </defs>
-        </svg>
+        {/* Lignes verticales — hors overflow:hidden, superposées au viewport */}
+        <div className="absolute pointer-events-none" style={{
+          top: 0, bottom: 0, zIndex: 20,
+          left: `calc(50% - ${CARD_WIDTH / 2}px)`,
+          width: 2, background: "#F59E0B", opacity: 0.7,
+        }} />
+        <div className="absolute pointer-events-none" style={{
+          top: 0, bottom: 0, zIndex: 20,
+          left: `calc(50% + ${CARD_WIDTH / 2 - 2}px)`,
+          width: 2, background: "#F59E0B", opacity: 0.7,
+        }} />
+
+        {/* Viewport */}
+        <div
+          className="relative rounded-2xl border-2 overflow-hidden w-full"
+          style={{
+            height: 190,
+            borderColor: isActive ? accentColor : "rgba(0,0,0,0.08)",
+            boxShadow: isActive ? `0 0 32px 4px ${accentColor}33` : "0 4px 16px rgba(0,0,0,0.06)",
+            transition: "border-color 0.3s, box-shadow 0.3s",
+            background: "#ffffff",
+          }}
+        >
+          {/* Fade edges */}
+          <div className="absolute inset-0 z-10 pointer-events-none" style={{
+            background: "linear-gradient(to right, rgba(255,255,255,0.95) 0%, transparent 18%, transparent 82%, rgba(255,255,255,0.95) 100%)"
+          }} />
+
+          {/* Rail */}
+          {rail.length > 0 && (
+            <div
+              ref={railDomRef}
+              className="absolute top-0 left-0 flex items-center h-full"
+              style={{ gap: GAP, paddingLeft: RAIL_PAD, willChange: "transform" }}
+            >
+              {rail.map((card, i) => (
+                <BoxImage
+                  key={i}
+                  card={card}
+                  isWinner={i === WINNER_INDEX}
+                  isRevealing={isRevealing}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Idle state */}
+          {phase === "idle" && rail.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <BoxImage
+                card={{ reward: 0, tier: { label: "", color: accentColor, isJackpot: false, isMega: false, isLegendary: false, isRare: false } }}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {isOpening && (
-        <div className="absolute inset-0 pointer-events-none" style={{ top: 40 }}>
-          <div
-            className="absolute left-1/2 top-0 -translate-x-1/2 rounded-full"
-            style={{
-              width: 120,
-              height: 120,
-              background: `radial-gradient(circle, ${accentColor}66 0%, transparent 70%)`,
-              animation: "light-burst 0.8s ease-out forwards",
-            }}
-          />
-          {[1,2,3,4,5,6,7,8].map((i) => (
-            <div
-              key={i}
-              className="absolute left-1/2 top-1/4"
-              style={{
-                width: isJackpotOrMega ? 10 : 6,
-                height: isJackpotOrMega ? 10 : 6,
-                borderRadius: "50%",
-                backgroundColor: i % 3 === 0 ? "#FCD34D" : i % 3 === 1 ? accentColor : "#F472B6",
-                animation: `particle-${i} ${0.6 + i * 0.1}s ease-out forwards`,
-                animationDelay: `${0.1 + i * 0.05}s`,
-              }}
-            />
-          ))}
-        </div>
-      )}
-
+      {/* Reward pop + confetti */}
       {isRevealing && rewardCrc !== undefined && (
-        <div
-          className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          style={{ animation: "reward-pop 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards", animationDelay: "0.3s", opacity: 0 }}
-        >
+        <div className="relative flex flex-col items-center">
+          {isJackpotOrMega && (
+            <div className="absolute inset-0 pointer-events-none">
+              {[1,2,3,4,5,6].map(i => (
+                <div key={i} className="absolute left-1/2 top-1/2"
+                  style={{
+                    width: isJackpotOrMega ? 10 : 6,
+                    height: isJackpotOrMega ? 10 : 6,
+                    borderRadius: "50%",
+                    backgroundColor: i % 3 === 0 ? "#FCD34D" : i % 3 === 1 ? accentColor : "#F472B6",
+                    animation: `confetti-${i} ${0.7 + i * 0.1}s ease-out forwards`,
+                    animationDelay: `${i * 0.05}s`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
           <div
-            className="rounded-2xl px-6 py-4 text-center shadow-xl"
-            style={{
-              background: isJackpotOrMega
-                ? `linear-gradient(135deg, ${tier?.color}ee, ${accentColor}ee)`
-                : "white",
-              border: `2px solid ${tier?.color || accentColor}22`,
-              boxShadow: `0 20px 40px -12px ${tier?.color || accentColor}33`,
-            }}
+            style={{ animation: "reward-pop 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards", opacity: 0 }}
+            className="rounded-2xl px-6 py-3 text-center shadow-xl"
           >
-            <p className="text-3xl font-black" style={{ color: isJackpotOrMega ? "white" : tier?.color || accentColor }}>
+            <p className="text-3xl font-black" style={{ color: tier?.color || accentColor }}>
               +{rewardCrc} CRC
             </p>
             {tier?.label && (
-              <p className="text-sm font-bold mt-1" style={{ color: isJackpotOrMega ? "#FCD34D" : tier.color }}>
-                {tier.label}
-              </p>
+              <p className="text-sm font-bold" style={{ color: tier.color }}>{tier.label}</p>
             )}
           </div>
         </div>
@@ -246,15 +394,25 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
 
   const [opens, setOpens] = useState<LootboxOpen[]>([]);
   const [scanning, setScanning] = useState(false);
-  const [watchingPayment, setWatchingPayment] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [watchingPayment, setWatchingPayment] = useState(false);
+  const [showConfirmed, setShowConfirmed] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [qrCode, setQrCode] = useState<string>("");
   const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [latestOpen, setLatestOpen] = useState<LootboxOpen | null>(null);
   const [animPhase, setAnimPhase] = useState<AnimPhase>("idle");
+  const [muted, setMuted] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("lootbox_muted") === "1";
+  });
+  const [showRules, setShowRules] = useState(false);
+  const [showRtp, setShowRtp] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const [videoOpen, setVideoOpen] = useState<LootboxOpen | null>(null);
   const [profiles, setProfiles] = useState<Record<string, { name?: string; imageUrl?: string | null }>>({});
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const prevOpenCount = useRef<number>(0);
   const profilesRef = useRef<Record<string, { name?: string; imageUrl?: string | null }>>({});
   const animTimers = useRef<NodeJS.Timeout[]>([]);
@@ -266,13 +424,15 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   );
   const { primaryColor, accentColor } = lootbox;
 
-  const { status: paymentStatus } = usePaymentWatcher({
-    enabled: watchingPayment,
-    dataValue: paymentLink,
-    minAmountCRC: lootbox.pricePerOpenCrc,
-    recipientAddress: lootbox.recipientAddress,
-    excludeTxHashes: opens.map((o) => o.transactionHash),
-  });
+  function toggleMute() {
+    const next = !muted;
+    setMuted(next);
+    setSoundMuted(next);
+    localStorage.setItem("lootbox_muted", next ? "1" : "0");
+  }
+
+  // Sync mute state with sounds lib au montage
+  useEffect(() => { setSoundMuted(muted); }, [muted]);
 
   useEffect(() => {
     profilesRef.current = profiles;
@@ -309,13 +469,23 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const runAnimation = useCallback((open: LootboxOpen) => {
     clearAnimTimers();
     setLatestOpen(open);
-    setAnimPhase("shaking");
+    const tier = getRewardTier(open.rewardCrc, lootbox.pricePerOpenCrc);
+    const isCommon = !tier.isJackpot && !tier.isLegendary && !tier.isMega && !tier.isRare;
+    if (isCommon) {
+      setVideoOpen(open);
+      setShowVideo(true);
+      return;
+    }
+    playRollingSound();
+    setAnimPhase("rolling");
     animTimers.current.push(
-      setTimeout(() => setAnimPhase("opening"), 1200),
-      setTimeout(() => setAnimPhase("revealing"), 2000),
-      setTimeout(() => setAnimPhase("idle"), 5000),
+      setTimeout(() => {
+        setAnimPhase("revealing");
+        playRevealSound(tier);
+      }, 7200),
+      setTimeout(() => setAnimPhase("idle"), 10500),
     );
-  }, [clearAnimTimers]);
+  }, [clearAnimTimers, lootbox.pricePerOpenCrc]);
 
   const initialLoadDone = useRef(false);
 
@@ -351,6 +521,34 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
     }
   }, [lootbox.id, fetchOpens]);
 
+  const dataValue = useMemo(
+    () => encodeGameData({ game: "lootbox", id: lootbox.slug, v: 1 }),
+    [lootbox.slug]
+  );
+
+  const excludeTxHashes = useMemo(
+    () => opens.map(o => o.transactionHash),
+    [opens]
+  );
+
+  const { status: paymentStatus } = usePaymentWatcher({
+    enabled: watchingPayment && lootbox.status === "active",
+    dataValue,
+    minAmountCRC: lootbox.pricePerOpenCrc,
+    recipientAddress: lootbox.recipientAddress,
+    excludeTxHashes,
+  });
+
+  useEffect(() => {
+    if (paymentStatus === "confirmed") {
+      setWatchingPayment(false);
+      setShowConfirmed(true);
+      scanNow();
+      if (confirmedTimerRef.current) clearTimeout(confirmedTimerRef.current);
+      confirmedTimerRef.current = setTimeout(() => setShowConfirmed(false), 4000);
+    }
+  }, [paymentStatus, scanNow]);
+
   useEffect(() => {
     fetchOpens();
     intervalRef.current = setInterval(scanNow, 10000);
@@ -359,14 +557,6 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
       clearAnimTimers();
     };
   }, [fetchOpens, scanNow, clearAnimTimers]);
-
-  useEffect(() => {
-    if (paymentStatus === "confirmed") {
-      scanNow();
-      const t = setTimeout(() => setWatchingPayment(false), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [paymentStatus, scanNow]);
 
   useEffect(() => {
     if (!showQr) return;
@@ -395,6 +585,27 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
 
   return (
     <div className="min-h-screen">
+      {/* Video overlay for common tier */}
+      {showVideo && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+          <video
+            src="/videos/lootbox.mp4"
+            autoPlay
+            playsInline
+            style={{ width: 480, maxWidth: "90vw", borderRadius: 16 }}
+            onEnded={() => {
+              setShowVideo(false);
+              setLatestOpen(videoOpen);
+              setAnimPhase("revealing");
+              playRevealSound({ isJackpot: false, isLegendary: false, isMega: false, isRare: false });
+              animTimers.current.push(
+                setTimeout(() => setAnimPhase("idle"), 3000)
+              );
+            }}
+          />
+          <p className="mt-4 text-white/50 text-sm">Ouverture en cours...</p>
+        </div>
+      )}
       <main className="px-4 py-10 md:py-16">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
           <div className="flex items-center justify-between">
@@ -415,13 +626,165 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
           </header>
 
           <div className="flex flex-col items-center gap-4">
-            <LootboxVisual
+            <SlotMachine
               phase={animPhase}
               accentColor={accentColor}
               primaryColor={primaryColor}
               rewardCrc={latestOpen?.rewardCrc}
+              priceCrc={lootbox.pricePerOpenCrc}
               tier={tier}
             />
+
+            {/* Boutons mute + règles */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleMute}
+                title={muted ? "Activer le son" : "Couper le son"}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-ink/10 text-ink/40 hover:text-ink/70 hover:border-ink/20 hover:bg-white/60 transition-all text-xs font-medium"
+              >
+                {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                {muted ? "Son coupé" : "Son activé"}
+              </button>
+              <button
+                onClick={() => setShowRules(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-ink/10 text-ink/40 hover:text-ink/70 hover:border-ink/20 hover:bg-white/60 transition-all text-xs font-medium"
+              >
+                <HelpCircle className="h-3.5 w-3.5" />
+                Règles
+              </button>
+              <button
+                onClick={() => setShowRtp(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-ink/10 text-ink/40 hover:text-ink/70 hover:border-ink/20 hover:bg-white/60 transition-all text-xs font-medium"
+              >
+                📊 RTP
+              </button>
+            </div>
+
+            {/* Modal règles */}
+            {showRules && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+                onClick={() => setShowRules(false)}
+              >
+                <div
+                  className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-4 border border-ink/10 overflow-y-auto max-h-[85vh]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-ink">Comment jouer ?</h2>
+                    <button onClick={() => setShowRules(false)} className="text-ink/30 hover:text-ink transition-colors">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <ol className="space-y-3 text-sm text-ink/70">
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">1</span>
+                      <span>Clique sur <strong className="text-ink">Payer avec Circles</strong> et envoie exactement <strong className="text-ink">{lootbox.pricePerOpenCrc} CRC</strong> depuis ton wallet.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">2</span>
+                      <span>La transaction est détectée automatiquement et l'animation se lance.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">3</span>
+                      <span>La boîte révèle ton gain — de <strong className="text-ink">{getRewardTable(lootbox.pricePerOpenCrc)[0].reward} CRC</strong> jusqu'à <strong className="text-ink">{getRewardTable(lootbox.pricePerOpenCrc).at(-1)!.reward} CRC</strong> pour le jackpot !</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">4</span>
+                      <span>Les CRC gagnés sont envoyés <strong className="text-ink">automatiquement</strong> sur ton adresse.</span>
+                    </li>
+                  </ol>
+
+                  <div className="rounded-xl bg-ink/[0.03] border border-ink/5 p-3 space-y-2">
+                    <p className="text-xs font-bold text-ink/40 uppercase tracking-widest">Tiers de gain</p>
+                    {[
+                      { label: "📦 Common",     mult: "×0.7–0.85", color: "#6B7280" },
+                      { label: "💎 Rare",        mult: "×0.85–1.4", color: "#2563EB" },
+                      { label: "✨ Mega",        mult: "×1.4–3",    color: "#7C3AED" },
+                      { label: "⚡ Legendary",   mult: "×3–7",      color: "#EF4444" },
+                      { label: "🔥 Jackpot",     mult: "×7+",       color: "#F59E0B" },
+                    ].map((t) => (
+                      <div key={t.label} className="flex items-center justify-between text-xs">
+                        <span className="font-semibold" style={{ color: t.color }}>{t.label}</span>
+                        <span className="font-bold text-ink">{t.mult}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-ink/30 text-center">Les gains sont distribués selon les probabilités affichées</p>
+                </div>
+              </div>
+            )}
+
+            {/* Modal RTP */}
+            {showRtp && (() => {
+              const table = getRewardTable(lootbox.pricePerOpenCrc);
+              const rtp = table.reduce((sum, e) => sum + e.probability * e.reward, 0) / lootbox.pricePerOpenCrc * 100;
+              const rtpDisplay = rtp.toFixed(1);
+              const isHealthy = rtp >= 95;
+              return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+                  onClick={() => setShowRtp(false)}>
+                  <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-4 border border-ink/10"
+                    onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-bold text-ink">📊 RTP — Retour joueur</h2>
+                      <button onClick={() => setShowRtp(false)} className="text-ink/30 hover:text-ink transition-colors">
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-center py-3">
+                      <span className="text-5xl font-black" style={{ color: isHealthy ? "#10B981" : "#EF4444" }}>{rtpDisplay}%</span>
+                    </div>
+
+                    <p className="text-sm text-ink/60 leading-relaxed text-center">
+                      Pour <strong className="text-ink">100 CRC</strong> misés, tu récupères en moyenne <strong className="text-ink">{rtpDisplay} CRC</strong>. Ce chiffre est basé sur les probabilités déclarées par la plateforme.
+                    </p>
+
+                    <div className="rounded-xl bg-ink/[0.03] border border-ink/5 p-3 space-y-2">
+                      <p className="text-xs font-bold text-ink/40 uppercase tracking-widest mb-2">Probabilités déclarées</p>
+                      {table.map((e, i) => {
+                        const t = getRewardTier(e.reward, lootbox.pricePerOpenCrc);
+                        const contrib = (e.probability * e.reward / lootbox.pricePerOpenCrc * 100).toFixed(1);
+                        return (
+                          <div key={i} className="flex items-center justify-between text-xs">
+                            <span className="font-semibold" style={{ color: t.color || "#6B7280" }}>
+                              {Math.round(e.probability * 100)}% × {e.reward} CRC
+                            </span>
+                            <span className="font-bold text-ink/50">= {contrib}%</span>
+                          </div>
+                        );
+                      })}
+                      <div className="border-t border-ink/10 pt-2 flex justify-between text-xs font-black">
+                        <span className="text-ink">Total RTP déclaré</span>
+                        <span style={{ color: isHealthy ? "#10B981" : "#EF4444" }}>{rtpDisplay}%</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-ink/30 text-center">Ces probabilités sont déclarées par la plateforme et non auditées par un tiers.</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {process.env.NODE_ENV === "development" && (
+              <div className="flex gap-2 flex-wrap justify-center">
+                {[0.7, 0.9, 1.4, 3.0, 7.5].map((mult) => {
+                  const reward = Math.round(lootbox.pricePerOpenCrc * mult);
+                  return (
+                    <button
+                      key={mult}
+                      onClick={() => runAnimation({ id: 0, playerAddress: "0x0000000000000000000000000000000000000000", transactionHash: "0xtest", rewardCrc: reward, payoutStatus: "pending", openedAt: new Date().toISOString() })}
+                      className="text-xs px-3 py-1 rounded-lg border border-dashed border-ink/20 text-ink/40 hover:text-ink/70 hover:border-ink/40 transition-colors"
+                    >
+                      Test {reward} CRC
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {latestOpen && animPhase === "idle" && (
               <div className="text-center">
@@ -440,7 +803,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               </div>
             )}
 
-            {animPhase === "shaking" && (
+            {animPhase === "rolling" && (
               <p className="text-sm font-semibold text-ink/50 animate-pulse">
                 {locale === "fr" ? "Ouverture en cours..." : "Opening..."}
               </p>
@@ -454,7 +817,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               href={paymentLink}
               target="_blank"
               rel="noreferrer"
-              onClick={() => setWatchingPayment(true)}
+              onClick={async () => { await scanNow(); setWatchingPayment(true); }}
               className="flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 shadow-sm w-full"
               style={{ backgroundColor: accentColor }}
             >
@@ -470,7 +833,14 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                 {copied ? t.copied[locale] : (locale === "fr" ? "Copier le lien" : "Copy link")}
               </button>
               <button
-                onClick={() => { setShowQr(!showQr); setWatchingPayment(true); }}
+                onClick={async () => {
+                  const next = !showQr;
+                  setShowQr(next);
+                  if (next) {
+                    await scanNow();
+                    setWatchingPayment(true);
+                  }
+                }}
                 className="px-4 py-3 rounded-xl border border-ink/15 text-ink/50 hover:text-ink hover:border-ink/30 hover:bg-white/80 transition-all"
               >
                 <QrCode className="h-5 w-5" />
@@ -484,13 +854,27 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               </button>
             </div>
 
-            {(scanning || watchingPayment) && (
-              <p className={`text-xs animate-pulse text-center ${paymentStatus === "confirmed" ? "text-green-600" : "text-ink/40"}`}>
-                {paymentStatus === "confirmed"
-                  ? (locale === "fr" ? "✅ Paiement détecté !" : "✅ Payment detected!")
-                  : scanning
-                    ? (locale === "fr" ? "Recherche de paiement..." : "Scanning for payment...")
-                    : (locale === "fr" ? "⏳ En attente du paiement..." : "⏳ Waiting for payment...")}
+            {(watchingPayment || showConfirmed) && (
+              <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+                showConfirmed
+                  ? "bg-green-50 border border-green-200 text-green-700"
+                  : paymentStatus === "error"
+                    ? "bg-red-50 border border-red-200 text-red-600"
+                    : "bg-white/60 border border-ink/10 text-ink/60"
+              }`}>
+                {showConfirmed ? (
+                  <><CheckCircle className="h-4 w-4 shrink-0 text-green-600" />{locale === "fr" ? "Paiement détecté ! Ouverture en cours..." : "Payment detected! Opening..."}</>
+                ) : paymentStatus === "error" ? (
+                  <><span className="h-4 w-4 shrink-0">⚠️</span>{locale === "fr" ? "Erreur de détection" : "Detection error"}</>
+                ) : (
+                  <><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{locale === "fr" ? "En attente du paiement..." : "Waiting for payment..."}</>
+                )}
+              </div>
+            )}
+
+            {scanning && !watchingPayment && (
+              <p className="text-xs text-ink/40 animate-pulse text-center">
+                {locale === "fr" ? "Recherche de paiement..." : "Scanning for payment..."}
               </p>
             )}
 

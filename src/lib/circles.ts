@@ -265,7 +265,7 @@ async function fetchTransferSingleFromChain(
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
 export async function checkPaymentReceived(
-  _dataValue: string,
+  dataValue: string,
   exactAmountCRC: number,
   recipientAddress?: string | null,
   excludeTxHashes?: Set<string>
@@ -281,12 +281,37 @@ export async function checkPaymentReceived(
   ]);
 
   const exactWei = BigInt(exactAmountCRC) * WEI_PER_CRC;
-
   const allEvents = deduplicateEvents(streamEvents, transferEvents, exactWei, normalized);
 
-  for (const event of allEvents) {
-    if (excludeTxHashes && excludeTxHashes.has(event.transactionHash.toLowerCase())) continue;
-    return event;
+  const candidates = allEvents.filter(
+    e => !excludeTxHashes || !excludeTxHashes.has(e.transactionHash.toLowerCase())
+  );
+
+  if (candidates.length === 0) return null;
+
+  // Decode expected game data — if empty/invalid, no game filter (backward compat)
+  const { decodeGameData } = await import("@/lib/game-data");
+  const expectedGame = decodeGameData(dataValue);
+
+  if (!expectedGame) {
+    // No game filter: return first candidate
+    return candidates[0];
+  }
+
+  // Fetch tx input data for all candidates to verify game ownership
+  const txHashes = candidates.map(e => e.transactionHash);
+  const gameDataMap = await fetchTxInputGameData(txHashes);
+
+  for (const event of candidates) {
+    const txGameData = gameDataMap.get(event.transactionHash.toLowerCase());
+
+    // Watcher is strict: require explicit game data to avoid false positives from old/manual txs
+    if (!txGameData) continue;
+
+    if (txGameData.game === expectedGame.game && txGameData.id === expectedGame.id) {
+      return event;
+    }
+    // Game data for a different game → skip
   }
 
   return null;
