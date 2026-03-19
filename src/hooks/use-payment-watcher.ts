@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { checkPaymentReceived, type CirclesTransferEvent } from "@/lib/circles";
 
 export type PaymentWatchStatus = "idle" | "waiting" | "confirmed" | "error";
@@ -9,6 +9,7 @@ interface PaymentWatchOptions {
   minAmountCRC: number;
   recipientAddress?: string;
   intervalMs?: number;
+  excludeTxHashes?: string[];
 }
 
 export function usePaymentWatcher({
@@ -16,11 +17,17 @@ export function usePaymentWatcher({
   dataValue,
   minAmountCRC,
   recipientAddress,
-  intervalMs = 5000
+  intervalMs = 5000,
+  excludeTxHashes = [],
 }: PaymentWatchOptions) {
   const [status, setStatus] = useState<PaymentWatchStatus>("idle");
   const [payment, setPayment] = useState<CirclesTransferEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Ref so the poll closure always reads the latest excludeTxHashes
+  // without causing the effect to restart on every list change
+  const excludeRef = useRef(excludeTxHashes);
+  useEffect(() => { excludeRef.current = excludeTxHashes; });
 
   useEffect(() => {
     setPayment(null);
@@ -38,13 +45,8 @@ export function usePaymentWatcher({
       setStatus((prev) => (prev === "confirmed" ? prev : "waiting"));
 
       try {
-        const res = await fetch("/api/participants");
-        const data = await res.json();
-        const registeredTxHashes = new Set<string>(
-          (data.registeredTxHashes || []).map((h: string) => h.toLowerCase())
-        );
-
-        const found = await checkPaymentReceived(dataValue, minAmountCRC, recipientAddress, registeredTxHashes);
+        const excludeSet = new Set(excludeRef.current.map((h) => h.toLowerCase()));
+        const found = await checkPaymentReceived(dataValue, minAmountCRC, recipientAddress, excludeSet);
 
         if (cancelled) return;
 
@@ -68,9 +70,7 @@ export function usePaymentWatcher({
 
     return () => {
       cancelled = true;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [enabled, dataValue, minAmountCRC, recipientAddress, intervalMs]);
 

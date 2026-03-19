@@ -380,7 +380,7 @@ export default function DashboardDaoPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 pt-16 pb-8">
         <div className="flex items-center justify-between mb-8">
           <Link href="/" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
             <ArrowLeft className="h-4 w-4" />

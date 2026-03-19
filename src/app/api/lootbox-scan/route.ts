@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lootboxes, lootboxOpens, claimedPayments } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { executePayout } from "@/lib/payout";
 import { getRandomReward } from "@/lib/lootbox";
@@ -24,13 +24,27 @@ export async function POST(req: NextRequest) {
     const priceCrc = lootbox.pricePerOpenCrc;
     const priceWei = BigInt(priceCrc) * WEI_PER_CRC;
 
-    const existingOpens = await db.select().from(lootboxOpens).where(eq(lootboxOpens.lootboxId, lootboxId));
+    const existingOpens = await db
+      .select({ transactionHash: lootboxOpens.transactionHash })
+      .from(lootboxOpens)
+      .where(eq(lootboxOpens.lootboxId, lootboxId));
     const knownTxHashes = new Set(existingOpens.map((o) => o.transactionHash.toLowerCase()));
 
-    const allClaimed = await db.select().from(claimedPayments);
-    const globalClaimedTxHashes = new Set(allClaimed.map((c) => c.txHash.toLowerCase()));
-
     const newPayments = await checkAllNewPayments(priceCrc, lootbox.recipientAddress);
+
+    // Query claimedPayments only for the txHashes we need, not the full table
+    const candidateTxHashes = newPayments
+      .map((p) => p.transactionHash.toLowerCase())
+      .filter((h) => !knownTxHashes.has(h));
+
+    const globalClaimedTxHashes = new Set<string>();
+    if (candidateTxHashes.length > 0) {
+      const claimed = await db
+        .select({ txHash: claimedPayments.txHash })
+        .from(claimedPayments)
+        .where(inArray(claimedPayments.txHash, candidateTxHashes));
+      for (const c of claimed) globalClaimedTxHashes.add(c.txHash.toLowerCase());
+    }
 
     const opened: Array<{ playerAddress: string; rewardCrc: number; transactionHash: string }> = [];
 
@@ -63,14 +77,21 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        await db.insert(lootboxOpens).values({
+        // Insert first — .returning() tells us if the row was actually inserted or conflict-ignored
+        const inserted = await db.insert(lootboxOpens).values({
           lootboxId,
           playerAddress,
           transactionHash: txHash,
           rewardCrc,
           payoutStatus: "pending",
           openedAt,
-        }).onConflictDoNothing();
+        }).onConflictDoNothing().returning({ id: lootboxOpens.id });
+
+        if (inserted.length === 0) {
+          // Row already existed (concurrent scan) — skip payout to prevent double-pay
+          knownTxHashes.add(txHash);
+          continue;
+        }
 
         knownTxHashes.add(txHash);
         globalClaimedTxHashes.add(txHash);
@@ -84,8 +105,6 @@ export async function POST(req: NextRequest) {
           amountCrc: priceCrc,
         }).onConflictDoNothing();
 
-        // Trigger payout via Safe bot
-        // Ici sera connecté : bot backend payout via Safe + Zodiac Roles Modifier
         const gameId = `lootbox-${lootboxId}-${txHash}`;
         const payoutResult = await executePayout({
           gameType: "lootbox",
@@ -109,7 +128,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const total = await db.select().from(lootboxOpens).where(eq(lootboxOpens.lootboxId, lootboxId));
+    const total = await db
+      .select({ id: lootboxOpens.id })
+      .from(lootboxOpens)
+      .where(eq(lootboxOpens.lootboxId, lootboxId));
     return NextResponse.json({ opened: opened.length, totalOpens: total.length, results: opened });
   } catch (error: any) {
     console.error("[LootboxScan] Fatal error:", error.message);

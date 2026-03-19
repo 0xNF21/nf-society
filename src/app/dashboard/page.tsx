@@ -794,7 +794,7 @@ function PayoutManager({ password, locale }: { password: string; locale: "fr" | 
     try {
       const [statusRes, listRes] = await Promise.all([
         fetch("/api/payout/status", { cache: "no-store" }),
-        fetch(`/api/payout?limit=20&password=${encodeURIComponent(password)}`, { cache: "no-store" }),
+        fetch(`/api/payout?limit=20`, { cache: "no-store", headers: { "Authorization": `Bearer ${password}` } }),
       ]);
       if (statusRes.ok) setPayoutStatus(await statusRes.json());
       if (listRes.ok) {

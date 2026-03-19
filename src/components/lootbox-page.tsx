@@ -7,6 +7,7 @@ import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { getRewardTable } from "@/lib/lootbox";
 import { generateGamePaymentLink } from "@/lib/circles";
+import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 
 type LootboxData = {
   id: number;
@@ -245,6 +246,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
 
   const [opens, setOpens] = useState<LootboxOpen[]>([]);
   const [scanning, setScanning] = useState(false);
+  const [watchingPayment, setWatchingPayment] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [qrCode, setQrCode] = useState<string>("");
@@ -263,6 +265,14 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
     [lootbox.recipientAddress, lootbox.pricePerOpenCrc, lootbox.slug]
   );
   const { primaryColor, accentColor } = lootbox;
+
+  const { status: paymentStatus } = usePaymentWatcher({
+    enabled: watchingPayment,
+    dataValue: paymentLink,
+    minAmountCRC: lootbox.pricePerOpenCrc,
+    recipientAddress: lootbox.recipientAddress,
+    excludeTxHashes: opens.map((o) => o.transactionHash),
+  });
 
   useEffect(() => {
     profilesRef.current = profiles;
@@ -351,6 +361,14 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   }, [fetchOpens, scanNow, clearAnimTimers]);
 
   useEffect(() => {
+    if (paymentStatus === "confirmed") {
+      scanNow();
+      const t = setTimeout(() => setWatchingPayment(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [paymentStatus, scanNow]);
+
+  useEffect(() => {
     if (!showQr) return;
     let active = true;
     setQrState("loading");
@@ -436,6 +454,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               href={paymentLink}
               target="_blank"
               rel="noreferrer"
+              onClick={() => setWatchingPayment(true)}
               className="flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 shadow-sm w-full"
               style={{ backgroundColor: accentColor }}
             >
@@ -451,7 +470,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                 {copied ? t.copied[locale] : (locale === "fr" ? "Copier le lien" : "Copy link")}
               </button>
               <button
-                onClick={() => setShowQr(!showQr)}
+                onClick={() => { setShowQr(!showQr); setWatchingPayment(true); }}
                 className="px-4 py-3 rounded-xl border border-ink/15 text-ink/50 hover:text-ink hover:border-ink/30 hover:bg-white/80 transition-all"
               >
                 <QrCode className="h-5 w-5" />
@@ -465,9 +484,13 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               </button>
             </div>
 
-            {scanning && (
-              <p className="text-xs text-ink/40 animate-pulse text-center">
-                {locale === "fr" ? "Recherche de paiement..." : "Scanning for payment..."}
+            {(scanning || watchingPayment) && (
+              <p className={`text-xs animate-pulse text-center ${paymentStatus === "confirmed" ? "text-green-600" : "text-ink/40"}`}>
+                {paymentStatus === "confirmed"
+                  ? (locale === "fr" ? "✅ Paiement détecté !" : "✅ Payment detected!")
+                  : scanning
+                    ? (locale === "fr" ? "Recherche de paiement..." : "Scanning for payment...")
+                    : (locale === "fr" ? "⏳ En attente du paiement..." : "⏳ Waiting for payment...")}
               </p>
             )}
 

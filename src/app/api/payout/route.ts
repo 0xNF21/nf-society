@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const password = request.nextUrl.searchParams.get("password");
+    const authHeader = request.headers.get("authorization");
+    const password = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
     if (password !== process.env.ADMIN_PASSWORD) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

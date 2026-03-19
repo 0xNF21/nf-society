@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Pencil, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Pencil, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { generatePaymentLink, generateGamePaymentLink } from "@/lib/circles";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
 import { useLocale, LanguageSwitcher } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
+import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 
 export type LotteryConfig = {
   id: number;
@@ -96,10 +97,19 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const [descriptionDraft, setDescriptionDraft] = useState(lottery.description || "");
   const [currentDescription, setCurrentDescription] = useState(lottery.description || "");
   const [savingDescription, setSavingDescription] = useState(false);
+  const [watchingPayment, setWatchingPayment] = useState(false);
 
   const paymentLink = useMemo(() => {
     return generateGamePaymentLink(lottery.recipientAddress, lottery.ticketPriceCrc, "lottery", lottery.slug);
   }, [lottery.recipientAddress, lottery.ticketPriceCrc, lottery.slug]);
+
+  const { status: paymentStatus } = usePaymentWatcher({
+    enabled: watchingPayment,
+    dataValue: paymentLink,
+    minAmountCRC: lottery.ticketPriceCrc,
+    recipientAddress: lottery.recipientAddress,
+    excludeTxHashes: participantList.map((p) => p.transactionHash),
+  });
 
   const lotteryQuery = `lotteryId=${lottery.id}`;
 
@@ -123,6 +133,14 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     const interval = setInterval(scanAndRefresh, 60000);
     return () => clearInterval(interval);
   }, [scanAndRefresh]);
+
+  useEffect(() => {
+    if (paymentStatus === "confirmed") {
+      scanAndRefresh();
+      const t = setTimeout(() => setWatchingPayment(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [paymentStatus, scanAndRefresh]);
 
   useEffect(() => {
     (async () => {
@@ -425,7 +443,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                     style={{ backgroundColor: lottery.primaryColor }}
                     asChild
                   >
-                    <a href={paymentLink} target="_blank" rel="noreferrer">
+                    <a href={paymentLink} target="_blank" rel="noreferrer" onClick={() => setWatchingPayment(true)}>
                       {l.buyTicket[locale]}
                       <ArrowUpRight className="h-5 w-5 ml-2" />
                     </a>
@@ -435,12 +453,30 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                       <Clipboard className="h-4 w-4 mr-2" />
                       {copyState === "copied" ? l.copied[locale] : l.copyLink[locale]}
                     </Button>
-                    <Button variant="outline" onClick={() => setShowQr((prev) => !prev)}>
+                    <Button variant="outline" onClick={() => { setShowQr((prev) => !prev); setWatchingPayment(true); }}>
                       <QrCode className="h-4 w-4 mr-2" />
                       {showQr ? l.hideQr[locale] : l.showQr[locale]}
                     </Button>
                   </div>
                 </div>
+
+                {watchingPayment && (
+                  <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-xl animate-in fade-in duration-200 ${
+                    paymentStatus === "confirmed"
+                      ? "bg-green-50 text-green-700"
+                      : paymentStatus === "error"
+                        ? "bg-red-50 text-red-600"
+                        : "bg-ink/5 text-ink/50"
+                  }`}>
+                    {paymentStatus === "confirmed"
+                      ? <Check className="h-4 w-4 shrink-0" />
+                      : <RefreshCw className="h-4 w-4 shrink-0 animate-spin" />
+                    }
+                    {paymentStatus === "confirmed" && (locale === "fr" ? "Paiement détecté ! Mise à jour..." : "Payment detected! Updating...")}
+                    {paymentStatus === "error" && (locale === "fr" ? "Erreur de détection" : "Detection error")}
+                    {paymentStatus === "waiting" && (locale === "fr" ? "En attente du paiement..." : "Waiting for payment...")}
+                  </div>
+                )}
 
                 {showQr && (
                   <div className="flex flex-col items-center gap-3 rounded-2xl border border-ink/10 bg-white/70 p-4 text-xs text-ink/70 animate-in fade-in zoom-in duration-200">

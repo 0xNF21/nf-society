@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { participants, lotteries, claimedPayments } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 
 const LOTTERY_START_TIMESTAMP = 1739404800;
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const ticketPriceWei = BigInt(ticketPriceCrc) * WEI_PER_CRC;
 
     const existingParticipants = await db
-      .select()
+      .select({ address: participants.address, transactionHash: participants.transactionHash })
       .from(participants)
       .where(eq(participants.lotteryId, lotteryId));
     const registeredTxHashes = new Set(
@@ -42,10 +42,21 @@ export async function POST(req: NextRequest) {
       existingParticipants.map((p) => p.address.toLowerCase())
     );
 
-    const allClaimed = await db.select().from(claimedPayments);
-    const globalClaimedTxHashes = new Set(allClaimed.map((c) => c.txHash.toLowerCase()));
-
     const newPayments = await checkAllNewPayments(ticketPriceCrc, recipientAddress);
+
+    // Query claimedPayments only for the txHashes we need, not the full table
+    const candidateTxHashes = newPayments
+      .map((p) => p.transactionHash.toLowerCase())
+      .filter((h) => !registeredTxHashes.has(h));
+
+    const globalClaimedTxHashes = new Set<string>();
+    if (candidateTxHashes.length > 0) {
+      const claimed = await db
+        .select({ txHash: claimedPayments.txHash })
+        .from(claimedPayments)
+        .where(inArray(claimedPayments.txHash, candidateTxHashes));
+      for (const c of claimed) globalClaimedTxHashes.add(c.txHash.toLowerCase());
+    }
 
     let added = 0;
     for (const payment of newPayments) {
@@ -111,7 +122,7 @@ export async function POST(req: NextRequest) {
     }
 
     const countResult = await db
-      .select()
+      .select({ id: participants.id })
       .from(participants)
       .where(eq(participants.lotteryId, lotteryId));
     return NextResponse.json({ added, total: countResult.length });
