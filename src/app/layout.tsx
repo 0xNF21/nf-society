@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Space_Grotesk, Sora } from "next/font/google";
 import { LanguageProvider } from "@/components/language-provider";
+import ProfileModal from "@/components/profile-modal";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body className="min-h-screen">
         <LanguageProvider>
           {children}
+          <ProfileModal />
         </LanguageProvider>
       </body>
     </html>

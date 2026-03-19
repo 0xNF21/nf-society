@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, Archive, CheckCircle2, Lock, LogOut, RefreshCw, Sparkles, Ticket, Trophy, Users } from "lucide-react";
-import { useLocale, LanguageSwitcher } from "@/components/language-provider";
+import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
 type LotteryCard = {
@@ -279,9 +279,6 @@ export default function HomePage() {
               <ArrowLeft className="h-4 w-4" />
               {locale === "fr" ? "Retour" : "Back"}
             </Link>
-          </div>
-          <div className="absolute right-0 top-0">
-            <LanguageSwitcher />
           </div>
           <div className="flex items-center justify-center gap-4">
             <img src="/nf-society-logo.png" alt="NF Society" className="h-20 w-20 rounded-2xl object-cover" />

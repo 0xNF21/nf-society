@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, uniqueIndex, real } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, uniqueIndex, real, boolean } from "drizzle-orm/pg-core";
 
 export const lotteries = pgTable("lotteries", {
   id: serial("id").primaryKey(),
@@ -122,6 +122,36 @@ export const morpionMoves = pgTable("morpion_moves", {
   moveNumber:    integer("move_number").notNull(),
   createdAt:     timestamp("created_at").defaultNow().notNull(),
 });
+
+export const players = pgTable("players", {
+  address:   text("address").primaryKey(),
+  xp:        integer("xp").notNull().default(0),
+  level:     integer("level").notNull().default(1),
+  streak:    integer("streak").notNull().default(0),
+  lastSeen:  timestamp("last_seen").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const badges = pgTable("badges", {
+  id:        serial("id").primaryKey(),
+  slug:      text("slug").notNull().unique(),
+  name:      text("name").notNull(),
+  description: text("description").notNull(),
+  icon:      text("icon").notNull(),
+  iconType:  text("icon_type").notNull().default("emoji"),
+  category:  text("category").notNull(),
+  secret:    boolean("secret").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const playerBadges = pgTable("player_badges", {
+  id:        serial("id").primaryKey(),
+  address:   text("address").notNull(),
+  badgeSlug: text("badge_slug").notNull(),
+  earnedAt:  timestamp("earned_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueBadgePerPlayer: uniqueIndex("unique_badge_per_player").on(table.address, table.badgeSlug),
+}));
 
 export const exchanges = pgTable("exchanges", {
   id: serial("id").primaryKey(),

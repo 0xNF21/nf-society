@@ -11,7 +11,7 @@ import { generatePaymentLink, generateGamePaymentLink } from "@/lib/circles";
 import { encodeGameData } from "@/lib/game-data";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
-import { useLocale, LanguageSwitcher } from "@/components/language-provider";
+import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
 export type LotteryConfig = {
@@ -390,14 +390,13 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     >
       <main className="px-4 py-10 md:py-16">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center">
             <Link
               href="/loteries"
               className="text-sm text-ink/50 hover:text-ink/80 transition-colors font-medium"
             >
               {l.backToLotteries[locale]}
             </Link>
-            <LanguageSwitcher />
           </div>
           <header className="space-y-4 text-center">
             {lottery.logoUrl && (

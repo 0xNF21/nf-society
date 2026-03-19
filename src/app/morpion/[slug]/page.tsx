@@ -6,6 +6,8 @@ import { ArrowLeft, Copy, Check, RefreshCw, Trophy, Clock, Users } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { generateGamePaymentLink } from "@/lib/circles";
+import { useLocale } from "@/components/language-provider";
+import { translations } from "@/lib/i18n";
 
 type GameStatus = "waiting_p1" | "waiting_p2" | "active" | "finished" | "cancelled";
 
@@ -38,16 +40,18 @@ function getWinLine(board: string): number[] | null {
   return null;
 }
 
-function PlayerBadge({ addr, profile, symbol, isMe }: {
+function PlayerBadge({ addr, profile, symbol, isMe, waitingLabel, youLabel }: {
   addr: string | null;
   profile?: { name: string; imageUrl: string | null };
   symbol: string;
   isMe: boolean;
+  waitingLabel: string;
+  youLabel: string;
 }) {
   if (!addr) return (
     <div className="flex items-center gap-2">
       <div className="w-7 h-7 rounded-full bg-ink/10 flex items-center justify-center text-xs text-ink/30 animate-pulse">?</div>
-      <span className="text-xs text-ink/30">En attente...</span>
+      <span className="text-xs text-ink/30">{waitingLabel}</span>
     </div>
   );
   const name = profile?.name || shortenAddress(addr);
@@ -62,7 +66,7 @@ function PlayerBadge({ addr, profile, symbol, isMe }: {
       )}
       <div>
         <span className="text-xs font-semibold text-ink/70 block leading-tight">{name}</span>
-        {isMe && <span className="text-[10px] text-ink/30">vous</span>}
+        {isMe && <span className="text-[10px] text-ink/30">{youLabel}</span>}
       </div>
     </div>
   );
@@ -70,6 +74,8 @@ function PlayerBadge({ addr, profile, symbol, isMe }: {
 
 export default function MorpionGamePage() {
   const { slug } = useParams<{ slug: string }>();
+  const { locale } = useLocale();
+  const t = translations.morpion;
   const [game, setGame] = useState<MorpionGame | null>(null);
   const [myAddress, setMyAddress] = useState("");
   const [addressInput, setAddressInput] = useState("");
@@ -153,7 +159,7 @@ export default function MorpionGamePage() {
     if (!myAddress || !game || game.status !== "active") return;
     setMoveError("");
     const mySymbol = game.player1Address?.toLowerCase() === myAddress.toLowerCase() ? "X" : "O";
-    if (game.currentTurn !== mySymbol) { setMoveError("Ce n'est pas votre tour"); return; }
+    if (game.currentTurn !== mySymbol) { setMoveError(t.notYourTurn[locale]); return; }
     if (game.board[position] !== "-") return;
     try {
       const res = await fetch(`/api/morpion/${slug}`, {
@@ -189,8 +195,8 @@ export default function MorpionGamePage() {
 
   if (!game) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <p className="text-ink/50">Partie introuvable</p>
-      <Link href="/morpion"><Button variant="outline" className="rounded-xl">← Retour</Button></Link>
+      <p className="text-ink/50">{locale === "fr" ? "Partie introuvable" : "Game not found"}</p>
+      <Link href="/morpion"><Button variant="outline" className="rounded-xl">← {t.back[locale]}</Button></Link>
     </div>
   );
 
@@ -210,10 +216,10 @@ export default function MorpionGamePage() {
         {/* Back + slug */}
         <div className="flex items-center justify-between mb-6">
           <Link href="/morpion" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Retour
+            <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
           </Link>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-ink/40">Partie</span>
+            <span className="text-xs text-ink/40">{t.gameLabel[locale]}</span>
             <span className="font-mono font-bold text-marine text-sm bg-marine/10 px-2.5 py-1 rounded-lg">{game.slug}</span>
           </div>
         </div>
@@ -224,13 +230,13 @@ export default function MorpionGamePage() {
             {game.status === "waiting_p1" && (
               <div className="flex items-center justify-center gap-2 text-ink/60 py-3 px-4">
                 <Clock className="w-4 h-4" />
-                <span className="text-sm font-semibold">En attente du paiement J1...</span>
+                <span className="text-sm font-semibold">{t.waitingP1[locale]}</span>
               </div>
             )}
             {game.status === "waiting_p2" && (
               <div className="flex items-center justify-center gap-2 text-ink/60 py-3 px-4">
                 <Users className="w-4 h-4" />
-                <span className="text-sm font-semibold">En attente du joueur 2...</span>
+                <span className="text-sm font-semibold">{t.waitingP2[locale]}</span>
               </div>
             )}
             {game.status === "active" && (
@@ -238,12 +244,12 @@ export default function MorpionGamePage() {
                 <img src={game.currentTurn === "X" ? "/morpion/player1.png" : "/morpion/player2.png"}
                   alt={game.currentTurn} className="w-16 h-16 object-contain" />
                 <span className="text-lg font-bold text-ink">
-                  {isMyTurn ? "C'est votre tour !" : `Tour de J${game.currentTurn === "X" ? "1" : "2"}`}
+                  {isMyTurn ? t.yourTurn[locale] : `${t.turnOf[locale]} J${game.currentTurn === "X" ? "1" : "2"}`}
                 </span>
               </div>
             )}
             {game.status === "finished" && game.result === "draw" && (
-              <p className="text-sm font-bold text-ink/70 py-3 px-4">🤝 Match nul — remboursement en cours</p>
+              <p className="text-sm font-bold text-ink/70 py-3 px-4">{t.draw[locale]}</p>
             )}
             {game.status === "finished" && game.result !== "draw" && (() => {
               const hasAddress = !!myAddress;
@@ -254,9 +260,9 @@ export default function MorpionGamePage() {
                 <div className="space-y-1 py-3 px-4">
                   <div className="flex items-center justify-center gap-2">
                     <Trophy className="w-5 h-5 text-citrus" />
-                    <span className="font-bold text-ink">Partie terminée</span>
+                    <span className="font-bold text-ink">{t.gameOver[locale]}</span>
                   </div>
-                  <p className="text-xs text-ink/50">Gagnant : {game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"} — {winAmount} CRC</p>
+                  <p className="text-xs text-ink/50">{locale === "fr" ? "Gagnant" : "Winner"} : {game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"} — {winAmount} CRC</p>
                 </div>
               );
 
@@ -264,19 +270,19 @@ export default function MorpionGamePage() {
                 <div className="space-y-1 py-3 px-4">
                   <div className="flex items-center justify-center gap-2">
                     <Trophy className="w-5 h-5 text-citrus" />
-                    <span className="font-bold text-ink">Vous avez gagné !</span>
+                    <span className="font-bold text-ink">{t.youWon[locale]}</span>
                   </div>
-                  <p className="text-xs text-ink/50">{winAmount} CRC en route</p>
+                  <p className="text-xs text-ink/50">{winAmount} CRC {locale === "fr" ? "en route" : "on the way"}</p>
                 </div>
               );
 
               if (iLost) return (
                 <div className="space-y-2 py-3 px-4">
                   <p className="text-2xl text-center">😢</p>
-                  <p className="font-bold text-ink text-sm">Vous avez perdu</p>
+                  <p className="font-bold text-ink text-sm">{t.youLost[locale]}</p>
                   <div className="text-xs text-ink/40 space-y-0.5">
-                    <p>Gagnant : <span className="font-semibold text-ink/60">{game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"}</span></p>
-                    <p>Mise remportée : <span className="font-bold text-ink/60">{winAmount} CRC</span></p>
+                    <p>{locale === "fr" ? "Gagnant" : "Winner"} : <span className="font-semibold text-ink/60">{game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"}</span></p>
+                    <p>{t.betWon[locale]} <span className="font-bold text-ink/60">{winAmount} CRC</span></p>
                   </div>
                 </div>
               );
@@ -290,30 +296,30 @@ export default function MorpionGamePage() {
             <CardContent className="pt-2 px-4 pb-4 space-y-3">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <span className="text-xs font-semibold text-ink/40 uppercase tracking-widest">
-                  {isCreator ? "Vous êtes J1 — payez pour commencer" : "Vous êtes J2 — payez pour rejoindre"}
+                  {isCreator ? t.payToStart[locale] : t.payToJoin[locale]}
                 </span>
                 <span className="text-xs font-bold text-marine bg-marine/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{game.betCrc} CRC</span>
               </div>
               <a href={paymentLink} target="_blank" rel="noreferrer">
                 <Button className="w-full rounded-xl font-bold" style={{ background: "#251B9F" }}>
-                  💸 Payer {game.betCrc} CRC avec Circles
+                  {t.payCrc[locale].replace("{bet}", String(game.betCrc))}
                 </Button>
               </a>
               <div className={`grid gap-2 ${isCreator && game.status === "waiting_p1" ? "grid-cols-2" : "grid-cols-1"}`}>
                 <Button variant="outline" size="sm" onClick={copyPaymentLink} className="rounded-xl text-xs border-ink/15 gap-1.5">
                   {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? "Copié !" : "Copier lien paiement"}
+                  {copied ? t.copied[locale] : t.copyPayLink[locale]}
                 </Button>
                 {isCreator && game.status === "waiting_p1" && (
                   <Button variant="outline" size="sm" onClick={copyGameLink} className="rounded-xl text-xs border-ink/15 gap-1.5">
                     {copiedLink ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copiedLink ? "Copié !" : "Inviter J2"}
+                    {copiedLink ? t.copied[locale] : t.inviteP2[locale]}
                   </Button>
                 )}
               </div>
               <button onClick={scanPayments} disabled={scanning} className="w-full text-xs text-ink/40 hover:text-ink/60 flex items-center justify-center gap-1.5 transition-colors">
                 <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
-                {scanning ? "Scan en cours..." : "Scanner les paiements"}
+                {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
               </button>
             </CardContent>
           </Card>
@@ -323,7 +329,7 @@ export default function MorpionGamePage() {
         {game.status === "active" && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
             <CardContent className="p-4 space-y-2">
-              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest">Votre adresse Circles</p>
+              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest">{t.yourAddress[locale]}</p>
               <div className="flex gap-2">
                 <input type="text" placeholder="0x..." value={addressInput}
                   onChange={(e) => setAddressInput(e.target.value)}
@@ -378,7 +384,7 @@ export default function MorpionGamePage() {
             return (
               <div key={label} className="bg-white/60 backdrop-blur-sm border border-ink/10 rounded-xl p-3">
                 <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest mb-1.5">{label}</p>
-                <PlayerBadge addr={addr} profile={profile} symbol={symbol} isMe={isMe} />
+                <PlayerBadge addr={addr} profile={profile} symbol={symbol} isMe={isMe} waitingLabel={t.waiting[locale]} youLabel={locale === "fr" ? "vous" : "you"} />
               </div>
             );
           })}
@@ -391,18 +397,18 @@ export default function MorpionGamePage() {
             {(game.status === "waiting_p1" || game.status === "waiting_p2") && (
               <button onClick={activateTestMode} disabled={testLoading}
                 className="w-full py-1.5 rounded-lg bg-ink/5 text-xs text-ink/40 hover:text-ink/60 hover:bg-ink/10 transition-all">
-                {testLoading ? "..." : "Injecter 2 faux joueurs"}
+                {testLoading ? "..." : locale === "fr" ? "Injecter 2 faux joueurs" : "Inject 2 test players"}
               </button>
             )}
             {game.status === "active" && !addressConfirmed && (
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => { setMyAddress("0xTEST000000000000000000000000000000000001"); setAddressConfirmed(true); }}
                   className="py-1.5 rounded-lg bg-marine/10 text-xs text-marine font-bold hover:bg-marine/20 transition-all">
-                  Jouer en J1 (X)
+                  {locale === "fr" ? "Jouer en J1 (X)" : "Play as P1 (X)"}
                 </button>
                 <button onClick={() => { setMyAddress("0xTEST000000000000000000000000000000000002"); setAddressConfirmed(true); }}
                   className="py-1.5 rounded-lg bg-citrus/10 text-xs text-citrus font-bold hover:bg-citrus/20 transition-all">
-                  Jouer en J2 (O)
+                  {locale === "fr" ? "Jouer en J2 (O)" : "Play as P2 (O)"}
                 </button>
               </div>
             )}
@@ -412,7 +418,7 @@ export default function MorpionGamePage() {
         {/* My symbol */}
         {mySymbol && game.status === "active" && (
           <p className="text-center text-xs text-ink/40 mt-2">
-            Vous jouez <span className="font-bold" style={{ color: mySymbol === "X" ? "#251B9F" : "#FF491B" }}>{mySymbol}</span>
+            {t.youPlay[locale]} <span className="font-bold" style={{ color: mySymbol === "X" ? "#251B9F" : "#FF491B" }}>{mySymbol}</span>
           </p>
         )}
       </div>

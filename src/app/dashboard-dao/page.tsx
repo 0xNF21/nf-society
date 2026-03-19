@@ -25,7 +25,7 @@ import {
   Send,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { useLocale, LanguageSwitcher } from "@/components/language-provider";
+import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
 type DaoData = {
@@ -398,7 +398,6 @@ export default function DashboardDaoPage() {
                 {t.refresh[locale]}
               </button>
             )}
-            <LanguageSwitcher />
           </div>
         </div>
 

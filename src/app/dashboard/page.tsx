@@ -6,7 +6,7 @@ import Image from "next/image";
 import { ArrowLeft, Check, Palette, RefreshCw, Sparkles, Wallet, AlertCircle, CheckCircle, XCircle, Send, ChevronDown, ExternalLink, Loader2, Gift, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useLocale, LanguageSwitcher } from "@/components/language-provider";
+import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { getRewardTable, computeRtp } from "@/lib/lootbox";
 
@@ -249,9 +249,6 @@ export default function DashboardPage() {
       <main className="px-4 py-10 md:py-16">
         <div className="mx-auto max-w-md">
           <div className="text-center mb-8 relative">
-            <div className="absolute right-0 top-0">
-              <LanguageSwitcher />
-            </div>
             <Link href="/" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6">
               <ArrowLeft className="h-4 w-4" />
               {d.backToHome[locale]}
@@ -300,7 +297,6 @@ export default function DashboardPage() {
             <p className="text-ink/50 mt-1">{d.createSubtitle[locale]}</p>
           </div>
           <div className="flex items-center gap-3">
-            <LanguageSwitcher />
             <div
               className="h-12 w-12 rounded-2xl flex items-center justify-center"
               style={{ backgroundColor: form.primaryColor + "20" }}

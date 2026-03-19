@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, BarChart3, Ticket, Gift, Gamepad2 } from "lucide-react";
-import { useLocale, LanguageSwitcher } from "@/components/language-provider";
+import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import ExchangeSection from "@/components/exchange-section";
 
@@ -15,10 +15,6 @@ export default function LandingPage() {
     <main className="min-h-screen flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16">
         <div className="w-full max-w-3xl flex flex-col items-center gap-10">
-          <div className="absolute top-4 right-4">
-            <LanguageSwitcher />
-          </div>
-
           <header className="text-center space-y-4">
             <img
               src="/nf-society-logo.png"
@@ -80,13 +76,13 @@ export default function LandingPage() {
                 <Gamepad2 className="h-8 w-8 text-violet-500" />
               </div>
               <h2 className="font-display text-2xl font-bold text-ink">
-                Morpion CRC
+                {translations.landingMorpion.title[locale]}
               </h2>
               <p className="text-sm text-ink/50 leading-relaxed">
-                Défiez un ami en 1v1 et misez des CRC. Le gagnant remporte le pot !
+                {translations.landingMorpion.desc[locale]}
               </p>
               <span className="mt-auto flex items-center gap-2 text-sm font-semibold text-violet-500 group-hover:gap-3 transition-all">
-                Jouer
+                {translations.landingMorpion.action[locale]}
                 <ArrowRight className="h-4 w-4" />
               </span>
             </Link>
