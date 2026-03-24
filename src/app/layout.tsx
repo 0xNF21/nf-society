@@ -2,7 +2,10 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Space_Grotesk, Sora } from "next/font/google";
 import { LanguageProvider } from "@/components/language-provider";
+import { DemoProvider } from "@/components/demo-provider";
+import DemoBanner from "@/components/demo-banner";
 import ProfileModal from "@/components/profile-modal";
+import DailyModal from "@/components/daily-modal";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -27,10 +30,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body className="min-h-screen">
-        <LanguageProvider>
-          {children}
-          <ProfileModal />
-        </LanguageProvider>
+        <DemoProvider>
+          <LanguageProvider>
+            <DemoBanner />
+            {children}
+            <ProfileModal />
+            <DailyModal />
+          </LanguageProvider>
+        </DemoProvider>
       </body>
     </html>
   );

@@ -22,7 +22,11 @@ export const XP_REWARDS: Record<string, number> = {
   lootbox_jackpot:   100,
   morpion_win:       15,
   morpion_lose:       5,
+  memory_win:        15,
+  memory_lose:        5,
   daily_checkin:      3,
+  daily_scratch:      5,
+  daily_spin:         5,
   streak_7days:      50,
 };
 
@@ -48,6 +52,14 @@ export function xpToNextLevel(xp: number): number {
 
 export function getXpForAction(action: string): number {
   return XP_REWARDS[action] ?? 0;
+}
+
+export function getAvailableXp(xp: number, xpSpent: number): number {
+  return xp - xpSpent;
+}
+
+export function canAfford(xp: number, xpSpent: number, itemCost: number): boolean {
+  return getAvailableXp(xp, xpSpent) >= itemCost;
 }
 
 /** Retourne l'action XP bonus selon le ratio reward/price */

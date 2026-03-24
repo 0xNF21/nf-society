@@ -4,7 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { User, X, Search, Loader2, ChevronRight, LogOut } from "lucide-react";
 import { LanguageSwitcher, useLocale } from "@/components/language-provider";
+import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
+import { getLevelName, xpToNextLevel } from "@/lib/xp";
 
 type SavedProfile = {
   address: string;
@@ -37,6 +39,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function ProfileModal() {
   const { locale } = useLocale();
+  const { isDemo, demoPlayer } = useDemo();
   const tp = translations.profile;
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState<SavedProfile | null>(null);
@@ -47,22 +50,33 @@ export default function ProfileModal() {
   const debouncedQuery = useDebounce(query, 350);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Charger profil sauvegardé au montage
+  // Charger profil sauvegardé au montage (ou injecter démo)
   useEffect(() => {
+    if (isDemo) {
+      setSaved({ address: demoPlayer.address, name: demoPlayer.name, imageUrl: demoPlayer.imageUrl });
+      setPlayer({
+        level: demoPlayer.level,
+        levelName: getLevelName(demoPlayer.level),
+        xp: demoPlayer.xp,
+        xpToNext: xpToNextLevel(demoPlayer.xp),
+        streak: demoPlayer.streak,
+      });
+      return;
+    }
     try {
       const raw = localStorage.getItem("nfs_profile");
       if (raw) setSaved(JSON.parse(raw));
     } catch {}
-  }, []);
+  }, [isDemo, demoPlayer]);
 
   // Charger données XP quand profil connu
   useEffect(() => {
-    if (!saved?.address) return;
+    if (isDemo || !saved?.address) return;
     fetch(`/api/players/${saved.address}`)
       .then(r => r.json())
       .then(d => setPlayer(d))
       .catch(() => {});
-  }, [saved]);
+  }, [saved, isDemo]);
 
   // Recherche Circles
   useEffect(() => {

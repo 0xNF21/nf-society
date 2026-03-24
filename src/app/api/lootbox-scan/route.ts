@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lootboxes, lootboxOpens, claimedPayments } from "@/lib/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { lootboxes, lootboxOpens, claimedPayments, shopCoupons } from "@/lib/db/schema";
+import { eq, and, inArray, gt } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { executePayout } from "@/lib/payout";
 import { getRandomReward } from "@/lib/lootbox";
@@ -120,6 +120,40 @@ export async function POST(req: NextRequest) {
           payoutTxHash: payoutResult.transferTxHash || null,
           errorMessage: payoutResult.error || null,
         }).where(eq(lootboxOpens.transactionHash, txHash));
+
+        // ─── Coupon refund check ───
+        try {
+          const [coupon] = await db
+            .select()
+            .from(shopCoupons)
+            .where(
+              and(
+                eq(shopCoupons.address, playerAddress),
+                eq(shopCoupons.used, false),
+                gt(shopCoupons.expiresAt, new Date()),
+                // lootbox_refund or lootbox_rare_refund
+              )
+            )
+            .limit(1);
+
+          if (coupon && (coupon.type === "lootbox_refund" || coupon.type === "lootbox_rare_refund")) {
+            // Consume coupon
+            await db.update(shopCoupons)
+              .set({ used: true, usedAt: new Date(), txHashUsed: txHash })
+              .where(eq(shopCoupons.id, coupon.id));
+
+            // Refund the player
+            await executePayout({
+              gameType: "shop_refund",
+              gameId: `refund-${txHash}`,
+              recipientAddress: playerAddress,
+              amountCrc: priceCrc,
+              reason: `Lootbox Remboursée — Boutique XP`,
+            });
+          }
+        } catch (couponErr) {
+          console.error("[LootboxScan] Coupon refund error:", couponErr);
+        }
 
         // XP non-bloquant — ne doit jamais bloquer le payout
         try {

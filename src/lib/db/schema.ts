@@ -126,6 +126,7 @@ export const morpionMoves = pgTable("morpion_moves", {
 export const players = pgTable("players", {
   address:   text("address").primaryKey(),
   xp:        integer("xp").notNull().default(0),
+  xpSpent:   integer("xp_spent").notNull().default(0),
   level:     integer("level").notNull().default(1),
   streak:    integer("streak").notNull().default(0),
   lastSeen:  timestamp("last_seen").defaultNow().notNull(),
@@ -153,6 +154,57 @@ export const playerBadges = pgTable("player_badges", {
   uniqueBadgePerPlayer: uniqueIndex("unique_badge_per_player").on(table.address, table.badgeSlug),
 }));
 
+export const memoryGames = pgTable("memory_games", {
+  id:               serial("id").primaryKey(),
+  slug:             text("slug").notNull().unique(),
+  betCrc:           integer("bet_crc").notNull(),
+  difficulty:       text("difficulty").notNull().default("medium"),
+  recipientAddress: text("recipient_address").notNull(),
+  commissionPct:    integer("commission_pct").notNull().default(5),
+  player1Address:   text("player1_address"),
+  player2Address:   text("player2_address"),
+  player1TxHash:    text("player1_tx_hash"),
+  player2TxHash:    text("player2_tx_hash"),
+  player1Moves:     integer("player1_moves"),
+  player1Time:      integer("player1_time"),
+  player2Moves:     integer("player2_moves"),
+  player2Time:      integer("player2_time"),
+  gridSeed:         text("grid_seed").notNull(),
+  currentTurn:      text("current_turn").notNull().default("player1"),
+  player1Pairs:     integer("player1_pairs").notNull().default(0),
+  player2Pairs:     integer("player2_pairs").notNull().default(0),
+  boardState:       text("board_state").notNull().default("{}"),
+  status:           text("status").notNull().default("waiting_p1"),
+  winnerAddress:    text("winner_address"),
+  result:           text("result"),
+  payoutStatus:     text("payout_status").notNull().default("pending"),
+  payoutTxHash:     text("payout_tx_hash"),
+  createdAt:        timestamp("created_at").defaultNow().notNull(),
+  updatedAt:        timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const dailySessions = pgTable("daily_sessions", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  address: text("address"),
+  txHash: text("tx_hash"),
+  date: text("date").notNull(),
+  scratchResult: text("scratch_result"),
+  scratchPlayed: boolean("scratch_played").notNull().default(false),
+  spinResult: text("spin_result"),
+  spinPlayed: boolean("spin_played").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const jackpotPool = pgTable("jackpot_pool", {
+  id: serial("id").primaryKey(),
+  address: text("address").notNull(),
+  amountCrc: integer("amount_crc").notNull().default(1),
+  txHash: text("tx_hash").notNull().unique(),
+  date: text("date").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const exchanges = pgTable("exchanges", {
   id: serial("id").primaryKey(),
   senderAddress: text("sender_address").notNull(),
@@ -163,4 +215,50 @@ export const exchanges = pgTable("exchanges", {
   status: text("status").notNull().default("detected"),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const shopSessions = pgTable("shop_sessions", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  address: text("address"),
+  txHash: text("tx_hash"),
+  refunded: boolean("refunded").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const shopItems = pgTable("shop_items", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull(),
+  category: text("category").notNull(),
+  xpCost: integer("xp_cost").notNull(),
+  levelRequired: integer("level_required").notNull().default(1),
+  refundType: text("refund_type"),
+  refundAmountCrc: integer("refund_amount_crc"),
+  stock: integer("stock"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const shopPurchases = pgTable("shop_purchases", {
+  id: serial("id").primaryKey(),
+  address: text("address").notNull(),
+  itemSlug: text("item_slug").notNull(),
+  xpSpent: integer("xp_spent").notNull(),
+  effectApplied: boolean("effect_applied").notNull().default(false),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const shopCoupons = pgTable("shop_coupons", {
+  id: serial("id").primaryKey(),
+  address: text("address").notNull(),
+  type: text("type").notNull(),
+  used: boolean("used").notNull().default(false),
+  usedAt: timestamp("used_at"),
+  txHashUsed: text("tx_hash_used"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
 });

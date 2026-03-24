@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { players } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { players, shopPurchases } from "@/lib/db/schema";
+import { eq, and, gt, sql } from "drizzle-orm";
 import { computeLevel, getLevelName, xpToNextLevel, getXpForAction } from "@/lib/xp";
 import { checkAndAwardBadges, awardSupremeFounder } from "@/lib/badges";
 
@@ -13,10 +13,33 @@ export async function POST(req: NextRequest) {
     }
 
     const addr = address.toLowerCase();
-    const xpGained = getXpForAction(action);
+    let xpGained = getXpForAction(action);
     if (xpGained === 0) {
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
+
+    // Check active XP boosts
+    try {
+      const now = new Date();
+      const activeBoosts = await db
+        .select({ itemSlug: shopPurchases.itemSlug })
+        .from(shopPurchases)
+        .where(
+          and(
+            eq(shopPurchases.address, addr),
+            gt(shopPurchases.expiresAt, now),
+          )
+        );
+
+      const hasBoost24h = activeBoosts.some(b => b.itemSlug === "xp_boost_24h");
+      const hasBoost7d = activeBoosts.some(b => b.itemSlug === "xp_boost_7d");
+
+      if (hasBoost24h) {
+        xpGained = Math.floor(xpGained * 2); // x2
+      } else if (hasBoost7d) {
+        xpGained = Math.floor(xpGained * 1.5); // x1.5
+      }
+    } catch { /* boost check fail silencieux */ }
 
     // Upsert player
     const now = new Date();

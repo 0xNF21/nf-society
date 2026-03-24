@@ -74,8 +74,8 @@ export default async function PlayerPage({
       toNext={toNext}
       progressPct={progressPct}
       streak={streak}
-      levels={LEVELS}
-      badges={badgesList}
+      levels={[...LEVELS]}
+      badges={badgesList.map(b => ({ ...b, earnedAt: b.earnedAt?.toISOString() ?? null }))}
     />
   );
 }
