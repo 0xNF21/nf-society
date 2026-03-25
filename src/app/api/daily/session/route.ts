@@ -4,6 +4,7 @@ import { dailySessions } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { todayString } from "@/lib/daily";
 import { runDailyScan } from "@/lib/daily-scan";
+import { generateGamePaymentLink } from "@/lib/circles";
 
 const SESSION_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
@@ -92,7 +93,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ status: "waiting" });
+    // Return waiting with payment link so frontend can show QR on reload
+    const safeAddress = process.env.SAFE_ADDRESS || "";
+    const paymentLink = generateGamePaymentLink(safeAddress, 1, "daily", session.token);
+    return NextResponse.json({ status: "waiting", paymentLink });
   } catch (error: any) {
     console.error("[Daily Session] Error:", error.message);
     return NextResponse.json({ error: error.message || "Session check failed" }, { status: 500 });

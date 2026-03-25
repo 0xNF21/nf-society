@@ -90,6 +90,14 @@ export default function DailyModal() {
               setPhase("scratch");
             }
           } else if (session.status === "waiting") {
+            if (session.paymentLink) {
+              setPaymentLink(session.paymentLink);
+              import("qrcode").then(QRCode => {
+                QRCode.toDataURL(session.paymentLink, { width: 300, margin: 2 })
+                  .then((url: string) => setQrCode(url))
+                  .catch(() => {});
+              });
+            }
             setPhase("payment");
           }
         })
@@ -135,6 +143,11 @@ export default function DailyModal() {
       setPaymentLink(data.paymentLink);
       setQrCode(data.qrCode);
       setPhase("payment");
+      // Save token immediately so reload doesn't create a new session
+      localStorage.setItem("nf-daily", JSON.stringify({
+        token: data.token,
+        date: new Date().toISOString().slice(0, 10),
+      }));
     } catch { /* error */ }
     setLoading(false);
   }, []);
