@@ -558,13 +558,18 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   }, [paymentStatus, scanNow]);
 
   useEffect(() => {
-    fetchOpens();
+    // On mount: scan first to capture any on-chain txs, then fetch opens
+    // This ensures the exclude list is populated before the watcher starts
+    (async () => {
+      try { await fetch(`/api/lootbox-scan?lootboxId=${lootbox.id}`, { method: "POST", cache: "no-store" }); } catch {}
+      await fetchOpens();
+    })();
     intervalRef.current = setInterval(scanNow, 10000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       clearAnimTimers();
     };
-  }, [fetchOpens, scanNow, clearAnimTimers]);
+  }, [fetchOpens, scanNow, clearAnimTimers, lootbox.id]);
 
   useEffect(() => {
     if (!showQr) return;
