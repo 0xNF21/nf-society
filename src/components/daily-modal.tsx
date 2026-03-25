@@ -393,6 +393,16 @@ export default function DailyModal() {
                     </div>
                   )}
 
+                  {/* Direct pay button — opens Gnosis app on mobile */}
+                  <a
+                    href={paymentLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-sm shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] mb-3"
+                  >
+                    💳 {locale === "fr" ? "Payer 1 CRC avec Circles" : "Pay 1 CRC with Circles"}
+                  </a>
+
                   <p className="text-xs text-ink/50 mb-2">{t.orCopy[locale]}</p>
 
                   <button
