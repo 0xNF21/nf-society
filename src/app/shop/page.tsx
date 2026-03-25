@@ -334,7 +334,7 @@ export default function ShopPage() {
     return (
       <button
         onClick={() => setConfirm(item.slug)}
-        className="px-3 py-1.5 bg-ink text-white text-xs font-bold rounded-lg shadow-sm hover:shadow-md transition-all hover:scale-[1.02]"
+        className="px-3 py-1.5 bg-pink-500 text-white text-xs font-bold rounded-lg shadow-sm hover:shadow-md hover:bg-pink-600 transition-all hover:scale-[1.02]"
       >
         {t.buy[locale]} — {item.xpCost} XP
       </button>
@@ -376,7 +376,7 @@ export default function ShopPage() {
             )}
             <button
               onClick={startAuth}
-              className="w-full py-3 bg-ink text-white font-bold rounded-xl hover:bg-ink/90 transition-colors"
+              className="w-full py-3 bg-pink-500 text-white font-bold rounded-xl hover:bg-pink-600 transition-colors"
             >
               {t.authVerify[locale]}
             </button>
@@ -414,7 +414,7 @@ export default function ShopPage() {
               />
               <button
                 onClick={copyLink}
-                className="flex items-center gap-1 px-3 py-2 bg-ink text-white text-xs font-bold rounded-lg hover:bg-ink/90 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 bg-pink-500 text-white text-xs font-bold rounded-lg hover:bg-pink-600 transition-colors"
               >
                 {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                 {copied ? t.authCopied[locale] : t.authOrCopy[locale]}
@@ -435,7 +435,7 @@ export default function ShopPage() {
             <p className="text-sm text-red-500 font-medium">{t.authExpired[locale]}</p>
             <button
               onClick={() => { setAuthState("idle"); setAuthToken(""); }}
-              className="px-4 py-2 bg-ink text-white font-bold rounded-xl hover:bg-ink/90 transition-colors"
+              className="px-4 py-2 bg-pink-500 text-white font-bold rounded-xl hover:bg-pink-600 transition-colors"
             >
               {t.authRetry[locale]}
             </button>
@@ -497,7 +497,7 @@ export default function ShopPage() {
             onClick={() => setCategory(cat)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
               category === cat
-                ? "bg-ink text-white shadow-md border-ink"
+                ? "bg-pink-500 text-white shadow-md border-pink-500"
                 : "bg-white text-ink/80 border-ink/15 hover:bg-ink/[0.06] hover:border-ink/25"
             }`}
           >

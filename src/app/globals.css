@@ -160,10 +160,13 @@ input, textarea, [contenteditable="true"] {
 .dark .group:hover .group-hover\:bg-pink-100 { background-color: rgba(236, 72, 153, 0.2) !important; }
 .dark .group:hover .group-hover\:bg-sky-100 { background-color: rgba(14, 165, 233, 0.2) !important; }
 
-/* Gray/slate text + backgrounds (used in dashboard-dao) */
-.dark .text-gray-900 { color: #ffffff !important; }
+/* Gray text (all shades) */
+.dark .text-gray-300 { color: rgba(255, 255, 255, 0.88) !important; }
 .dark .text-gray-400 { color: rgba(255, 255, 255, 0.85) !important; }
+.dark .text-gray-500 { color: rgba(255, 255, 255, 0.85) !important; }
 .dark .text-gray-600 { color: rgba(255, 255, 255, 0.9) !important; }
+.dark .text-gray-700 { color: rgba(255, 255, 255, 0.92) !important; }
+.dark .text-gray-900 { color: #ffffff !important; }
 .dark .text-black { color: #ffffff !important; }
 .dark .bg-gray-100 { background-color: rgba(255, 255, 255, 0.1) !important; }
 .dark .bg-gray-50 { background-color: rgba(255, 255, 255, 0.05) !important; }
@@ -193,12 +196,7 @@ input, textarea, [contenteditable="true"] {
 .dark .to-yellow-50 { --tw-gradient-to: rgba(234, 179, 8, 0.1) !important; }
 .dark .border-amber-300 { border-color: rgba(245, 158, 11, 0.4) !important; }
 
-/* Text gray-500 (archived badges, admin buttons) */
-.dark .text-gray-500 { color: rgba(255, 255, 255, 0.85) !important; }
-.dark .text-gray-700 { color: rgba(255, 255, 255, 0.92) !important; }
-.dark .text-gray-300 { color: rgba(255, 255, 255, 0.88) !important; }
-
-/* Border gray-300 (admin buttons) */
+/* Border gray (admin buttons) */
 .dark .border-gray-300 { border-color: rgba(255, 255, 255, 0.2) !important; }
 .dark .border-gray-200 { border-color: rgba(255, 255, 255, 0.15) !important; }
 

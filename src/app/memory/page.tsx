@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft, Brain } from "lucide-react";
+import { ArrowLeft, Brain, Loader2 } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -20,6 +20,7 @@ export default function MemoryLobby() {
   const { locale } = useLocale();
   const { isDemo } = useDemo();
   const t = translations.memory;
+  const te = translations.errors;
   const [betCrc, setBetCrc] = useState(10);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [joinSlug, setJoinSlug] = useState("");
@@ -43,8 +44,8 @@ export default function MemoryLobby() {
       if (!res.ok) throw new Error(data.error);
       sessionStorage.setItem(`memory_creator_${data.slug}`, "1");
       router.push(`/memory/${data.slug}`);
-    } catch (e: any) {
-      setError(e.message);
+    } catch {
+      setError(te.gameCreate[locale]);
     } finally {
       setLoading(false);
     }
@@ -83,11 +84,11 @@ export default function MemoryLobby() {
               <div className="flex items-center gap-2">
                 {DIFFICULTIES.map((d) => (
                   <button key={d.value} onClick={() => setDifficulty(d.value)}
-                    className="flex-1 py-2.5 rounded-xl text-center border transition-all"
-                    style={difficulty === d.value
-                      ? { background: "#EC4899", color: "#fff", borderColor: "#EC4899" }
-                      : { background: "rgba(255,255,255,0.8)", color: "rgba(0,0,0,0.6)", borderColor: "rgba(0,0,0,0.1)" }
-                    }>
+                    className={`flex-1 min-h-[44px] py-2.5 rounded-xl text-center border transition-all active:scale-95 ${
+                      difficulty === d.value
+                        ? "bg-pink-500 text-white border-pink-500"
+                        : "bg-white/80 text-ink/60 border-ink/10"
+                    }`}>
                     <span className="block text-sm font-bold">
                       {d.value === "easy" ? t.easy[locale] : d.value === "medium" ? t.medium[locale] : t.hard[locale]}
                     </span>
@@ -103,11 +104,11 @@ export default function MemoryLobby() {
               <div className="flex items-center gap-3">
                 {[5, 10, 25, 50].map((v) => (
                   <button key={v} onClick={() => setBetCrc(v)}
-                    className="flex-1 py-2 rounded-xl text-sm font-bold border transition-all"
-                    style={betCrc === v
-                      ? { background: "#EC4899", color: "#fff", borderColor: "#EC4899" }
-                      : { background: "rgba(255,255,255,0.8)", color: "rgba(0,0,0,0.6)", borderColor: "rgba(0,0,0,0.1)" }
-                    }>
+                    className={`flex-1 min-h-[44px] py-2.5 rounded-xl text-sm font-bold border transition-all active:scale-95 ${
+                      betCrc === v
+                        ? "bg-pink-500 text-white border-pink-500"
+                        : "bg-white/80 text-ink/60 border-ink/10"
+                    }`}>
                     {v}
                   </button>
                 ))}
@@ -130,7 +131,7 @@ export default function MemoryLobby() {
 
             <Button onClick={createGame} disabled={loading} className="w-full rounded-xl font-bold"
               style={{ background: "#EC4899" }}>
-              {loading ? t.creating[locale] : `${t.createBtn[locale]} — ${betCrc} CRC`}
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" /> {t.creating[locale]}</> : `${t.createBtn[locale]} — ${betCrc} CRC`}
             </Button>
           </CardContent>
         </Card>

@@ -404,8 +404,24 @@ function RealMemoryGame({ slug }: { slug: string }) {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <RefreshCw className="w-6 h-6 text-pink-500 animate-spin" />
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md space-y-4">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-5 w-20 rounded-lg bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+          <div className="h-7 w-24 rounded-lg bg-pink-500/10 animate-pulse motion-reduce:animate-none" />
+        </div>
+        <div className="h-16 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        <div className="h-12 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        <div className="grid grid-cols-4 gap-1.5">
+          {Array.from({ length: 16 }).map((_, i) => (
+            <div key={i} className="aspect-square rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="h-16 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+          <div className="h-16 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        </div>
+      </div>
     </div>
   );
 
@@ -547,8 +563,8 @@ function RealMemoryGame({ slug }: { slug: string }) {
               <p className="text-[10px] text-ink/40">{t.pairs[locale]}</p>
             </div>
             <div className="text-center">
-              <p className="text-[10px] font-bold text-ink/30 uppercase">VS</p>
-              <p className="text-sm text-ink/40">{Object.keys(boardState.matched).length}/{totalPairs}</p>
+              <p className="text-[10px] font-bold text-ink/40 uppercase">VS</p>
+              <p className="text-sm text-ink/50">{Object.keys(boardState.matched).length}/{totalPairs}</p>
             </div>
             <div className="text-center">
               <p className="text-[10px] font-bold uppercase" style={{ color: "#F97316" }}>J2</p>
@@ -611,10 +627,10 @@ function RealMemoryGame({ slug }: { slug: string }) {
                 {addr ? (
                   <p className="text-xs font-semibold text-ink/70">
                     {profile?.name || shortenAddress(addr)}
-                    {isMe && <span className="text-ink/30 ml-1">({locale === "fr" ? "vous" : "you"})</span>}
+                    {isMe && <span className="text-ink/50 ml-1">({locale === "fr" ? "vous" : "you"})</span>}
                   </p>
                 ) : (
-                  <p className="text-xs text-ink/30">{t.waiting[locale]}</p>
+                  <p className="text-xs text-ink/50">{t.waiting[locale]}</p>
                 )}
               </div>
             );
@@ -624,7 +640,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
         {/* Test mode */}
         {process.env.NODE_ENV === "development" && (
           <div className="mt-2 p-3 rounded-xl border border-dashed border-ink/15 space-y-2">
-            <p className="text-xs text-ink/30 text-center font-mono">🧪 Mode test</p>
+            <p className="text-xs text-ink/50 text-center font-mono">🧪 Mode test</p>
             {(game.status === "waiting_p1" || game.status === "waiting_p2") && (
               <button
                 onClick={async () => {
