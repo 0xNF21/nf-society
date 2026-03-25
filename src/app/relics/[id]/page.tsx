@@ -1,0 +1,929 @@
+"use client"
+import { useEffect, useState, useCallback, useRef } from "react"
+import { useParams } from "next/navigation"
+import { RELICS, RELIC_ORDER, GRID_SIZE, buildCellMap, placeRelic, removeRelic, canPlace, allRelicsPlaced, emptyGrid, processShot, isDefeated } from "@/lib/relics"
+import type { RelicId, Orientation, PlayerGrid } from "@/lib/relics"
+import type { RelicsGameRow } from "@/lib/db/schema/relics"
+import { useDemo } from "@/components/demo-provider"
+import { useLocale } from "@/components/language-provider"
+import { useTheme } from "@/components/theme-provider"
+import { generateGamePaymentLink } from "@/lib/circles"
+import { translations } from "@/lib/i18n"
+import Link from "next/link"
+import { ArrowLeft, RotateCcw, Copy, Check, RefreshCw, Trophy, Clock, Users, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+
+function shortenAddress(addr: string) {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
+
+// ─── Scoreboard: live recap of hits, misses, sunk relics ───
+function GameScoreboard({ myGrid, opponentGrid, locale, isDark }: {
+  myGrid: PlayerGrid | null | undefined
+  opponentGrid: PlayerGrid | null | undefined
+  locale: "fr" | "en"
+  isDark: boolean
+}) {
+  function getStats(grid: PlayerGrid | null | undefined) {
+    if (!grid) return { shots: 0, hits: 0, misses: 0, sunkCount: 0, sunkRelics: [] as RelicId[] }
+    const cellMap = buildCellMap(grid)
+    let hits = 0, misses = 0
+    for (const [r, c] of grid.shotsReceived) {
+      if (cellMap[`${r},${c}`]) hits++; else misses++
+    }
+    const sunkRelics = grid.relics.filter(r => r.sunk).map(r => r.id)
+    return { shots: grid.shotsReceived.length, hits, misses, sunkCount: sunkRelics.length, sunkRelics }
+  }
+
+  const myAttacks = getStats(opponentGrid) // my shots ON opponent
+  const oppAttacks = getStats(myGrid)      // opponent shots ON me
+
+  return (
+    <div className="w-full max-w-sm space-y-3">
+      {/* Score bars */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className={`rounded-xl p-3 ${isDark ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-emerald-50 border border-emerald-200/50"}`}>
+          <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-2">
+            {locale === "fr" ? "Mes tirs" : "My shots"}
+          </p>
+          <div className="flex items-baseline gap-3">
+            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{myAttacks.sunkCount}<span className="text-sm font-bold">/{RELIC_ORDER.length}</span></span>
+            <div className="text-[10px] text-ink/50 dark:text-white/50 space-y-0.5">
+              <p>💥 {myAttacks.hits} {locale === "fr" ? "touchés" : "hits"}</p>
+              <p>💧 {myAttacks.misses} {locale === "fr" ? "ratés" : "misses"}</p>
+            </div>
+          </div>
+        </div>
+        <div className={`rounded-xl p-3 ${isDark ? "bg-red-500/10 border border-red-500/20" : "bg-red-50 border border-red-200/50"}`}>
+          <p className="text-[10px] font-bold text-red-500 dark:text-red-400 uppercase tracking-widest mb-2">
+            {locale === "fr" ? "Tirs adverses" : "Opponent shots"}
+          </p>
+          <div className="flex items-baseline gap-3">
+            <span className="text-2xl font-black text-red-500 dark:text-red-400">{oppAttacks.sunkCount}<span className="text-sm font-bold">/{RELIC_ORDER.length}</span></span>
+            <div className="text-[10px] text-ink/50 dark:text-white/50 space-y-0.5">
+              <p>💥 {oppAttacks.hits} {locale === "fr" ? "touchés" : "hits"}</p>
+              <p>💧 {oppAttacks.misses} {locale === "fr" ? "ratés" : "misses"}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Opponent relics tracker */}
+      <div className={`rounded-xl p-3 ${isDark ? "bg-white/5 border border-white/10" : "bg-white/60 border border-ink/10"}`}>
+        <p className="text-[10px] font-bold text-ink/40 dark:text-white/40 uppercase tracking-widest mb-2">
+          {locale === "fr" ? "Reliques adverses" : "Opponent relics"}
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {RELIC_ORDER.map(rid => {
+            const oppRelic = opponentGrid?.relics.find(r => r.id === rid)
+            const isSunk = oppRelic?.sunk ?? false
+            const hitCount = oppRelic?.hitCount ?? 0
+            const size = RELICS[rid].size
+            const hasHits = hitCount > 0 && !isSunk
+            return (
+              <div key={rid} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs transition-all
+                ${isSunk
+                  ? "border-red-500/50 bg-red-500/10 dark:bg-red-500/20"
+                  : hasHits
+                    ? "border-amber-500/50 bg-amber-500/10 dark:bg-amber-500/20"
+                    : "border-ink/10 dark:border-white/10"}`}>
+                <span>{RELICS[rid].emoji}</span>
+                <span className={`font-medium ${isSunk ? "line-through text-red-500 dark:text-red-400" : hasHits ? "text-amber-600 dark:text-amber-400" : "text-ink/50 dark:text-white/50"}`}>
+                  {locale === "fr" ? RELICS[rid].name_fr : RELICS[rid].name_en}
+                </span>
+                {isSunk && <span className="text-red-500 dark:text-red-400 font-bold">✕</span>}
+                {hasHits && !isSunk && <span className="text-amber-600 dark:text-amber-400 text-[10px] font-bold">{hitCount}/{size}</span>}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* My relics tracker */}
+      <div className={`rounded-xl p-3 ${isDark ? "bg-white/5 border border-white/10" : "bg-white/60 border border-ink/10"}`}>
+        <p className="text-[10px] font-bold text-ink/40 dark:text-white/40 uppercase tracking-widest mb-2">
+          {locale === "fr" ? "Mes reliques" : "My relics"}
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {RELIC_ORDER.map(rid => {
+            const myRelic = myGrid?.relics.find(r => r.id === rid)
+            const isSunk = myRelic?.sunk ?? false
+            const hitCount = myRelic?.hitCount ?? 0
+            const size = RELICS[rid].size
+            const hasHits = hitCount > 0 && !isSunk
+            return (
+              <div key={rid} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs transition-all
+                ${isSunk
+                  ? "border-red-500/50 bg-red-500/10 dark:bg-red-500/20"
+                  : hasHits
+                    ? "border-amber-500/50 bg-amber-500/10 dark:bg-amber-500/20"
+                    : "border-ink/10 dark:border-white/10"}`}>
+                <span>{RELICS[rid].emoji}</span>
+                <span className={`font-medium ${isSunk ? "line-through text-red-500 dark:text-red-400" : hasHits ? "text-amber-600 dark:text-amber-400" : "text-ink/50 dark:text-white/50"}`}>
+                  {locale === "fr" ? RELICS[rid].name_fr : RELICS[rid].name_en}
+                </span>
+                {isSunk && <span className="text-red-500 dark:text-red-400 font-bold">✕</span>}
+                {hasHits && !isSunk && <span className="text-amber-600 dark:text-amber-400 text-[10px] font-bold">{hitCount}/{size}</span>}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Demo Relics (client-only vs bot) ───
+function DemoRelicsGame() {
+  const { locale } = useLocale()
+  const { addXp } = useDemo()
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
+  const t = translations.relics
+
+  const [phase, setPhase] = useState<"placing" | "playing" | "finished">("placing")
+  const [myGrid, setMyGrid] = useState<PlayerGrid>(emptyGrid())
+  const [botGrid, setBotGrid] = useState<PlayerGrid | null>(null)
+  const [selectedRelic, setSelectedRelic] = useState<RelicId>("crown")
+  const [orientation, setOrientation] = useState<Orientation>("H")
+  const [previewCells, setPreviewCells] = useState<[number, number][]>([])
+  const [isMyTurn, setIsMyTurn] = useState(true)
+  const [lastResult, setLastResult] = useState("")
+  const [winner, setWinner] = useState<"me" | "bot" | null>(null)
+  const [xpGained, setXpGained] = useState(0)
+  const [botThinking, setBotThinking] = useState(false)
+
+  function generateBotGrid(): PlayerGrid {
+    let grid = emptyGrid()
+    for (const rid of RELIC_ORDER) {
+      let placed = false
+      for (let attempt = 0; attempt < 200 && !placed; attempt++) {
+        const o: Orientation = Math.random() > 0.5 ? "H" : "V"
+        const r = Math.floor(Math.random() * GRID_SIZE)
+        const c = Math.floor(Math.random() * GRID_SIZE)
+        if (canPlace(grid, rid, r, c, o)) {
+          grid = placeRelic(grid, rid, r, c, o)
+          placed = true
+        }
+      }
+    }
+    return grid
+  }
+
+  function handleGridHover(row: number, col: number) {
+    if (phase !== "placing") return
+    const cells: [number, number][] = []
+    const size = RELICS[selectedRelic].size
+    for (let i = 0; i < size; i++) {
+      const r = orientation === "H" ? row : row + i
+      const c = orientation === "H" ? col + i : col
+      if (r < GRID_SIZE && c < GRID_SIZE) cells.push([r, c])
+    }
+    setPreviewCells(canPlace(myGrid, selectedRelic, row, col, orientation) ? cells : [])
+  }
+
+  function handleGridClick(row: number, col: number) {
+    if (phase !== "placing") return
+    if (!canPlace(myGrid, selectedRelic, row, col, orientation)) return
+    const newGrid = placeRelic(myGrid, selectedRelic, row, col, orientation)
+    setMyGrid(newGrid)
+    const next = RELIC_ORDER.find(rid => !newGrid.relics.some(r => r.id === rid))
+    if (next) setSelectedRelic(next)
+  }
+
+  function handleConfirmPlacement() {
+    if (!allRelicsPlaced(myGrid)) return
+    setBotGrid(generateBotGrid())
+    setPhase("playing")
+    setIsMyTurn(true)
+  }
+
+  function handleShot(row: number, col: number) {
+    if (!isMyTurn || phase !== "playing" || !botGrid) return
+    const { grid: newGrid, result } = processShot(botGrid, row, col)
+    if (result === "already_shot") return
+    setBotGrid(newGrid)
+    const msgs: Record<string, string> = { hit: t.hit[locale], miss: t.miss[locale], sunk: t.sunk[locale] }
+    setLastResult(msgs[result] ?? "")
+    setTimeout(() => setLastResult(""), 2000)
+    if (isDefeated(newGrid)) {
+      setPhase("finished")
+      setWinner("me")
+      setXpGained(addXp("relics_win"))
+      return
+    }
+    setIsMyTurn(false)
+    setBotThinking(true)
+  }
+
+  // Bot turn
+  useEffect(() => {
+    if (isMyTurn || phase !== "playing" || !botThinking) return
+    const timeout = setTimeout(() => {
+      const available: [number, number][] = []
+      for (let r = 0; r < GRID_SIZE; r++)
+        for (let c = 0; c < GRID_SIZE; c++)
+          if (!myGrid.shotsReceived.some(([sr, sc]) => sr === r && sc === c))
+            available.push([r, c])
+      if (available.length === 0) return
+      const [br, bc] = available[Math.floor(Math.random() * available.length)]
+      const { grid: newGrid, result } = processShot(myGrid, br, bc)
+      setMyGrid(newGrid)
+      if (isDefeated(newGrid)) {
+        setPhase("finished")
+        setWinner("bot")
+        setXpGained(addXp("morpion_lose"))
+      } else {
+        setIsMyTurn(true)
+      }
+      setBotThinking(false)
+    }, 800)
+    return () => clearTimeout(timeout)
+  }, [isMyTurn, phase, botThinking, myGrid])
+
+  function renderGrid(grid: PlayerGrid | null, clickable: boolean, showRelics: boolean) {
+    const cellMap = grid ? buildCellMap(grid) : {}
+    const shots = grid?.shotsReceived ?? []
+    const shotSet = new Set(shots.map(([r, c]) => `${r},${c}`))
+    return (
+      <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)` }}
+        onMouseLeave={() => setPreviewCells([])}>
+        {Array.from({ length: GRID_SIZE }, (_, r) =>
+          Array.from({ length: GRID_SIZE }, (_, c) => {
+            const key = `${r},${c}`
+            const cell = cellMap[key]
+            const isShot = shotSet.has(key)
+            const isPreview = previewCells.some(([pr, pc]) => pr === r && pc === c)
+            const isHit = isShot && !!cell
+            const isMiss = isShot && !cell
+            let bg = isDark ? "bg-white/5" : "bg-ink/5"
+            if (showRelics && cell && !isShot) bg = cell.sunk ? "bg-red-900/60" : "bg-marine/60"
+            if (isHit) bg = "bg-red-500/80"
+            if (isMiss) bg = isDark ? "bg-blue-400/30" : "bg-blue-200/50"
+            if (isPreview) bg = "bg-amber-400/40"
+            return (
+              <div key={key}
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-sm cursor-pointer border border-ink/5 dark:border-white/5 flex items-center justify-center text-xs transition-colors ${bg}`}
+                onMouseEnter={() => showRelics && handleGridHover(r, c)}
+                onClick={() => { if (showRelics) handleGridClick(r, c); if (clickable) handleShot(r, c) }}>
+                {isHit && "💥"}
+                {isMiss && "·"}
+                {showRelics && cell && !isShot && <span className="text-[10px]">{RELICS[cell.relicId].emoji}</span>}
+              </div>
+            )
+          })
+        )}
+      </div>
+    )
+  }
+
+  // Placing phase
+  if (phase === "placing") {
+    return (
+      <main className="min-h-screen flex flex-col items-center p-4 gap-6">
+        <div className="flex items-center justify-between w-full max-w-lg mt-4">
+          <Link href="/relics" className="text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition">
+            <ArrowLeft className="h-6 w-6" />
+          </Link>
+          <h1 className="font-display text-2xl font-bold text-marine dark:text-blue-400 tracking-widest">{t.placeRelics[locale]}</h1>
+          <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg font-bold">DEMO</span>
+        </div>
+
+        <div className="flex flex-wrap gap-2 justify-center">
+          {RELIC_ORDER.map(rid => {
+            const placed = myGrid.relics.some(r => r.id === rid)
+            return (
+              <button key={rid} onClick={() => setSelectedRelic(rid)}
+                className={`px-3 py-2 rounded-lg border text-sm font-medium transition
+                  ${placed ? "border-green-500/50 text-green-600 dark:text-green-400 opacity-60" : ""}
+                  ${selectedRelic === rid && !placed ? "border-marine dark:border-blue-400 text-marine dark:text-blue-400 bg-marine/10 dark:bg-blue-400/10" : "border-ink/20 dark:border-white/20 text-ink/60 dark:text-white/60"}`}>
+                {RELICS[rid].emoji} {locale === "fr" ? RELICS[rid].name_fr : RELICS[rid].name_en} ({RELICS[rid].size})
+                {placed && " ✓"}
+              </button>
+            )
+          })}
+        </div>
+
+        <button onClick={() => setOrientation(o => o === "H" ? "V" : "H")}
+          className="flex items-center gap-2 px-4 py-2 bg-ink/5 dark:bg-white/10 rounded-lg text-ink/70 dark:text-white/70 text-sm hover:bg-ink/10 dark:hover:bg-white/20 transition">
+          <RotateCcw className="h-4 w-4" />
+          {orientation === "H" ? t.orientationH[locale] : t.orientationV[locale]}
+        </button>
+
+        {renderGrid(myGrid, false, true)}
+
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setMyGrid(removeRelic(myGrid, selectedRelic))}>
+            {t.remove[locale]} {RELICS[selectedRelic].emoji}
+          </Button>
+          <Button onClick={handleConfirmPlacement} disabled={!allRelicsPlaced(myGrid)}>
+            {t.confirmPlacement[locale]}
+          </Button>
+        </div>
+      </main>
+    )
+  }
+
+  // Playing / Finished
+  return (
+    <main className="min-h-screen flex flex-col items-center p-4 gap-6">
+      <div className="flex items-center justify-between w-full max-w-lg mt-4">
+        <Link href="/relics" className="text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition">
+          <ArrowLeft className="h-6 w-6" />
+        </Link>
+        <h1 className="font-display text-2xl font-bold text-marine dark:text-blue-400 tracking-widest">RELICS</h1>
+        <div className={`px-3 py-1 rounded-full text-sm font-medium ${isMyTurn && phase === "playing" ? "bg-amber-400 text-ink" : "bg-ink/10 dark:bg-white/10 text-ink/50 dark:text-white/50"}`}>
+          {phase === "finished"
+            ? (winner === "me" ? t.victory[locale] : t.defeat[locale])
+            : isMyTurn ? t.yourTurn[locale] : t.opponentTurn[locale]}
+        </div>
+      </div>
+
+      {lastResult && <div className="text-lg font-bold text-ink dark:text-white animate-bounce">{lastResult}</div>}
+
+      {phase === "finished" && (
+        <Card className="w-full max-w-sm rounded-xl border-0 shadow-sm bg-white/60 dark:bg-white/5 backdrop-blur-sm">
+          <CardContent className="py-4 text-center">
+            {winner === "me" ? (
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-2"><Trophy className="w-5 h-5 text-citrus" /><span className="font-bold text-ink dark:text-white">{t.victory[locale]}</span></div>
+                {xpGained > 0 && <span className="text-xs text-emerald-600 font-bold">+{xpGained} XP</span>}
+              </div>
+            ) : (
+              <div><p className="text-2xl">🤖</p><p className="font-bold text-ink dark:text-white text-sm">{t.defeat[locale]}</p>
+                {xpGained > 0 && <p className="text-xs text-emerald-600 font-bold">+{xpGained} XP</p>}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Scoreboard */}
+      <GameScoreboard myGrid={myGrid} opponentGrid={botGrid} locale={locale} isDark={isDark} />
+
+      <div className="flex flex-col items-center gap-2">
+        <p className="text-ink/50 dark:text-white/50 text-xs uppercase tracking-widest">{t.opponentGrid[locale]}</p>
+        {renderGrid(botGrid, isMyTurn && phase === "playing", false)}
+      </div>
+
+      <div className="flex flex-col items-center gap-2">
+        <p className="text-ink/50 dark:text-white/50 text-xs uppercase tracking-widest">{t.yourGrid[locale]}</p>
+        {renderGrid(myGrid, false, true)}
+      </div>
+
+      {phase === "finished" && (
+        <Link href="/relics">
+          <Button className="rounded-xl font-bold mt-2" style={{ background: "#251B9F" }}>
+            {locale === "fr" ? "Rejouer" : "Play again"}
+          </Button>
+        </Link>
+      )}
+    </main>
+  )
+}
+
+// ─── Real Relics Game (multiplayer with payment) ───
+function RealRelicsGame({ id }: { id: string }) {
+  const { locale } = useLocale()
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
+  const t = translations.relics
+
+  const [game, setGame] = useState<RelicsGameRow | null>(null)
+  const [myAddress, setMyAddress] = useState("")
+  const [addressInput, setAddressInput] = useState("")
+  const [addressConfirmed, setAddressConfirmed] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [scanning, setScanning] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
+  const [isCreator, setIsCreator] = useState(false)
+  const [error, setError] = useState("")
+  const [lastResult, setLastResult] = useState("")
+  const [profiles, setProfiles] = useState<Record<string, { name: string; imageUrl: string | null }>>({})
+  const [qrCode, setQrCode] = useState("")
+  const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle")
+
+  // Placement state
+  const [myGrid, setMyGrid] = useState<PlayerGrid>(emptyGrid())
+  const [selectedRelic, setSelectedRelic] = useState<RelicId>("crown")
+  const [orientation, setOrientation] = useState<Orientation>("H")
+  const [previewCells, setPreviewCells] = useState<[number, number][]>([])
+
+  const pollRef = useRef<NodeJS.Timeout | null>(null)
+  const scanRef = useRef<NodeJS.Timeout | null>(null)
+
+  const fetchGame = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/relics?id=${id}`)
+      if (res.ok) setGame(await res.json())
+    } catch {}
+    setLoading(false)
+  }, [id])
+
+  const scanPayments = useCallback(async () => {
+    if (scanning) return
+    setScanning(true)
+    try {
+      await fetch(`/api/relics-scan?gameId=${id}`, { method: "POST" })
+      await fetchGame()
+    } catch {}
+    setScanning(false)
+  }, [id, scanning, fetchGame])
+
+  useEffect(() => {
+    setIsCreator(sessionStorage.getItem(`relics_creator_${id}`) === "1")
+  }, [id])
+
+  // Fetch profiles
+  useEffect(() => {
+    if (!game) return
+    const addresses = [game.player1Address, game.player2Address].filter(Boolean) as string[]
+    if (addresses.length === 0) return
+    const unknown = addresses.filter(a => !profiles[a.toLowerCase()])
+    if (unknown.length === 0) return
+    fetch("/api/profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ addresses: unknown }),
+    }).then(r => r.json()).then(data => {
+      if (data.profiles) setProfiles(prev => ({ ...prev, ...data.profiles }))
+    }).catch(() => {})
+  }, [game?.player1Address, game?.player2Address])
+
+  // Polling
+  useEffect(() => {
+    fetchGame()
+    pollRef.current = setInterval(fetchGame, 2000)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [fetchGame])
+
+  // Auto-scan payments
+  useEffect(() => {
+    if (!game) return
+    if (game.status === "placing" || game.status === "playing" || game.status === "finished") {
+      if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null }
+      return
+    }
+    if (!scanRef.current) scanRef.current = setInterval(scanPayments, 5000)
+    return () => { if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null } }
+  }, [game?.status, scanPayments])
+
+  // Generate QR code when in payment phase
+  useEffect(() => {
+    if (!game || (game.status !== "waiting_p1" && game.status !== "waiting_p2")) return
+    let active = true
+    setQrState("loading")
+    ;(async () => {
+      try {
+        const { toDataURL } = await import("qrcode")
+        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug)
+        const url = await toDataURL(link, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } })
+        if (active) { setQrCode(url); setQrState("ready") }
+      } catch {
+        if (active) { setQrCode(""); setQrState("error") }
+      }
+    })()
+    return () => { active = false }
+  }, [game?.status, game?.recipientAddress, game?.betCrc, game?.slug])
+
+  function copyPaymentLink() {
+    if (!game) return
+    const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug)
+    navigator.clipboard.writeText(link)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  function copyGameLink() {
+    navigator.clipboard.writeText(window.location.href)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2000)
+  }
+
+  // Placement handlers
+  function handleGridHover(row: number, col: number) {
+    const cells: [number, number][] = []
+    const size = RELICS[selectedRelic].size
+    for (let i = 0; i < size; i++) {
+      const r = orientation === "H" ? row : row + i
+      const c = orientation === "H" ? col + i : col
+      if (r < GRID_SIZE && c < GRID_SIZE) cells.push([r, c])
+    }
+    setPreviewCells(canPlace(myGrid, selectedRelic, row, col, orientation) ? cells : [])
+  }
+
+  function handleGridClick(row: number, col: number) {
+    if (!canPlace(myGrid, selectedRelic, row, col, orientation)) return
+    const newGrid = placeRelic(myGrid, selectedRelic, row, col, orientation)
+    setMyGrid(newGrid)
+    const next = RELIC_ORDER.find(rid => !newGrid.relics.some(r => r.id === rid))
+    if (next) setSelectedRelic(next)
+  }
+
+  async function handleConfirmPlacement() {
+    if (!allRelicsPlaced(myGrid)) return setError(t.placeAll[locale])
+    const res = await fetch("/api/relics/place", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, player: myAddress, grid: myGrid }),
+    })
+    const data = await res.json()
+    if (!data.ok) setError(data.error ?? "Erreur")
+    else { setError(""); fetchGame() }
+  }
+
+  async function handleShot(row: number, col: number) {
+    if (!myAddress || !game || game.status !== "playing") return
+    if (game.currentTurn?.toLowerCase() !== myAddress.toLowerCase()) return
+    const res = await fetch("/api/relics/shot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, player: myAddress, row, col }),
+    })
+    const data = await res.json()
+    if (data.result) {
+      const msgs: Record<string, string> = { hit: t.hit[locale], miss: t.miss[locale], sunk: t.sunk[locale] }
+      setLastResult(msgs[data.result] ?? "")
+      setTimeout(() => setLastResult(""), 2000)
+    }
+    if (data.error) setError(data.error)
+    fetchGame()
+  }
+
+  function renderGrid(grid: PlayerGrid | null | undefined, clickable: boolean, showRelics: boolean, placingMode?: boolean) {
+    const cellMap = grid ? buildCellMap(grid) : {}
+    const shots = grid?.shotsReceived ?? []
+    const shotSet = new Set(shots.map(([r, c]) => `${r},${c}`))
+    return (
+      <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)` }}
+        onMouseLeave={() => setPreviewCells([])}>
+        {Array.from({ length: GRID_SIZE }, (_, r) =>
+          Array.from({ length: GRID_SIZE }, (_, c) => {
+            const key = `${r},${c}`
+            const cell = cellMap[key]
+            const isShot = shotSet.has(key)
+            const isPreview = previewCells.some(([pr, pc]) => pr === r && pc === c)
+            const isHit = isShot && !!cell
+            const isMiss = isShot && !cell
+            let bg = isDark ? "bg-white/5" : "bg-ink/5"
+            if (showRelics && cell && !isShot) bg = cell.sunk ? "bg-red-900/60" : "bg-marine/60"
+            if (isHit) bg = "bg-red-500/80"
+            if (isMiss) bg = isDark ? "bg-blue-400/30" : "bg-blue-200/50"
+            if (isPreview) bg = "bg-amber-400/40"
+            return (
+              <div key={key}
+                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-sm cursor-pointer border border-ink/5 dark:border-white/5 flex items-center justify-center text-xs transition-colors ${bg}`}
+                onMouseEnter={() => placingMode && handleGridHover(r, c)}
+                onClick={() => { if (placingMode) handleGridClick(r, c); if (clickable) handleShot(r, c) }}>
+                {isHit && "💥"}
+                {isMiss && "·"}
+                {showRelics && cell && !isShot && <span className="text-[10px]">{RELICS[cell.relicId].emoji}</span>}
+              </div>
+            )
+          })
+        )}
+      </div>
+    )
+  }
+
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm space-y-4">
+        <div className="h-16 rounded-xl bg-ink/[0.08] dark:bg-white/[0.08] animate-pulse" />
+        <div className="h-64 rounded-2xl bg-ink/[0.08] dark:bg-white/[0.08] animate-pulse" />
+      </div>
+    </div>
+  )
+
+  if (!game) {
+    // If ID looks like a demo game, keep loading (parent will switch to DemoRelicsGame)
+    if (id.startsWith("DEMO")) return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm space-y-4">
+          <div className="h-16 rounded-xl bg-ink/[0.08] dark:bg-white/[0.08] animate-pulse" />
+          <div className="h-64 rounded-2xl bg-ink/[0.08] dark:bg-white/[0.08] animate-pulse" />
+        </div>
+      </div>
+    )
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <p className="text-ink/50 dark:text-white/50">{locale === "fr" ? "Partie introuvable" : "Game not found"}</p>
+        <Link href="/relics"><Button variant="outline" className="rounded-xl">← {t.title[locale]}</Button></Link>
+      </div>
+    )
+  }
+
+  const isP1 = myAddress && game.player1Address?.toLowerCase() === myAddress.toLowerCase()
+  const isP2 = myAddress && game.player2Address?.toLowerCase() === myAddress.toLowerCase()
+  const myGridServer = isP1 ? game.grid1 : isP2 ? game.grid2 : null
+  const opponentGrid = isP1 ? game.grid2 : isP2 ? game.grid1 : null
+  const isMyTurn = myAddress && game.currentTurn?.toLowerCase() === myAddress.toLowerCase()
+  const isPlacing = game.status === "placing"
+  const isPlaying = game.status === "playing"
+  const isFinished = game.status === "finished"
+  const isWaiting = game.status === "waiting_p1" || game.status === "waiting_p2"
+  const winAmount = Math.floor(game.betCrc * 2 * (1 - game.commissionPct / 100))
+  const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug)
+
+  return (
+    <div className="min-h-screen flex flex-col items-center px-4 py-6">
+      <div className="w-full max-w-sm">
+
+        {/* Back + Game ID */}
+        <div className="flex items-center justify-between mb-6">
+          <Link href="/relics" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4" /> {t.title[locale]}
+          </Link>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-ink/40 dark:text-white/40">{locale === "fr" ? "Partie" : "Game"}</span>
+            <span className="font-mono font-bold text-marine dark:text-blue-400 text-sm bg-marine/10 dark:bg-blue-400/10 px-2.5 py-1 rounded-lg">{game.slug}</span>
+          </div>
+        </div>
+
+        {/* Status banner */}
+        <Card className="mb-4 rounded-xl border-0 shadow-sm bg-white/60 dark:bg-white/5 backdrop-blur-sm">
+          <CardContent className="p-0 overflow-hidden text-center">
+            {game.status === "waiting_p1" && (
+              <div className="flex items-center justify-center gap-2 text-ink/60 dark:text-white/60 py-3 px-4">
+                <Clock className="w-4 h-4" />
+                <span className="text-sm font-semibold">{t.payToStart[locale]}</span>
+              </div>
+            )}
+            {game.status === "waiting_p2" && (
+              <div className="flex items-center justify-center gap-2 text-ink/60 dark:text-white/60 py-3 px-4">
+                <Users className="w-4 h-4" />
+                <span className="text-sm font-semibold">{t.waitingP2[locale]}</span>
+              </div>
+            )}
+            {isPlacing && (
+              <div className="flex items-center justify-center gap-2 py-3 px-4">
+                <span className="text-sm font-semibold text-ink dark:text-white">{t.placeRelics[locale]}</span>
+              </div>
+            )}
+            {isPlaying && (
+              <div className="flex items-center justify-center gap-2 py-3 px-4">
+                <span className="text-lg font-bold text-ink dark:text-white">
+                  {isMyTurn ? t.yourTurn[locale] : t.opponentTurn[locale]}
+                </span>
+              </div>
+            )}
+            {isFinished && (
+              <div className="space-y-1 py-3 px-4">
+                <div className="flex items-center justify-center gap-2">
+                  <Trophy className="w-5 h-5 text-citrus" />
+                  <span className="font-bold text-ink dark:text-white">
+                    {game.winnerAddress?.toLowerCase() === myAddress.toLowerCase() ? t.victory[locale] : t.defeat[locale]}
+                  </span>
+                </div>
+                <p className="text-xs text-ink/50 dark:text-white/50">{winAmount} CRC</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Payment section */}
+        {isWaiting && (
+          <Card className="mb-4 bg-white/60 dark:bg-white/5 backdrop-blur-sm border-ink/10 dark:border-white/10 shadow-sm rounded-2xl">
+            <CardContent className="pt-2 px-4 pb-4 space-y-3">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <span className="text-xs font-semibold text-ink/40 dark:text-white/40 uppercase tracking-widest">
+                  {isCreator ? t.payToStart[locale] : t.payToJoin[locale]}
+                </span>
+                <span className="text-xs font-bold text-marine dark:text-blue-400 bg-marine/10 dark:bg-blue-400/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{game.betCrc} CRC</span>
+              </div>
+              <a href={paymentLink} target="_blank" rel="noreferrer">
+                <Button className="w-full rounded-xl font-bold" style={{ background: "#251B9F" }}>
+                  {t.payCrc[locale].replace("{bet}", String(game.betCrc))}
+                </Button>
+              </a>
+              <div className={`grid gap-2 ${isCreator && game.status === "waiting_p1" ? "grid-cols-2" : "grid-cols-1"}`}>
+                <Button variant="outline" size="sm" onClick={copyPaymentLink} className="rounded-xl text-xs border-ink/15 dark:border-white/15 gap-1.5">
+                  {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? t.copied[locale] : t.copyPayLink[locale]}
+                </Button>
+                {isCreator && game.status === "waiting_p1" && (
+                  <Button variant="outline" size="sm" onClick={copyGameLink} className="rounded-xl text-xs border-ink/15 dark:border-white/15 gap-1.5">
+                    {copiedLink ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedLink ? t.copied[locale] : t.inviteP2[locale]}
+                  </Button>
+                )}
+              </div>
+              {/* QR Code */}
+              <div className="flex justify-center">
+                <div className="bg-white rounded-2xl p-4 shadow-lg border border-ink/5">
+                  {qrState === "loading" && (
+                    <div className="w-[220px] h-[220px] flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-ink/20" />
+                    </div>
+                  )}
+                  {qrState === "ready" && qrCode && <img src={qrCode} alt="QR Code" className="w-[220px] h-[220px]" />}
+                  {qrState === "error" && (
+                    <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">QR Error</div>
+                  )}
+                  <p className="text-xs text-ink/40 dark:text-white/40 mt-2 text-center">
+                    {locale === "fr" ? "Scannez pour ouvrir dans Gnosis App" : "Scan to open in Gnosis App"}
+                  </p>
+                </div>
+              </div>
+
+              <button onClick={scanPayments} disabled={scanning}
+                className="w-full text-xs text-ink/40 dark:text-white/40 hover:text-ink/60 dark:hover:text-white/60 flex items-center justify-center gap-1.5 transition-colors">
+                <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
+                {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
+              </button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Address input — when game is active */}
+        {(isPlacing || isPlaying) && !addressConfirmed && (
+          <Card className="mb-4 bg-white/60 dark:bg-white/5 backdrop-blur-sm border-ink/10 dark:border-white/10 shadow-sm rounded-2xl">
+            <CardContent className="p-4 space-y-2">
+              <p className="text-xs font-semibold text-ink/40 dark:text-white/40 uppercase tracking-widest">{t.yourAddress[locale]}</p>
+              <div className="flex gap-2">
+                <input type="text" placeholder="0x..." value={addressInput}
+                  onChange={(e) => setAddressInput(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-xl border border-ink/10 dark:border-white/10 bg-white/80 dark:bg-white/5 text-ink dark:text-white text-xs font-mono focus:outline-none focus:border-marine/40" />
+                <Button size="sm" onClick={() => { setMyAddress(addressInput.trim().toLowerCase()); setAddressConfirmed(true) }}
+                  className="rounded-xl px-4 text-xs" style={{ background: "#251B9F" }}>
+                  OK
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Placement phase */}
+        {isPlacing && addressConfirmed && (
+          <>
+            <div className="flex flex-wrap gap-2 justify-center mb-4">
+              {RELIC_ORDER.map(rid => {
+                const placed = myGrid.relics.some(r => r.id === rid)
+                return (
+                  <button key={rid} onClick={() => setSelectedRelic(rid)}
+                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition
+                      ${placed ? "border-green-500/50 text-green-600 dark:text-green-400 opacity-60" : ""}
+                      ${selectedRelic === rid && !placed ? "border-marine dark:border-blue-400 text-marine dark:text-blue-400 bg-marine/10 dark:bg-blue-400/10" : "border-ink/20 dark:border-white/20 text-ink/60 dark:text-white/60"}`}>
+                    {RELICS[rid].emoji} {locale === "fr" ? RELICS[rid].name_fr : RELICS[rid].name_en} ({RELICS[rid].size})
+                    {placed && " ✓"}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex justify-center mb-4">
+              <button onClick={() => setOrientation(o => o === "H" ? "V" : "H")}
+                className="flex items-center gap-2 px-4 py-2 bg-ink/5 dark:bg-white/10 rounded-lg text-ink/70 dark:text-white/70 text-sm hover:bg-ink/10 dark:hover:bg-white/20 transition">
+                <RotateCcw className="h-4 w-4" />
+                {orientation === "H" ? t.orientationH[locale] : t.orientationV[locale]}
+              </button>
+            </div>
+            <div className="flex justify-center mb-4">
+              {renderGrid(myGrid, false, true, true)}
+            </div>
+            <div className="flex gap-3 justify-center mb-4">
+              <Button variant="outline" onClick={() => setMyGrid(removeRelic(myGrid, selectedRelic))}>
+                {t.remove[locale]} {RELICS[selectedRelic].emoji}
+              </Button>
+              <Button onClick={handleConfirmPlacement} disabled={!allRelicsPlaced(myGrid)}>
+                {t.confirmPlacement[locale]}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Playing/Finished grids */}
+        {(isPlaying || isFinished) && addressConfirmed && (
+          <>
+            {lastResult && <div className="text-lg font-bold text-ink dark:text-white animate-bounce text-center mb-2">{lastResult}</div>}
+
+            {/* Scoreboard */}
+            <GameScoreboard myGrid={myGridServer as PlayerGrid | null} opponentGrid={opponentGrid as PlayerGrid | null} locale={locale} isDark={isDark} />
+
+            <div className="flex flex-col items-center gap-2 mb-4">
+              <p className="text-ink/50 dark:text-white/50 text-xs uppercase tracking-widest">{t.opponentGrid[locale]}</p>
+              {renderGrid(opponentGrid as PlayerGrid | null, !!(isMyTurn && isPlaying), false)}
+            </div>
+
+            <div className="flex flex-col items-center gap-2 mb-4">
+              <p className="text-ink/50 dark:text-white/50 text-xs uppercase tracking-widest">{t.yourGrid[locale]}</p>
+              {renderGrid(myGridServer as PlayerGrid | null, false, true)}
+            </div>
+          </>
+        )}
+
+        {/* Placing waiting notice */}
+        {isPlacing && !addressConfirmed && (
+          <p className="text-center text-sm text-ink/50 dark:text-white/50 mt-4">{t.enterAddress[locale]}</p>
+        )}
+
+        {/* Players */}
+        {(isPlacing || isPlaying || isFinished) && (
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {[
+              { label: "J1", addr: game.player1Address },
+              { label: "J2", addr: game.player2Address },
+            ].map(({ label, addr }) => {
+              const isMe = !!myAddress && addr?.toLowerCase() === myAddress.toLowerCase()
+              const profile = addr ? profiles[addr.toLowerCase()] : undefined
+              return (
+                <div key={label} className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-ink/10 dark:border-white/10 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-ink/40 dark:text-white/40 uppercase tracking-widest mb-1.5">{label}</p>
+                  <div className="flex items-center gap-2">
+                    {addr ? (
+                      <>
+                        {profile?.imageUrl ? (
+                          <img src={profile.imageUrl} alt={profile.name} className="w-7 h-7 rounded-full object-cover border border-ink/10 dark:border-white/10" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-marine/20 dark:bg-blue-400/20 flex items-center justify-center text-xs text-marine dark:text-blue-400 font-bold">{label.slice(1)}</div>
+                        )}
+                        <div>
+                          <span className="text-xs font-semibold text-ink/70 dark:text-white/70 block leading-tight">{profile?.name || shortenAddress(addr)}</span>
+                          {isMe && <span className="text-[10px] text-ink/50 dark:text-white/50">{locale === "fr" ? "vous" : "you"}</span>}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-ink/10 dark:bg-white/10 flex items-center justify-center text-xs text-ink/50 dark:text-white/50 animate-pulse">?</div>
+                        <span className="text-xs text-ink/50 dark:text-white/50">{t.waiting[locale]}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Test mode — dev only */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-2 p-3 rounded-xl border border-dashed border-ink/15 dark:border-white/15 space-y-2">
+            <p className="text-xs text-ink/50 dark:text-white/50 text-center font-mono">Test mode</p>
+            {isWaiting && (
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={async () => {
+                  await fetch(`/api/relics/${id}/test`, { method: "POST" })
+                  setMyAddress("0xtest000000000000000000000000000000000001")
+                  setAddressConfirmed(true)
+                  await fetchGame()
+                }} className="py-1.5 rounded-lg bg-ink/5 dark:bg-white/10 text-xs text-ink/40 dark:text-white/40 hover:text-ink/60 dark:hover:text-white/60 transition-all">
+                  {locale === "fr" ? "Injecter joueurs" : "Inject players"}
+                </button>
+                <button onClick={async () => {
+                  await fetch(`/api/relics/${id}/test?mode=skip`, { method: "POST" })
+                  setMyAddress("0xtest000000000000000000000000000000000001")
+                  setAddressConfirmed(true)
+                  await fetchGame()
+                }} className="py-1.5 rounded-lg bg-emerald-500/10 text-xs text-emerald-500 font-bold hover:bg-emerald-500/20 transition-all">
+                  {locale === "fr" ? "Passer au jeu" : "Skip to game"}
+                </button>
+              </div>
+            )}
+            {(isPlacing || isPlaying) && game.player1Address && game.player2Address && (
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => { setMyAddress(game.player1Address!.toLowerCase()); setAddressConfirmed(true) }}
+                  className={`py-1.5 rounded-lg text-xs font-bold transition-all ${myAddress === game.player1Address?.toLowerCase() ? "bg-marine/20 text-marine ring-2 ring-marine/40" : "bg-marine/10 text-marine hover:bg-marine/20"}`}>
+                  J1 {myAddress === game.player1Address?.toLowerCase() ? "●" : ""}
+                </button>
+                <button onClick={() => { setMyAddress(game.player2Address!.toLowerCase()); setAddressConfirmed(true) }}
+                  className={`py-1.5 rounded-lg text-xs font-bold transition-all ${myAddress === game.player2Address?.toLowerCase() ? "bg-citrus/20 text-citrus ring-2 ring-citrus/40" : "bg-citrus/10 text-citrus hover:bg-citrus/20"}`}>
+                  J2 {myAddress === game.player2Address?.toLowerCase() ? "●" : ""}
+                </button>
+              </div>
+            )}
+            {isPlacing && addressConfirmed && (
+              <button onClick={async () => {
+                await fetch(`/api/relics/${id}/test?mode=skip`, { method: "POST" })
+                await fetchGame()
+              }} className="w-full py-1.5 rounded-lg bg-emerald-500/10 text-xs text-emerald-500 font-bold hover:bg-emerald-500/20 transition-all">
+                {locale === "fr" ? "Passer au jeu (auto-place)" : "Skip to game (auto-place)"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {error && <p className="text-red-500 text-sm text-center mt-2">{error}</p>}
+
+        {isFinished && (
+          <Link href="/relics" className="block mt-4">
+            <Button className="w-full rounded-xl font-bold" style={{ background: "#251B9F" }}>
+              {locale === "fr" ? "Rejouer" : "Play again"}
+            </Button>
+          </Link>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function RelicsGamePage() {
+  const { id } = useParams<{ id: string }>()
+  const { isDemo } = useDemo()
+
+  if (isDemo && id.startsWith("DEMO")) {
+    return <DemoRelicsGame />
+  }
+
+  return <RealRelicsGame id={id} />
+}

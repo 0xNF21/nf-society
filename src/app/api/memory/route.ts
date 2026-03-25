@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { memoryGames } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-function generateSlug(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let slug = "";
-  for (let i = 0; i < 6; i++) slug += chars[Math.floor(Math.random() * chars.length)];
-  return slug;
-}
+import { generateGameCode } from "@/lib/utils";
 
 function generateGridSeed(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -34,13 +28,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No recipient address configured" }, { status: 500 });
     }
 
-    let slug = generateSlug();
+    let slug = generateGameCode();
     let attempts = 0;
     while (attempts < 10) {
       const existing = await db.select().from(memoryGames)
         .where(eq(memoryGames.slug, slug)).limit(1);
       if (existing.length === 0) break;
-      slug = generateSlug();
+      slug = generateGameCode();
       attempts++;
     }
 

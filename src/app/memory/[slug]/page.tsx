@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Copy, Check, RefreshCw, Trophy, Clock, Users, Brain } from "lucide-react";
+import { ArrowLeft, Copy, Check, RefreshCw, Trophy, Clock, Users, Brain, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { generateGamePaymentLink } from "@/lib/circles";
@@ -297,6 +297,8 @@ function RealMemoryGame({ slug }: { slug: string }) {
   const [isCreator, setIsCreator] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, { name: string; imageUrl: string | null }>>({});
+  const [qrCode, setQrCode] = useState("");
+  const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [flipping, setFlipping] = useState(false);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -365,6 +367,24 @@ function RealMemoryGame({ slug }: { slug: string }) {
     if (!scanRef.current) scanRef.current = setInterval(scanPayments, 5000);
     return () => { if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null; } };
   }, [game?.status, scanPayments]);
+
+  // Generate QR code when in payment phase
+  useEffect(() => {
+    if (!game || (game.status !== "waiting_p1" && game.status !== "waiting_p2")) return;
+    let active = true;
+    setQrState("loading");
+    (async () => {
+      try {
+        const { toDataURL } = await import("qrcode");
+        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "memory", game.slug);
+        const url = await toDataURL(link, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } });
+        if (active) { setQrCode(url); setQrState("ready"); }
+      } catch {
+        if (active) { setQrCode(""); setQrState("error"); }
+      }
+    })();
+    return () => { active = false; };
+  }, [game?.status, game?.recipientAddress, game?.betCrc, game?.slug]);
 
   const isP1 = myAddress && game?.player1Address?.toLowerCase() === myAddress.toLowerCase();
   const isP2 = myAddress && game?.player2Address?.toLowerCase() === myAddress.toLowerCase();
@@ -527,6 +547,24 @@ function RealMemoryGame({ slug }: { slug: string }) {
                   </Button>
                 )}
               </div>
+              {/* QR Code */}
+              <div className="flex justify-center">
+                <div className="bg-white rounded-2xl p-4 shadow-lg border border-ink/5">
+                  {qrState === "loading" && (
+                    <div className="w-[220px] h-[220px] flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-ink/20" />
+                    </div>
+                  )}
+                  {qrState === "ready" && qrCode && <img src={qrCode} alt="QR Code" className="w-[220px] h-[220px]" />}
+                  {qrState === "error" && (
+                    <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">QR Error</div>
+                  )}
+                  <p className="text-xs text-ink/40 mt-2 text-center">
+                    {locale === "fr" ? "Scannez pour ouvrir dans Gnosis App" : "Scan to open in Gnosis App"}
+                  </p>
+                </div>
+              </div>
+
               <button onClick={scanPayments} disabled={scanning} className="w-full text-xs text-ink/40 hover:text-ink/60 flex items-center justify-center gap-1.5 transition-colors">
                 <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
                 {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}

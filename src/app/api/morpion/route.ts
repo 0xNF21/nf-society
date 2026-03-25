@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { morpionGames } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-function generateSlug(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let slug = "";
-  for (let i = 0; i < 6; i++) slug += chars[Math.floor(Math.random() * chars.length)];
-  return slug;
-}
+import { generateGameCode } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,13 +19,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate unique slug
-    let slug = generateSlug();
+    let slug = generateGameCode();
     let attempts = 0;
     while (attempts < 10) {
       const existing = await db.select().from(morpionGames)
         .where(eq(morpionGames.slug, slug)).limit(1);
       if (existing.length === 0) break;
-      slug = generateSlug();
+      slug = generateGameCode();
       attempts++;
     }
 

@@ -262,3 +262,9 @@ export const shopCoupons = pgTable("shop_coupons", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(),
 });
+
+export { relicsGames } from "./schema/relics";
+export type { RelicsGameRow, NewRelicsGame } from "./schema/relics";
+
+export { damesGames } from "./schema/dames";
+export type { DamesGameRow, NewDamesGame } from "./schema/dames";

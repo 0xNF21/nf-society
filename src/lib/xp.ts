@@ -28,6 +28,10 @@ export const XP_REWARDS: Record<string, number> = {
   daily_scratch:      5,
   daily_spin:         5,
   streak_7days:      50,
+  dames_win:         20,
+  dames_lose:         5,
+  relics_win:        20,
+  relics_lose:        5,
 };
 
 export function computeLevel(xp: number): number {

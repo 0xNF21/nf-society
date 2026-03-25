@@ -5,6 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Generate a short, uppercase game code (e.g. "44JQ7N").
+ * Uses unambiguous characters only (no 0/O/I/1/L confusion).
+ * All games should use this for consistent code format.
+ */
+const GAME_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export function generateGameCode(length = 6): string {
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += GAME_CODE_CHARS[Math.floor(Math.random() * GAME_CODE_CHARS.length)];
+  }
+  return code;
+}
+
 function parseHex(hex: string): [number, number, number] | null {
   const c = hex.replace("#", "");
   if (c.length < 6) return null;

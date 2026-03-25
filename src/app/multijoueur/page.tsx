@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ArrowLeft, Gamepad2, Brain } from "lucide-react";
+import { ArrowRight, ArrowLeft, Gamepad2, Brain, Sword } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
@@ -68,6 +68,44 @@ export default function MultiplayerPage() {
               </p>
               <span className="mt-auto flex items-center gap-2 text-sm font-semibold text-pink-500 group-hover:gap-3 transition-all">
                 {translations.landingMemory.action[locale]}
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </Link>
+
+            <Link
+              href="/relics"
+              className="group relative rounded-3xl border-2 border-ink/5 bg-white/80 backdrop-blur-sm p-8 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex flex-col items-center text-center gap-4"
+            >
+              <div className="h-16 w-16 rounded-2xl bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                <Sword className="h-8 w-8 text-emerald-500" />
+              </div>
+              <h2 className="font-display text-2xl font-bold text-ink">
+                {translations.landingRelics.title[locale]}
+              </h2>
+              <p className="text-sm text-ink/50 leading-relaxed">
+                {translations.landingRelics.desc[locale]}
+              </p>
+              <span className="mt-auto flex items-center gap-2 text-sm font-semibold text-emerald-500 group-hover:gap-3 transition-all">
+                {translations.landingRelics.action[locale]}
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </Link>
+
+            <Link
+              href="/dames"
+              className="group relative rounded-3xl border-2 border-ink/5 bg-white/80 backdrop-blur-sm p-8 shadow-sm hover:shadow-xl hover:border-amber-200 transition-all duration-300 flex flex-col items-center text-center gap-4"
+            >
+              <div className="h-16 w-16 rounded-2xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors text-3xl">
+                ♟️
+              </div>
+              <h2 className="font-display text-2xl font-bold text-ink">
+                {translations.landingDames.title[locale]}
+              </h2>
+              <p className="text-sm text-ink/50 leading-relaxed">
+                {translations.landingDames.desc[locale]}
+              </p>
+              <span className="mt-auto flex items-center gap-2 text-sm font-semibold text-amber-500 group-hover:gap-3 transition-all">
+                {translations.landingDames.action[locale]}
                 <ArrowRight className="h-4 w-4" />
               </span>
             </Link>
