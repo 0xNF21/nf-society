@@ -57,7 +57,36 @@ export async function runDailyScan(): Promise<number> {
       ))
       .limit(1);
 
-    if (existing) continue;
+    if (existing) {
+      // User already played today but with a different session token
+      // Link this new session to their existing confirmed session data
+      const [confirmedSession] = await db
+        .select()
+        .from(dailySessions)
+        .where(eq(dailySessions.id, existing.id))
+        .limit(1);
+      if (confirmedSession && confirmedSession.address) {
+        await db.update(dailySessions).set({
+          address: confirmedSession.address,
+          txHash: confirmedSession.txHash,
+          scratchPlayed: confirmedSession.scratchPlayed,
+          scratchResult: confirmedSession.scratchResult,
+          spinPlayed: confirmedSession.spinPlayed,
+          spinResult: confirmedSession.spinResult,
+        }).where(eq(dailySessions.id, session.id));
+        // Mark tx as claimed so we don't reprocess
+        await db.insert(claimedPayments).values({
+          txHash,
+          gameType: "daily",
+          gameId: session.id,
+          playerAddress,
+          amountCrc: 1,
+        }).onConflictDoNothing();
+        globalClaimed.add(txHash);
+        processed++;
+      }
+      continue;
+    }
 
     try {
       await db.update(dailySessions).set({
