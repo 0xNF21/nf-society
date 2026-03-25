@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { keccakHex } from "./hash";
 import { db } from "./db";
 import { jackpotPool } from "./db/schema";
-import { sql } from "drizzle-orm";
+import { sql, and } from "drizzle-orm";
 import { getSafeCrcBalance } from "./payout";
 import { ethers } from "ethers";
 
@@ -147,7 +147,10 @@ export async function getJackpotInfo(): Promise<{
       contributors: sql<number>`COUNT(DISTINCT ${jackpotPool.address})`,
     })
     .from(jackpotPool)
-    .where(sql`${jackpotPool.date} >= ${monthStart} AND ${jackpotPool.date} <= ${monthEnd}`);
+    .where(and(
+      sql`${jackpotPool.date} >= ${monthStart}`,
+      sql`${jackpotPool.date} <= ${monthEnd}`,
+    ));
 
   const total = Number(result[0]?.total ?? 0);
   const contributors = Number(result[0]?.contributors ?? 0);
