@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { todayString } from "@/lib/daily";
+import { runDailyScan } from "@/lib/daily-scan";
 
 const SESSION_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
@@ -46,10 +47,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "expired" });
     }
 
-    // Trigger scan inline
+    // Trigger scan inline (direct call, no HTTP self-request)
     try {
-      const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      await fetch(`${base}/api/daily/scan`, { method: "POST" });
+      await runDailyScan();
     } catch { /* scan fail silencieux */ }
 
     // Re-check this session after scan
