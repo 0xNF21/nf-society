@@ -2,11 +2,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Copy, Check, RefreshCw, Trophy, Clock, Users } from "lucide-react";
+import { ArrowLeft, Copy, Check, RefreshCw, Trophy, Clock, Users, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { generateGamePaymentLink } from "@/lib/circles";
 import { useLocale } from "@/components/language-provider";
+import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 
@@ -51,8 +52,8 @@ function PlayerBadge({ addr, profile, symbol, isMe, waitingLabel, youLabel }: {
 }) {
   if (!addr) return (
     <div className="flex items-center gap-2">
-      <div className="w-7 h-7 rounded-full bg-ink/10 flex items-center justify-center text-xs text-ink/30 animate-pulse">?</div>
-      <span className="text-xs text-ink/30">{waitingLabel}</span>
+      <div className="w-7 h-7 rounded-full bg-ink/10 flex items-center justify-center text-xs text-ink/50 animate-pulse">?</div>
+      <span className="text-xs text-ink/50">{waitingLabel}</span>
     </div>
   );
   const name = profile?.name || shortenAddress(addr);
@@ -67,7 +68,7 @@ function PlayerBadge({ addr, profile, symbol, isMe, waitingLabel, youLabel }: {
       )}
       <div>
         <span className="text-xs font-semibold text-ink/70 block leading-tight">{name}</span>
-        {isMe && <span className="text-[10px] text-ink/30">{youLabel}</span>}
+        {isMe && <span className="text-[10px] text-ink/50">{youLabel}</span>}
       </div>
     </div>
   );
@@ -233,14 +234,14 @@ function DemoMorpionGame({ slug }: { slug: string }) {
         {/* Players */}
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div className="bg-white/60 backdrop-blur-sm border border-ink/10 rounded-xl p-3">
-            <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest mb-1.5">J1</p>
+            <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest mb-1.5">J1</p>
             <div className="flex items-center gap-2">
               <span className="text-lg font-black text-emerald-600">X</span>
-              <span className="text-xs font-semibold text-ink/70">{demoPlayer.name} <span className="text-ink/30">({locale === "fr" ? "vous" : "you"})</span></span>
+              <span className="text-xs font-semibold text-ink/70">{demoPlayer.name} <span className="text-ink/50">({locale === "fr" ? "vous" : "you"})</span></span>
             </div>
           </div>
           <div className="bg-white/60 backdrop-blur-sm border border-ink/10 rounded-xl p-3">
-            <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest mb-1.5">J2</p>
+            <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest mb-1.5">J2</p>
             <div className="flex items-center gap-2">
               <span className="text-lg font-black text-violet-600">O</span>
               <span className="text-xs font-semibold text-ink/70">🤖 Bot</span>
@@ -256,7 +257,7 @@ function DemoMorpionGame({ slug }: { slug: string }) {
           </Link>
         )}
 
-        <p className="text-center text-xs text-ink/40 mt-2">
+        <p className="text-center text-xs text-ink/50 mt-2">
           {t.youPlay[locale]} <span className="font-bold text-emerald-600">X</span>
         </p>
       </div>
@@ -278,7 +279,9 @@ export default function MorpionGamePage() {
 
 function RealMorpionGame({ slug }: { slug: string }) {
   const { locale } = useLocale();
+  const { theme } = useTheme();
   const t = translations.morpion;
+  const te = translations.errors;
   const [game, setGame] = useState<MorpionGame | null>(null);
   const [myAddress, setMyAddress] = useState("");
   const [addressInput, setAddressInput] = useState("");
@@ -373,7 +376,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       await fetchGame();
-    } catch (e: any) { setMoveError(e.message); }
+    } catch { setMoveError(te.invalidMove[locale]); }
   }
 
   function copyPaymentLink() {
@@ -391,8 +394,19 @@ function RealMorpionGame({ slug }: { slug: string }) {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <RefreshCw className="w-6 h-6 text-marine animate-spin" />
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm space-y-4">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-5 w-20 rounded-lg bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+          <div className="h-7 w-24 rounded-lg bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        </div>
+        <div className="h-16 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        <div className="h-64 rounded-2xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="h-16 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+          <div className="h-16 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        </div>
+      </div>
     </div>
   );
 
@@ -483,7 +497,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
                 <div className="space-y-2 py-3 px-4">
                   <p className="text-2xl text-center">😢</p>
                   <p className="font-bold text-ink text-sm">{t.youLost[locale]}</p>
-                  <div className="text-xs text-ink/40 space-y-0.5">
+                  <div className="text-xs text-ink/50 space-y-0.5">
                     <p>{locale === "fr" ? "Gagnant" : "Winner"} : <span className="font-semibold text-ink/60">{game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"}</span></p>
                     <p>{t.betWon[locale]} <span className="font-bold text-ink/60">{winAmount} CRC</span></p>
                   </div>
@@ -586,7 +600,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
             const profile = addr ? profiles[addr.toLowerCase()] : undefined;
             return (
               <div key={label} className="bg-white/60 backdrop-blur-sm border border-ink/10 rounded-xl p-3">
-                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest mb-1.5">{label}</p>
+                <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest mb-1.5">{label}</p>
                 <PlayerBadge addr={addr} profile={profile} symbol={symbol} isMe={isMe} waitingLabel={t.waiting[locale]} youLabel={locale === "fr" ? "vous" : "you"} />
               </div>
             );
@@ -596,7 +610,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
         {/* Test mode — dev only */}
         {process.env.NODE_ENV === "development" && (
           <div className="mt-2 p-3 rounded-xl border border-dashed border-ink/15 space-y-2">
-            <p className="text-xs text-ink/30 text-center font-mono">🧪 Mode test</p>
+            <p className="text-xs text-ink/50 text-center font-mono">🧪 Mode test</p>
             {(game.status === "waiting_p1" || game.status === "waiting_p2") && (
               <button onClick={activateTestMode} disabled={testLoading}
                 className="w-full py-1.5 rounded-lg bg-ink/5 text-xs text-ink/40 hover:text-ink/60 hover:bg-ink/10 transition-all">
@@ -620,8 +634,8 @@ function RealMorpionGame({ slug }: { slug: string }) {
 
         {/* My symbol */}
         {mySymbol && game.status === "active" && (
-          <p className="text-center text-xs text-ink/40 mt-2">
-            {t.youPlay[locale]} <span className="font-bold" style={{ color: mySymbol === "X" ? "#251B9F" : "#FF491B" }}>{mySymbol}</span>
+          <p className="text-center text-xs text-ink/50 mt-2">
+            {t.youPlay[locale]} <span className="font-bold" style={{ color: mySymbol === "X" ? (theme === "dark" ? "#7C6FFF" : "#251B9F") : "#FF491B" }}>{mySymbol}</span>
           </p>
         )}
       </div>

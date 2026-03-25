@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft, Gamepad2 } from "lucide-react";
+import { ArrowLeft, Gamepad2, Loader2 } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -14,6 +14,7 @@ export default function MorpionLobby() {
   const { locale } = useLocale();
   const { isDemo } = useDemo();
   const t = translations.morpion;
+  const te = translations.errors;
   const [betCrc, setBetCrc] = useState(10);
   const [joinSlug, setJoinSlug] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,8 +37,8 @@ export default function MorpionLobby() {
       if (!res.ok) throw new Error(data.error);
       sessionStorage.setItem(`morpion_creator_${data.slug}`, "1");
       router.push(`/morpion/${data.slug}`);
-    } catch (e: any) {
-      setError(e.message);
+    } catch {
+      setError(te.gameCreate[locale]);
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export default function MorpionLobby() {
               <div className="flex items-center gap-3">
                 {[5, 10, 25, 50].map((v) => (
                   <button key={v} onClick={() => setBetCrc(v)}
-                    className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${betCrc === v ? "bg-marine text-white border-marine" : "bg-white/80 text-ink/60 border-ink/10 hover:border-marine/40"}`}>
+                    className={`flex-1 min-h-[44px] py-2.5 rounded-xl text-sm font-bold border transition-all active:scale-95 ${betCrc === v ? "bg-marine text-white border-marine" : "bg-white/80 text-ink/60 border-ink/10 hover:border-marine/40"}`}>
                     {v}
                   </button>
                 ))}
@@ -101,7 +102,7 @@ export default function MorpionLobby() {
 
             <Button onClick={createGame} disabled={loading} className="w-full rounded-xl font-bold"
               style={{ background: "#251B9F" }}>
-              {loading ? t.creating[locale] : `${t.createBtn[locale]} — ${betCrc} CRC`}
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" /> {t.creating[locale]}</> : `${t.createBtn[locale]} — ${betCrc} CRC`}
             </Button>
           </CardContent>
         </Card>

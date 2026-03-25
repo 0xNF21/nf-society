@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { SpinResult } from "@/lib/daily-shared";
 import { SPIN_SEGMENTS } from "@/lib/daily-shared";
+import { useTheme } from "@/components/theme-provider";
 
 type Props = {
   result: SpinResult | null;
@@ -16,6 +17,8 @@ const SEGMENT_COUNT = 8;
 const SEGMENT_ANGLE = 360 / SEGMENT_COUNT;
 
 export default function SpinWheel({ result, onSpin, onComplete, spinning, locale }: Props) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [rotation, setRotation] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [hasSpun, setHasSpun] = useState(false);
@@ -76,12 +79,12 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
     // Center circle
     ctx.beginPath();
     ctx.arc(center, center, 20, 0, Math.PI * 2);
-    ctx.fillStyle = "#1b1b1f";
+    ctx.fillStyle = isDark ? "#f5f5f5" : "#1b1b1f";
     ctx.fill();
-    ctx.strokeStyle = "#ffffff";
+    ctx.strokeStyle = isDark ? "#333" : "#ffffff";
     ctx.lineWidth = 3;
     ctx.stroke();
-  }, []);
+  }, [isDark]);
 
   // Trigger spin animation
   useEffect(() => {
@@ -114,7 +117,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
       <div className="relative">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-10">
           <svg width="24" height="28" viewBox="0 0 24 28" fill="none">
-            <path d="M12 28L0 0H24L12 28Z" fill="#1b1b1f" stroke="#fff" strokeWidth="1.5"/>
+            <path d="M12 28L0 0H24L12 28Z" fill={isDark ? "#f5f5f5" : "#1b1b1f"} stroke={isDark ? "#333" : "#fff"} strokeWidth="1.5"/>
           </svg>
         </div>
 

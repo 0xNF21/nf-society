@@ -36,6 +36,14 @@ export default function DailyModal() {
   const [loading, setLoading] = useState(false);
   const [showProbs, setShowProbs] = useState(false);
 
+  // Fermer avec Escape
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open]);
+
   // Listen for custom event from /chance page
   useEffect(() => {
     const handler = () => setOpen(true);
@@ -214,16 +222,6 @@ export default function DailyModal() {
 
   return (
     <>
-      {/* ─── Bouton fixed top-left ─── */}
-      <button
-        onClick={() => setOpen(true)}
-        style={{ position: "fixed", top: 12, left: 12, zIndex: 40 }}
-        className="flex items-center gap-2 rounded-2xl shadow-md border border-ink/10 bg-gradient-to-r from-amber-50 to-orange-50 backdrop-blur-sm px-4 py-3 hover:shadow-lg transition-all hover:scale-[1.02]"
-      >
-        <span className="text-xl">🎰</span>
-        <span className="text-sm font-bold text-amber-700">Daily</span>
-      </button>
-
       {/* ─── Modal overlay ─── */}
       {open && (
         <div
@@ -251,7 +249,7 @@ export default function DailyModal() {
                 <span className="text-xl">🎰</span>
                 <h2 className="text-base font-bold text-ink">{t.title[locale]}</h2>
               </div>
-              <button onClick={() => setOpen(false)} className="text-ink/30 hover:text-ink transition-colors">
+              <button onClick={() => setOpen(false)} className="text-ink/50 hover:text-ink transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -382,7 +380,7 @@ export default function DailyModal() {
                     </div>
                   )}
 
-                  <p className="text-xs text-ink/40 mb-2">{t.orCopy[locale]}</p>
+                  <p className="text-xs text-ink/50 mb-2">{t.orCopy[locale]}</p>
 
                   <button
                     onClick={copyLink}
@@ -394,7 +392,7 @@ export default function DailyModal() {
                     </span>
                   </button>
 
-                  <div className="mt-4 flex items-center justify-center gap-2 text-ink/40">
+                  <div className="mt-4 flex items-center justify-center gap-2 text-ink/50">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span className="text-xs">{t.detecting[locale]}</span>
                   </div>
@@ -491,7 +489,7 @@ export default function DailyModal() {
                     )}
                   </div>
 
-                  <p className="text-center text-ink/40 text-xs mt-4">{t.comeBack[locale]}</p>
+                  <p className="text-center text-ink/50 text-xs mt-4">{t.comeBack[locale]}</p>
                 </div>
               )}
             </div>

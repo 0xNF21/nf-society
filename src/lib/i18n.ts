@@ -721,6 +721,15 @@ export const translations = {
     enter: { fr: "Essayer en démo", en: "Try demo" },
     enterDesc: { fr: "Explorez la plateforme sans wallet", en: "Explore the platform without a wallet" },
   },
+  errors: {
+    generic: { fr: "Une erreur est survenue. Réessayez.", en: "Something went wrong. Please try again." },
+    network: { fr: "Problème de connexion. Vérifiez votre réseau.", en: "Connection issue. Check your network." },
+    gameCreate: { fr: "Impossible de créer la partie. Réessayez.", en: "Could not create game. Try again." },
+    gameNotFound: { fr: "Partie introuvable.", en: "Game not found." },
+    notYourTurn: { fr: "Ce n'est pas votre tour.", en: "It's not your turn." },
+    invalidMove: { fr: "Ce coup n'est pas valide.", en: "This move is not valid." },
+    paymentFailed: { fr: "Le paiement n'a pas pu être vérifié.", en: "Payment could not be verified." },
+  },
 } as const;
 
 export function t(section: string, key: string, locale: Locale): string {

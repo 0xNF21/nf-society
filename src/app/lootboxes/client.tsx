@@ -4,7 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, Gift, Sparkles } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
+import { darkSafeColor } from "@/lib/utils";
 
 interface LootboxData {
   id: number;
@@ -19,6 +21,8 @@ interface LootboxData {
 
 export default function LootboxesClient({ lootboxes }: { lootboxes: LootboxData[] }) {
   const { locale } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const t = translations.lootboxes;
 
   return (
@@ -86,7 +90,7 @@ export default function LootboxesClient({ lootboxes }: { lootboxes: LootboxData[
                     <div className="flex items-center gap-4">
                       <div>
                         <p className="text-xs text-ink/40">{t.price[locale]}</p>
-                        <p className="text-lg font-bold" style={{ color: lb.accentColor }}>{lb.pricePerOpenCrc} CRC</p>
+                        <p className="text-lg font-bold" style={{ color: darkSafeColor(lb.accentColor, isDark) }}>{lb.pricePerOpenCrc} CRC</p>
                       </div>
                       <div>
                         <p className="text-xs text-ink/40">{t.maxGain[locale]}</p>
@@ -95,7 +99,7 @@ export default function LootboxesClient({ lootboxes }: { lootboxes: LootboxData[
                     </div>
                     <div
                       className="flex items-center gap-1 text-sm font-semibold group-hover:gap-2 transition-all"
-                      style={{ color: lb.accentColor }}
+                      style={{ color: darkSafeColor(lb.accentColor, isDark) }}
                     >
                       {t.open[locale]}
                       <ArrowRight className="h-4 w-4" />

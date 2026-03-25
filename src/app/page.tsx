@@ -71,10 +71,10 @@ export default function LandingPage() {
               alt="NF Society"
               className="h-24 w-24 rounded-2xl object-cover mx-auto"
             />
-            <h1 className="font-display text-5xl font-bold text-ink sm:text-6xl">
+            <h1 className="font-display text-5xl font-bold text-ink dark:text-white sm:text-6xl">
               NF Society
             </h1>
-            <p className="text-lg text-ink/60 max-w-md mx-auto">
+            <p className="text-lg text-ink/60 dark:text-white/60 max-w-md mx-auto">
               {t.subtitle[locale]}
             </p>
           </header>
@@ -84,15 +84,15 @@ export default function LandingPage() {
               <Link
                 key={cat.href}
                 href={cat.href}
-                className={`group relative rounded-3xl border-2 border-ink/5 bg-white/80 backdrop-blur-sm p-6 sm:p-8 shadow-sm hover:shadow-xl ${cat.borderHover} transition-all duration-300 flex flex-col items-center text-center gap-3`}
+                className={`group relative rounded-3xl border-2 border-ink/5 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur-sm p-6 sm:p-8 shadow-sm hover:shadow-xl ${cat.borderHover} transition-all duration-300 flex flex-col items-center text-center gap-3`}
               >
                 <div className={`h-16 w-16 rounded-2xl ${cat.iconBg} flex items-center justify-center transition-colors`}>
                   {cat.icon}
                 </div>
-                <h2 className="font-display text-xl sm:text-2xl font-bold text-ink">
+                <h2 className="font-display text-xl sm:text-2xl font-bold text-ink dark:text-white">
                   {cat.title}
                 </h2>
-                <p className="text-xs sm:text-sm text-ink/50 leading-relaxed">
+                <p className="text-xs sm:text-sm text-ink/50 dark:text-white/50 leading-relaxed">
                   {cat.desc}
                 </p>
                 <span className={`mt-auto flex items-center gap-2 text-sm font-semibold ${cat.color} group-hover:gap-3 transition-all`}>

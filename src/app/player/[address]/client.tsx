@@ -89,7 +89,7 @@ export default function PlayerProfileClient({
   const totalVisible = badges.filter(b => !b.secret || b.earned).length;
 
   return (
-    <div className="min-h-screen bg-[#f7f4ee]">
+    <div className="min-h-screen bg-sand">
       <main className="mx-auto max-w-lg px-4 py-10 flex flex-col gap-4">
         <Link href="/" className="flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink/80 transition-colors font-medium w-fit">
           <ArrowLeft className="h-3.5 w-3.5" />

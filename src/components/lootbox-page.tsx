@@ -4,7 +4,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle, Copy, Check, Loader2, QrCode, Trophy, Zap, Volume2, VolumeX, HelpCircle, X, ChevronDown } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
+import { darkSafeColor } from "@/lib/utils";
 import { getRewardTable } from "@/lib/lootbox";
 import { generateGamePaymentLink } from "@/lib/circles";
 import { encodeGameData } from "@/lib/game-data";
@@ -119,8 +121,8 @@ function darkenHex(hex: string, factor: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-function BoxImage({ card, isWinner, isRevealing }: {
-  card: SlotCard; isWinner?: boolean; isRevealing?: boolean;
+function BoxImage({ card, isWinner, isRevealing, dark }: {
+  card: SlotCard; isWinner?: boolean; isRevealing?: boolean; dark?: boolean;
 }) {
   const { tier } = card;
   const [imgError, setImgError] = useState(false);
@@ -164,8 +166,8 @@ function BoxImage({ card, isWinner, isRevealing }: {
         )}
       </div>
       <div style={{ textAlign: "center", lineHeight: 1.2 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: tier.color || "#374151" }}>{card.reward}</span>
-        <span style={{ fontSize: 10, fontWeight: 600, color: tier.color || "#9CA3AF", marginLeft: 2 }}>CRC</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: tier.color || (dark ? "#e5e7eb" : "#374151") }}>{card.reward}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: tier.color || (dark ? "#9CA3AF" : "#9CA3AF"), marginLeft: 2 }}>CRC</span>
       </div>
     </div>
   );
@@ -179,6 +181,7 @@ function SlotMachine({
   priceCrc,
   tier,
   animTrigger,
+  dark,
 }: {
   phase: AnimPhase;
   accentColor: string;
@@ -187,6 +190,7 @@ function SlotMachine({
   priceCrc: number;
   tier?: ReturnType<typeof getRewardTier> | null;
   animTrigger: number;
+  dark?: boolean;
 }) {
   const isJackpotOrMega = tier?.isJackpot || tier?.isMega;
   const isRolling = phase === "rolling";
@@ -317,15 +321,17 @@ function SlotMachine({
           className="relative rounded-2xl border-2 overflow-hidden w-full"
           style={{
             height: 190,
-            borderColor: isActive ? accentColor : "rgba(0,0,0,0.08)",
-            boxShadow: isActive ? `0 0 32px 4px ${accentColor}33` : "0 4px 16px rgba(0,0,0,0.06)",
+            borderColor: isActive ? accentColor : (dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"),
+            boxShadow: isActive ? `0 0 32px 4px ${accentColor}33` : (dark ? "0 4px 16px rgba(0,0,0,0.3)" : "0 4px 16px rgba(0,0,0,0.06)"),
             transition: "border-color 0.3s, box-shadow 0.3s",
-            background: "#ffffff",
+            background: dark ? "#1c1c1e" : "#ffffff",
           }}
         >
           {/* Fade edges */}
           <div className="absolute inset-0 z-10 pointer-events-none" style={{
-            background: "linear-gradient(to right, rgba(255,255,255,0.95) 0%, transparent 18%, transparent 82%, rgba(255,255,255,0.95) 100%)"
+            background: dark
+              ? "linear-gradient(to right, rgba(28,28,30,0.95) 0%, transparent 18%, transparent 82%, rgba(28,28,30,0.95) 100%)"
+              : "linear-gradient(to right, rgba(255,255,255,0.95) 0%, transparent 18%, transparent 82%, rgba(255,255,255,0.95) 100%)"
           }} />
 
           {/* Rail */}
@@ -341,6 +347,7 @@ function SlotMachine({
                   card={card}
                   isWinner={i === WINNER_INDEX}
                   isRevealing={isRevealing}
+                  dark={dark}
                 />
               ))}
             </div>
@@ -351,6 +358,7 @@ function SlotMachine({
             <div className="absolute inset-0 flex items-center justify-center">
               <BoxImage
                 card={{ reward: 0, tier: { label: "", color: accentColor, isJackpot: false, isMega: false, isLegendary: false, isRare: false } }}
+                dark={dark}
               />
             </div>
           )}
@@ -395,6 +403,8 @@ function SlotMachine({
 
 export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData }) {
   const { locale } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const t = translations.lootbox;
 
   const [opens, setOpens] = useState<LootboxOpen[]>([]);
@@ -430,7 +440,9 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
     () => generateGamePaymentLink(lootbox.recipientAddress, lootbox.pricePerOpenCrc, "lootbox", lootbox.slug),
     [lootbox.recipientAddress, lootbox.pricePerOpenCrc, lootbox.slug]
   );
-  const { primaryColor, accentColor } = lootbox;
+  const accentColorRaw = lootbox.accentColor;
+  const primaryColor = lootbox.primaryColor;
+  const accentColor = darkSafeColor(accentColorRaw, isDark);
 
   function toggleMute() {
     const next = !muted;
@@ -640,6 +652,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               priceCrc={lootbox.pricePerOpenCrc}
               tier={tier}
               animTrigger={animTrigger}
+              dark={isDark}
             />
 
             {/* Boutons mute + règles */}
@@ -769,7 +782,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                         const contrib = (e.probability * e.reward / lootbox.pricePerOpenCrc * 100).toFixed(1);
                         return (
                           <div key={i} className="flex items-center justify-between text-xs">
-                            <span className="font-semibold" style={{ color: tier.color || "#6B7280" }}>
+                            <span className="font-semibold" style={{ color: tier.color || (dark ? "#e5e7eb" : "#6B7280") }}>
                               {TIER_EMOJIS[i]} {Math.round(e.probability * 100)}% × {e.reward} CRC
                             </span>
                             <span className="font-bold text-ink/50">= {contrib}%</span>
@@ -837,8 +850,8 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               target="_blank"
               rel="noreferrer"
               onClick={async () => { await scanNow(); setWatchingPayment(true); }}
-              className="flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 shadow-sm w-full"
-              style={{ backgroundColor: accentColor }}
+              className="flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 shadow-sm w-full"
+              style={{ backgroundColor: accentColorRaw, color: isDark ? "#000000" : "#ffffff" }}
             >
               {t.payWithCircles[locale]}
             </a>
@@ -959,7 +972,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                           {profile?.imageUrl ? (
                             <img src={profile.imageUrl} alt="" className="h-8 w-8 rounded-full flex-shrink-0 object-cover shadow-sm" />
                           ) : (
-                            <div className="h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center shadow-sm" style={{ backgroundColor: accentColor + "18" }}>
+                            <div className="h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center shadow-sm" style={{ backgroundColor: accentColorRaw + "18" }}>
                               <span className="text-xs font-bold" style={{ color: accentColor }}>{o.playerAddress.slice(2, 4).toUpperCase()}</span>
                             </div>
                           )}

@@ -12,7 +12,9 @@ import { encodeGameData } from "@/lib/game-data";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
 import { useLocale } from "@/components/language-provider";
+import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
+import { darkSafeColor } from "@/lib/utils";
 
 export type LotteryConfig = {
   id: number;
@@ -70,6 +72,10 @@ function FaqItem({ question, children }: { question: string; children: React.Rea
 
 export default function LotteryPage({ lottery, initialParticipants, initialCount }: { lottery: LotteryConfig; initialParticipants?: ParticipantEntry[]; initialCount?: number }) {
   const { locale } = useLocale();
+  const { theme } = useTheme();
+  const isAppDark = theme === "dark";
+  const displayColor = darkSafeColor(lottery.primaryColor, isAppDark);
+  const displayAccent = darkSafeColor(lottery.accentColor, isAppDark);
   const l = translations.lottery;
 
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
@@ -378,11 +384,11 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     }
   };
 
-  const isDark = lottery.theme === "dark";
+  const isLotteryDark = lottery.theme === "dark";
 
   return (
     <div
-      className={isDark ? "dark bg-gray-950 min-h-screen" : ""}
+      className={isLotteryDark ? "dark bg-gray-950 min-h-screen" : ""}
       style={{
         "--color-primary": lottery.primaryColor,
         "--color-accent": lottery.accentColor,
@@ -595,7 +601,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
               className="w-full flex items-center justify-between p-6 md:p-8 bg-white hover:bg-sand/20 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <HelpCircle className="h-6 w-6" style={{ color: lottery.accentColor }} />
+                <HelpCircle className="h-6 w-6" style={{ color: displayAccent }} />
                 <div className="text-left">
                   <h2 className="text-lg font-bold text-ink">{l.howItWorks[locale]}</h2>
                   <p className="text-sm text-ink/50 mt-0.5">{l.howItWorksSub[locale]}</p>
