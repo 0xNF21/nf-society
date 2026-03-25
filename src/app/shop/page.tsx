@@ -302,7 +302,7 @@ export default function ShopPage() {
     }
     if (status === "level_required") {
       return (
-        <span className="flex items-center gap-1 text-xs font-medium text-ink/40">
+        <span className="flex items-center gap-1 text-xs font-medium text-ink/50">
           <Lock className="w-3 h-3" /> {t.levelRequired[locale]} {item.levelRequired}
         </span>
       );
@@ -404,7 +404,7 @@ export default function ShopPage() {
                 <img src={qrCode} alt="QR" className="w-48 h-48 rounded-xl" />
               </div>
             )}
-            <p className="text-center text-xs text-ink/40">{t.authScanQr[locale]}</p>
+            <p className="text-center text-xs text-ink/50">{t.authScanQr[locale]}</p>
 
             <div className="flex items-center gap-2">
               <input
@@ -426,7 +426,7 @@ export default function ShopPage() {
               <span className="text-sm text-ink/50">{t.authWaiting[locale]}</span>
             </div>
 
-            <p className="text-center text-[10px] text-ink/30">{t.authRefunded[locale]}</p>
+            <p className="text-center text-[10px] text-ink/50">{t.authRefunded[locale]}</p>
           </div>
         )}
 
@@ -470,7 +470,7 @@ export default function ShopPage() {
               </p>
             )}
             {verifiedAddress && !demo && (
-              <p className="text-[10px] text-ink/30 font-mono truncate max-w-[200px]">
+              <p className="text-[10px] text-ink/50 font-mono truncate max-w-[200px]">
                 {verifiedAddress}
               </p>
             )}
@@ -546,7 +546,7 @@ export default function ShopPage() {
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center py-12 text-ink/40 text-sm">
+        <div className="text-center py-12 text-ink/50 text-sm">
           {t.noItems[locale]}
         </div>
       )}
