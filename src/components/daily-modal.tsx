@@ -105,12 +105,16 @@ export default function DailyModal() {
     } catch { /* localStorage error */ }
   }, []);
 
-  // Poll for payment
+  // Poll for payment — call scan first, then check session
   useEffect(() => {
     if (phase !== "payment" || !token || !open) return;
 
-    const interval = setInterval(async () => {
+    const poll = async () => {
       try {
+        // 1. Trigger scan directly from frontend (reliable, no self-HTTP issue)
+        await fetch("/api/daily/scan", { method: "POST" }).catch(() => {});
+
+        // 2. Check session status
         const res = await fetch(`/api/daily/session?token=${token}`);
         const data = await res.json();
 
@@ -128,7 +132,11 @@ export default function DailyModal() {
           setToken(null);
         }
       } catch { /* retry next poll */ }
-    }, 3000);
+    };
+
+    // First poll immediately
+    poll();
+    const interval = setInterval(poll, 5000);
 
     return () => clearInterval(interval);
   }, [phase, token, open]);

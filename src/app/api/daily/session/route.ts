@@ -47,24 +47,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "expired" });
     }
 
-    // Trigger scan via HTTP to own origin (reliable on Vercel)
-    try {
-      const origin = req.nextUrl.origin;
-      await fetch(`${origin}/api/daily/scan`, { method: "POST" });
-    } catch { /* scan fail silencieux */ }
-
-    // Re-check this session after scan
-    const [updated] = await db
-      .select()
-      .from(dailySessions)
-      .where(eq(dailySessions.token, token))
-      .limit(1);
-
-    if (updated?.address) {
-      return confirmedResponse(updated);
-    }
-
-    // Still not confirmed — check if THIS user already has a confirmed session today
+    // Check if THIS user already has a confirmed session today
     const address = req.nextUrl.searchParams.get("address");
     if (address) {
       const today = todayString();
