@@ -403,6 +403,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const [scanning, setScanning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [watchingPayment, setWatchingPayment] = useState(false);
+  const [initialExcludeReady, setInitialExcludeReady] = useState(false);
   const [showConfirmed, setShowConfirmed] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [qrCode, setQrCode] = useState<string>("");
@@ -540,7 +541,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   );
 
   const { status: paymentStatus } = usePaymentWatcher({
-    enabled: watchingPayment && lootbox.status === "active",
+    enabled: initialExcludeReady && lootbox.status === "active",
     dataValue,
     minAmountCRC: lootbox.pricePerOpenCrc,
     recipientAddress: lootbox.recipientAddress,
@@ -563,6 +564,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
     (async () => {
       try { await fetch(`/api/lootbox-scan?lootboxId=${lootbox.id}`, { method: "POST", cache: "no-store" }); } catch {}
       await fetchOpens();
+      setInitialExcludeReady(true);
     })();
     intervalRef.current = setInterval(scanNow, 10000);
     return () => {
@@ -590,7 +592,6 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   function handleCopy() {
     navigator.clipboard.writeText(paymentLink);
     setCopied(true);
-    setWatchingPayment(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
