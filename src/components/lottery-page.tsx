@@ -73,9 +73,9 @@ function FaqItem({ question, children }: { question: string; children: React.Rea
 export default function LotteryPage({ lottery, initialParticipants, initialCount }: { lottery: LotteryConfig; initialParticipants?: ParticipantEntry[]; initialCount?: number }) {
   const { locale } = useLocale();
   const { theme } = useTheme();
-  const isAppDark = theme === "dark";
-  const displayColor = darkSafeColor(lottery.primaryColor, isAppDark);
-  const displayAccent = darkSafeColor(lottery.accentColor, isAppDark);
+  const isDark = theme === "dark";
+  const displayColor = darkSafeColor(lottery.primaryColor, isDark);
+  const displayAccent = darkSafeColor(lottery.accentColor, isDark);
   const l = translations.lottery;
 
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");

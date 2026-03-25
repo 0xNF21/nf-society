@@ -113,16 +113,8 @@ function buildRail(winnerReward: number, priceCrc: number): SlotCard[] {
 const BOX_S = 58;
 const BOX_HALF = BOX_S / 2;
 
-function darkenHex(hex: string, factor: number): string {
-  const num = parseInt(hex.replace("#", ""), 16);
-  const r = Math.round(((num >> 16) & 255) * factor);
-  const g = Math.round(((num >> 8) & 255) * factor);
-  const b = Math.round((num & 255) * factor);
-  return `rgb(${r},${g},${b})`;
-}
-
-function BoxImage({ card, isWinner, isRevealing, dark }: {
-  card: SlotCard; isWinner?: boolean; isRevealing?: boolean; dark?: boolean;
+function BoxImage({ card, isWinner, isRevealing, isDark }: {
+  card: SlotCard; isWinner?: boolean; isRevealing?: boolean; isDark?: boolean;
 }) {
   const { tier } = card;
   const [imgError, setImgError] = useState(false);
@@ -166,8 +158,8 @@ function BoxImage({ card, isWinner, isRevealing, dark }: {
         )}
       </div>
       <div style={{ textAlign: "center", lineHeight: 1.2 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: tier.color || (dark ? "#e5e7eb" : "#374151") }}>{card.reward}</span>
-        <span style={{ fontSize: 10, fontWeight: 600, color: tier.color || (dark ? "#9CA3AF" : "#9CA3AF"), marginLeft: 2 }}>CRC</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: tier.color || (isDark ? "#e5e7eb" : "#374151") }}>{card.reward}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: tier.color || (isDark ? "#9CA3AF" : "#9CA3AF"), marginLeft: 2 }}>CRC</span>
       </div>
     </div>
   );
@@ -181,7 +173,7 @@ function SlotMachine({
   priceCrc,
   tier,
   animTrigger,
-  dark,
+  isDark,
 }: {
   phase: AnimPhase;
   accentColor: string;
@@ -190,7 +182,7 @@ function SlotMachine({
   priceCrc: number;
   tier?: ReturnType<typeof getRewardTier> | null;
   animTrigger: number;
-  dark?: boolean;
+  isDark?: boolean;
 }) {
   const isJackpotOrMega = tier?.isJackpot || tier?.isMega;
   const isRolling = phase === "rolling";
@@ -321,15 +313,15 @@ function SlotMachine({
           className="relative rounded-2xl border-2 overflow-hidden w-full"
           style={{
             height: 190,
-            borderColor: isActive ? accentColor : (dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"),
-            boxShadow: isActive ? `0 0 32px 4px ${accentColor}33` : (dark ? "0 4px 16px rgba(0,0,0,0.3)" : "0 4px 16px rgba(0,0,0,0.06)"),
+            borderColor: isActive ? accentColor : (isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"),
+            boxShadow: isActive ? `0 0 32px 4px ${accentColor}33` : (isDark ? "0 4px 16px rgba(0,0,0,0.3)" : "0 4px 16px rgba(0,0,0,0.06)"),
             transition: "border-color 0.3s, box-shadow 0.3s",
-            background: dark ? "#1c1c1e" : "#ffffff",
+            background: isDark ? "#1c1c1e" : "#ffffff",
           }}
         >
           {/* Fade edges */}
           <div className="absolute inset-0 z-10 pointer-events-none" style={{
-            background: dark
+            background: isDark
               ? "linear-gradient(to right, rgba(28,28,30,0.95) 0%, transparent 18%, transparent 82%, rgba(28,28,30,0.95) 100%)"
               : "linear-gradient(to right, rgba(255,255,255,0.95) 0%, transparent 18%, transparent 82%, rgba(255,255,255,0.95) 100%)"
           }} />
@@ -347,7 +339,7 @@ function SlotMachine({
                   card={card}
                   isWinner={i === WINNER_INDEX}
                   isRevealing={isRevealing}
-                  dark={dark}
+                  isDark={isDark}
                 />
               ))}
             </div>
@@ -358,7 +350,7 @@ function SlotMachine({
             <div className="absolute inset-0 flex items-center justify-center">
               <BoxImage
                 card={{ reward: 0, tier: { label: "", color: accentColor, isJackpot: false, isMega: false, isLegendary: false, isRare: false } }}
-                dark={dark}
+                isDark={isDark}
               />
             </div>
           )}
@@ -652,7 +644,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               priceCrc={lootbox.pricePerOpenCrc}
               tier={tier}
               animTrigger={animTrigger}
-              dark={isDark}
+              isDark={isDark}
             />
 
             {/* Boutons mute + règles */}
