@@ -140,14 +140,38 @@ export default function DailyModal() {
       const res = await fetch("/api/daily/init", { method: "POST" });
       const data = await res.json();
       setToken(data.token);
-      setPaymentLink(data.paymentLink);
-      setQrCode(data.qrCode);
-      setPhase("payment");
-      // Save token immediately so reload doesn't create a new session
-      localStorage.setItem("nf-daily", JSON.stringify({
-        token: data.token,
-        date: new Date().toISOString().slice(0, 10),
-      }));
+
+      if (data.alreadyConfirmed) {
+        // User already paid today — go straight to session check
+        localStorage.setItem("nf-daily", JSON.stringify({
+          token: data.token,
+          date: new Date().toISOString().slice(0, 10),
+        }));
+        // Fetch full session to resume at right phase
+        const sRes = await fetch(`/api/daily/session?token=${data.token}`);
+        const session = await sRes.json();
+        if (session.status === "confirmed") {
+          setAddress(session.address);
+          if (session.scratchPlayed && session.spinPlayed) {
+            setScratchResult(session.scratchResult);
+            setSpinResult(session.spinResult);
+            setPhase("complete");
+          } else if (session.scratchPlayed) {
+            setScratchResult(session.scratchResult);
+            setPhase("spin");
+          } else {
+            setPhase("scratch");
+          }
+        }
+      } else {
+        setPaymentLink(data.paymentLink);
+        setQrCode(data.qrCode);
+        setPhase("payment");
+        localStorage.setItem("nf-daily", JSON.stringify({
+          token: data.token,
+          date: new Date().toISOString().slice(0, 10),
+        }));
+      }
     } catch { /* error */ }
     setLoading(false);
   }, []);
