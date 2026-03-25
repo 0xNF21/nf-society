@@ -1,0 +1,91 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { dailySessions } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { determineScratchResult, isSafeBalanceSafe } from "@/lib/daily";
+import { executePayout } from "@/lib/payout";
+
+export async function POST(req: NextRequest) {
+  try {
+    const { token } = await req.json();
+    if (!token) {
+      return NextResponse.json({ error: "token is required" }, { status: 400 });
+    }
+
+    const [session] = await db
+      .select()
+      .from(dailySessions)
+      .where(eq(dailySessions.token, token))
+      .limit(1);
+
+    if (!session) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+    if (!session.address || !session.txHash) {
+      return NextResponse.json({ error: "Payment not confirmed yet" }, { status: 400 });
+    }
+    if (session.scratchPlayed) {
+      // Return existing result
+      return NextResponse.json({
+        result: session.scratchResult ? JSON.parse(session.scratchResult) : null,
+        alreadyPlayed: true,
+      });
+    }
+
+    // Calculate result deterministically
+    const seed = session.txHash + session.address;
+    let result = determineScratchResult(seed);
+
+    // Safe balance check — replace CRC with XP if low
+    if (result.crcValue > 0) {
+      const safe = await isSafeBalanceSafe();
+      if (!safe) {
+        result = {
+          ...result,
+          crcValue: 0,
+          xpValue: result.crcValue * 100, // Convert CRC to XP (1 CRC = 100 XP)
+          label: `+${result.crcValue * 100} XP`,
+          type: "xp_fallback",
+        };
+      }
+    }
+
+    // Save result
+    await db.update(dailySessions).set({
+      scratchResult: JSON.stringify(result),
+      scratchPlayed: true,
+    }).where(eq(dailySessions.id, session.id));
+
+    // Payout if CRC won (non-blocking)
+    if (result.crcValue > 0) {
+      try {
+        await executePayout({
+          gameType: "daily-scratch",
+          gameId: `daily-scratch-${token}`,
+          recipientAddress: session.address,
+          amountCrc: result.crcValue,
+          reason: `Daily scratch card — ${result.label}`,
+        });
+      } catch (err: any) {
+        console.error("[DailyScratch] Payout error:", err.message);
+      }
+    }
+
+    // XP if won (non-blocking)
+    if (result.xpValue > 0) {
+      try {
+        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        await fetch(`${base}/api/players/xp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: session.address, action: "daily_scratch" }),
+        });
+      } catch { /* XP fail silencieux */ }
+    }
+
+    return NextResponse.json({ result });
+  } catch (error: any) {
+    console.error("[DailyScratch] Error:", error.message);
+    return NextResponse.json({ error: error.message || "Scratch failed" }, { status: 500 });
+  }
+}

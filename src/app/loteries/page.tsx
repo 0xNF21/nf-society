@@ -5,7 +5,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, Archive, CheckCircle2, Lock, LogOut, RefreshCw, Sparkles, Ticket, Trophy, Users } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
+import { darkSafeColor } from "@/lib/utils";
 
 type LotteryCard = {
   id: number;
@@ -28,6 +30,8 @@ export default function HomePage() {
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const { locale } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const h = translations.home;
 
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -197,6 +201,7 @@ export default function HomePage() {
 
   const renderLotteryCard = (lottery: LotteryCard) => {
     const isInactive = lottery.status !== "active";
+    const displayColor = darkSafeColor(lottery.primaryColor, isDark);
 
     return (
       <Link
@@ -219,9 +224,9 @@ export default function HomePage() {
             ) : (
               <div
                 className="h-10 w-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: lottery.primaryColor + "20" }}
+                style={{ backgroundColor: displayColor + "20" }}
               >
-                <Sparkles className="h-5 w-5" style={{ color: lottery.primaryColor }} />
+                <Sparkles className="h-5 w-5" style={{ color: displayColor }} />
               </div>
             )}
             <div>
@@ -245,7 +250,7 @@ export default function HomePage() {
             <div className="flex items-center gap-1.5">
               <span
                 className="text-lg font-bold"
-                style={{ color: lottery.primaryColor }}
+                style={{ color: displayColor }}
               >
                 {lottery.ticketPriceCrc}
               </span>
@@ -258,7 +263,7 @@ export default function HomePage() {
           </div>
           <div
             className="flex items-center gap-1 text-sm font-semibold group-hover:gap-2 transition-all"
-            style={{ color: lottery.primaryColor }}
+            style={{ color: displayColor }}
           >
             {isInactive ? h.viewResults[locale] : h.participate[locale]}
             <ArrowRight className="h-4 w-4" />

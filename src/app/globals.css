@@ -4,10 +4,26 @@
 
 :root {
   color-scheme: light;
+  --bg-primary: #f7f4ee;
+  --bg-card: rgba(255, 255, 255, 0.6);
+  --bg-card-solid: #ffffff;
+  --border-subtle: rgba(27, 27, 31, 0.1);
+  --text-primary: #1b1b1f;
+  --text-secondary: rgba(27, 27, 31, 0.5);
+}
+
+.dark {
+  color-scheme: dark;
+  --bg-primary: #0a0a0a;
+  --bg-card: rgba(28, 28, 30, 0.6);
+  --bg-card-solid: #1c1c1e;
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --text-primary: #f5f5f5;
+  --text-secondary: rgba(255, 255, 255, 0.5);
 }
 
 body {
-  @apply font-body text-ink;
+  @apply font-body text-ink dark:text-white;
   background:
     radial-gradient(circle at 12% 8%, rgba(37, 27, 159, 0.16), transparent 45%),
     radial-gradient(circle at 88% 12%, rgba(255, 73, 27, 0.18), transparent 46%),
@@ -15,10 +31,227 @@ body {
   min-height: 100vh;
 }
 
+.dark body, body.dark {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(37, 27, 159, 0.25), transparent 45%),
+    radial-gradient(circle at 88% 12%, rgba(255, 73, 27, 0.15), transparent 46%),
+    linear-gradient(180deg, #0a0a0a 0%, #111113 55%, #0a0f0e 100%);
+}
+
+html.dark {
+  background: #0a0a0a;
+}
+
 * {
   box-sizing: border-box;
 }
 
+/* Default arrow cursor everywhere, text cursor only on inputs */
+*, *::before, *::after {
+  cursor: default !important;
+}
+a, a *, button, button *, [role="button"], [role="button"] * {
+  cursor: pointer !important;
+}
+input, textarea, [contenteditable="true"] {
+  cursor: text !important;
+}
+
 ::selection {
   background: rgba(37, 27, 159, 0.2);
+}
+
+/* ═══ Dark mode overrides: ink → white, sand → dark ═══ */
+
+/* Text ink — all opacity variants → blanc quasi-pur en dark mode */
+.dark .text-ink { color: #ffffff !important; }
+.dark .text-ink\/20 { color: rgba(255, 255, 255, 0.75) !important; }
+.dark .text-ink\/25 { color: rgba(255, 255, 255, 0.78) !important; }
+.dark .text-ink\/30 { color: rgba(255, 255, 255, 0.8) !important; }
+.dark .text-ink\/35 { color: rgba(255, 255, 255, 0.82) !important; }
+.dark .text-ink\/40 { color: rgba(255, 255, 255, 0.85) !important; }
+.dark .text-ink\/50 { color: rgba(255, 255, 255, 0.9) !important; }
+.dark .text-ink\/60 { color: rgba(255, 255, 255, 0.92) !important; }
+.dark .text-ink\/70 { color: rgba(255, 255, 255, 0.95) !important; }
+.dark .text-ink\/80 { color: rgba(255, 255, 255, 0.97) !important; }
+.dark .text-ink\/90 { color: rgba(255, 255, 255, 0.99) !important; }
+
+/* Hover text ink */
+.dark .hover\:text-ink:hover { color: #ffffff !important; }
+.dark .hover\:text-ink\/40:hover { color: rgba(255, 255, 255, 0.9) !important; }
+.dark .hover\:text-ink\/50:hover { color: rgba(255, 255, 255, 0.92) !important; }
+.dark .hover\:text-ink\/60:hover { color: rgba(255, 255, 255, 0.95) !important; }
+.dark .hover\:text-ink\/70:hover { color: rgba(255, 255, 255, 0.97) !important; }
+.dark .hover\:text-ink\/80:hover { color: rgba(255, 255, 255, 0.99) !important; }
+.dark .group-hover\:text-ink\/80 { color: rgba(255, 255, 255, 0.97) !important; }
+
+/* Border ink — all variants */
+.dark .border-ink { border-color: rgba(255, 255, 255, 0.15) !important; }
+.dark .border-ink\/5 { border-color: rgba(255, 255, 255, 0.05) !important; }
+.dark .border-ink\/10 { border-color: rgba(255, 255, 255, 0.1) !important; }
+.dark .border-ink\/15 { border-color: rgba(255, 255, 255, 0.15) !important; }
+.dark .border-ink\/20 { border-color: rgba(255, 255, 255, 0.2) !important; }
+
+/* Hover border ink */
+.dark .hover\:border-ink\/10:hover { border-color: rgba(255, 255, 255, 0.1) !important; }
+.dark .hover\:border-ink\/20:hover { border-color: rgba(255, 255, 255, 0.2) !important; }
+.dark .hover\:border-ink\/25:hover { border-color: rgba(255, 255, 255, 0.25) !important; }
+.dark .hover\:border-ink\/30:hover { border-color: rgba(255, 255, 255, 0.3) !important; }
+.dark .hover\:border-ink\/40:hover { border-color: rgba(255, 255, 255, 0.4) !important; }
+
+/* Background white — all variants (progressive opacity in dark mode) */
+.dark .bg-white { background-color: #1c1c1e !important; }
+.dark .bg-white\/5 { background-color: rgba(255, 255, 255, 0.03) !important; }
+.dark .bg-white\/10 { background-color: rgba(255, 255, 255, 0.05) !important; }
+.dark .bg-white\/15 { background-color: rgba(255, 255, 255, 0.06) !important; }
+.dark .bg-white\/50 { background-color: rgba(255, 255, 255, 0.08) !important; }
+.dark .bg-white\/60 { background-color: rgba(255, 255, 255, 0.10) !important; }
+.dark .bg-white\/70 { background-color: rgba(255, 255, 255, 0.12) !important; }
+.dark .bg-white\/80 { background-color: rgba(255, 255, 255, 0.14) !important; }
+.dark .bg-white\/90 { background-color: rgba(255, 255, 255, 0.16) !important; }
+
+/* Background ink — opacity variants only (solid bg-ink stays dark for buttons) */
+.dark .bg-ink\/5 { background-color: rgba(255, 255, 255, 0.05) !important; }
+.dark .bg-ink\/10 { background-color: rgba(255, 255, 255, 0.1) !important; }
+.dark .bg-ink\/\[0\.02\] { background-color: rgba(255, 255, 255, 0.02) !important; }
+.dark .bg-ink\/\[0\.03\] { background-color: rgba(255, 255, 255, 0.03) !important; }
+.dark .bg-ink\/\[0\.06\] { background-color: rgba(255, 255, 255, 0.06) !important; }
+.dark .bg-ink\/\[0\.08\] { background-color: rgba(255, 255, 255, 0.08) !important; }
+
+/* Hover background ink */
+.dark .hover\:bg-ink\/5:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+.dark .hover\:bg-ink\/10:hover { background-color: rgba(255, 255, 255, 0.1) !important; }
+/* hover:bg-ink/90 stays dark (used on buttons with text-white) */
+.dark .hover\:bg-ink\/\[0\.02\]:hover { background-color: rgba(255, 255, 255, 0.02) !important; }
+.dark .hover\:bg-ink\/\[0\.06\]:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+
+/* Background sand — all variants */
+.dark .bg-sand { background-color: #0a0a0a !important; }
+.dark .bg-sand\/20 { background-color: rgba(10, 10, 10, 0.2) !important; }
+.dark .bg-sand\/30 { background-color: rgba(10, 10, 10, 0.3) !important; }
+.dark .bg-sand\/40 { background-color: rgba(10, 10, 10, 0.4) !important; }
+.dark .bg-sand\/50 { background-color: rgba(10, 10, 10, 0.5) !important; }
+
+/* Hover background sand */
+.dark .hover\:bg-sand:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+.dark .hover\:bg-sand\/20:hover { background-color: rgba(255, 255, 255, 0.03) !important; }
+
+/* Hover background slate */
+.dark .hover\:bg-slate-50:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+.dark .hover\:bg-slate-50\/50:hover { background-color: rgba(255, 255, 255, 0.03) !important; }
+
+/* Light-mode-only colored backgrounds that need dark variants */
+.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
+.dark .bg-violet-50 { background-color: rgba(139, 92, 246, 0.1) !important; }
+.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.1) !important; }
+.dark .bg-pink-50 { background-color: rgba(236, 72, 153, 0.1) !important; }
+.dark .bg-sky-50 { background-color: rgba(14, 165, 233, 0.1) !important; }
+.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.1) !important; }
+.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.15) !important; }
+.dark .bg-violet-100 { background-color: rgba(139, 92, 246, 0.15) !important; }
+.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.15) !important; }
+.dark .bg-pink-100 { background-color: rgba(236, 72, 153, 0.15) !important; }
+.dark .bg-sky-100 { background-color: rgba(14, 165, 233, 0.15) !important; }
+
+/* Group-hover colored backgrounds */
+.dark .group:hover .group-hover\:bg-amber-100 { background-color: rgba(245, 158, 11, 0.2) !important; }
+.dark .group:hover .group-hover\:bg-violet-100 { background-color: rgba(139, 92, 246, 0.2) !important; }
+.dark .group:hover .group-hover\:bg-emerald-100 { background-color: rgba(16, 185, 129, 0.2) !important; }
+.dark .group:hover .group-hover\:bg-pink-100 { background-color: rgba(236, 72, 153, 0.2) !important; }
+.dark .group:hover .group-hover\:bg-sky-100 { background-color: rgba(14, 165, 233, 0.2) !important; }
+
+/* Gray/slate text + backgrounds (used in dashboard-dao) */
+.dark .text-gray-900 { color: #ffffff !important; }
+.dark .text-gray-400 { color: rgba(255, 255, 255, 0.85) !important; }
+.dark .text-gray-600 { color: rgba(255, 255, 255, 0.9) !important; }
+.dark .text-black { color: #ffffff !important; }
+.dark .bg-gray-100 { background-color: rgba(255, 255, 255, 0.1) !important; }
+.dark .bg-gray-50 { background-color: rgba(255, 255, 255, 0.05) !important; }
+.dark .border-gray-100 { border-color: rgba(255, 255, 255, 0.1) !important; }
+.dark .bg-slate-50 { background-color: rgba(255, 255, 255, 0.03) !important; }
+.dark .bg-slate-100 { background-color: rgba(255, 255, 255, 0.08) !important; }
+.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.1) !important; }
+.dark .bg-blue-100 { background-color: rgba(59, 130, 246, 0.15) !important; }
+.dark .bg-orange-50 { background-color: rgba(249, 115, 22, 0.1) !important; }
+
+/* Gradient backgrounds (dashboard page bg) */
+.dark .from-slate-50 { --tw-gradient-from: #0a0a0a !important; }
+.dark .to-white { --tw-gradient-to: #0a0a0a !important; }
+
+/* Hover on gray text */
+.dark .hover\:text-gray-600:hover { color: rgba(255, 255, 255, 0.85) !important; }
+
+/* Marine color (dark blue #251B9F — invisible on dark bg) */
+.dark .text-marine { color: #7C6FFF !important; }
+.dark .bg-marine\/10 { background-color: rgba(124, 111, 255, 0.15) !important; }
+.dark .bg-marine\/8 { background-color: rgba(124, 111, 255, 0.12) !important; }
+.dark .border-marine\/20 { border-color: rgba(124, 111, 255, 0.2) !important; }
+.dark .ring-ink\/5 { --tw-ring-color: rgba(255, 255, 255, 0.08) !important; }
+
+/* Yellow/amber gradient backgrounds (badges) */
+.dark .from-amber-50 { --tw-gradient-from: rgba(245, 158, 11, 0.1) !important; }
+.dark .to-yellow-50 { --tw-gradient-to: rgba(234, 179, 8, 0.1) !important; }
+.dark .border-amber-300 { border-color: rgba(245, 158, 11, 0.4) !important; }
+
+/* Text gray-500 (archived badges, admin buttons) */
+.dark .text-gray-500 { color: rgba(255, 255, 255, 0.85) !important; }
+.dark .text-gray-700 { color: rgba(255, 255, 255, 0.92) !important; }
+.dark .text-gray-300 { color: rgba(255, 255, 255, 0.88) !important; }
+
+/* Border gray-300 (admin buttons) */
+.dark .border-gray-300 { border-color: rgba(255, 255, 255, 0.2) !important; }
+.dark .border-gray-200 { border-color: rgba(255, 255, 255, 0.15) !important; }
+
+/* Green badges + buttons */
+.dark .text-green-600 { color: #34D399 !important; }
+.dark .text-green-700 { color: #6EE7B7 !important; }
+.dark .bg-green-50 { background-color: rgba(16, 185, 129, 0.1) !important; }
+.dark .hover\:bg-green-50:hover { background-color: rgba(16, 185, 129, 0.15) !important; }
+.dark .border-green-200 { border-color: rgba(16, 185, 129, 0.25) !important; }
+.dark .border-green-300 { border-color: rgba(16, 185, 129, 0.3) !important; }
+.dark .border-green-100 { border-color: rgba(16, 185, 129, 0.15) !important; }
+
+/* Hover bg-gray-50 (admin buttons) */
+.dark .hover\:bg-gray-50:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+
+/* Amber text (daily modal, lottery) */
+.dark .text-amber-700 { color: #FBBF24 !important; }
+.dark .text-amber-800 { color: #FCD34D !important; }
+.dark .text-amber-600 { color: #F59E0B !important; }
+.dark .border-amber-200 { border-color: rgba(245, 158, 11, 0.3) !important; }
+.dark .bg-amber-200 { background-color: rgba(245, 158, 11, 0.25) !important; }
+
+/* Orange gradient (daily modal button + header) */
+.dark .from-amber-500 { --tw-gradient-from: #F59E0B !important; }
+.dark .to-orange-500 { --tw-gradient-to: #F97316 !important; }
+.dark .from-orange-50 { --tw-gradient-from: rgba(249, 115, 22, 0.1) !important; }
+.dark .to-orange-50 { --tw-gradient-to: rgba(249, 115, 22, 0.1) !important; }
+
+/* Red text + backgrounds */
+.dark .text-red-600 { color: #F87171 !important; }
+.dark .border-red-200 { border-color: rgba(239, 68, 68, 0.25) !important; }
+.dark .border-red-100 { border-color: rgba(239, 68, 68, 0.15) !important; }
+
+/* Indigo (FAQ sections) */
+.dark .bg-indigo-50 { background-color: rgba(99, 102, 241, 0.1) !important; }
+.dark .border-indigo-100 { border-color: rgba(99, 102, 241, 0.15) !important; }
+.dark .text-indigo-700 { color: #A5B4FC !important; }
+.dark .text-indigo-600\/80 { color: rgba(165, 180, 252, 0.8) !important; }
+
+/* Yellow (winner card) */
+.dark .border-yellow-400 { border-color: rgba(250, 204, 21, 0.5) !important; }
+.dark .bg-yellow-50\/50 { background-color: rgba(250, 204, 21, 0.05) !important; }
+.dark .text-yellow-600 { color: #FBBF24 !important; }
+
+/* Gray-950 (lottery dark theme) */
+.dark .bg-gray-950 { background-color: #0a0a0a !important; }
+
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

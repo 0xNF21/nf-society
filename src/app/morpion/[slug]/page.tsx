@@ -2,11 +2,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Copy, Check, RefreshCw, Trophy, Clock, Users } from "lucide-react";
+import { ArrowLeft, Copy, Check, RefreshCw, Trophy, Clock, Users, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { generateGamePaymentLink } from "@/lib/circles";
 import { useLocale } from "@/components/language-provider";
+import { useTheme } from "@/components/theme-provider";
+import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 
 type GameStatus = "waiting_p1" | "waiting_p2" | "active" | "finished" | "cancelled";
@@ -50,8 +52,8 @@ function PlayerBadge({ addr, profile, symbol, isMe, waitingLabel, youLabel }: {
 }) {
   if (!addr) return (
     <div className="flex items-center gap-2">
-      <div className="w-7 h-7 rounded-full bg-ink/10 flex items-center justify-center text-xs text-ink/30 animate-pulse">?</div>
-      <span className="text-xs text-ink/30">{waitingLabel}</span>
+      <div className="w-7 h-7 rounded-full bg-ink/10 flex items-center justify-center text-xs text-ink/50 animate-pulse">?</div>
+      <span className="text-xs text-ink/50">{waitingLabel}</span>
     </div>
   );
   const name = profile?.name || shortenAddress(addr);
@@ -66,7 +68,198 @@ function PlayerBadge({ addr, profile, symbol, isMe, waitingLabel, youLabel }: {
       )}
       <div>
         <span className="text-xs font-semibold text-ink/70 block leading-tight">{name}</span>
-        {isMe && <span className="text-[10px] text-ink/30">{youLabel}</span>}
+        {isMe && <span className="text-[10px] text-ink/50">{youLabel}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Demo Morpion (client-only vs bot) ───
+function DemoMorpionGame({ slug }: { slug: string }) {
+  const { locale } = useLocale();
+  const { addXp, demoPlayer } = useDemo();
+  const t = translations.morpion;
+  const [board, setBoard] = useState("---------");
+  const [currentTurn, setCurrentTurn] = useState<"X" | "O">("X");
+  const [status, setStatus] = useState<"active" | "finished">("active");
+  const [result, setResult] = useState<string | null>(null);
+  const [botThinking, setBotThinking] = useState(false);
+  const [xpGained, setXpGained] = useState(0);
+
+  const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+  function checkWinner(b: string): "X" | "O" | "draw" | null {
+    for (const [a, c2, c3] of WINS) {
+      if (b[a] !== "-" && b[a] === b[c2] && b[c2] === b[c3]) return b[a] as "X" | "O";
+    }
+    if (!b.includes("-")) return "draw";
+    return null;
+  }
+
+  function getWinLine(b: string): number[] | null {
+    for (const [a, c2, c3] of WINS) {
+      if (b[a] !== "-" && b[a] === b[c2] && b[c2] === b[c3]) return [a, c2, c3];
+    }
+    return null;
+  }
+
+  // Simple bot: try to win, then block, then center, then random
+  function botMove(b: string): number {
+    const empty = b.split("").map((c, i) => c === "-" ? i : -1).filter(i => i >= 0);
+    // Try to win
+    for (const pos of empty) {
+      const test = b.slice(0, pos) + "O" + b.slice(pos + 1);
+      if (checkWinner(test) === "O") return pos;
+    }
+    // Block player
+    for (const pos of empty) {
+      const test = b.slice(0, pos) + "X" + b.slice(pos + 1);
+      if (checkWinner(test) === "X") return pos;
+    }
+    // Center
+    if (empty.includes(4)) return 4;
+    // Random
+    return empty[Math.floor(Math.random() * empty.length)];
+  }
+
+  function makeMove(pos: number) {
+    if (status !== "active" || currentTurn !== "X" || board[pos] !== "-" || botThinking) return;
+    const newBoard = board.slice(0, pos) + "X" + board.slice(pos + 1);
+    setBoard(newBoard);
+    const winner = checkWinner(newBoard);
+    if (winner) {
+      setStatus("finished");
+      setResult(winner === "draw" ? "draw" : winner);
+      if (winner === "X") setXpGained(addXp("morpion_win"));
+      else if (winner === "draw") setXpGained(addXp("morpion_lose"));
+      return;
+    }
+    setCurrentTurn("O");
+    setBotThinking(true);
+  }
+
+  // Bot plays after player
+  useEffect(() => {
+    if (currentTurn !== "O" || status !== "active" || !botThinking) return;
+    const timeout = setTimeout(() => {
+      const pos = botMove(board);
+      const newBoard = board.slice(0, pos) + "O" + board.slice(pos + 1);
+      setBoard(newBoard);
+      const winner = checkWinner(newBoard);
+      if (winner) {
+        setStatus("finished");
+        setResult(winner === "draw" ? "draw" : winner);
+        if (winner === "O") setXpGained(addXp("morpion_lose"));
+        else if (winner === "draw") setXpGained(addXp("morpion_lose"));
+      } else {
+        setCurrentTurn("X");
+      }
+      setBotThinking(false);
+    }, 600);
+    return () => clearTimeout(timeout);
+  }, [currentTurn, status, botThinking, board]);
+
+  const winLine = status === "finished" ? getWinLine(board) : null;
+  const isMyTurn = currentTurn === "X" && status === "active";
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center justify-between mb-6">
+          <Link href="/morpion" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink transition-colors">
+            <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
+          </Link>
+          <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg font-bold">DEMO</span>
+        </div>
+
+        {/* Status */}
+        <Card className="mb-4 rounded-xl border-0 shadow-sm bg-white/60 backdrop-blur-sm">
+          <CardContent className="p-0 overflow-hidden text-center">
+            {status === "active" && (
+              <div className="flex items-center justify-center gap-2 py-3 px-4">
+                <span className="text-lg font-bold text-ink">
+                  {isMyTurn ? (t.yourTurn[locale]) : (botThinking ? "🤖 Bot..." : `${t.turnOf[locale]} Bot`)}
+                </span>
+              </div>
+            )}
+            {status === "finished" && result === "draw" && (
+              <p className="text-sm font-bold text-ink/70 py-3 px-4">{t.draw[locale]}</p>
+            )}
+            {status === "finished" && result === "X" && (
+              <div className="flex flex-col items-center gap-1 py-3 px-4">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-citrus" />
+                  <span className="font-bold text-ink">{t.youWon[locale]} 🎉</span>
+                </div>
+                {xpGained > 0 && <span className="text-xs text-emerald-600 font-bold">+{xpGained} XP</span>}
+              </div>
+            )}
+            {status === "finished" && result === "O" && (
+              <div className="py-3 px-4">
+                <p className="text-2xl text-center">🤖</p>
+                <p className="font-bold text-ink text-sm">{locale === "fr" ? "Le bot a gagné !" : "Bot wins!"}</p>
+                {xpGained > 0 && <p className="text-xs text-emerald-600 font-bold">+{xpGained} XP</p>}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Board */}
+        <Card className="mb-4 bg-white/70 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-3 gap-2">
+              {board.split("").map((cell, i) => {
+                const isEmpty = cell === "-";
+                const canClick = isEmpty && isMyTurn && !botThinking;
+                const isWinCell = winLine?.includes(i) ?? false;
+                const winSymbol = winLine ? board[winLine[0]] : null;
+                return (
+                  <button key={i} onClick={() => canClick && makeMove(i)}
+                    className={`aspect-square rounded-xl flex items-center justify-center transition-all border-2 select-none text-3xl font-black
+                      ${isWinCell && winSymbol === "X" ? "border-emerald-400 bg-emerald-100 scale-105" :
+                        isWinCell && winSymbol === "O" ? "border-violet-400 bg-violet-100 scale-105" :
+                        cell === "X" ? "border-emerald-400/40 bg-emerald-50 text-emerald-600" :
+                        cell === "O" ? "border-violet-400/40 bg-violet-50 text-violet-600" :
+                        canClick ? "border-ink/10 bg-white hover:border-marine/30 hover:bg-marine/5 cursor-pointer" :
+                        "border-ink/5 bg-white/50 cursor-default"}`}
+                  >
+                    {cell !== "-" ? cell : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Players */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="bg-white/60 backdrop-blur-sm border border-ink/10 rounded-xl p-3">
+            <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest mb-1.5">J1</p>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-black text-emerald-600">X</span>
+              <span className="text-xs font-semibold text-ink/70">{demoPlayer.name} <span className="text-ink/50">({locale === "fr" ? "vous" : "you"})</span></span>
+            </div>
+          </div>
+          <div className="bg-white/60 backdrop-blur-sm border border-ink/10 rounded-xl p-3">
+            <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest mb-1.5">J2</p>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-black text-violet-600">O</span>
+              <span className="text-xs font-semibold text-ink/70">🤖 Bot</span>
+            </div>
+          </div>
+        </div>
+
+        {status === "finished" && (
+          <Link href="/morpion">
+            <Button className="w-full rounded-xl font-bold mt-4" style={{ background: "#251B9F" }}>
+              {locale === "fr" ? "Rejouer" : "Play again"}
+            </Button>
+          </Link>
+        )}
+
+        <p className="text-center text-xs text-ink/50 mt-2">
+          {t.youPlay[locale]} <span className="font-bold text-emerald-600">X</span>
+        </p>
       </div>
     </div>
   );
@@ -74,8 +267,21 @@ function PlayerBadge({ addr, profile, symbol, isMe, waitingLabel, youLabel }: {
 
 export default function MorpionGamePage() {
   const { slug } = useParams<{ slug: string }>();
+  const { isDemo } = useDemo();
+
+  // Demo mode: play locally vs bot
+  if (isDemo && slug.startsWith("DEMO")) {
+    return <DemoMorpionGame slug={slug} />;
+  }
+
+  return <RealMorpionGame slug={slug} />;
+}
+
+function RealMorpionGame({ slug }: { slug: string }) {
   const { locale } = useLocale();
+  const { theme } = useTheme();
   const t = translations.morpion;
+  const te = translations.errors;
   const [game, setGame] = useState<MorpionGame | null>(null);
   const [myAddress, setMyAddress] = useState("");
   const [addressInput, setAddressInput] = useState("");
@@ -170,7 +376,7 @@ export default function MorpionGamePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       await fetchGame();
-    } catch (e: any) { setMoveError(e.message); }
+    } catch { setMoveError(te.invalidMove[locale]); }
   }
 
   function copyPaymentLink() {
@@ -188,8 +394,19 @@ export default function MorpionGamePage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <RefreshCw className="w-6 h-6 text-marine animate-spin" />
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm space-y-4">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-5 w-20 rounded-lg bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+          <div className="h-7 w-24 rounded-lg bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        </div>
+        <div className="h-16 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        <div className="h-64 rounded-2xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="h-16 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+          <div className="h-16 rounded-xl bg-ink/[0.08] animate-pulse motion-reduce:animate-none" />
+        </div>
+      </div>
     </div>
   );
 
@@ -280,7 +497,7 @@ export default function MorpionGamePage() {
                 <div className="space-y-2 py-3 px-4">
                   <p className="text-2xl text-center">😢</p>
                   <p className="font-bold text-ink text-sm">{t.youLost[locale]}</p>
-                  <div className="text-xs text-ink/40 space-y-0.5">
+                  <div className="text-xs text-ink/50 space-y-0.5">
                     <p>{locale === "fr" ? "Gagnant" : "Winner"} : <span className="font-semibold text-ink/60">{game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"}</span></p>
                     <p>{t.betWon[locale]} <span className="font-bold text-ink/60">{winAmount} CRC</span></p>
                   </div>
@@ -383,7 +600,7 @@ export default function MorpionGamePage() {
             const profile = addr ? profiles[addr.toLowerCase()] : undefined;
             return (
               <div key={label} className="bg-white/60 backdrop-blur-sm border border-ink/10 rounded-xl p-3">
-                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest mb-1.5">{label}</p>
+                <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest mb-1.5">{label}</p>
                 <PlayerBadge addr={addr} profile={profile} symbol={symbol} isMe={isMe} waitingLabel={t.waiting[locale]} youLabel={locale === "fr" ? "vous" : "you"} />
               </div>
             );
@@ -393,7 +610,7 @@ export default function MorpionGamePage() {
         {/* Test mode — dev only */}
         {process.env.NODE_ENV === "development" && (
           <div className="mt-2 p-3 rounded-xl border border-dashed border-ink/15 space-y-2">
-            <p className="text-xs text-ink/30 text-center font-mono">🧪 Mode test</p>
+            <p className="text-xs text-ink/50 text-center font-mono">🧪 Mode test</p>
             {(game.status === "waiting_p1" || game.status === "waiting_p2") && (
               <button onClick={activateTestMode} disabled={testLoading}
                 className="w-full py-1.5 rounded-lg bg-ink/5 text-xs text-ink/40 hover:text-ink/60 hover:bg-ink/10 transition-all">
@@ -417,8 +634,8 @@ export default function MorpionGamePage() {
 
         {/* My symbol */}
         {mySymbol && game.status === "active" && (
-          <p className="text-center text-xs text-ink/40 mt-2">
-            {t.youPlay[locale]} <span className="font-bold" style={{ color: mySymbol === "X" ? "#251B9F" : "#FF491B" }}>{mySymbol}</span>
+          <p className="text-center text-xs text-ink/50 mt-2">
+            {t.youPlay[locale]} <span className="font-bold" style={{ color: mySymbol === "X" ? (theme === "dark" ? "#7C6FFF" : "#251B9F") : "#FF491B" }}>{mySymbol}</span>
           </p>
         )}
       </div>

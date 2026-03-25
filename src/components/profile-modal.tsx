@@ -4,7 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { User, X, Search, Loader2, ChevronRight, LogOut } from "lucide-react";
 import { LanguageSwitcher, useLocale } from "@/components/language-provider";
+import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
+import { getLevelName, xpToNextLevel } from "@/lib/xp";
 
 type SavedProfile = {
   address: string;
@@ -37,6 +39,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function ProfileModal() {
   const { locale } = useLocale();
+  const { isDemo, demoPlayer } = useDemo();
   const tp = translations.profile;
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState<SavedProfile | null>(null);
@@ -47,22 +50,41 @@ export default function ProfileModal() {
   const debouncedQuery = useDebounce(query, 350);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Charger profil sauvegardé au montage
+  // Fermer avec Escape
   useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open]);
+
+  // Charger profil sauvegardé au montage (ou injecter démo)
+  useEffect(() => {
+    if (isDemo) {
+      setSaved({ address: demoPlayer.address, name: demoPlayer.name, imageUrl: demoPlayer.imageUrl });
+      setPlayer({
+        level: demoPlayer.level,
+        levelName: getLevelName(demoPlayer.level),
+        xp: demoPlayer.xp,
+        xpToNext: xpToNextLevel(demoPlayer.xp),
+        streak: demoPlayer.streak,
+      });
+      return;
+    }
     try {
       const raw = localStorage.getItem("nfs_profile");
       if (raw) setSaved(JSON.parse(raw));
     } catch {}
-  }, []);
+  }, [isDemo, demoPlayer]);
 
   // Charger données XP quand profil connu
   useEffect(() => {
-    if (!saved?.address) return;
+    if (isDemo || !saved?.address) return;
     fetch(`/api/players/${saved.address}`)
       .then(r => r.json())
       .then(d => setPlayer(d))
       .catch(() => {});
-  }, [saved]);
+  }, [saved, isDemo]);
 
   // Recherche Circles
   useEffect(() => {
@@ -101,25 +123,33 @@ export default function ProfileModal() {
 
   return (
     <>
-      {/* Barre haut droite : langue + profil */}
-      <div style={{ position: "fixed", top: 12, right: 12, zIndex: 40, display: "flex", alignItems: "center", gap: 8 }}>
-        <div className="rounded-full shadow-sm border border-ink/10 bg-white/90 backdrop-blur-sm px-2 py-1.5">
+      {/* Barre haut droite : langue + daily + profil */}
+      <div style={{ position: "fixed", top: 12, right: 12, zIndex: 40, display: "flex", alignItems: "center", gap: 6 }}>
+        <div className="rounded-full shadow-sm border border-ink/10 bg-white/90 dark:bg-white/10 backdrop-blur-sm px-2 py-1.5">
           <LanguageSwitcher />
         </div>
         <button
+          onClick={() => window.dispatchEvent(new Event("open-daily-modal"))}
+          className="flex items-center gap-1.5 rounded-full shadow-md border border-ink/10 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/40 dark:to-orange-900/40 backdrop-blur-sm px-2.5 py-2 hover:shadow-lg transition-all hover:scale-[1.02]"
+          title="Daily"
+        >
+          <span className="text-base">🎰</span>
+          <span className="text-xs font-bold text-amber-700 dark:text-amber-300 hidden sm:inline">Daily</span>
+        </button>
+        <button
           onClick={() => setOpen(true)}
-          className="flex items-center gap-2 rounded-full shadow-md border border-ink/10 bg-white/90 backdrop-blur-sm px-3 py-2 hover:bg-white transition-all hover:shadow-lg"
+          className="flex items-center gap-1.5 rounded-full shadow-md border border-ink/10 bg-white/90 dark:bg-white/10 backdrop-blur-sm px-2.5 py-2 hover:bg-white dark:hover:bg-white/15 transition-all hover:shadow-lg"
         >
           {saved?.imageUrl ? (
             <img src={saved.imageUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
           ) : (
-            <User className="h-4 w-4 text-marine" />
+            <User className="h-4 w-4 text-marine dark:text-blue-400" />
           )}
-          <span className="text-sm font-semibold text-ink">
+          <span className="text-sm font-semibold text-ink hidden sm:inline">
             {saved ? saved.name || `${saved.address.slice(0, 6)}…${saved.address.slice(-4)}` : tp.button[locale]}
           </span>
           {player && (
-            <span className="text-xs font-bold text-marine bg-marine/10 px-2 py-0.5 rounded-full">
+            <span className="text-xs font-bold text-marine dark:text-blue-400 bg-marine/10 dark:bg-blue-400/20 px-1.5 py-0.5 rounded-full">
               Lv.{player.level}
             </span>
           )}
@@ -139,7 +169,7 @@ export default function ProfileModal() {
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-ink/5">
               <h2 className="text-base font-bold text-ink">{tp.title[locale]}</h2>
-              <button onClick={() => setOpen(false)} className="text-ink/30 hover:text-ink transition-colors">
+              <button onClick={() => setOpen(false)} className="text-ink/50 hover:text-ink transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -158,7 +188,7 @@ export default function ProfileModal() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-ink truncate">{saved.name || tp.title[locale]}</p>
-                    <p className="text-xs font-mono text-ink/30 truncate">{saved.address}</p>
+                    <p className="text-xs font-mono text-ink/50 truncate">{saved.address}</p>
                   </div>
                 </div>
 
@@ -175,7 +205,7 @@ export default function ProfileModal() {
                         style={{ width: `${progressPct}%`, background: "linear-gradient(90deg, #251B9F, #FF491B)" }}
                       />
                     </div>
-                    <div className="flex justify-between text-xs text-ink/40">
+                    <div className="flex justify-between text-xs text-ink/50">
                       <span>{player.xp.toLocaleString()} XP</span>
                       {player.level < 10 && <span>+{player.xpToNext} {locale === "fr" ? "pour" : "to"} Lv.{player.level + 1}</span>}
                     </div>
@@ -209,7 +239,7 @@ export default function ProfileModal() {
                 <p className="text-sm text-ink/50">{tp.searchHint[locale]}</p>
 
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink/30" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink/50" />
                   <input
                     ref={inputRef}
                     type="text"
@@ -219,7 +249,7 @@ export default function ProfileModal() {
                     className="w-full pl-9 pr-4 py-3 rounded-xl border border-ink/15 bg-white text-sm focus:outline-none focus:border-marine/50 focus:ring-2 focus:ring-marine/10 transition-all"
                   />
                   {searching && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink/30 animate-spin" />
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink/50 animate-spin" />
                   )}
                 </div>
 
@@ -240,7 +270,7 @@ export default function ProfileModal() {
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-ink truncate">{r.name}</p>
-                          <p className="text-xs font-mono text-ink/30 truncate">{r.address}</p>
+                          <p className="text-xs font-mono text-ink/50 truncate">{r.address}</p>
                         </div>
                       </button>
                     ))}
@@ -248,7 +278,7 @@ export default function ProfileModal() {
                 )}
 
                 {query.length >= 2 && !searching && results.length === 0 && (
-                  <p className="text-sm text-ink/40 text-center py-2">{tp.noResults[locale]}</p>
+                  <p className="text-sm text-ink/50 text-center py-2">{tp.noResults[locale]}</p>
                 )}
               </div>
             )}
