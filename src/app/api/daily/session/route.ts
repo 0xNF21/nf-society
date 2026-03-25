@@ -63,30 +63,33 @@ export async function GET(req: NextRequest) {
       return confirmedResponse(updated);
     }
 
-    // Still not confirmed — check if user already has a confirmed session today
-    // (handles: reload, clear cache, different device)
-    const today = todayString();
-    const [existingConfirmed] = await db
-      .select()
-      .from(dailySessions)
-      .where(and(
-        eq(dailySessions.date, today),
-        isNotNull(dailySessions.address),
-      ))
-      .limit(1);
+    // Still not confirmed — check if THIS user already has a confirmed session today
+    // Only works if frontend passes their address as query param
+    const address = req.nextUrl.searchParams.get("address");
+    if (address) {
+      const today = todayString();
+      const [existingConfirmed] = await db
+        .select()
+        .from(dailySessions)
+        .where(and(
+          eq(dailySessions.date, today),
+          eq(dailySessions.address, address.toLowerCase()),
+        ))
+        .limit(1);
 
-    if (existingConfirmed) {
-      // Copy the confirmed data to the current session so the token stays consistent
-      await db.update(dailySessions).set({
-        address: existingConfirmed.address,
-        txHash: existingConfirmed.txHash,
-        scratchPlayed: existingConfirmed.scratchPlayed,
-        scratchResult: existingConfirmed.scratchResult,
-        spinPlayed: existingConfirmed.spinPlayed,
-        spinResult: existingConfirmed.spinResult,
-      }).where(eq(dailySessions.id, session.id));
+      if (existingConfirmed) {
+        // Copy the confirmed data to the current session so the token stays consistent
+        await db.update(dailySessions).set({
+          address: existingConfirmed.address,
+          txHash: existingConfirmed.txHash,
+          scratchPlayed: existingConfirmed.scratchPlayed,
+          scratchResult: existingConfirmed.scratchResult,
+          spinPlayed: existingConfirmed.spinPlayed,
+          spinResult: existingConfirmed.spinResult,
+        }).where(eq(dailySessions.id, session.id));
 
-      return confirmedResponse({ ...session, ...existingConfirmed, id: session.id, token: session.token });
+        return confirmedResponse({ ...session, ...existingConfirmed, id: session.id, token: session.token });
+      }
     }
 
     return NextResponse.json({ status: "waiting" });
