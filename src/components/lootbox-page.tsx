@@ -402,7 +402,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const [opens, setOpens] = useState<LootboxOpen[]>([]);
   const [scanning, setScanning] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [watchingPayment, setWatchingPayment] = useState(false);
+  const [watchingPayment, setWatchingPayment] = useState(lootbox.status === "active");
   const [showConfirmed, setShowConfirmed] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [qrCode, setQrCode] = useState<string>("");
