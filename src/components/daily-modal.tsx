@@ -282,7 +282,7 @@ export default function DailyModal() {
                 <div className="text-center py-6">
                   <p className="text-ink/60 text-sm mb-4">{t.subtitle[locale]}</p>
                   <button
-                    onClick={isDemo ? handleDemo : handleInit}
+                    onClick={isDemo && process.env.NODE_ENV === "development" ? handleDemo : handleInit}
                     disabled={loading}
                     className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-base shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] disabled:opacity-50"
                   >
@@ -294,7 +294,7 @@ export default function DailyModal() {
                       t.payButton[locale]
                     )}
                   </button>
-                  {!isDemo && (
+                  {!isDemo && process.env.NODE_ENV === "development" && (
                   <button
                     onClick={handleDemo}
                     className="w-full mt-3 py-2.5 bg-ink/5 hover:bg-ink/10 text-ink/60 font-medium rounded-xl text-sm transition-colors"
