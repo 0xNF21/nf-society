@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { todayString } from "@/lib/daily";
-import { runDailyScan } from "@/lib/daily-scan";
 import { generateGamePaymentLink } from "@/lib/circles";
 
 const SESSION_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
@@ -48,9 +47,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "expired" });
     }
 
-    // Trigger scan inline (direct call, no HTTP self-request)
+    // Trigger scan via HTTP to own origin (reliable on Vercel)
     try {
-      await runDailyScan();
+      const origin = req.nextUrl.origin;
+      await fetch(`${origin}/api/daily/scan`, { method: "POST" });
     } catch { /* scan fail silencieux */ }
 
     // Re-check this session after scan
@@ -65,7 +65,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Still not confirmed — check if THIS user already has a confirmed session today
-    // Only works if frontend passes their address as query param
     const address = req.nextUrl.searchParams.get("address");
     if (address) {
       const today = todayString();
@@ -79,7 +78,6 @@ export async function GET(req: NextRequest) {
         .limit(1);
 
       if (existingConfirmed) {
-        // Copy the confirmed data to the current session so the token stays consistent
         await db.update(dailySessions).set({
           address: existingConfirmed.address,
           txHash: existingConfirmed.txHash,
