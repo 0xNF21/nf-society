@@ -422,6 +422,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const [showRecentOpens, setShowRecentOpens] = useState(false);
   const [videoOpen, setVideoOpen] = useState<LootboxOpen | null>(null);
   const [profiles, setProfiles] = useState<Record<string, { name?: string; imageUrl?: string | null }>>({});
+  const [claimedHashes, setClaimedHashes] = useState<string[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const prevOpenCount = useRef<number>(0);
@@ -501,12 +502,14 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
     try {
       const res = await fetch(`/api/lootbox-opens?lootboxId=${lootbox.id}`, { cache: "no-store" });
       if (!res.ok) return;
-      const data: LootboxOpen[] = await res.json();
+      const json = await res.json();
+      // Support both old format (array) and new format ({ opens, claimedTxHashes })
+      const data: LootboxOpen[] = Array.isArray(json) ? json : json.opens;
+      if (json.claimedTxHashes) setClaimedHashes(json.claimedTxHashes);
 
       if (!initialLoadDone.current) {
         initialLoadDone.current = true;
         prevOpenCount.current = data.length;
-        // watchingPayment is activated by user interaction (QR, pay button, copy link)
       } else if (data.length > prevOpenCount.current) {
         runAnimation(data[0]);
         prevOpenCount.current = data.length;
@@ -536,8 +539,8 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   );
 
   const excludeTxHashes = useMemo(
-    () => opens.map(o => o.transactionHash),
-    [opens]
+    () => [...opens.map(o => o.transactionHash), ...claimedHashes],
+    [opens, claimedHashes]
   );
 
   const { status: paymentStatus } = usePaymentWatcher({
