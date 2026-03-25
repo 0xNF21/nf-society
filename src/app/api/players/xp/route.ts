@@ -7,13 +7,13 @@ import { checkAndAwardBadges, awardSupremeFounder } from "@/lib/badges";
 
 export async function POST(req: NextRequest) {
   try {
-    const { address, action } = await req.json();
+    const { address, action, xpOverride } = await req.json();
     if (!address || !action) {
       return NextResponse.json({ error: "Missing address or action" }, { status: 400 });
     }
 
     const addr = address.toLowerCase();
-    let xpGained = getXpForAction(action);
+    let xpGained = typeof xpOverride === "number" && xpOverride > 0 ? xpOverride : getXpForAction(action);
     if (xpGained === 0) {
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }

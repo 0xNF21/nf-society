@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
         await fetch(`${base}/api/players/xp`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: session.address, action: "daily_spin" }),
+          body: JSON.stringify({ address: session.address, action: "daily_spin", xpOverride: result.xpValue }),
         });
       } catch { /* XP fail silencieux */ }
     }
