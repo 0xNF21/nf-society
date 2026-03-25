@@ -505,7 +505,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
       if (!initialLoadDone.current) {
         initialLoadDone.current = true;
         prevOpenCount.current = data.length;
-        if (lootbox.status === "active") setWatchingPayment(true);
+        // watchingPayment is activated by user interaction (QR, pay button, copy link)
       } else if (data.length > prevOpenCount.current) {
         runAnimation(data[0]);
         prevOpenCount.current = data.length;
@@ -590,6 +590,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   function handleCopy() {
     navigator.clipboard.writeText(paymentLink);
     setCopied(true);
+    setWatchingPayment(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
