@@ -42,7 +42,7 @@ export async function POST(
     if (finished) {
       try {
         const pot = game.betCrc * 2
-        const fee = Math.floor(pot * game.commissionPct / 100)
+        const fee = Math.ceil(pot * game.commissionPct / 100)
         const winAmount = pot - fee
         const payoutResult = await executePayout({
           gameType: 'dames', gameId: `dames-${game.slug}-winner`,
