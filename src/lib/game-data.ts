@@ -42,7 +42,9 @@ export function decodeGameData(raw: string): GameData | null {
     ) {
       return null;
     }
-    return { game: parsed.game, id: parsed.id, v: parsed.v, ...(parsed.t ? { t: parsed.t } : {}) };
+    const result: GameData = { game: parsed.game, id: parsed.id, v: parsed.v };
+    if (typeof parsed.t === "string" && parsed.t.length > 0) result.t = parsed.t;
+    return result;
   } catch {
     return null;
   }
