@@ -319,15 +319,25 @@ function RealMorpionGame({ slug }: { slug: string }) {
     setScanning(false);
   }, [slug, scanning, fetchGame]);
 
-  // Init player token from localStorage or generate new one
+  // Init player token from URL param, localStorage, or generate new one
   useEffect(() => {
-    const stored = localStorage.getItem(`morpion-${slug}-token`);
-    if (stored) {
-      playerTokenRef.current = stored;
+    // Check URL for ?setToken= (used to inject token on mobile)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get("setToken");
+    if (urlToken) {
+      localStorage.setItem(`morpion-${slug}-token`, urlToken);
+      playerTokenRef.current = urlToken;
+      // Clean URL
+      window.history.replaceState({}, "", window.location.pathname);
     } else {
-      const token = crypto.randomUUID().slice(0, 8);
-      localStorage.setItem(`morpion-${slug}-token`, token);
-      playerTokenRef.current = token;
+      const stored = localStorage.getItem(`morpion-${slug}-token`);
+      if (stored) {
+        playerTokenRef.current = stored;
+      } else {
+        const token = crypto.randomUUID().slice(0, 8);
+        localStorage.setItem(`morpion-${slug}-token`, token);
+        playerTokenRef.current = token;
+      }
     }
     setIsCreator(sessionStorage.getItem(`morpion_creator_${slug}`) === "1");
   }, [slug]);
