@@ -447,18 +447,30 @@ function RealGame({ id }: { id: string }) {
           </Card>
         )}
 
-        {/* Adresse */}
+        {/* Player selection */}
         {game.status === 'playing' && !address && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
             <CardContent className="p-5 space-y-3">
-              <p className="text-sm font-semibold text-ink">{t.yourAddress[locale]}</p>
-              <div className="flex gap-2">
-                <input value={addressInput} onChange={e => setAddressInput(e.target.value)}
-                  className="flex-1 px-3 py-2.5 rounded-xl border border-ink/10 bg-white/80 text-ink text-sm focus:outline-none focus:border-marine/40"
-                  placeholder="0x..." />
-                <Button onClick={() => setAddress(addressInput.trim())} className="rounded-xl font-bold" style={{ background: '#251B9F' }}>
-                  OK
-                </Button>
+              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest text-center">
+                {locale === 'fr' ? 'Qui êtes-vous ?' : 'Who are you?'}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { if (game.player1Address) setAddress(game.player1Address); }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-amber-400/40 hover:bg-amber-50 transition-all"
+                >
+                  <span className="text-2xl">⚪</span>
+                  <span className="text-xs font-bold text-ink/70">J1 (Blancs)</span>
+                  <span className="text-[10px] text-ink/40 font-mono">{game.player1Address ? `${game.player1Address.slice(0, 6)}…${game.player1Address.slice(-4)}` : '?'}</span>
+                </button>
+                <button
+                  onClick={() => { if (game.player2Address) setAddress(game.player2Address); }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-red-400/40 hover:bg-red-50 transition-all"
+                >
+                  <span className="text-2xl">🔴</span>
+                  <span className="text-xs font-bold text-ink/70">J2 (Rouges)</span>
+                  <span className="text-[10px] text-ink/40 font-mono">{game.player2Address ? `${game.player2Address.slice(0, 6)}…${game.player2Address.slice(-4)}` : '?'}</span>
+                </button>
               </div>
             </CardContent>
           </Card>

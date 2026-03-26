@@ -737,19 +737,30 @@ function RealRelicsGame({ id }: { id: string }) {
           </Card>
         )}
 
-        {/* Address input — when game is active */}
+        {/* Player selection */}
         {(isPlacing || isPlaying) && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 dark:bg-white/5 backdrop-blur-sm border-ink/10 dark:border-white/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 space-y-2">
-              <p className="text-xs font-semibold text-ink/40 dark:text-white/40 uppercase tracking-widest">{t.yourAddress[locale]}</p>
-              <div className="flex gap-2">
-                <input type="text" placeholder="0x..." value={addressInput}
-                  onChange={(e) => setAddressInput(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-xl border border-ink/10 dark:border-white/10 bg-white/80 dark:bg-white/5 text-ink dark:text-white text-xs font-mono focus:outline-none focus:border-marine/40" />
-                <Button size="sm" onClick={() => { setMyAddress(addressInput.trim().toLowerCase()); setAddressConfirmed(true) }}
-                  className="rounded-xl px-4 text-xs" style={{ background: "#251B9F" }}>
-                  OK
-                </Button>
+            <CardContent className="p-4 space-y-3">
+              <p className="text-xs font-semibold text-ink/40 dark:text-white/40 uppercase tracking-widest text-center">
+                {locale === "fr" ? "Qui êtes-vous ?" : "Who are you?"}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { if (game?.player1Address) { setMyAddress(game.player1Address.toLowerCase()); setAddressConfirmed(true); } }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 dark:border-white/10 hover:border-emerald-400/40 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                >
+                  <span className="text-2xl">🛡️</span>
+                  <span className="text-xs font-bold text-ink/70 dark:text-white/70">J1</span>
+                  <span className="text-[10px] text-ink/40 dark:text-white/40 font-mono">{game?.player1Address ? `${game.player1Address.slice(0, 6)}…${game.player1Address.slice(-4)}` : "?"}</span>
+                </button>
+                <button
+                  onClick={() => { if (game?.player2Address) { setMyAddress(game.player2Address.toLowerCase()); setAddressConfirmed(true); } }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 dark:border-white/10 hover:border-orange-400/40 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all"
+                >
+                  <span className="text-2xl">⚔️</span>
+                  <span className="text-xs font-bold text-ink/70 dark:text-white/70">J2</span>
+                  <span className="text-[10px] text-ink/40 dark:text-white/40 font-mono">{game?.player2Address ? `${game.player2Address.slice(0, 6)}…${game.player2Address.slice(-4)}` : "?"}</span>
+                </button>
               </div>
             </CardContent>
           </Card>

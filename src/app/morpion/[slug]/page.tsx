@@ -580,20 +580,30 @@ function RealMorpionGame({ slug }: { slug: string }) {
           </Card>
         )}
 
-        {/* Address input */}
+        {/* Player selection */}
         {game.status === "active" && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 space-y-2">
-              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest">{t.yourAddress[locale]}</p>
-              <div className="flex gap-2">
-                <input type="text" placeholder="0x..." value={addressInput}
-                  onChange={(e) => setAddressInput(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-xl border border-ink/10 bg-white/80 text-ink text-xs font-mono focus:outline-none focus:border-marine/40"
-                />
-                <Button size="sm" onClick={() => { setMyAddress(addressInput); setAddressConfirmed(true); }}
-                  className="rounded-xl px-4 text-xs" style={{ background: "#251B9F" }}>
-                  OK
-                </Button>
+            <CardContent className="p-4 space-y-3">
+              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest text-center">
+                {locale === "fr" ? "Qui êtes-vous ?" : "Who are you?"}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { if (game.player1Address) { setMyAddress(game.player1Address); setAddressConfirmed(true); } }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-marine/40 hover:bg-marine/5 transition-all"
+                >
+                  <img src="/morpion/player1.png" alt="J1" className="w-10 h-10 object-contain" />
+                  <span className="text-xs font-bold text-ink/70">J1 (X)</span>
+                  <span className="text-[10px] text-ink/40 font-mono">{game.player1Address ? shortenAddress(game.player1Address) : "?"}</span>
+                </button>
+                <button
+                  onClick={() => { if (game.player2Address) { setMyAddress(game.player2Address); setAddressConfirmed(true); } }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-orange-400/40 hover:bg-orange-50 transition-all"
+                >
+                  <img src="/morpion/player2.png" alt="J2" className="w-10 h-10 object-contain" />
+                  <span className="text-xs font-bold text-ink/70">J2 (O)</span>
+                  <span className="text-[10px] text-ink/40 font-mono">{game.player2Address ? shortenAddress(game.player2Address) : "?"}</span>
+                </button>
               </div>
             </CardContent>
           </Card>

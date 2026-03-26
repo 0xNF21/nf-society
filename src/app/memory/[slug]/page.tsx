@@ -573,20 +573,30 @@ function RealMemoryGame({ slug }: { slug: string }) {
           </Card>
         )}
 
-        {/* Address input */}
+        {/* Player selection */}
         {game.status === "playing" && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 space-y-2">
-              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest">{t.yourAddress[locale]}</p>
-              <div className="flex gap-2">
-                <input type="text" placeholder="0x..." value={addressInput}
-                  onChange={(e) => setAddressInput(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-xl border border-ink/10 bg-white/80 text-ink text-xs font-mono focus:outline-none focus:border-pink-400/40"
-                />
-                <Button size="sm" onClick={() => { setMyAddress(addressInput); setAddressConfirmed(true); }}
-                  className="rounded-xl px-4 text-xs" style={{ background: "#EC4899" }}>
-                  OK
-                </Button>
+            <CardContent className="p-4 space-y-3">
+              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest text-center">
+                {locale === "fr" ? "Qui êtes-vous ?" : "Who are you?"}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { if (game.player1Address) { setMyAddress(game.player1Address); setAddressConfirmed(true); } }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-pink-400/40 hover:bg-pink-50 transition-all"
+                >
+                  <span className="text-2xl">🧠</span>
+                  <span className="text-xs font-bold text-ink/70">J1</span>
+                  <span className="text-[10px] text-ink/40 font-mono">{game.player1Address ? `${game.player1Address.slice(0, 6)}…${game.player1Address.slice(-4)}` : "?"}</span>
+                </button>
+                <button
+                  onClick={() => { if (game.player2Address) { setMyAddress(game.player2Address); setAddressConfirmed(true); } }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-purple-400/40 hover:bg-purple-50 transition-all"
+                >
+                  <span className="text-2xl">🎯</span>
+                  <span className="text-xs font-bold text-ink/70">J2</span>
+                  <span className="text-[10px] text-ink/40 font-mono">{game.player2Address ? `${game.player2Address.slice(0, 6)}…${game.player2Address.slice(-4)}` : "?"}</span>
+                </button>
               </div>
             </CardContent>
           </Card>
