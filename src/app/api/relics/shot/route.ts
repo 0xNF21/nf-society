@@ -8,7 +8,7 @@ import type { PlayerGrid } from '@/lib/relics'
 
 export async function POST(req: NextRequest) {
   try {
-    const { id, player, row, col } = await req.json()
+    const { id, player, row, col, playerToken } = await req.json()
     if (!id || !player || row == null || col == null)
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
@@ -19,6 +19,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not your turn' }, { status: 403 })
 
     const isP1 = game.player1Address?.toLowerCase() === player.toLowerCase()
+    const isP2 = game.player2Address?.toLowerCase() === player.toLowerCase()
+    if (playerToken) {
+      if (isP1 && game.player1Token && game.player1Token !== playerToken) {
+        return NextResponse.json({ error: 'Invalid player token' }, { status: 403 })
+      }
+      if (isP2 && game.player2Token && game.player2Token !== playerToken) {
+        return NextResponse.json({ error: 'Invalid player token' }, { status: 403 })
+      }
+    }
     const targetGrid = (isP1 ? game.grid2 : game.grid1) as PlayerGrid
 
     const { grid: newGrid, result } = processShot(targetGrid, row, col)
@@ -41,7 +50,7 @@ export async function POST(req: NextRequest) {
     if (defeated) {
       try {
         const pot = game.betCrc * 2
-        const fee = Math.ceil(pot * game.commissionPct / 100)
+        const fee = Math.floor(pot * game.commissionPct / 100)
         const winAmount = pot - fee
         const payoutResult = await executePayout({
           gameType: "relics",

@@ -85,7 +85,7 @@ export async function POST(
   const { slug } = await params;
   try {
     const body = await req.json();
-    const { playerAddress, cardIndex } = body;
+    const { playerAddress, cardIndex, playerToken } = body;
 
     if (!playerAddress || typeof cardIndex !== "number") {
       return NextResponse.json({ error: "playerAddress and cardIndex required" }, { status: 400 });
@@ -101,6 +101,15 @@ export async function POST(
     const isP1 = addr === p1;
     const isP2 = addr === p2;
     if (!isP1 && !isP2) return NextResponse.json({ error: "Not a player" }, { status: 403 });
+
+    if (playerToken) {
+      if (isP1 && game.player1Token && game.player1Token !== playerToken) {
+        return NextResponse.json({ error: "Invalid player token" }, { status: 403 });
+      }
+      if (isP2 && game.player2Token && game.player2Token !== playerToken) {
+        return NextResponse.json({ error: "Invalid player token" }, { status: 403 });
+      }
+    }
 
     const playerKey = isP1 ? "player1" : "player2";
     if (game.currentTurn !== playerKey) {
@@ -189,7 +198,7 @@ export async function POST(
 
         // Trigger payout
         const pot = game.betCrc * 2;
-        const fee = Math.ceil(pot * game.commissionPct / 100);
+        const fee = Math.floor(pot * game.commissionPct / 100);
         const winAmount = pot - fee;
 
         try {

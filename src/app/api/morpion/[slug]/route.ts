@@ -58,7 +58,7 @@ export async function POST(
     const isP2 = addr === p2;
     if (!isP1 && !isP2) return NextResponse.json({ error: "You are not a player in this game" }, { status: 403 });
 
-    // Verify player token if tokens exist (prevents impersonation)
+    // Verify player token
     if (playerToken) {
       if (isP1 && game.player1Token && game.player1Token !== playerToken) {
         return NextResponse.json({ error: "Invalid player token" }, { status: 403 });
@@ -125,7 +125,7 @@ export async function POST(
 
     // Trigger payout
     const pot = game.betCrc * 2;
-    const fee = Math.ceil(pot * game.commissionPct / 100);
+    const fee = Math.floor(pot * game.commissionPct / 100);
     const winAmount = pot - fee;
 
     if (winResult === "draw") {

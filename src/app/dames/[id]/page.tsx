@@ -238,7 +238,7 @@ function RealGame({ id }: { id: string }) {
   const t = translations.dames
   const [game, setGame] = useState<DamesGameRow | null>(null)
   const [address, setAddress] = useState('')
-  const [addressInput, setAddressInput] = useState('')
+  const [addressConfirmed, setAddressConfirmed] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copiedPayLink, setCopiedPayLink] = useState(false)
@@ -246,6 +246,7 @@ function RealGame({ id }: { id: string }) {
   const [moveLog, setMoveLog] = useState<string[]>([])
   const [qrCode, setQrCode] = useState('')
   const [qrState, setQrState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const playerTokenRef = useRef<string>('')
 
   const fetchGame = useCallback(async () => {
     const res = await fetch(`/api/dames?id=${id}`)
@@ -272,6 +273,39 @@ function RealGame({ id }: { id: string }) {
     }
   }, [game?.status, scanPayments])
 
+  // Init player token from URL, localStorage, or generate new
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlToken = urlParams.get('setToken')
+    if (urlToken) {
+      localStorage.setItem(`dames-${id}-token`, urlToken)
+      playerTokenRef.current = urlToken
+      window.history.replaceState({}, '', window.location.pathname)
+    } else {
+      const stored = localStorage.getItem(`dames-${id}-token`)
+      if (stored) {
+        playerTokenRef.current = stored
+      } else {
+        const token = crypto.randomUUID().slice(0, 8)
+        localStorage.setItem(`dames-${id}-token`, token)
+        playerTokenRef.current = token
+      }
+    }
+  }, [id])
+
+  // Auto-identify player via token match
+  useEffect(() => {
+    if (!game || !playerTokenRef.current || addressConfirmed) return
+    const token = playerTokenRef.current
+    if (game.player1Token === token && game.player1Address) {
+      setAddress(game.player1Address)
+      setAddressConfirmed(true)
+    } else if (game.player2Token === token && game.player2Address) {
+      setAddress(game.player2Address)
+      setAddressConfirmed(true)
+    }
+  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed])
+
   // Generate QR code when in payment phase
   useEffect(() => {
     if (!game || (game.status !== 'waiting_p1' && game.status !== 'waiting_p2')) return
@@ -280,7 +314,7 @@ function RealGame({ id }: { id: string }) {
     ;(async () => {
       try {
         const { toDataURL } = await import('qrcode')
-        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, 'dames', game.slug)
+        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, 'dames', game.slug, playerTokenRef.current)
         const url = await toDataURL(link, { width: 220, margin: 1, color: { dark: '#1b1b1f', light: '#ffffff' } })
         if (active) { setQrCode(url); setQrState('ready') }
       } catch {
@@ -297,7 +331,7 @@ function RealGame({ id }: { id: string }) {
     const res = await fetch(`/api/dames/${id}/move`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ player: address, move }),
+      body: JSON.stringify({ player: address, move, playerToken: playerTokenRef.current }),
     })
     const data = await res.json()
     if (data.error) setError(data.error)
@@ -323,7 +357,7 @@ function RealGame({ id }: { id: string }) {
     : null)
     : null
   const isMyTurn = state && myPlayer && state.currentPlayer === myPlayer
-  const payLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, 'dames', game.slug)
+  const payLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, 'dames', game.slug, playerTokenRef.current)
 
   async function copyId() {
     await navigator.clipboard.writeText(id)
@@ -447,31 +481,13 @@ function RealGame({ id }: { id: string }) {
           </Card>
         )}
 
-        {/* Player selection */}
-        {game.status === 'playing' && !address && (
+        {/* Spectator notice */}
+        {game.status === 'playing' && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-5 space-y-3">
-              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest text-center">
-                {locale === 'fr' ? 'Qui êtes-vous ?' : 'Who are you?'}
+            <CardContent className="p-5 text-center">
+              <p className="text-sm text-ink/60 dark:text-white/60">
+                {locale === 'fr' ? 'Mode spectateur — vous regardez cette partie' : 'Spectator mode — you are watching this game'}
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => { if (game.player1Address) setAddress(game.player1Address); }}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-amber-400/40 hover:bg-amber-50 transition-all"
-                >
-                  <span className="text-2xl">⚪</span>
-                  <span className="text-xs font-bold text-ink/70">J1 (Blancs)</span>
-                  <span className="text-[10px] text-ink/40 font-mono">{game.player1Address ? `${game.player1Address.slice(0, 6)}…${game.player1Address.slice(-4)}` : '?'}</span>
-                </button>
-                <button
-                  onClick={() => { if (game.player2Address) setAddress(game.player2Address); }}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-red-400/40 hover:bg-red-50 transition-all"
-                >
-                  <span className="text-2xl">🔴</span>
-                  <span className="text-xs font-bold text-ink/70">J2 (Rouges)</span>
-                  <span className="text-[10px] text-ink/40 font-mono">{game.player2Address ? `${game.player2Address.slice(0, 6)}…${game.player2Address.slice(-4)}` : '?'}</span>
-                </button>
-              </div>
             </CardContent>
           </Card>
         )}
@@ -513,12 +529,12 @@ function RealGame({ id }: { id: string }) {
               Skip → Jeu
             </Button>
             <Button variant={address === game?.player1Address ? 'default' : 'outline'} size="sm"
-              onClick={() => setGame(g => { if (g) setAddress(g.player1Address ?? ''); return g })}
+              onClick={() => setGame(g => { if (g) { setAddress(g.player1Address ?? ''); setAddressConfirmed(true) } return g })}
               className="rounded-lg text-xs">
               J1
             </Button>
             <Button variant={address === game?.player2Address ? 'default' : 'outline'} size="sm"
-              onClick={() => setGame(g => { if (g) setAddress(g.player2Address ?? ''); return g })}
+              onClick={() => setGame(g => { if (g) { setAddress(g.player2Address ?? ''); setAddressConfirmed(true) } return g })}
               className="rounded-lg text-xs">
               J2
             </Button>

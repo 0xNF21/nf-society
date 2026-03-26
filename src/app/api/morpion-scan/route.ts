@@ -61,7 +61,6 @@ export async function POST(req: NextRequest) {
       knownTxHashes.add(txHash);
       globalClaimedTxHashes.add(txHash);
 
-      // Extract player token from payment data
       const playerToken = payment.gameData?.t || null;
 
       // Assign player

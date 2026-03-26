@@ -319,41 +319,9 @@ function RealMorpionGame({ slug }: { slug: string }) {
     setScanning(false);
   }, [slug, scanning, fetchGame]);
 
-  // Init player token from URL param, localStorage, or generate new one
   useEffect(() => {
-    // Check URL for ?setToken= (used to inject token on mobile)
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get("setToken");
-    if (urlToken) {
-      localStorage.setItem(`morpion-${slug}-token`, urlToken);
-      playerTokenRef.current = urlToken;
-      // Clean URL
-      window.history.replaceState({}, "", window.location.pathname);
-    } else {
-      const stored = localStorage.getItem(`morpion-${slug}-token`);
-      if (stored) {
-        playerTokenRef.current = stored;
-      } else {
-        const token = crypto.randomUUID().slice(0, 8);
-        localStorage.setItem(`morpion-${slug}-token`, token);
-        playerTokenRef.current = token;
-      }
-    }
     setIsCreator(sessionStorage.getItem(`morpion_creator_${slug}`) === "1");
   }, [slug]);
-
-  // Auto-identify player when game has tokens
-  useEffect(() => {
-    if (!game || !playerTokenRef.current || addressConfirmed) return;
-    const token = playerTokenRef.current;
-    if (game.player1Token === token && game.player1Address) {
-      setMyAddress(game.player1Address);
-      setAddressConfirmed(true);
-    } else if (game.player2Token === token && game.player2Address) {
-      setMyAddress(game.player2Address);
-      setAddressConfirmed(true);
-    }
-  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed]);
 
   useEffect(() => {
     if (!game) return;
@@ -385,6 +353,39 @@ function RealMorpionGame({ slug }: { slug: string }) {
     if (!scanRef.current) scanRef.current = setInterval(scanPayments, 5000);
     return () => { if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null; } };
   }, [game?.status, scanPayments]);
+
+  // Init player token from URL, localStorage, or generate new
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get("setToken");
+    if (urlToken) {
+      localStorage.setItem(`morpion-${slug}-token`, urlToken);
+      playerTokenRef.current = urlToken;
+      window.history.replaceState({}, "", window.location.pathname);
+    } else {
+      const stored = localStorage.getItem(`morpion-${slug}-token`);
+      if (stored) {
+        playerTokenRef.current = stored;
+      } else {
+        const token = crypto.randomUUID().slice(0, 8);
+        localStorage.setItem(`morpion-${slug}-token`, token);
+        playerTokenRef.current = token;
+      }
+    }
+  }, [slug]);
+
+  // Auto-identify player via token match
+  useEffect(() => {
+    if (!game || !playerTokenRef.current || addressConfirmed) return;
+    const token = playerTokenRef.current;
+    if (game.player1Token === token && game.player1Address) {
+      setMyAddress(game.player1Address);
+      setAddressConfirmed(true);
+    } else if (game.player2Token === token && game.player2Address) {
+      setMyAddress(game.player2Address);
+      setAddressConfirmed(true);
+    }
+  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed]);
 
   // Generate QR code when in payment phase
   useEffect(() => {
@@ -614,12 +615,12 @@ function RealMorpionGame({ slug }: { slug: string }) {
           </Card>
         )}
 
-        {/* Spectator notice — game active but user is not a player */}
+        {/* Spectator notice */}
         {game.status === "active" && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 text-center">
-              <p className="text-sm text-ink/60">
-                {locale === "fr" ? "👀 Mode spectateur — vous regardez la partie" : "👀 Spectator mode — you're watching the game"}
+            <CardContent className="p-5 text-center">
+              <p className="text-sm text-ink/60 dark:text-white/60">
+                {locale === "fr" ? "Mode spectateur — vous regardez cette partie" : "Spectator mode — you are watching this game"}
               </p>
             </CardContent>
           </Card>

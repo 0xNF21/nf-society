@@ -2,7 +2,7 @@ export type GameData = {
   game: string;
   id: string;
   v: number;
-  t?: string; // player token for identity verification
+  t?: string;
 };
 
 const SUPPORTED_VERSIONS = [1];

@@ -12,7 +12,7 @@ export async function POST(
 ) {
   try {
     const { id: slug } = await params
-    const { player, move }: { player: string; move: Move } = await req.json()
+    const { player, move, playerToken }: { player: string; move: Move; playerToken?: string } = await req.json()
     if (!player || !move) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     const [game] = await db.select().from(damesGames).where(eq(damesGames.slug, slug))
     if (!game) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -21,6 +21,14 @@ export async function POST(
     const isP1 = game.player1Address?.toLowerCase() === playerLC
     const isP2 = game.player2Address?.toLowerCase() === playerLC
     if (!isP1 && !isP2) return NextResponse.json({ error: 'Not in game' }, { status: 403 })
+    if (playerToken) {
+      if (isP1 && game.player1Token && game.player1Token !== playerToken) {
+        return NextResponse.json({ error: 'Invalid player token' }, { status: 403 })
+      }
+      if (isP2 && game.player2Token && game.player2Token !== playerToken) {
+        return NextResponse.json({ error: 'Invalid player token' }, { status: 403 })
+      }
+    }
     const state = game.gameState as DamesState
     const expectedPlayer = state.currentPlayer === 1 ? game.player1Address : game.player2Address
     if (expectedPlayer?.toLowerCase() !== playerLC) return NextResponse.json({ error: 'Not your turn' }, { status: 403 })
@@ -34,7 +42,7 @@ export async function POST(
     if (finished) {
       try {
         const pot = game.betCrc * 2
-        const fee = Math.ceil(pot * game.commissionPct / 100)
+        const fee = Math.floor(pot * game.commissionPct / 100)
         const winAmount = pot - fee
         const payoutResult = await executePayout({
           gameType: 'dames', gameId: `dames-${game.slug}-winner`,

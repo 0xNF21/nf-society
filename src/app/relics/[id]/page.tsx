@@ -392,7 +392,6 @@ function RealRelicsGame({ id }: { id: string }) {
 
   const [game, setGame] = useState<RelicsGameRow | null>(null)
   const [myAddress, setMyAddress] = useState("")
-  const [addressInput, setAddressInput] = useState("")
   const [addressConfirmed, setAddressConfirmed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
@@ -413,6 +412,7 @@ function RealRelicsGame({ id }: { id: string }) {
 
   const pollRef = useRef<NodeJS.Timeout | null>(null)
   const scanRef = useRef<NodeJS.Timeout | null>(null)
+  const playerTokenRef = useRef<string>("")
 
   const fetchGame = useCallback(async () => {
     try {
@@ -435,6 +435,39 @@ function RealRelicsGame({ id }: { id: string }) {
   useEffect(() => {
     setIsCreator(sessionStorage.getItem(`relics_creator_${id}`) === "1")
   }, [id])
+
+  // Init player token from URL, localStorage, or generate new
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlToken = urlParams.get("setToken")
+    if (urlToken) {
+      localStorage.setItem(`relics-${id}-token`, urlToken)
+      playerTokenRef.current = urlToken
+      window.history.replaceState({}, "", window.location.pathname)
+    } else {
+      const stored = localStorage.getItem(`relics-${id}-token`)
+      if (stored) {
+        playerTokenRef.current = stored
+      } else {
+        const token = crypto.randomUUID().slice(0, 8)
+        localStorage.setItem(`relics-${id}-token`, token)
+        playerTokenRef.current = token
+      }
+    }
+  }, [id])
+
+  // Auto-identify player via token match
+  useEffect(() => {
+    if (!game || !playerTokenRef.current || addressConfirmed) return
+    const token = playerTokenRef.current
+    if (game.player1Token === token && game.player1Address) {
+      setMyAddress(game.player1Address)
+      setAddressConfirmed(true)
+    } else if (game.player2Token === token && game.player2Address) {
+      setMyAddress(game.player2Address)
+      setAddressConfirmed(true)
+    }
+  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed])
 
   // Fetch profiles
   useEffect(() => {
@@ -478,7 +511,7 @@ function RealRelicsGame({ id }: { id: string }) {
     ;(async () => {
       try {
         const { toDataURL } = await import("qrcode")
-        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug)
+        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug, playerTokenRef.current)
         const url = await toDataURL(link, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } })
         if (active) { setQrCode(url); setQrState("ready") }
       } catch {
@@ -490,7 +523,7 @@ function RealRelicsGame({ id }: { id: string }) {
 
   function copyPaymentLink() {
     if (!game) return
-    const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug)
+    const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug, playerTokenRef.current)
     navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -527,7 +560,7 @@ function RealRelicsGame({ id }: { id: string }) {
     const res = await fetch("/api/relics/place", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, player: myAddress, grid: myGrid }),
+      body: JSON.stringify({ id, player: myAddress, grid: myGrid, playerToken: playerTokenRef.current }),
     })
     const data = await res.json()
     if (!data.ok) setError(data.error ?? "Erreur")
@@ -540,7 +573,7 @@ function RealRelicsGame({ id }: { id: string }) {
     const res = await fetch("/api/relics/shot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, player: myAddress, row, col }),
+      body: JSON.stringify({ id, player: myAddress, row, col, playerToken: playerTokenRef.current }),
     })
     const data = await res.json()
     if (data.result) {
@@ -625,7 +658,7 @@ function RealRelicsGame({ id }: { id: string }) {
   const isFinished = game.status === "finished"
   const isWaiting = game.status === "waiting_p1" || game.status === "waiting_p2"
   const winAmount = Math.floor(game.betCrc * 2 * (1 - game.commissionPct / 100))
-  const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug)
+  const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug, playerTokenRef.current)
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-6">
@@ -737,31 +770,13 @@ function RealRelicsGame({ id }: { id: string }) {
           </Card>
         )}
 
-        {/* Player selection */}
+        {/* Spectator notice */}
         {(isPlacing || isPlaying) && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 dark:bg-white/5 backdrop-blur-sm border-ink/10 dark:border-white/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 space-y-3">
-              <p className="text-xs font-semibold text-ink/40 dark:text-white/40 uppercase tracking-widest text-center">
-                {locale === "fr" ? "Qui êtes-vous ?" : "Who are you?"}
+            <CardContent className="p-4 text-center">
+              <p className="text-sm text-ink/60 dark:text-white/60">
+                {locale === "fr" ? "Mode spectateur — vous regardez cette partie" : "Spectator mode — you are watching this game"}
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => { if (game?.player1Address) { setMyAddress(game.player1Address.toLowerCase()); setAddressConfirmed(true); } }}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 dark:border-white/10 hover:border-emerald-400/40 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                >
-                  <span className="text-2xl">🛡️</span>
-                  <span className="text-xs font-bold text-ink/70 dark:text-white/70">J1</span>
-                  <span className="text-[10px] text-ink/40 dark:text-white/40 font-mono">{game?.player1Address ? `${game.player1Address.slice(0, 6)}…${game.player1Address.slice(-4)}` : "?"}</span>
-                </button>
-                <button
-                  onClick={() => { if (game?.player2Address) { setMyAddress(game.player2Address.toLowerCase()); setAddressConfirmed(true); } }}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 dark:border-white/10 hover:border-orange-400/40 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all"
-                >
-                  <span className="text-2xl">⚔️</span>
-                  <span className="text-xs font-bold text-ink/70 dark:text-white/70">J2</span>
-                  <span className="text-[10px] text-ink/40 dark:text-white/40 font-mono">{game?.player2Address ? `${game.player2Address.slice(0, 6)}…${game.player2Address.slice(-4)}` : "?"}</span>
-                </button>
-              </div>
             </CardContent>
           </Card>
         )}

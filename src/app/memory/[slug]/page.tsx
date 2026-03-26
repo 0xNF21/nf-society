@@ -28,6 +28,8 @@ interface MemoryGame {
   commissionPct: number;
   player1Address: string | null;
   player2Address: string | null;
+  player1Token: string | null;
+  player2Token: string | null;
   player1Pairs: number;
   player2Pairs: number;
   currentTurn: string;
@@ -288,7 +290,6 @@ function RealMemoryGame({ slug }: { slug: string }) {
   const t = translations.memory;
   const [game, setGame] = useState<MemoryGame | null>(null);
   const [myAddress, setMyAddress] = useState("");
-  const [addressInput, setAddressInput] = useState("");
   const [addressConfirmed, setAddressConfirmed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -303,6 +304,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const scanRef = useRef<NodeJS.Timeout | null>(null);
+  const playerTokenRef = useRef<string>("");
 
   const grid = game ? buildGrid(game.difficulty, game.gridSeed) : [];
   const config = game ? GRID_CONFIG[game.difficulty] : GRID_CONFIG.medium;
@@ -336,6 +338,39 @@ function RealMemoryGame({ slug }: { slug: string }) {
   useEffect(() => {
     setIsCreator(sessionStorage.getItem(`memory_creator_${slug}`) === "1");
   }, [slug]);
+
+  // Init player token from URL, localStorage, or generate new
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get("setToken");
+    if (urlToken) {
+      localStorage.setItem(`memory-${slug}-token`, urlToken);
+      playerTokenRef.current = urlToken;
+      window.history.replaceState({}, "", window.location.pathname);
+    } else {
+      const stored = localStorage.getItem(`memory-${slug}-token`);
+      if (stored) {
+        playerTokenRef.current = stored;
+      } else {
+        const token = crypto.randomUUID().slice(0, 8);
+        localStorage.setItem(`memory-${slug}-token`, token);
+        playerTokenRef.current = token;
+      }
+    }
+  }, [slug]);
+
+  // Auto-identify player via token match
+  useEffect(() => {
+    if (!game || !playerTokenRef.current || addressConfirmed) return;
+    const token = playerTokenRef.current;
+    if (game.player1Token === token && game.player1Address) {
+      setMyAddress(game.player1Address);
+      setAddressConfirmed(true);
+    } else if (game.player2Token === token && game.player2Address) {
+      setMyAddress(game.player2Address);
+      setAddressConfirmed(true);
+    }
+  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed]);
 
   useEffect(() => {
     if (!game) return;
@@ -376,7 +411,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
     (async () => {
       try {
         const { toDataURL } = await import("qrcode");
-        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "memory", game.slug);
+        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "memory", game.slug, playerTokenRef.current);
         const url = await toDataURL(link, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } });
         if (active) { setQrCode(url); setQrState("ready"); }
       } catch {
@@ -401,7 +436,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
       const res = await fetch(`/api/memory/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerAddress: myAddress, cardIndex: index }),
+        body: JSON.stringify({ playerAddress: myAddress, cardIndex: index, playerToken: playerTokenRef.current }),
       });
       await res.json();
       await fetchGame();
@@ -411,7 +446,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
 
   function copyPaymentLink() {
     if (!game) return;
-    const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "memory", game.slug);
+    const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "memory", game.slug, playerTokenRef.current);
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -453,7 +488,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
   );
 
   const winAmount = Math.floor(game.betCrc * 2 * (1 - game.commissionPct / 100));
-  const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "memory", game.slug);
+  const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "memory", game.slug, playerTokenRef.current);
   const iWon = game.status === "finished" && myAddress && game.winnerAddress?.toLowerCase() === myAddress.toLowerCase();
   const iLost = game.status === "finished" && !!myAddress && !iWon && game.result !== "draw";
 
@@ -573,31 +608,13 @@ function RealMemoryGame({ slug }: { slug: string }) {
           </Card>
         )}
 
-        {/* Player selection */}
+        {/* Spectator notice */}
         {game.status === "playing" && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 space-y-3">
-              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest text-center">
-                {locale === "fr" ? "Qui êtes-vous ?" : "Who are you?"}
+            <CardContent className="p-4 text-center">
+              <p className="text-sm text-ink/60 dark:text-white/60">
+                {locale === "fr" ? "Mode spectateur — vous regardez cette partie" : "Spectator mode — you are watching this game"}
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => { if (game.player1Address) { setMyAddress(game.player1Address); setAddressConfirmed(true); } }}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-pink-400/40 hover:bg-pink-50 transition-all"
-                >
-                  <span className="text-2xl">🧠</span>
-                  <span className="text-xs font-bold text-ink/70">J1</span>
-                  <span className="text-[10px] text-ink/40 font-mono">{game.player1Address ? `${game.player1Address.slice(0, 6)}…${game.player1Address.slice(-4)}` : "?"}</span>
-                </button>
-                <button
-                  onClick={() => { if (game.player2Address) { setMyAddress(game.player2Address); setAddressConfirmed(true); } }}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-purple-400/40 hover:bg-purple-50 transition-all"
-                >
-                  <span className="text-2xl">🎯</span>
-                  <span className="text-xs font-bold text-ink/70">J2</span>
-                  <span className="text-[10px] text-ink/40 font-mono">{game.player2Address ? `${game.player2Address.slice(0, 6)}…${game.player2Address.slice(-4)}` : "?"}</span>
-                </button>
-              </div>
             </CardContent>
           </Card>
         )}
