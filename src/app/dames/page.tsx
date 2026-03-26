@@ -94,7 +94,7 @@ export default function DamesLobbyPage() {
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-ink/[0.03] border border-ink/5 text-xs text-ink/50">
-                  🏆 {locale === 'fr' ? 'Le gagnant remporte' : 'Winner gets'} <span className="font-bold text-ink">{Math.floor(betCrc * 2 * 0.95)} CRC</span>
+                  🏆 {locale === 'fr' ? 'Le gagnant remporte' : 'Winner gets'} <span className="font-bold text-ink">{betCrc * 2 * 0.95} CRC</span>
                   <span className="ml-1">(5% {locale === 'fr' ? 'commission' : 'commission'})</span>
                 </div>
               </>

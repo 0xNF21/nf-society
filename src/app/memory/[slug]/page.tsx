@@ -487,7 +487,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
     </div>
   );
 
-  const winAmount = Math.floor(game.betCrc * 2 * (1 - game.commissionPct / 100));
+  const winAmount = game.betCrc * 2 * (1 - game.commissionPct / 100);
   const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "memory", game.slug, playerTokenRef.current);
   const iWon = game.status === "finished" && myAddress && game.winnerAddress?.toLowerCase() === myAddress.toLowerCase();
   const iLost = game.status === "finished" && !!myAddress && !iWon && game.result !== "draw";

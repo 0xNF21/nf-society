@@ -478,7 +478,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
     : null;
   const isMyTurn = mySymbol !== null && game.status === "active" && game.currentTurn === mySymbol;
   const winLine = game.status === "finished" ? getWinLine(game.board) : null;
-  const winAmount = Math.floor(game.betCrc * 2 * (1 - game.commissionPct / 100));
+  const winAmount = game.betCrc * 2 * (1 - game.commissionPct / 100);
   const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug, playerTokenRef.current);
 
   return (

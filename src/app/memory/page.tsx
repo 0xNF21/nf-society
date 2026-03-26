@@ -123,7 +123,7 @@ export default function MemoryLobby() {
             </div>
 
             <div className="p-3 rounded-xl bg-ink/[0.03] border border-ink/5 text-xs text-ink/50">
-              🏆 {t.winnerGets[locale]} <span className="font-bold text-ink">{Math.floor(betCrc * 2 * 0.95)} CRC</span>
+              🏆 {t.winnerGets[locale]} <span className="font-bold text-ink">{betCrc * 2 * 0.95} CRC</span>
               <span className="ml-1">{t.commission[locale]}</span>
             </div>
 

@@ -475,7 +475,7 @@ function RealGame({ id }: { id: string }) {
 
               <div className="p-3 rounded-xl bg-ink/[0.03] border border-ink/5 text-xs text-ink/50 text-center space-y-0.5">
                 <p>{locale === 'fr' ? 'Paiement via Circles sur Gnosis Chain' : 'Payment via Circles on Gnosis Chain'}</p>
-                <p>🏆 {locale === 'fr' ? 'Gain du gagnant' : 'Winner gets'}: <span className="font-bold text-ink">{Math.floor(game.betCrc * 2 * 0.95)} CRC</span> (5% commission)</p>
+                <p>🏆 {locale === 'fr' ? 'Gain du gagnant' : 'Winner gets'}: <span className="font-bold text-ink">{game.betCrc * 2 * 0.95} CRC</span> (5% commission)</p>
               </div>
             </CardContent>
           </Card>

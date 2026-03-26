@@ -657,7 +657,7 @@ function RealRelicsGame({ id }: { id: string }) {
   const isPlaying = game.status === "playing"
   const isFinished = game.status === "finished"
   const isWaiting = game.status === "waiting_p1" || game.status === "waiting_p2"
-  const winAmount = Math.floor(game.betCrc * 2 * (1 - game.commissionPct / 100))
+  const winAmount = game.betCrc * 2 * (1 - game.commissionPct / 100)
   const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug, playerTokenRef.current)
 
   return (
