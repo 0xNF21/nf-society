@@ -137,20 +137,12 @@ export async function getJackpotInfo(): Promise<{
   contributors: number;
   percentage: number;
 }> {
-  const now = new Date();
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-31`;
-
   const result = await db
     .select({
       total: sql<number>`COALESCE(SUM(${jackpotPool.amountCrc}), 0)`,
       contributors: sql<number>`COUNT(DISTINCT ${jackpotPool.address})`,
     })
-    .from(jackpotPool)
-    .where(and(
-      sql`${jackpotPool.date} >= ${monthStart}`,
-      sql`${jackpotPool.date} <= ${monthEnd}`,
-    ));
+    .from(jackpotPool);
 
   const total = Number(result[0]?.total ?? 0);
   const contributors = Number(result[0]?.contributors ?? 0);
