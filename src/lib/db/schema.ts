@@ -45,7 +45,7 @@ export const payouts = pgTable("payouts", {
   gameType: text("game_type").notNull(),
   gameId: text("game_id").notNull().unique(),
   recipientAddress: text("recipient_address").notNull(),
-  amountCrc: integer("amount_crc").notNull(),
+  amountCrc: real("amount_crc").notNull(),
   reason: text("reason"),
   wrapTxHash: text("wrap_tx_hash"),
   transferTxHash: text("transfer_tx_hash"),
