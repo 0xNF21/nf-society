@@ -189,7 +189,7 @@ export async function POST(
 
         // Trigger payout
         const pot = game.betCrc * 2;
-        const fee = Math.floor(pot * game.commissionPct / 100);
+        const fee = Math.ceil(pot * game.commissionPct / 100);
         const winAmount = pot - fee;
 
         try {

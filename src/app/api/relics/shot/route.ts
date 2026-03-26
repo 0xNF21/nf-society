@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     if (defeated) {
       try {
         const pot = game.betCrc * 2
-        const fee = Math.floor(pot * game.commissionPct / 100)
+        const fee = Math.ceil(pot * game.commissionPct / 100)
         const winAmount = pot - fee
         const payoutResult = await executePayout({
           gameType: "relics",
