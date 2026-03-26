@@ -43,8 +43,11 @@ export function generateGamePaymentLink(
   amountCRC: number,
   gameType: string,
   gameSlug: string,
+  playerToken?: string,
 ): string {
-  const hexData = encodeGameData({ game: gameType, id: gameSlug, v: 1 });
+  const data: { game: string; id: string; v: number; t?: string } = { game: gameType, id: gameSlug, v: 1 };
+  if (playerToken) data.t = playerToken;
+  const hexData = encodeGameData(data);
   return `https://app.gnosis.io/transfer/${recipientAddress}/crc?data=${encodeURIComponent(hexData)}&amount=${amountCRC}`;
 }
 

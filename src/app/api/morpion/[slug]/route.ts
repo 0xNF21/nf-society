@@ -39,7 +39,7 @@ export async function POST(
   const { slug } = await params;
   try {
     const body = await req.json();
-    const { playerAddress, position } = body;
+    const { playerAddress, position, playerToken } = body;
 
     if (!playerAddress || typeof position !== "number" || position < 0 || position > 8) {
       return NextResponse.json({ error: "playerAddress and position (0-8) required" }, { status: 400 });
@@ -57,6 +57,16 @@ export async function POST(
     const isP1 = addr === p1;
     const isP2 = addr === p2;
     if (!isP1 && !isP2) return NextResponse.json({ error: "You are not a player in this game" }, { status: 403 });
+
+    // Verify player token if tokens exist (prevents impersonation)
+    if (playerToken) {
+      if (isP1 && game.player1Token && game.player1Token !== playerToken) {
+        return NextResponse.json({ error: "Invalid player token" }, { status: 403 });
+      }
+      if (isP2 && game.player2Token && game.player2Token !== playerToken) {
+        return NextResponse.json({ error: "Invalid player token" }, { status: 403 });
+      }
+    }
 
     const expectedSymbol = game.currentTurn;
     if (isP1 && expectedSymbol !== "X") return NextResponse.json({ error: "Not your turn" }, { status: 400 });

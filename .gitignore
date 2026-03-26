@@ -10,3 +10,5 @@ out
 nf_society_export.sql
 tsconfig.tsbuildinfo
 attached_assets/
+
+.vercel

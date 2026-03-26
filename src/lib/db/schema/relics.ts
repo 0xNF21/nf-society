@@ -12,6 +12,8 @@ export const relicsGames = pgTable('relics_games', {
   player2Address:   text('player2_address'),
   player1TxHash:    text('player1_tx_hash'),
   player2TxHash:    text('player2_tx_hash'),
+  player1Token:     text('player1_token'),
+  player2Token:     text('player2_token'),
   grid1:            jsonb('grid1').$type<PlayerGrid>(),
   grid2:            jsonb('grid2').$type<PlayerGrid>(),
   ready1:           integer('ready1').notNull().default(0),

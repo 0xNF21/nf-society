@@ -61,11 +61,15 @@ export async function POST(req: NextRequest) {
       knownTxHashes.add(txHash);
       globalClaimedTxHashes.add(txHash);
 
+      // Extract player token from payment data
+      const playerToken = payment.gameData?.t || null;
+
       // Assign player
       if (!game.player1Address) {
         await db.update(morpionGames).set({
           player1Address: playerAddress,
           player1TxHash: txHash,
+          player1Token: playerToken,
           status: "waiting_p2",
           updatedAt: new Date(),
         }).where(eq(morpionGames.id, game.id));
@@ -76,6 +80,7 @@ export async function POST(req: NextRequest) {
         await db.update(morpionGames).set({
           player2Address: playerAddress,
           player2TxHash: txHash,
+          player2Token: playerToken,
           status: "active",
           updatedAt: new Date(),
         }).where(eq(morpionGames.id, game.id));

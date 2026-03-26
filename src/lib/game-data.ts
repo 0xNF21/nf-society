@@ -2,6 +2,7 @@ export type GameData = {
   game: string;
   id: string;
   v: number;
+  t?: string; // player token for identity verification
 };
 
 const SUPPORTED_VERSIONS = [1];
@@ -41,7 +42,7 @@ export function decodeGameData(raw: string): GameData | null {
     ) {
       return null;
     }
-    return { game: parsed.game, id: parsed.id, v: parsed.v };
+    return { game: parsed.game, id: parsed.id, v: parsed.v, ...(parsed.t ? { t: parsed.t } : {}) };
   } catch {
     return null;
   }

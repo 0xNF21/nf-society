@@ -21,6 +21,8 @@ interface MorpionGame {
   commissionPct: number;
   player1Address: string | null;
   player2Address: string | null;
+  player1Token: string | null;
+  player2Token: string | null;
   board: string;
   currentTurn: string;
   status: GameStatus;
@@ -284,8 +286,8 @@ function RealMorpionGame({ slug }: { slug: string }) {
   const te = translations.errors;
   const [game, setGame] = useState<MorpionGame | null>(null);
   const [myAddress, setMyAddress] = useState("");
-  const [addressInput, setAddressInput] = useState("");
   const [addressConfirmed, setAddressConfirmed] = useState(false);
+  const playerTokenRef = useRef<string>("");
   const [loading, setLoading] = useState(true);
   const [moveError, setMoveError] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -317,9 +319,31 @@ function RealMorpionGame({ slug }: { slug: string }) {
     setScanning(false);
   }, [slug, scanning, fetchGame]);
 
+  // Init player token from localStorage or generate new one
   useEffect(() => {
+    const stored = localStorage.getItem(`morpion-${slug}-token`);
+    if (stored) {
+      playerTokenRef.current = stored;
+    } else {
+      const token = crypto.randomUUID().slice(0, 8);
+      localStorage.setItem(`morpion-${slug}-token`, token);
+      playerTokenRef.current = token;
+    }
     setIsCreator(sessionStorage.getItem(`morpion_creator_${slug}`) === "1");
   }, [slug]);
+
+  // Auto-identify player when game has tokens
+  useEffect(() => {
+    if (!game || !playerTokenRef.current || addressConfirmed) return;
+    const token = playerTokenRef.current;
+    if (game.player1Token === token && game.player1Address) {
+      setMyAddress(game.player1Address);
+      setAddressConfirmed(true);
+    } else if (game.player2Token === token && game.player2Address) {
+      setMyAddress(game.player2Address);
+      setAddressConfirmed(true);
+    }
+  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed]);
 
   useEffect(() => {
     if (!game) return;
@@ -360,7 +384,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
     (async () => {
       try {
         const { toDataURL } = await import("qrcode");
-        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug);
+        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug, playerTokenRef.current);
         const url = await toDataURL(link, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } });
         if (active) { setQrCode(url); setQrState("ready"); }
       } catch {
@@ -391,7 +415,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
       const res = await fetch(`/api/morpion/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerAddress: myAddress, position }),
+        body: JSON.stringify({ playerAddress: myAddress, position, playerToken: playerTokenRef.current }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -401,7 +425,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
 
   function copyPaymentLink() {
     if (!game) return;
-    const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug);
+    const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug, playerTokenRef.current);
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -444,7 +468,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
   const isMyTurn = mySymbol !== null && game.status === "active" && game.currentTurn === mySymbol;
   const winLine = game.status === "finished" ? getWinLine(game.board) : null;
   const winAmount = Math.floor(game.betCrc * 2 * (1 - game.commissionPct / 100));
-  const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug);
+  const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug, playerTokenRef.current);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
@@ -580,31 +604,13 @@ function RealMorpionGame({ slug }: { slug: string }) {
           </Card>
         )}
 
-        {/* Player selection */}
+        {/* Spectator notice — game active but user is not a player */}
         {game.status === "active" && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 space-y-3">
-              <p className="text-xs font-semibold text-ink/40 uppercase tracking-widest text-center">
-                {locale === "fr" ? "Qui êtes-vous ?" : "Who are you?"}
+            <CardContent className="p-4 text-center">
+              <p className="text-sm text-ink/60">
+                {locale === "fr" ? "👀 Mode spectateur — vous regardez la partie" : "👀 Spectator mode — you're watching the game"}
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => { if (game.player1Address) { setMyAddress(game.player1Address); setAddressConfirmed(true); } }}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-marine/40 hover:bg-marine/5 transition-all"
-                >
-                  <img src="/morpion/player1.png" alt="J1" className="w-10 h-10 object-contain" />
-                  <span className="text-xs font-bold text-ink/70">J1 (X)</span>
-                  <span className="text-[10px] text-ink/40 font-mono">{game.player1Address ? shortenAddress(game.player1Address) : "?"}</span>
-                </button>
-                <button
-                  onClick={() => { if (game.player2Address) { setMyAddress(game.player2Address); setAddressConfirmed(true); } }}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-ink/10 hover:border-orange-400/40 hover:bg-orange-50 transition-all"
-                >
-                  <img src="/morpion/player2.png" alt="J2" className="w-10 h-10 object-contain" />
-                  <span className="text-xs font-bold text-ink/70">J2 (O)</span>
-                  <span className="text-[10px] text-ink/40 font-mono">{game.player2Address ? shortenAddress(game.player2Address) : "?"}</span>
-                </button>
-              </div>
             </CardContent>
           </Card>
         )}

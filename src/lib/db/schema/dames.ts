@@ -12,6 +12,8 @@ export const damesGames = pgTable('dames_games', {
   player2Address:   text('player2_address'),
   player1TxHash:    text('player1_tx_hash'),
   player2TxHash:    text('player2_tx_hash'),
+  player1Token:     text('player1_token'),
+  player2Token:     text('player2_token'),
   gameState:        jsonb('game_state').$type<DamesState>(),
   winnerAddress:    text('winner_address'),
   payoutStatus:     text('payout_status').notNull().default('pending'),

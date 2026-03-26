@@ -15,6 +15,13 @@
       "when": 1773951161307,
       "tag": "0001_brown_ma_gnuci",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774454938485,
+      "tag": "0002_cynical_grey_gargoyle",
+      "breakpoints": true
     }
   ]
 }
