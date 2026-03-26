@@ -406,48 +406,46 @@ function RealGame({ id }: { id: string }) {
           </Card>
         )}
 
-        {/* Paiement */}
-        {(game.status === 'waiting_p1' || game.status === 'waiting_p2') && (
+        {/* J1 déjà payé — attend J2 */}
+        {game.status === 'waiting_p2' && addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
             <CardContent className="p-5 space-y-4">
-              <p className="text-sm font-semibold text-ink">
-                {game.status === 'waiting_p1' ? t.payToStart[locale] : t.waitingP2[locale]}
-              </p>
+              <p className="text-sm font-semibold text-ink">{t.waitingP2[locale]}</p>
+              <p className="text-xs text-ink/50">{t.inviteP2[locale]}</p>
+              <div className="flex gap-2">
+                <code className="flex-1 px-3 py-2.5 rounded-xl border border-ink/10 bg-white/80 text-xs font-mono text-ink/70 truncate">{id}</code>
+                <Button variant="outline" size="sm" onClick={copyId} className="rounded-xl border-ink/20">
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+              <Button variant="ghost" onClick={scanPayments} disabled={scanning}
+                className="w-full rounded-xl text-ink/40">
+                <RefreshCw className={`w-3 h-3 mr-1 ${scanning ? 'animate-spin' : ''}`} />
+                {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
-              {game.status === 'waiting_p1' && (
-                <>
-                  <a href={payLink} target="_blank" rel="noopener noreferrer">
-                    <Button className="w-full rounded-xl font-bold" style={{ background: '#251B9F' }}>
-                      {t.payCrc[locale].replace('{amount}', String(game.betCrc))}
-                    </Button>
-                  </a>
-                  <Button variant="outline" onClick={copyPayment}
-                    className="w-full rounded-xl border-ink/20 hover:border-marine/40 text-ink/60">
-                    {copiedPayLink ? <><Check className="w-4 h-4" /> {t.copied[locale]}</> : <><Copy className="w-4 h-4" /> {locale === 'fr' ? 'Copier le lien de paiement' : 'Copy payment link'}</>}
-                  </Button>
-                </>
-              )}
-
-              {game.status === 'waiting_p2' && (
-                <>
-                  <p className="text-xs text-ink/50">{t.inviteP2[locale]}</p>
-                  <div className="flex gap-2">
-                    <code className="flex-1 px-3 py-2.5 rounded-xl border border-ink/10 bg-white/80 text-xs font-mono text-ink/70 truncate">{id}</code>
-                    <Button variant="outline" size="sm" onClick={copyId} className="rounded-xl border-ink/20">
-                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                  <a href={payLink} target="_blank" rel="noopener noreferrer">
-                    <Button className="w-full rounded-xl font-bold" style={{ background: '#251B9F' }}>
-                      {t.payToJoin[locale].replace('{amount}', String(game.betCrc))}
-                    </Button>
-                  </a>
-                  <Button variant="outline" onClick={copyPayment}
-                    className="w-full rounded-xl border-ink/20 hover:border-marine/40 text-ink/60">
-                    {copiedPayLink ? <><Check className="w-4 h-4" /> {t.copied[locale]}</> : <><Copy className="w-4 h-4" /> {locale === 'fr' ? 'Copier le lien de paiement' : 'Copy payment link'}</>}
-                  </Button>
-                </>
-              )}
+        {/* Paiement — J1 pas encore payé OU J2 qui doit payer */}
+        {((game.status === 'waiting_p1') || (game.status === 'waiting_p2' && !addressConfirmed)) && (
+          <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-ink/40 uppercase tracking-widest">
+                  {game.status === 'waiting_p1' ? t.payToStart[locale] : t.payToJoin[locale]}
+                </span>
+                <span className="text-xs font-bold text-marine bg-marine/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{game.betCrc} CRC</span>
+              </div>
+              <a href={payLink} target="_blank" rel="noopener noreferrer">
+                <Button className="w-full rounded-xl font-bold" style={{ background: '#251B9F' }}>
+                  {t.payCrc[locale].replace('{amount}', String(game.betCrc))}
+                </Button>
+              </a>
+              <Button variant="outline" onClick={copyPayment}
+                className="w-full rounded-xl border-ink/20 hover:border-marine/40 text-ink/60">
+                {copiedPayLink ? <><Check className="w-4 h-4" /> {t.copied[locale]}</> : <><Copy className="w-4 h-4" /> {locale === 'fr' ? 'Copier le lien de paiement' : 'Copy payment link'}</>}
+              </Button>
 
               {/* QR Code */}
               <div className="flex justify-center">
