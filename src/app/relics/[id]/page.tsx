@@ -358,8 +358,6 @@ function DemoRelicsGame() {
         </div>
       </div>
 
-      {lastResult && <div className="text-lg font-bold text-ink dark:text-white animate-bounce">{lastResult}</div>}
-
       {phase === "finished" && (
         <Card className="w-full max-w-sm rounded-xl border-0 shadow-sm bg-white/60 dark:bg-white/5 backdrop-blur-sm">
           <CardContent className="py-4 text-center">
@@ -380,9 +378,18 @@ function DemoRelicsGame() {
       {/* Scoreboard */}
       <GameScoreboard myGrid={myGrid} opponentGrid={botGrid} locale={locale} isDark={isDark} />
 
-      <div className="flex flex-col items-center gap-2">
+      <div className="relative flex flex-col items-center gap-2">
         <p className="text-ink/50 dark:text-white/50 text-xs uppercase tracking-widest">{t.opponentGrid[locale]}</p>
         {renderGrid(botGrid, isMyTurn && phase === "playing", false)}
+        {lastResult && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <div className={`px-5 py-3 rounded-2xl text-lg font-black text-white shadow-xl animate-bounce ${
+              lastResult.includes("💥") ? "bg-red-500/90" : lastResult.includes("🔥") ? "bg-orange-500/90" : "bg-blue-500/90"
+            }`}>
+              {lastResult}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col items-center gap-2">
@@ -855,14 +862,21 @@ function RealRelicsGame({ id }: { id: string }) {
         {/* Playing/Finished grids */}
         {(isPlaying || isFinished) && addressConfirmed && (
           <>
-            {lastResult && <div className="text-lg font-bold text-ink dark:text-white animate-bounce text-center mb-2">{lastResult}</div>}
-
             {/* Scoreboard */}
             <GameScoreboard myGrid={myGridServer as PlayerGrid | null} opponentGrid={opponentGrid as PlayerGrid | null} locale={locale} isDark={isDark} />
 
-            <div className="flex flex-col items-center gap-2 mb-4">
+            <div className="relative flex flex-col items-center gap-2 mb-4">
               <p className="text-ink/50 dark:text-white/50 text-xs uppercase tracking-widest">{t.opponentGrid[locale]}</p>
               {renderGrid(opponentGrid as PlayerGrid | null, !!(isMyTurn && isPlaying), false)}
+              {lastResult && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                  <div className={`px-5 py-3 rounded-2xl text-lg font-black text-white shadow-xl animate-bounce ${
+                    lastResult.includes("💥") ? "bg-red-500/90" : lastResult.includes("🔥") ? "bg-orange-500/90" : "bg-blue-500/90"
+                  }`}>
+                    {lastResult}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col items-center gap-2 mb-4">
