@@ -503,7 +503,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
       <div className="w-full max-w-md">
 
         {/* Back + slug */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 space-y-2">
           <Link href="/memory" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink transition-colors">
             <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
           </Link>

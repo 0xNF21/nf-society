@@ -371,13 +371,15 @@ function RealGame({ id }: { id: string }) {
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-8">
       <div className="w-full max-w-lg">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 space-y-2">
           <Link href="/dames" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink transition-colors">
             <ArrowLeft className="w-4 h-4" /> {locale === 'fr' ? 'Retour' : 'Back'}
           </Link>
-          <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg font-bold">
-            {game.betCrc} CRC
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-ink/40">{locale === 'fr' ? 'Partie' : 'Game'}</span>
+            <span className="font-mono font-bold text-marine text-sm bg-marine/10 px-2.5 py-1 rounded-lg">{id}</span>
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg font-bold">{game.betCrc} CRC</span>
+          </div>
         </div>
 
         {/* Status bar */}

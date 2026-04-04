@@ -698,7 +698,7 @@ function RealRelicsGame({ id }: { id: string }) {
       <div className="w-full max-w-sm">
 
         {/* Back + Game ID */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 space-y-2">
           <Link href="/relics" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" /> {t.title[locale]}
           </Link>
