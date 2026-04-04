@@ -37,14 +37,38 @@ export function createInitialState(): DamesState {
 function getCaptures(board: Board, r: number, c: number): Move[] {
   const cell = board[r][c]
   if (!cell) return []
-  const dirs = cell.isKing ? [[-1,-1],[-1,1],[1,-1],[1,1]] : cell.player === 1 ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]
+  // All pawns can capture in all 4 diagonal directions (French rules)
+  const dirs: [number, number][] = [[-1,-1],[-1,1],[1,-1],[1,1]]
   const moves: Move[] = []
-  for (const [dr, dc] of dirs) {
-    const [mr, mc, tr, tc] = [r+dr, c+dc, r+dr*2, c+dc*2]
-    if (tr < 0 || tr >= GRID_SIZE || tc < 0 || tc >= GRID_SIZE) continue
-    if (!board[mr]?.[mc] || board[mr][mc]!.player === cell.player) continue
-    if (board[tr][tc] !== null) continue
-    moves.push({ from: [r, c], to: [tr, tc], captures: [[mr, mc]] })
+
+  if (cell.isKing) {
+    // King flies along diagonals, can capture at distance
+    for (const [dr, dc] of dirs) {
+      let mr = r + dr, mc = c + dc
+      // Slide until we hit something
+      while (mr >= 0 && mr < GRID_SIZE && mc >= 0 && mc < GRID_SIZE && board[mr][mc] === null) {
+        mr += dr; mc += dc
+      }
+      // Check if we hit an enemy piece
+      if (mr < 0 || mr >= GRID_SIZE || mc < 0 || mc >= GRID_SIZE) continue
+      if (!board[mr][mc] || board[mr][mc]!.player === cell.player) continue
+      const capturedR = mr, capturedC = mc
+      // Land on any empty square after the captured piece
+      let tr = mr + dr, tc = mc + dc
+      while (tr >= 0 && tr < GRID_SIZE && tc >= 0 && tc < GRID_SIZE && board[tr][tc] === null) {
+        moves.push({ from: [r, c], to: [tr, tc], captures: [[capturedR, capturedC]] })
+        tr += dr; tc += dc
+      }
+    }
+  } else {
+    // Regular pawn — capture in all 4 directions but only 1 square away
+    for (const [dr, dc] of dirs) {
+      const [mr, mc, tr, tc] = [r+dr, c+dc, r+dr*2, c+dc*2]
+      if (tr < 0 || tr >= GRID_SIZE || tc < 0 || tc >= GRID_SIZE) continue
+      if (!board[mr]?.[mc] || board[mr][mc]!.player === cell.player) continue
+      if (board[tr][tc] !== null) continue
+      moves.push({ from: [r, c], to: [tr, tc], captures: [[mr, mc]] })
+    }
   }
   return moves
 }
@@ -52,11 +76,29 @@ function getCaptures(board: Board, r: number, c: number): Move[] {
 function getSimpleMoves(board: Board, r: number, c: number): Move[] {
   const cell = board[r][c]
   if (!cell) return []
-  const dirs = cell.isKing ? [[-1,-1],[-1,1],[1,-1],[1,1]] : cell.player === 1 ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]
-  return dirs
-    .map(([dr, dc]) => [r+dr, c+dc] as [number, number])
-    .filter(([tr, tc]) => tr >= 0 && tr < GRID_SIZE && tc >= 0 && tc < GRID_SIZE && board[tr][tc] === null)
-    .map(([tr, tc]) => ({ from: [r, c] as [number, number], to: [tr, tc] as [number, number], captures: [] }))
+  const moves: Move[] = []
+
+  if (cell.isKing) {
+    // King slides along all 4 diagonals
+    const dirs: [number, number][] = [[-1,-1],[-1,1],[1,-1],[1,1]]
+    for (const [dr, dc] of dirs) {
+      let tr = r + dr, tc = c + dc
+      while (tr >= 0 && tr < GRID_SIZE && tc >= 0 && tc < GRID_SIZE && board[tr][tc] === null) {
+        moves.push({ from: [r, c], to: [tr, tc], captures: [] })
+        tr += dr; tc += dc
+      }
+    }
+  } else {
+    // Regular pawn — move forward only (no backward simple moves)
+    const dirs: [number, number][] = cell.player === 1 ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]
+    for (const [dr, dc] of dirs) {
+      const [tr, tc] = [r+dr, c+dc]
+      if (tr >= 0 && tr < GRID_SIZE && tc >= 0 && tc < GRID_SIZE && board[tr][tc] === null) {
+        moves.push({ from: [r, c], to: [tr, tc], captures: [] })
+      }
+    }
+  }
+  return moves
 }
 
 export function getValidMoves(state: DamesState): Move[] {
