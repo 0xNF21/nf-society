@@ -204,15 +204,33 @@ function DemoRelicsGame() {
     const { grid: newGrid, result } = processShot(botGrid, row, col)
     if (result === "already_shot") return
     setBotGrid(newGrid)
-    const msgs: Record<string, string> = { hit: t.hit[locale], miss: t.miss[locale], sunk: t.sunk[locale] }
-    setLastResult(msgs[result] ?? "")
-    setTimeout(() => setLastResult(""), 2000)
+    const RELIC_NAMES_DEMO: Record<string, string> = {
+      crown: locale === "fr" ? "👑 Couronne" : "👑 Crown",
+      scepter: locale === "fr" ? "🔱 Sceptre" : "🔱 Scepter",
+      cup: locale === "fr" ? "🏆 Coupe" : "🏆 Cup",
+      scroll: locale === "fr" ? "📜 Parchemin" : "📜 Scroll",
+      owl: locale === "fr" ? "🦉 Hibou" : "🦉 Owl",
+    }
+    let demoMsg = ""
+    if (result === "sunk") {
+      const sunkRelic = newGrid.relics.find(r => r.sunk && r.cells.some(([cr, cc]) => cr === row && cc === col))
+      const name = sunkRelic ? (RELIC_NAMES_DEMO[sunkRelic.id] ?? sunkRelic.id) : ""
+      demoMsg = locale === "fr" ? `💥 ${name} coulé !` : `💥 ${name} sunk!`
+    } else if (result === "hit") {
+      demoMsg = locale === "fr" ? "🔥 Touché ! Rejoue !" : "🔥 Hit! Play again!"
+    } else {
+      demoMsg = t.miss[locale]
+    }
+    setLastResult(demoMsg)
+    setTimeout(() => setLastResult(""), 3000)
     if (isDefeated(newGrid)) {
       setPhase("finished")
       setWinner("me")
       setXpGained(addXp("relics_win"))
       return
     }
+    // Hit or sunk = play again
+    if (result === "hit" || result === "sunk") return
     setIsMyTurn(false)
     setBotThinking(true)
   }
@@ -577,9 +595,24 @@ function RealRelicsGame({ id }: { id: string }) {
     })
     const data = await res.json()
     if (data.result) {
-      const msgs: Record<string, string> = { hit: t.hit[locale], miss: t.miss[locale], sunk: t.sunk[locale] }
-      setLastResult(msgs[data.result] ?? "")
-      setTimeout(() => setLastResult(""), 2000)
+      const RELIC_NAMES: Record<string, string> = {
+        crown: locale === "fr" ? "👑 Couronne" : "👑 Crown",
+        scepter: locale === "fr" ? "🔱 Sceptre" : "🔱 Scepter",
+        cup: locale === "fr" ? "🏆 Coupe" : "🏆 Cup",
+        scroll: locale === "fr" ? "📜 Parchemin" : "📜 Scroll",
+        owl: locale === "fr" ? "🦉 Hibou" : "🦉 Owl",
+      }
+      let msg = ""
+      if (data.result === "sunk" && data.sunkRelicId) {
+        const name = RELIC_NAMES[data.sunkRelicId] ?? data.sunkRelicId
+        msg = locale === "fr" ? `💥 ${name} coulé !` : `💥 ${name} sunk!`
+      } else if (data.result === "hit") {
+        msg = locale === "fr" ? "🔥 Touché ! Rejoue !" : "🔥 Hit! Play again!"
+      } else if (data.result === "miss") {
+        msg = t.miss[locale]
+      }
+      setLastResult(msg)
+      setTimeout(() => setLastResult(""), 3000)
     }
     if (data.error) setError(data.error)
     fetchGame()

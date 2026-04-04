@@ -36,10 +36,21 @@ export async function POST(req: NextRequest) {
     const nextTurn = isP1 ? game.player2Address : game.player1Address
     const defeated = isDefeated(newGrid)
 
+    // On a hit or sunk, the shooter plays again
+    const keepTurn = result === 'hit' || result === 'sunk'
+
+    // Find which relic was sunk (if any)
+    let sunkRelicId: string | null = null
+    if (result === 'sunk') {
+      const hitRelic = (newGrid.relics as Array<{ id: string; cells: [number, number][]; sunk: boolean }>)
+        .find(r => r.sunk && r.cells.some(([cr, cc]: [number, number]) => cr === row && cc === col))
+      if (hitRelic) sunkRelicId = hitRelic.id
+    }
+
     const update: Record<string, unknown> = {
       updatedAt: new Date(),
-      lastShot: { row, col, result, shooter: player },
-      currentTurn: defeated ? null : nextTurn,
+      lastShot: { row, col, result, shooter: player, sunkRelicId },
+      currentTurn: defeated ? null : (keepTurn ? player : nextTurn),
       ...(isP1 ? { grid2: newGrid } : { grid1: newGrid }),
       ...(defeated ? { status: 'finished', winnerAddress: player } : {}),
     }
@@ -72,7 +83,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ result, winner: defeated ? player : null })
+    return NextResponse.json({ result, winner: defeated ? player : null, sunkRelicId, keepTurn })
   } catch (e) {
     console.error('[Relics] Shot error:', e)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
