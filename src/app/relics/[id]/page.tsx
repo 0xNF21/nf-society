@@ -275,11 +275,12 @@ function DemoRelicsGame() {
             const isPreview = previewCells.some(([pr, pc]) => pr === r && pc === c)
             const isHit = isShot && !!cell
             const isMiss = isShot && !cell
-            const isSunkCell = isHit && cell?.sunk
+            const isSunkCell = cell?.sunk
             let bg = isDark ? "bg-white/5" : "bg-ink/5"
-            if (showRelics && cell && !isShot) bg = cell.sunk ? "bg-red-900/60" : "bg-marine/60"
+            if (showRelics && cell && !isSunkCell && !isShot) bg = "bg-marine/60"
+            if (showRelics && isSunkCell) bg = "bg-red-900/90 ring-1 ring-red-400/50"
             if (isHit && !isSunkCell) bg = "bg-red-500/80"
-            if (isSunkCell) bg = "bg-red-900/90 ring-1 ring-red-400/50"
+            if (isHit && isSunkCell) bg = "bg-red-900/90 ring-1 ring-red-400/50"
             if (isMiss) bg = isDark ? "bg-blue-400/30" : "bg-blue-200/50"
             if (isPreview) bg = "bg-amber-400/40"
             return (
@@ -288,9 +289,9 @@ function DemoRelicsGame() {
                 onMouseEnter={() => showRelics && handleGridHover(r, c)}
                 onClick={() => { if (showRelics) handleGridClick(r, c); if (clickable) handleShot(r, c) }}>
                 {isHit && !isSunkCell && "💥"}
-                {isSunkCell && <><span className="text-[10px]">{RELICS[cell!.relicId].emoji}</span><span className="absolute inset-0 flex items-center justify-center text-red-300 font-black text-lg leading-none">✕</span></>}
+                {isSunkCell && cell && <><span className="text-[10px]">{RELICS[cell.relicId].emoji}</span><span className="absolute inset-0 flex items-center justify-center text-red-300 font-black text-lg leading-none">✕</span></>}
                 {isMiss && "·"}
-                {showRelics && cell && !isShot && <span className="text-[10px]">{RELICS[cell.relicId].emoji}</span>}
+                {showRelics && cell && !isShot && !isSunkCell && <span className="text-[10px]">{RELICS[cell.relicId].emoji}</span>}
               </div>
             )
           })
@@ -643,11 +644,12 @@ function RealRelicsGame({ id }: { id: string }) {
             const isPreview = previewCells.some(([pr, pc]) => pr === r && pc === c)
             const isHit = isShot && !!cell
             const isMiss = isShot && !cell
-            const isSunkCell = isHit && cell?.sunk
+            const isSunkCell = cell?.sunk
             let bg = isDark ? "bg-white/5" : "bg-ink/5"
-            if (showRelics && cell && !isShot) bg = cell.sunk ? "bg-red-900/60" : "bg-marine/60"
+            if (showRelics && cell && !isSunkCell && !isShot) bg = "bg-marine/60"
+            if (showRelics && isSunkCell) bg = "bg-red-900/90 ring-1 ring-red-400/50"
             if (isHit && !isSunkCell) bg = "bg-red-500/80"
-            if (isSunkCell) bg = "bg-red-900/90 ring-1 ring-red-400/50"
+            if (isHit && isSunkCell) bg = "bg-red-900/90 ring-1 ring-red-400/50"
             if (isMiss) bg = isDark ? "bg-blue-400/30" : "bg-blue-200/50"
             if (isPreview) bg = "bg-amber-400/40"
             return (
@@ -656,9 +658,9 @@ function RealRelicsGame({ id }: { id: string }) {
                 onMouseEnter={() => placingMode && handleGridHover(r, c)}
                 onClick={() => { if (placingMode) handleGridClick(r, c); if (clickable) handleShot(r, c) }}>
                 {isHit && !isSunkCell && "💥"}
-                {isSunkCell && <><span className="text-[10px]">{RELICS[cell!.relicId].emoji}</span><span className="absolute inset-0 flex items-center justify-center text-red-300 font-black text-lg leading-none">✕</span></>}
+                {isSunkCell && cell && <><span className="text-[10px]">{RELICS[cell.relicId].emoji}</span><span className="absolute inset-0 flex items-center justify-center text-red-300 font-black text-lg leading-none">✕</span></>}
                 {isMiss && "·"}
-                {showRelics && cell && !isShot && <span className="text-[10px]">{RELICS[cell.relicId].emoji}</span>}
+                {showRelics && cell && !isShot && !isSunkCell && <span className="text-[10px]">{RELICS[cell.relicId].emoji}</span>}
               </div>
             )
           })
