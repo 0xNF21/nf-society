@@ -35,7 +35,8 @@ function timeAgo(dateStr: string, locale: "fr" | "en") {
 
 export default function LobbyPage() {
   const { locale } = useLocale();
-  const { isDark } = useTheme();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
