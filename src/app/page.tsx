@@ -5,17 +5,20 @@ import Image from "next/image";
 import { ArrowRight, BarChart3, Dice5, Swords, ArrowLeftRight, ShoppingBag, FlaskConical } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
+import { useFeatureFlags } from "@/components/feature-flag-provider";
 import { translations } from "@/lib/i18n";
 
 export default function LandingPage() {
   const { locale } = useLocale();
   const { isDemo, enterDemo } = useDemo();
+  const { isVisible, flagStatus } = useFeatureFlags();
   const t = translations.landing;
   const td = translations.demo;
 
   const categories = [
     {
       href: "/chance",
+      flag: "chance",
       icon: <Dice5 className="h-8 w-8 text-amber-500" />,
       iconBg: "bg-amber-50 group-hover:bg-amber-100",
       borderHover: "hover:border-amber-200",
@@ -25,6 +28,7 @@ export default function LandingPage() {
     },
     {
       href: "/multijoueur",
+      flag: "multiplayer",
       icon: <Swords className="h-8 w-8 text-violet-500" />,
       iconBg: "bg-violet-50 group-hover:bg-violet-100",
       borderHover: "hover:border-violet-200",
@@ -34,6 +38,7 @@ export default function LandingPage() {
     },
     {
       href: "/dashboard-dao",
+      flag: "governance",
       icon: <BarChart3 className="h-8 w-8 text-emerald-500" />,
       iconBg: "bg-emerald-50 group-hover:bg-emerald-100",
       borderHover: "hover:border-emerald-200",
@@ -43,6 +48,7 @@ export default function LandingPage() {
     },
     {
       href: "/exchange",
+      flag: "exchange",
       icon: <ArrowLeftRight className="h-8 w-8 text-sky-500" />,
       iconBg: "bg-sky-50 group-hover:bg-sky-100",
       borderHover: "hover:border-sky-200",
@@ -52,6 +58,7 @@ export default function LandingPage() {
     },
     {
       href: "/shop",
+      flag: "shop",
       icon: <ShoppingBag className="h-8 w-8 text-pink-500" />,
       iconBg: "bg-pink-50 group-hover:bg-pink-100",
       borderHover: "hover:border-pink-200",
@@ -80,26 +87,37 @@ export default function LandingPage() {
           </header>
 
           <div className="grid gap-5 w-full grid-cols-2">
-            {categories.map((cat) => (
-              <Link
-                key={cat.href}
-                href={cat.href}
-                className={`group relative rounded-3xl border-2 border-ink/5 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur-sm p-6 sm:p-8 shadow-sm hover:shadow-xl ${cat.borderHover} transition-all duration-300 flex flex-col items-center text-center gap-3`}
-              >
-                <div className={`h-16 w-16 rounded-2xl ${cat.iconBg} flex items-center justify-center transition-colors`}>
-                  {cat.icon}
-                </div>
-                <h2 className="font-display text-xl sm:text-2xl font-bold text-ink dark:text-white">
-                  {cat.title}
-                </h2>
-                <p className="text-xs sm:text-sm text-ink/50 dark:text-white/50 leading-relaxed">
-                  {cat.desc}
-                </p>
-                <span className={`mt-auto flex items-center gap-2 text-sm font-semibold ${cat.color} group-hover:gap-3 transition-all`}>
-                  <ArrowRight className="h-4 w-4" />
-                </span>
-              </Link>
-            ))}
+            {categories.filter((cat) => !cat.flag || isVisible(cat.flag)).map((cat) => {
+              const comingSoon = cat.flag && flagStatus(cat.flag) === "coming_soon";
+              return (
+                <Link
+                  key={cat.href}
+                  href={comingSoon ? "#" : cat.href}
+                  onClick={comingSoon ? (e: React.MouseEvent) => e.preventDefault() : undefined}
+                  className={`group relative rounded-3xl border-2 border-ink/5 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur-sm p-6 sm:p-8 shadow-sm ${comingSoon ? "" : `hover:shadow-xl ${cat.borderHover}`} transition-all duration-300 flex flex-col items-center text-center gap-3 overflow-hidden`}
+                >
+                  {comingSoon && (
+                    <div className="absolute inset-0 bg-white/60 dark:bg-black/50 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-widest bg-ink/90 dark:bg-white/90 text-white dark:text-ink px-3 py-1.5 rounded-lg -rotate-12 shadow-lg">
+                        Coming Soon
+                      </span>
+                    </div>
+                  )}
+                  <div className={`h-16 w-16 rounded-2xl ${cat.iconBg} flex items-center justify-center transition-colors`}>
+                    {cat.icon}
+                  </div>
+                  <h2 className="font-display text-xl sm:text-2xl font-bold text-ink dark:text-white">
+                    {cat.title}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-ink/50 dark:text-white/50 leading-relaxed">
+                    {cat.desc}
+                  </p>
+                  <span className={`mt-auto flex items-center gap-2 text-sm font-semibold ${cat.color} group-hover:gap-3 transition-all`}>
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                </Link>
+              );
+            })}
           </div>
 
           {!isDemo && (

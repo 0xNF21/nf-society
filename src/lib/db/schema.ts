@@ -269,6 +269,14 @@ export const shopCoupons = pgTable("shop_coupons", {
   expiresAt: timestamp("expires_at").notNull(),
 });
 
+export const featureFlags = pgTable("feature_flags", {
+  key: text("key").primaryKey(),
+  status: text("status").notNull().default("enabled"),
+  label: text("label").notNull(),
+  category: text("category").notNull().default("general"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export { relicsGames } from "./schema/relics";
 export type { RelicsGameRow, NewRelicsGame } from "./schema/relics";
 

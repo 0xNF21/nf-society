@@ -63,6 +63,19 @@ src/
 - NE JAMAIS travailler dans le worktree sans synchroniser vers le main repo
 - En cas de doute : le chemin CORRECT est `C:\Projects\NF-SOCIETY/src/...`
 
+## Checklist — Nouveau jeu multijoueur
+
+Quand on crée un nouveau jeu multijoueur, TOUJOURS inclure :
+
+1. **Schema DB** : colonne `isPrivate: boolean("is_private").notNull().default(false)` dans la table du jeu
+2. **Schema DB** : colonnes `player1_token`/`player2_token` pour le système de tokens joueur
+3. **Route API POST** (création) : accepter `isPrivate` dans le body et le passer à `db.insert(...).values({ ..., isPrivate: !!isPrivate })`
+4. **Page de création** : toggle privé/public avec les icônes Lock/Globe (copier le pattern de morpion/page.tsx)
+5. **Route API lobby** (`src/app/api/lobby/route.ts`) : ajouter une query pour la nouvelle table (même pattern que les 4 existantes)
+6. **Scan route** : générer un token joueur au paiement, le stocker dans `player1_token`/`player2_token`
+7. **Page de jeu** : auto-identification par token localStorage, vérification token sur les moves
+8. **Migration Neon** : exécuter `ALTER TABLE ... ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false` + colonnes tokens
+
 ## Watch Out
 
 - Les fichiers `public/` non-trackes par git ne sont pas visibles dans un worktree
