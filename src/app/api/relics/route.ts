@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 // POST /api/relics — créer une partie
 export async function POST(req: NextRequest) {
   try {
-    const { betCrc } = await req.json()
+    const { betCrc, isPrivate } = await req.json()
     if (!betCrc) return NextResponse.json({ error: 'Missing betCrc' }, { status: 400 })
     const slug = generateGameCode()
     const recipientAddress = process.env.SAFE_ADDRESS || ''
@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
       recipientAddress,
       commissionPct: 5,
       status: 'waiting_p1',
+      isPrivate: !!isPrivate,
     }).returning()
     return NextResponse.json({ id: game.slug }, { status: 201 })
   } catch (e) {

@@ -14,11 +14,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { betCrc } = await req.json()
+    const { betCrc, isPrivate } = await req.json()
     if (!betCrc) return NextResponse.json({ error: 'Missing betCrc' }, { status: 400 })
     const slug = generateGameCode()
     const recipientAddress = process.env.SAFE_ADDRESS ?? ''
-    const [game] = await db.insert(damesGames).values({ slug, betCrc, recipientAddress }).returning()
+    const [game] = await db.insert(damesGames).values({ slug, betCrc, recipientAddress, isPrivate: !!isPrivate }).returning()
     return NextResponse.json({ id: game.slug })
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

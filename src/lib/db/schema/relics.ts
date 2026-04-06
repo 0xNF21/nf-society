@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, jsonb, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, serial, text, integer, jsonb, timestamp, boolean } from 'drizzle-orm/pg-core'
 import type { PlayerGrid, LastShot } from '@/lib/relics'
 
 export const relicsGames = pgTable('relics_games', {
@@ -14,6 +14,7 @@ export const relicsGames = pgTable('relics_games', {
   player2TxHash:    text('player2_tx_hash'),
   player1Token:     text('player1_token'),
   player2Token:     text('player2_token'),
+  isPrivate:        boolean('is_private').notNull().default(false),
   grid1:            jsonb('grid1').$type<PlayerGrid>(),
   grid2:            jsonb('grid2').$type<PlayerGrid>(),
   ready1:           integer('ready1').notNull().default(0),

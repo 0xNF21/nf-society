@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, jsonb, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, serial, text, integer, jsonb, timestamp, boolean } from 'drizzle-orm/pg-core'
 import type { DamesState, GameStatus } from '@/lib/dames'
 
 export const damesGames = pgTable('dames_games', {
@@ -14,6 +14,7 @@ export const damesGames = pgTable('dames_games', {
   player2TxHash:    text('player2_tx_hash'),
   player1Token:     text('player1_token'),
   player2Token:     text('player2_token'),
+  isPrivate:        boolean('is_private').notNull().default(false),
   gameState:        jsonb('game_state').$type<DamesState>(),
   winnerAddress:    text('winner_address'),
   payoutStatus:     text('payout_status').notNull().default('pending'),

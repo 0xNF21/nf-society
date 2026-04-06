@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Lock, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDemo } from '@/components/demo-provider'
@@ -17,6 +17,7 @@ export default function DamesLobbyPage() {
   const te = translations.errors
   const [betCrc, setBetCrc] = useState(10)
   const [joinId, setJoinId] = useState('')
+  const [isPrivate, setIsPrivate] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -31,7 +32,7 @@ export default function DamesLobbyPage() {
       const res = await fetch('/api/dames', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ betCrc }),
+        body: JSON.stringify({ betCrc, isPrivate }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -92,6 +93,19 @@ export default function DamesLobbyPage() {
                       className="w-24 px-3 py-2 rounded-xl border border-ink/10 bg-white/80 text-ink text-sm font-bold focus:outline-none focus:border-marine/40" />
                     <span className="text-sm text-ink/50">CRC</span>
                   </div>
+                </div>
+                {/* Private toggle */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-ink/[0.03] border border-ink/5">
+                  <div className="flex items-center gap-2">
+                    {isPrivate ? <Lock className="w-4 h-4 text-ink/40" /> : <Globe className="w-4 h-4 text-ink/40" />}
+                    <span className="text-xs font-semibold text-ink/60">
+                      {isPrivate ? (locale === 'fr' ? 'Partie privée' : 'Private game') : (locale === 'fr' ? 'Partie publique' : 'Public game')}
+                    </span>
+                  </div>
+                  <button onClick={() => setIsPrivate(!isPrivate)}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${isPrivate ? 'bg-marine' : 'bg-ink/20'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isPrivate ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
                 </div>
                 <div className="p-3 rounded-xl bg-ink/[0.03] border border-ink/5 text-xs text-ink/50">
                   🏆 {locale === 'fr' ? 'Le gagnant remporte' : 'Winner gets'} <span className="font-bold text-ink">{betCrc * 2 * 0.95} CRC</span>

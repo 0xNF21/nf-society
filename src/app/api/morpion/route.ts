@@ -7,7 +7,7 @@ import { generateGameCode } from "@/lib/utils";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { betCrc, recipientAddress } = body;
+    const { betCrc, recipientAddress, isPrivate } = body;
 
     if (!betCrc || typeof betCrc !== "number" || betCrc <= 0) {
       return NextResponse.json({ error: "betCrc must be a positive number" }, { status: 400 });
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
       betCrc,
       recipientAddress: recipient,
       commissionPct: 5,
+      isPrivate: !!isPrivate,
     }).returning();
 
     return NextResponse.json(game, { status: 201 });

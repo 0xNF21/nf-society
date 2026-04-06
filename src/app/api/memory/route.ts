@@ -13,7 +13,7 @@ const VALID_DIFFICULTIES = ["easy", "medium", "hard"];
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { betCrc, difficulty = "medium", recipientAddress } = body;
+    const { betCrc, difficulty = "medium", recipientAddress, isPrivate } = body;
 
     if (!betCrc || typeof betCrc !== "number" || betCrc <= 0) {
       return NextResponse.json({ error: "betCrc must be a positive number" }, { status: 400 });
@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       recipientAddress: recipient,
       commissionPct: 5,
       gridSeed: generateGridSeed(),
+      isPrivate: !!isPrivate,
     }).returning();
 
     return NextResponse.json(game, { status: 201 });

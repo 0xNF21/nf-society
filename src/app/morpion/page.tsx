@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft, Gamepad2, Loader2 } from "lucide-react";
+import { ArrowLeft, Gamepad2, Loader2, Lock, Globe } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -17,6 +17,7 @@ export default function MorpionLobby() {
   const te = translations.errors;
   const [betCrc, setBetCrc] = useState(10);
   const [joinSlug, setJoinSlug] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -31,7 +32,7 @@ export default function MorpionLobby() {
       const res = await fetch("/api/morpion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ betCrc }),
+        body: JSON.stringify({ betCrc, isPrivate }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -91,6 +92,22 @@ export default function MorpionLobby() {
                 />
                 <span className="text-sm text-ink/50 leading-none">{t.crcPerPlayer[locale]}</span>
               </div>
+            </div>
+
+            {/* Private toggle */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-ink/[0.03] border border-ink/5">
+              <div className="flex items-center gap-2">
+                {isPrivate ? <Lock className="w-4 h-4 text-ink/40" /> : <Globe className="w-4 h-4 text-ink/40" />}
+                <span className="text-xs font-semibold text-ink/60">
+                  {isPrivate
+                    ? (locale === "fr" ? "Partie privée" : "Private game")
+                    : (locale === "fr" ? "Partie publique" : "Public game")}
+                </span>
+              </div>
+              <button onClick={() => setIsPrivate(!isPrivate)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${isPrivate ? "bg-marine" : "bg-ink/20"}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isPrivate ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
             </div>
 
             <div className="p-3 rounded-xl bg-ink/[0.03] border border-ink/5 text-xs text-ink/50">

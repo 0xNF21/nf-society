@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ArrowLeft, Gamepad2, Brain, Sword } from "lucide-react";
+import { ArrowRight, ArrowLeft, Gamepad2, Brain, Sword, Users } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
@@ -32,6 +32,19 @@ export default function MultiplayerPage() {
               {t.sectionMultiplayerDesc[locale]}
             </p>
           </header>
+
+          {/* Lobby banner */}
+          <Link href="/lobby"
+            className="group flex items-center gap-4 rounded-2xl border-2 border-purple-200/50 bg-gradient-to-r from-purple-500/10 to-blue-500/10 p-5 hover:shadow-lg transition-all">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shrink-0">
+              <Users className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-ink text-lg">{locale === "fr" ? "Lobby" : "Lobby"}</h3>
+              <p className="text-xs text-ink/50">{locale === "fr" ? "Rejoins une partie ouverte par un autre joueur" : "Join a game created by another player"}</p>
+            </div>
+            <ArrowRight className="h-5 w-5 text-purple-400 group-hover:translate-x-1 transition-transform" />
+          </Link>
 
           <div className="grid gap-5 grid-cols-2">
             <Link
