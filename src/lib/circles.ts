@@ -45,10 +45,11 @@ export function generateGamePaymentLink(
   gameSlug: string,
   playerToken?: string,
 ): string {
-  const data: { game: string; id: string; v: number; t?: string } = { game: gameType, id: gameSlug, v: 1 };
-  if (playerToken) data.t = playerToken;
-  const hexData = encodeGameData(data);
-  return `https://app.gnosis.io/transfer/${recipientAddress}/crc?data=${encodeURIComponent(hexData)}&amount=${amountCRC}`;
+  // Format: "game:slug:token" as plain text (Gnosis App requires plain text, not hex)
+  const parts = [gameType, gameSlug];
+  if (playerToken) parts.push(playerToken);
+  const data = parts.join(":");
+  return `https://app.gnosis.io/transfer/${recipientAddress}/crc?data=${encodeURIComponent(data)}&amount=${amountCRC}`;
 }
 
 function normalizeAddress(value: string): string | null {
@@ -356,6 +357,24 @@ async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { g
         const hexStr = inputData.replace(/^0+/, "");
         if (hexStr.length < 2) continue;
 
+        // Try to decode the entire input as UTF-8 text first (new format: "game:id:token")
+        try {
+          const cleanHex = inputData.replace(/0+$/, ""); // trim trailing zeros
+          if (cleanHex.length >= 2) {
+            const fullBytes = new Uint8Array(cleanHex.length / 2);
+            for (let k = 0; k < cleanHex.length; k += 2) {
+              fullBytes[k / 2] = parseInt(cleanHex.slice(k, k + 2), 16);
+            }
+            const fullText = new TextDecoder().decode(fullBytes).replace(/\0/g, "").trim();
+            const decoded = decodeGameData(fullText);
+            if (decoded) {
+              results.set(batch[j].toLowerCase(), decoded);
+              continue;
+            }
+          }
+        } catch {}
+
+        // Fallback: scan for JSON object (legacy format: {"game":"morpion",...})
         for (let offset = 0; offset < inputData.length - 4; offset += 2) {
           const byte = parseInt(inputData.slice(offset, offset + 2), 16);
           if (byte === 0x7b) {

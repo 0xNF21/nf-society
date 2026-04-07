@@ -20,6 +20,8 @@ export function encodeGameData(data: GameData): string {
 export function decodeGameData(raw: string): GameData | null {
   try {
     let input = raw;
+
+    // Try hex decode first (legacy format: 0x7b2267616d65...)
     if (input.startsWith("0x") || input.startsWith("0X")) {
       input = input.slice(2);
     }
@@ -33,18 +35,32 @@ export function decodeGameData(raw: string): GameData | null {
       input = new TextDecoder().decode(bytes);
     }
 
-    const parsed = JSON.parse(input);
-    if (
-      typeof parsed.game !== "string" || parsed.game.length === 0 ||
-      typeof parsed.id !== "string" || parsed.id.length === 0 ||
-      typeof parsed.v !== "number" || !Number.isInteger(parsed.v) ||
-      !SUPPORTED_VERSIONS.includes(parsed.v)
-    ) {
-      return null;
+    // Try JSON format: {"game":"morpion","id":"K7PCE2","v":1,"t":"abc"}
+    try {
+      const parsed = JSON.parse(input);
+      if (
+        typeof parsed.game === "string" && parsed.game.length > 0 &&
+        typeof parsed.id === "string" && parsed.id.length > 0 &&
+        typeof parsed.v === "number" && Number.isInteger(parsed.v) &&
+        SUPPORTED_VERSIONS.includes(parsed.v)
+      ) {
+        const result: GameData = { game: parsed.game, id: parsed.id, v: parsed.v };
+        if (typeof parsed.t === "string" && parsed.t.length > 0) result.t = parsed.t;
+        return result;
+      }
+    } catch {
+      // Not JSON, try text format below
     }
-    const result: GameData = { game: parsed.game, id: parsed.id, v: parsed.v };
-    if (typeof parsed.t === "string" && parsed.t.length > 0) result.t = parsed.t;
-    return result;
+
+    // Try text format: "game:id" or "game:id:token"
+    const parts = input.split(":");
+    if (parts.length >= 2 && parts[0].length > 0 && parts[1].length > 0) {
+      const result: GameData = { game: parts[0], id: parts[1], v: 1 };
+      if (parts[2] && parts[2].length > 0) result.t = parts[2];
+      return result;
+    }
+
+    return null;
   } catch {
     return null;
   }
