@@ -145,8 +145,17 @@ export const badges = pgTable("badges", {
   iconType:  text("icon_type").notNull().default("emoji"),
   category:  text("category").notNull(),
   secret:    boolean("secret").notNull().default(false),
+  condition: jsonb("condition").$type<BadgeCondition>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export type BadgeCondition = {
+  type: "first" | "streak" | "count" | "hour_before" | "hour_between" | "lose_streak" | "manual";
+  action?: string;
+  value?: number;
+  min?: number;
+  max?: number;
+};
 
 export const playerBadges = pgTable("player_badges", {
   id:        serial("id").primaryKey(),

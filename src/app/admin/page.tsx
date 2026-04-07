@@ -13,7 +13,7 @@ import Link from "next/link";
 type FlagStatus = "enabled" | "coming_soon" | "hidden";
 interface FlagRow { key: string; status: FlagStatus; label: string; category: string; updatedAt: string }
 
-type Tab = "flags" | "lotteries" | "lootboxes" | "payouts" | "xp" | "shop" | "daily";
+type Tab = "flags" | "lotteries" | "lootboxes" | "payouts" | "xp" | "shop" | "daily" | "badges";
 
 /* ─── Constants ─── */
 const TABS: { key: Tab; label: string; icon: typeof Flag }[] = [
@@ -24,6 +24,7 @@ const TABS: { key: Tab; label: string; icon: typeof Flag }[] = [
   { key: "xp",        label: "XP",        icon: Sparkles },
   { key: "shop",      label: "Shop",      icon: Gift },
   { key: "daily",     label: "Daily",     icon: Clock },
+  { key: "badges",    label: "Badges",    icon: Shield },
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -151,6 +152,7 @@ export default function AdminPage() {
           {activeTab === "xp" && <XpTab password={password} />}
           {activeTab === "shop" && <ShopTab password={password} />}
           {activeTab === "daily" && <DailyTab password={password} />}
+          {activeTab === "badges" && <BadgesTab password={password} />}
         </div>
       </div>
     </main>
@@ -1345,6 +1347,228 @@ function DailyTab({ password }: { password: string }) {
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Badges Tab ─── */
+
+const CONDITION_TYPES = [
+  { value: "manual", label: "Manuel (attribuer a la main)" },
+  { value: "first", label: "Premiere fois (action)" },
+  { value: "streak", label: "Streak (X jours/wins de suite)" },
+  { value: "count", label: "Compteur (X fois total)" },
+  { value: "hour_before", label: "Heure avant (check-in avant Xh)" },
+  { value: "hour_between", label: "Heure entre (check-in entre X et Y)" },
+  { value: "lose_streak", label: "Serie de defaites (X de suite)" },
+];
+
+const BADGE_CATEGORIES = ["game", "activity", "event", "secret"];
+
+interface BadgeRow {
+  id: number; slug: string; name: string; description: string; icon: string;
+  iconType: string; category: string; secret: boolean;
+  condition: { type: string; action?: string; value?: number; min?: number; max?: number } | null;
+}
+
+function BadgesTab({ password }: { password: string }) {
+  const [allBadges, setBadges] = useState<BadgeRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editData, setEditData] = useState<Partial<BadgeRow>>({});
+  const [showNew, setShowNew] = useState(false);
+  const [newBadge, setNewBadge] = useState({
+    slug: "", name: "", description: "", icon: "🏆", category: "game", secret: false,
+    condition: { type: "manual" as string, action: "", value: 1, min: 0, max: 4 },
+  });
+  const [saving, setSaving] = useState(false);
+  const [awardAddress, setAwardAddress] = useState("");
+  const [awardSlug, setAwardSlug] = useState("");
+  const [awarding, setAwarding] = useState(false);
+  const [awardMsg, setAwardMsg] = useState("");
+
+  const fetchBadges = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/badges", { headers: { "x-admin-password": password } });
+      const data = await res.json();
+      setBadges(data.badges || []);
+    } catch {}
+    setLoading(false);
+  }, [password]);
+
+  useEffect(() => { fetchBadges(); }, [fetchBadges]);
+
+  async function createBadge() {
+    if (!newBadge.slug || !newBadge.name) return;
+    setSaving(true);
+    try {
+      const condition: Record<string, unknown> = { type: newBadge.condition.type };
+      if (newBadge.condition.type !== "manual") {
+        if (newBadge.condition.action) condition.action = newBadge.condition.action;
+        if (["streak", "count", "hour_before", "lose_streak"].includes(newBadge.condition.type)) condition.value = newBadge.condition.value;
+        if (newBadge.condition.type === "hour_between") { condition.min = newBadge.condition.min; condition.max = newBadge.condition.max; }
+      }
+      const res = await fetch("/api/admin/badges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({ ...newBadge, condition }),
+      });
+      if (res.ok) {
+        setShowNew(false);
+        setNewBadge({ slug: "", name: "", description: "", icon: "🏆", category: "game", secret: false, condition: { type: "manual", action: "", value: 1, min: 0, max: 4 } });
+        await fetchBadges();
+      } else { const d = await res.json(); alert(d.error); }
+    } catch {}
+    setSaving(false);
+  }
+
+  async function updateBadge(slug: string) {
+    setSaving(true);
+    try {
+      await fetch("/api/admin/badges", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({ slug, ...editData }),
+      });
+      setEditing(null); setEditData({});
+      await fetchBadges();
+    } catch {}
+    setSaving(false);
+  }
+
+  async function deleteBadge(slug: string) {
+    if (!confirm(`Supprimer "${slug}" et tous ses awards ?`)) return;
+    await fetch("/api/admin/badges", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ slug }),
+    });
+    await fetchBadges();
+  }
+
+  async function awardBadge() {
+    if (!awardAddress || !awardSlug) return;
+    setAwarding(true);
+    const res = await fetch("/api/admin/badges/award", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": password },
+      body: JSON.stringify({ address: awardAddress, badgeSlug: awardSlug }),
+    });
+    setAwardMsg(res.ok ? "Badge attribue !" : "Erreur");
+    setTimeout(() => setAwardMsg(""), 3000);
+    setAwarding(false);
+  }
+
+  function conditionLabel(c: BadgeRow["condition"]): string {
+    if (!c) return "—";
+    const labels: Record<string, string> = {
+      manual: "Manuel", first: `1ere: ${c.action || "?"}`, streak: `Streak ${c.value}x: ${c.action || "?"}`,
+      count: `${c.value}x: ${c.action || "?"}`, hour_before: `Avant ${c.value}h`,
+      hour_between: `${c.min}h-${c.max}h`, lose_streak: `${c.value} defaites: ${c.action || "?"}`,
+    };
+    return labels[c.type] || c.type;
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-ink/30" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-bold text-ink/40 uppercase tracking-widest">Badges ({allBadges.length})</h3>
+        <button onClick={() => setShowNew(!showNew)} className="px-3 py-1 rounded-lg bg-marine text-white text-xs font-bold hover:opacity-90">
+          {showNew ? "Annuler" : "+ Nouveau"}
+        </button>
+      </div>
+
+      {/* New badge form */}
+      {showNew && (
+        <div className="p-4 rounded-xl border-2 border-dashed border-marine/30 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <input placeholder="slug (ex: speed_demon)" value={newBadge.slug} onChange={e => setNewBadge(p => ({ ...p, slug: e.target.value }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
+            <input placeholder="Nom" value={newBadge.name} onChange={e => setNewBadge(p => ({ ...p, name: e.target.value }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
+          </div>
+          <input placeholder="Description" value={newBadge.description} onChange={e => setNewBadge(p => ({ ...p, description: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-ink/10 text-sm" />
+          <div className="grid grid-cols-3 gap-2">
+            <input placeholder="Emoji" value={newBadge.icon} onChange={e => setNewBadge(p => ({ ...p, icon: e.target.value }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm text-center text-xl" />
+            <select value={newBadge.category} onChange={e => setNewBadge(p => ({ ...p, category: e.target.value }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm">
+              {BADGE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-ink/10 text-sm cursor-pointer">
+              <input type="checkbox" checked={newBadge.secret} onChange={e => setNewBadge(p => ({ ...p, secret: e.target.checked }))} /> Secret
+            </label>
+          </div>
+          <select value={newBadge.condition.type} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, type: e.target.value } }))} className="w-full px-3 py-2 rounded-lg border border-ink/10 text-sm">
+            {CONDITION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+          {newBadge.condition.type !== "manual" && (
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="Action (ex: *_win)" value={newBadge.condition.action} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, action: e.target.value } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
+              {["streak", "count", "hour_before", "lose_streak"].includes(newBadge.condition.type) && (
+                <input type="number" min={1} value={newBadge.condition.value} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, value: parseInt(e.target.value) || 1 } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
+              )}
+              {newBadge.condition.type === "hour_between" && (
+                <>
+                  <input type="number" min={0} max={23} value={newBadge.condition.min} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, min: parseInt(e.target.value) || 0 } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" placeholder="Min h" />
+                  <input type="number" min={0} max={24} value={newBadge.condition.max} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, max: parseInt(e.target.value) || 4 } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" placeholder="Max h" />
+                </>
+              )}
+            </div>
+          )}
+          <button onClick={createBadge} disabled={saving || !newBadge.slug || !newBadge.name} className="w-full py-2 rounded-lg bg-marine text-white text-sm font-bold hover:opacity-90 disabled:opacity-50">
+            {saving ? "Creation..." : "Creer le badge"}
+          </button>
+        </div>
+      )}
+
+      {/* Badge list */}
+      {allBadges.map(badge => (
+        <div key={badge.slug} className="p-4 rounded-xl bg-white/60 dark:bg-white/5 border border-ink/5 space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{badge.icon}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-ink dark:text-white">{badge.name}</p>
+              <p className="text-[10px] text-ink/30 font-mono">{badge.slug} · {badge.category}{badge.secret ? " · 🔒" : ""}</p>
+            </div>
+            <span className="text-[10px] text-ink/40 bg-ink/5 px-2 py-0.5 rounded-full">{conditionLabel(badge.condition)}</span>
+          </div>
+          <p className="text-xs text-ink/50">{badge.description}</p>
+          <div className="flex gap-2">
+            <button onClick={() => { setEditing(badge.slug); setEditData({ name: badge.name, description: badge.description, icon: badge.icon }); }}
+              className="text-xs px-2 py-1 rounded-lg border border-ink/10 text-ink/50 hover:text-ink">Modifier</button>
+            <button onClick={() => deleteBadge(badge.slug)}
+              className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-400 hover:text-red-600">Supprimer</button>
+          </div>
+          {editing === badge.slug && (
+            <div className="p-3 rounded-lg bg-ink/[0.03] space-y-2 mt-2">
+              <div className="grid grid-cols-2 gap-2">
+                <input value={editData.name || ""} onChange={e => setEditData(p => ({ ...p, name: e.target.value }))} className="px-2 py-1 rounded-lg border border-ink/10 text-sm" placeholder="Nom" />
+                <input value={editData.icon || ""} onChange={e => setEditData(p => ({ ...p, icon: e.target.value }))} className="px-2 py-1 rounded-lg border border-ink/10 text-sm text-xl text-center" placeholder="Emoji" />
+              </div>
+              <input value={editData.description || ""} onChange={e => setEditData(p => ({ ...p, description: e.target.value }))} className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm" placeholder="Description" />
+              <div className="flex gap-2">
+                <button onClick={() => updateBadge(badge.slug)} disabled={saving} className="px-3 py-1 rounded-lg bg-marine text-white text-xs font-bold">{saving ? "..." : "Sauvegarder"}</button>
+                <button onClick={() => { setEditing(null); setEditData({}); }} className="px-3 py-1 rounded-lg border border-ink/10 text-xs text-ink/50">Annuler</button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Manual award */}
+      <div className="p-4 rounded-xl border-2 border-dashed border-amber-300/50 bg-amber-50/30 dark:bg-amber-900/10 space-y-3">
+        <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest">Attribuer manuellement</p>
+        <div className="grid grid-cols-2 gap-2">
+          <input placeholder="Adresse 0x..." value={awardAddress} onChange={e => setAwardAddress(e.target.value)} className="px-3 py-2 rounded-lg border border-ink/10 text-sm font-mono" />
+          <select value={awardSlug} onChange={e => setAwardSlug(e.target.value)} className="px-3 py-2 rounded-lg border border-ink/10 text-sm">
+            <option value="">Choisir...</option>
+            {allBadges.map(b => <option key={b.slug} value={b.slug}>{b.icon} {b.name}</option>)}
+          </select>
+        </div>
+        <button onClick={awardBadge} disabled={awarding || !awardAddress || !awardSlug} className="w-full py-2 rounded-lg bg-amber-500 text-white text-sm font-bold hover:opacity-90 disabled:opacity-50">
+          {awarding ? "..." : "Attribuer"}
+        </button>
+        {awardMsg && <p className="text-xs text-center text-emerald-600 font-semibold">{awardMsg}</p>}
       </div>
     </div>
   );
