@@ -1020,21 +1020,22 @@ function StatCard({ icon, value, label, sub }: { icon: React.ReactNode; value: n
 /* ─── Platform Treasury Section ─── */
 
 type PlatformTreasuryData = {
+  safeBalance: number | null;
   totalBets: number;
   totalRedistributed: number;
   totalCommissions: number;
   totalGamesPlayed: number;
-  totalPayouts: number;
-  monthlyBets: number;
-  monthlyRedistributed: number;
-  weeklyRedistributed: number;
-  byGameType: { gameType: string; total: number; count: number }[];
+  avgRevenuePerDay: number;
+  monthly: { bets: number; redistributed: number; commissions: number };
+  lastMonth: { bets: number; redistributed: number; commissions: number };
+  lootbox: { opens: number; received: number; paid: number; rtp: number; margin: number };
+  daily: { sessions: number; received: number; paid: number; rtp: number; margin: number };
+  gameRecaps: { key: string; played: number; totalBet: number; totalPaid: number; margin: number }[];
+  weeklyChart: { day: string; paid: number }[];
 };
 
 const GAME_TYPE_LABELS: Record<string, string> = {
   morpion: "Morpion", memory: "Memory", relics: "Relics", dames: "Dames", pfc: "PFC",
-  "daily-scratch": "Daily Scratch", "daily-spin": "Daily Spin", "daily-scratch-test": "Test Scratch",
-  "daily-spin-test": "Test Spin", shop_crc: "Shop CRC",
 };
 
 function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
@@ -1076,64 +1077,122 @@ function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
 
           {data && (
             <>
+              {/* Safe balance */}
+              {data.safeBalance !== null && (
+                <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200 dark:border-emerald-800 p-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] text-emerald-600/60 font-bold uppercase tracking-widest">{locale === "fr" ? "Solde Safe (on-chain)" : "Safe Balance (on-chain)"}</p>
+                    <p className="text-2xl font-black text-emerald-600">{data.safeBalance.toLocaleString()} <span className="text-sm">CRC</span></p>
+                  </div>
+                  <Wallet className="h-6 w-6 text-emerald-400" />
+                </div>
+              )}
+
               {/* Main stats */}
               <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-xl bg-ink/[0.03] p-3 text-center">
-                  <p className="text-lg font-black text-ink">{data.totalBets} <span className="text-xs font-normal text-ink/40">CRC</span></p>
-                  <p className="text-[10px] text-ink/40">{locale === "fr" ? "Total misé" : "Total bet"}</p>
+                <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3 text-center">
+                  <p className="text-lg font-black text-ink dark:text-white">{data.totalBets} <span className="text-xs font-normal text-ink/40">CRC</span></p>
+                  <p className="text-[10px] text-ink/40">{locale === "fr" ? "Total recu" : "Total received"}</p>
                 </div>
-                <div className="rounded-xl bg-emerald-50 p-3 text-center">
-                  <p className="text-lg font-black text-emerald-600">{data.totalCommissions} <span className="text-xs font-normal text-emerald-400">CRC</span></p>
+                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-3 text-center">
+                  <p className={`text-lg font-black ${data.totalCommissions >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.totalCommissions} <span className="text-xs font-normal">CRC</span></p>
                   <p className="text-[10px] text-emerald-600/60">{locale === "fr" ? "Commissions" : "Commissions"}</p>
                 </div>
-                <div className="rounded-xl bg-blue-50 p-3 text-center">
+                <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-3 text-center">
                   <p className="text-lg font-black text-blue-600">{data.totalRedistributed} <span className="text-xs font-normal text-blue-400">CRC</span></p>
                   <p className="text-[10px] text-blue-600/60">{locale === "fr" ? "Redistribué" : "Redistributed"}</p>
                 </div>
               </div>
 
-              {/* Activity */}
-              <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03]">
-                <span className="text-xs text-ink/50">{locale === "fr" ? "Parties jouées" : "Games played"}</span>
-                <span className="text-sm font-bold text-ink">{data.totalGamesPlayed}</span>
-              </div>
-              <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03]">
-                <span className="text-xs text-ink/50">{locale === "fr" ? "Payouts effectués" : "Payouts sent"}</span>
-                <span className="text-sm font-bold text-ink">{data.totalPayouts}</span>
+              {/* Revenue per day + games played */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5">
+                  <span className="text-xs text-ink/50">{locale === "fr" ? "Revenu moy/jour" : "Avg rev/day"}</span>
+                  <span className={`text-sm font-bold ${data.avgRevenuePerDay >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.avgRevenuePerDay} CRC</span>
+                </div>
+                <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5">
+                  <span className="text-xs text-ink/50">{locale === "fr" ? "Parties jouées" : "Games played"}</span>
+                  <span className="text-sm font-bold text-ink dark:text-white">{data.totalGamesPlayed}</span>
+                </div>
               </div>
 
-              {/* Monthly */}
+              {/* Monthly comparison */}
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Ce mois" : "This month"}</p>
-                <div className="flex gap-2">
-                  <div className="flex-1 rounded-xl bg-ink/[0.03] p-2 text-center">
-                    <p className="text-sm font-bold text-ink">{data.monthlyBets} CRC</p>
-                    <p className="text-[10px] text-ink/40">{locale === "fr" ? "Misé" : "Bet"}</p>
+                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Ce mois vs mois dernier" : "This month vs last month"}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3">
+                    <p className="text-[10px] text-ink/40 mb-1">{locale === "fr" ? "Ce mois" : "This month"}</p>
+                    <p className="text-sm font-bold text-ink dark:text-white">{data.monthly.bets} CRC {locale === "fr" ? "recu" : "in"}</p>
+                    <p className={`text-xs font-bold ${data.monthly.commissions >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.monthly.commissions >= 0 ? "+" : ""}{data.monthly.commissions} CRC</p>
                   </div>
-                  <div className="flex-1 rounded-xl bg-ink/[0.03] p-2 text-center">
-                    <p className="text-sm font-bold text-ink">{data.monthlyRedistributed} CRC</p>
-                    <p className="text-[10px] text-ink/40">{locale === "fr" ? "Redistribué" : "Redistributed"}</p>
-                  </div>
-                  <div className="flex-1 rounded-xl bg-ink/[0.03] p-2 text-center">
-                    <p className="text-sm font-bold text-ink">{data.weeklyRedistributed} CRC</p>
-                    <p className="text-[10px] text-ink/40">{locale === "fr" ? "Cette semaine" : "This week"}</p>
+                  <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3">
+                    <p className="text-[10px] text-ink/40 mb-1">{locale === "fr" ? "Mois dernier" : "Last month"}</p>
+                    <p className="text-sm font-bold text-ink dark:text-white">{data.lastMonth.bets} CRC {locale === "fr" ? "recu" : "in"}</p>
+                    <p className={`text-xs font-bold ${data.lastMonth.commissions >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.lastMonth.commissions >= 0 ? "+" : ""}{data.lastMonth.commissions} CRC</p>
                   </div>
                 </div>
               </div>
 
-              {/* By game type */}
-              {data.byGameType.length > 0 && (
+              {/* Lootbox recap */}
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">Lootboxes</p>
+                <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3 space-y-1">
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Ouvertures" : "Opens"}</span><span className="text-xs font-bold">{data.lootbox.opens}</span></div>
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Recu" : "Received"}</span><span className="text-xs font-bold">{data.lootbox.received} CRC</span></div>
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Redistribué" : "Paid"}</span><span className="text-xs font-bold">{data.lootbox.paid} CRC</span></div>
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">RTP</span><span className="text-xs font-bold">{data.lootbox.rtp}%</span></div>
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Marge" : "Margin"}</span><span className={`text-xs font-bold ${data.lootbox.margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.lootbox.margin} CRC</span></div>
+                </div>
+              </div>
+
+              {/* Daily recap */}
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">Daily</p>
+                <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3 space-y-1">
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">Sessions</span><span className="text-xs font-bold">{data.daily.sessions}</span></div>
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Recu" : "Received"}</span><span className="text-xs font-bold">{data.daily.received} CRC</span></div>
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Redistribué" : "Paid"}</span><span className="text-xs font-bold">{data.daily.paid} CRC</span></div>
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">RTP</span><span className="text-xs font-bold">{data.daily.rtp}%</span></div>
+                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Marge" : "Margin"}</span><span className={`text-xs font-bold ${data.daily.margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.daily.margin} CRC</span></div>
+                </div>
+              </div>
+
+              {/* Game recaps */}
+              {data.gameRecaps.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Par type" : "By type"}</p>
-                  {data.byGameType.sort((a, b) => b.total - a.total).map(g => (
-                    <div key={g.gameType} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-ink/[0.02]">
-                      <span className="text-xs text-ink/60">{GAME_TYPE_LABELS[g.gameType] || g.gameType}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-ink/30">{g.count}x</span>
-                        <span className="text-xs font-bold text-ink">{g.total} CRC</span>
+                  <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Recap par jeu" : "By game"}</p>
+                  {data.gameRecaps.filter(g => g.played > 0).sort((a, b) => b.totalBet - a.totalBet).map(g => (
+                    <div key={g.key} className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-ink dark:text-white">{GAME_TYPE_LABELS[g.key] || g.key}</p>
+                        <p className="text-[10px] text-ink/30">{g.played} {locale === "fr" ? "parties" : "games"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-ink/50">{g.totalBet} → {g.totalPaid} CRC</p>
+                        <p className={`text-xs font-bold ${g.margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>{g.margin >= 0 ? "+" : ""}{g.margin} CRC</p>
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Weekly chart */}
+              {data.weeklyChart.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Redistribué cette semaine" : "Redistributed this week"}</p>
+                  <div className="flex items-end gap-1 h-20">
+                    {data.weeklyChart.map(d => {
+                      const max = Math.max(...data.weeklyChart.map(x => x.paid), 1);
+                      const pct = (d.paid / max) * 100;
+                      return (
+                        <div key={d.day} className="flex-1 flex flex-col items-center gap-0.5">
+                          <span className="text-[8px] text-ink/30">{d.paid}</span>
+                          <div className="w-full bg-blue-400 rounded-t-sm" style={{ height: `${Math.max(pct, 4)}%` }} />
+                          <span className="text-[7px] text-ink/20">{d.day.slice(5)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </>
