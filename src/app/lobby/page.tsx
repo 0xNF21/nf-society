@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import Link from "next/link";
-import { ArrowLeft, RefreshCw, Users, Clock, Swords, Brain, Ship, Grid3X3 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Users, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -12,14 +12,15 @@ interface Room {
   betCrc: number;
   commissionPct: number;
   createdAt: string;
-  game: "morpion" | "dames" | "relics" | "memory";
+  game: string;
 }
 
-const GAME_INFO: Record<string, { label_fr: string; label_en: string; icon: React.ReactNode; color: string; href: string }> = {
-  morpion: { label_fr: "Morpion", label_en: "Tic-Tac-Toe", icon: <Grid3X3 className="w-5 h-5" />, color: "text-blue-500", href: "/morpion" },
-  dames: { label_fr: "Dames", label_en: "Checkers", icon: <Swords className="w-5 h-5" />, color: "text-amber-500", href: "/dames" },
-  relics: { label_fr: "Bataille Navale", label_en: "Naval Battle", icon: <Ship className="w-5 h-5" />, color: "text-emerald-500", href: "/relics" },
-  memory: { label_fr: "Memory", label_en: "Memory", icon: <Brain className="w-5 h-5" />, color: "text-pink-500", href: "/memory" },
+const GAME_INFO: Record<string, { label_fr: string; label_en: string; emoji: string; color: string }> = {
+  morpion: { label_fr: "Morpion", label_en: "Tic-Tac-Toe", emoji: "❌", color: "text-blue-500" },
+  dames: { label_fr: "Dames", label_en: "Checkers", emoji: "♟️", color: "text-amber-500" },
+  relics: { label_fr: "Bataille Navale", label_en: "Naval Battle", emoji: "⚓", color: "text-emerald-500" },
+  memory: { label_fr: "Memory", label_en: "Memory", emoji: "🃏", color: "text-pink-500" },
+  pfc: { label_fr: "Pierre-Feuille-Ciseaux", label_en: "Rock-Paper-Scissors", emoji: "✊", color: "text-red-500" },
 };
 
 function timeAgo(dateStr: string, locale: "fr" | "en") {
@@ -94,10 +95,11 @@ export default function LobbyPage() {
         <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
           {[
             { key: "all", label_fr: "Tous", label_en: "All" },
-            { key: "morpion", label_fr: "Morpion", label_en: "Tic-Tac-Toe" },
-            { key: "dames", label_fr: "Dames", label_en: "Checkers" },
-            { key: "relics", label_fr: "Bataille", label_en: "Naval" },
-            { key: "memory", label_fr: "Memory", label_en: "Memory" },
+            ...Object.entries(GAME_INFO).map(([key, info]) => ({
+              key,
+              label_fr: info.label_fr,
+              label_en: info.label_en,
+            })),
           ].map((f) => (
             <button
               key={f.key}
@@ -139,20 +141,20 @@ export default function LobbyPage() {
         {!loading && filtered.length > 0 && (
           <div className="space-y-3">
             {filtered.map((room) => {
-              const info = GAME_INFO[room.game];
+              const info = GAME_INFO[room.game] || { label_fr: room.game, label_en: room.game, emoji: "🎮", color: "text-ink/50" };
               const winAmount = room.betCrc * 2 * (1 - room.commissionPct / 100);
               return (
-                <Link key={`${room.game}-${room.slug}`} href={`${info.href}/${room.slug}`}>
+                <Link key={`${room.game}-${room.slug}`} href={`/${room.game}/${room.slug}`}>
                   <Card className={`rounded-2xl border-0 shadow-sm hover:shadow-md transition-all cursor-pointer ${
                     isDark ? "bg-white/5 hover:bg-white/10" : "bg-white/60 hover:bg-white/80"
                   } backdrop-blur-sm mb-2`}>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
                         {/* Game icon */}
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl ${
                           isDark ? "bg-white/10" : "bg-ink/[0.05]"
-                        } ${info.color}`}>
-                          {info.icon}
+                        }`}>
+                          {info.emoji}
                         </div>
 
                         {/* Info */}
@@ -200,12 +202,12 @@ export default function LobbyPage() {
           </p>
           <div className="grid grid-cols-2 gap-2">
             {Object.entries(GAME_INFO).map(([key, info]) => (
-              <Link key={key} href={info.href}>
+              <Link key={key} href={`/${key}`}>
                 <Card className={`rounded-xl border-0 shadow-sm hover:shadow-md transition-all cursor-pointer ${
                   isDark ? "bg-white/5 hover:bg-white/10" : "bg-white/60 hover:bg-white/80"
                 } backdrop-blur-sm`}>
                   <CardContent className="p-3 flex items-center gap-2">
-                    <span className={info.color}>{info.icon}</span>
+                    <span className="text-lg">{info.emoji}</span>
                     <span className="text-xs font-bold text-ink dark:text-white">
                       {locale === "fr" ? info.label_fr : info.label_en}
                     </span>
