@@ -421,7 +421,7 @@ async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { g
 
         // Search for known game key patterns in the hex data
         // Each game key (morpion, memory, relics, dames) followed by ":" (3a in hex)
-        const gameKeys = ["morpion", "memory", "relics", "dames"];
+        const gameKeys = ["morpion", "memory", "relics", "dames", "daily", "shop_auth"];
         let found = false;
 
         for (const gk of gameKeys) {
