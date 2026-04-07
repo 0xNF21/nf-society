@@ -321,6 +321,70 @@ export async function checkPaymentReceived(
   return null;
 }
 
+/**
+ * Fetch CrcV2_TransferData events from Circles RPC to get the `data` field.
+ * This is how Gnosis App stores the payment data (plain text format).
+ */
+async function fetchTransferDataGameData(
+  recipientAddress: string,
+  txHashes: Set<string>
+): Promise<Map<string, { game: string; id: string; v: number; t?: string }>> {
+  const { decodeGameData } = await import("@/lib/game-data");
+  const results = new Map<string, { game: string; id: string; v: number; t?: string }>();
+
+  try {
+    const response = await fetch(circlesConfig.rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "circles_events",
+        params: [recipientAddress, null, null, ["CrcV2_TransferData"]],
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!response.ok) return results;
+
+    const payload = await response.json();
+    if (payload.error) return results;
+
+    const events = payload.result?.events || [];
+    for (const item of events) {
+      const values = item.values ?? {};
+      const txHash = String(values.transactionHash ?? "").toLowerCase();
+      const dataField = String(values.data ?? "");
+
+      if (!txHash || !txHashes.has(txHash) || !dataField) continue;
+
+      // Try to decode the data field — could be plain text "game:id:token" or hex-encoded
+      let decoded = decodeGameData(dataField);
+
+      // Also try hex-to-utf8 decoding
+      if (!decoded) {
+        const hexStr = dataField.startsWith("0x") ? dataField.slice(2) : dataField;
+        if (/^[0-9a-fA-F]+$/.test(hexStr) && hexStr.length > 0 && hexStr.length % 2 === 0) {
+          try {
+            const bytes = new Uint8Array(hexStr.length / 2);
+            for (let k = 0; k < hexStr.length; k += 2) {
+              bytes[k / 2] = parseInt(hexStr.slice(k, k + 2), 16);
+            }
+            const text = new TextDecoder().decode(bytes).replace(/\0/g, "").trim();
+            decoded = decodeGameData(text);
+          } catch {}
+        }
+      }
+
+      if (decoded) {
+        results.set(txHash, decoded);
+      }
+    }
+  } catch {}
+
+  return results;
+}
+
 async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { game: string; id: string; v: number }>> {
   const { decodeGameData } = await import("@/lib/game-data");
   const results = new Map<string, { game: string; id: string; v: number }>();
@@ -437,10 +501,18 @@ export async function checkAllNewPayments(
 
   const txHashes = [...new Set(events.map(e => e.transactionHash).filter(h => h))];
   if (txHashes.length > 0) {
-    const gameDataMap = await fetchTxInputGameData(txHashes);
+    const txHashSet = new Set(txHashes.map(h => h.toLowerCase()));
+
+    // Try CrcV2_TransferData events first (new plain text format)
+    const transferDataMap = await fetchTransferDataGameData(normalized, txHashSet);
+
+    // Fallback to tx input parsing (legacy hex/JSON format)
+    const txInputMap = await fetchTxInputGameData(txHashes);
+
     for (const event of events) {
       const txKey = event.transactionHash.toLowerCase();
-      event.gameData = gameDataMap.get(txKey) || null;
+      // Prefer TransferData events, fallback to tx input
+      event.gameData = transferDataMap.get(txKey) || txInputMap.get(txKey) || null;
     }
   }
 
