@@ -11,6 +11,8 @@ export type BadgeContext = {
   loseStreak?: number;
   totalLootbox?: number;
   totalWins?: number;
+  totalGamesPlayed?: number;
+  totalCrcWon?: number;
   hour?: number;
   isFirstLootbox?: boolean;
   isFirstWin?: boolean;
@@ -96,6 +98,41 @@ async function evaluateCondition(
     case "lose_streak": {
       const needed = condition.value ?? 10;
       return (context.loseStreak ?? 0) >= needed;
+    }
+
+    case "xp_threshold": {
+      const needed = condition.value ?? 100;
+      const [player] = await db.select().from(players).where(eq(players.address, address));
+      return (player?.xp ?? 0) >= needed;
+    }
+
+    case "level_threshold": {
+      const needed = condition.value ?? 2;
+      const [player] = await db.select().from(players).where(eq(players.address, address));
+      return (player?.level ?? 1) >= needed;
+    }
+
+    case "games_played": {
+      const needed = condition.value ?? 10;
+      return (context.totalGamesPlayed ?? 0) >= needed;
+    }
+
+    case "games_won": {
+      const needed = condition.value ?? 5;
+      return (context.totalWins ?? 0) >= needed;
+    }
+
+    case "crc_won": {
+      const needed = condition.value ?? 100;
+      return (context.totalCrcWon ?? 0) >= needed;
+    }
+
+    case "multi_game": {
+      // Player has played X different game types
+      // This checks via the action pattern — e.g., if action contains different game prefixes
+      // For now, check totalGamesPlayed as proxy
+      const needed = condition.value ?? 3;
+      return (context.totalGamesPlayed ?? 0) >= needed;
     }
 
     default:

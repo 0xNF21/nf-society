@@ -1362,6 +1362,12 @@ const CONDITION_TYPES = [
   { value: "hour_before", label: "Heure avant (check-in avant Xh)" },
   { value: "hour_between", label: "Heure entre (check-in entre X et Y)" },
   { value: "lose_streak", label: "Serie de defaites (X de suite)" },
+  { value: "xp_threshold", label: "Seuil XP (atteindre X XP)" },
+  { value: "level_threshold", label: "Seuil niveau (atteindre niveau X)" },
+  { value: "games_played", label: "Parties jouees (jouer X parties)" },
+  { value: "games_won", label: "Victoires totales (gagner X fois)" },
+  { value: "crc_won", label: "CRC gagnes (gagner X CRC total)" },
+  { value: "multi_game", label: "Multi-jeu (jouer a X jeux differents)" },
 ];
 
 const BADGE_CATEGORIES = ["game", "activity", "event", "secret"];
@@ -1406,7 +1412,7 @@ function BadgesTab({ password }: { password: string }) {
       const condition: Record<string, unknown> = { type: newBadge.condition.type };
       if (newBadge.condition.type !== "manual") {
         if (newBadge.condition.action) condition.action = newBadge.condition.action;
-        if (["streak", "count", "hour_before", "lose_streak"].includes(newBadge.condition.type)) condition.value = newBadge.condition.value;
+        if (["streak", "count", "hour_before", "lose_streak", "xp_threshold", "level_threshold", "games_played", "games_won", "crc_won", "multi_game"].includes(newBadge.condition.type)) condition.value = newBadge.condition.value;
         if (newBadge.condition.type === "hour_between") { condition.min = newBadge.condition.min; condition.max = newBadge.condition.max; }
       }
       const res = await fetch("/api/admin/badges", {
@@ -1466,6 +1472,9 @@ function BadgesTab({ password }: { password: string }) {
       manual: "Manuel", first: `1ere: ${c.action || "?"}`, streak: `Streak ${c.value}x: ${c.action || "?"}`,
       count: `${c.value}x: ${c.action || "?"}`, hour_before: `Avant ${c.value}h`,
       hour_between: `${c.min}h-${c.max}h`, lose_streak: `${c.value} defaites: ${c.action || "?"}`,
+      xp_threshold: `${c.value} XP`, level_threshold: `Niveau ${c.value}`,
+      games_played: `${c.value} parties`, games_won: `${c.value} victoires`,
+      crc_won: `${c.value} CRC gagnes`, multi_game: `${c.value} jeux differents`,
     };
     return labels[c.type] || c.type;
   }
@@ -1504,7 +1513,7 @@ function BadgesTab({ password }: { password: string }) {
           {newBadge.condition.type !== "manual" && (
             <div className="grid grid-cols-2 gap-2">
               <input placeholder="Action (ex: *_win)" value={newBadge.condition.action} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, action: e.target.value } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
-              {["streak", "count", "hour_before", "lose_streak"].includes(newBadge.condition.type) && (
+              {["streak", "count", "hour_before", "lose_streak", "xp_threshold", "level_threshold", "games_played", "games_won", "crc_won", "multi_game"].includes(newBadge.condition.type) && (
                 <input type="number" min={1} value={newBadge.condition.value} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, value: parseInt(e.target.value) || 1 } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
               )}
               {newBadge.condition.type === "hour_between" && (

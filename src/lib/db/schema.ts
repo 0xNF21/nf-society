@@ -150,7 +150,8 @@ export const badges = pgTable("badges", {
 });
 
 export type BadgeCondition = {
-  type: "first" | "streak" | "count" | "hour_before" | "hour_between" | "lose_streak" | "manual";
+  type: "first" | "streak" | "count" | "hour_before" | "hour_between" | "lose_streak" | "manual"
+    | "xp_threshold" | "level_threshold" | "games_played" | "games_won" | "crc_won" | "multi_game";
   action?: string;
   value?: number;
   min?: number;
