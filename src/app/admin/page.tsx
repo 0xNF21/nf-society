@@ -1266,8 +1266,31 @@ function DailyTab({ password }: { password: string }) {
     setTesting(false);
   }
 
+  const scratchRtp = editScratch.reduce((s, r) => s + r.prob * r.crcValue, 0);
+  const spinRtp = editSpin.reduce((s, r) => s + r.prob * r.crcValue, 0);
+  const combinedRtp = scratchRtp + spinRtp;
+  const rtpColor = combinedRtp > 1 ? "text-red-600 bg-red-100" : combinedRtp > 0.95 ? "text-amber-600 bg-amber-100" : "text-green-600 bg-green-100";
+
   return (
     <div className="space-y-8">
+      {/* RTP Indicator */}
+      <div className={`p-4 rounded-xl border-2 ${combinedRtp > 1 ? "border-red-300" : combinedRtp > 0.95 ? "border-amber-300" : "border-green-300"} space-y-2`}>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-ink/40 uppercase tracking-widest">RTP combine (Scratch + Spin)</span>
+          <span className={`text-lg font-black px-3 py-1 rounded-lg ${rtpColor}`}>
+            {(combinedRtp * 100).toFixed(1)}%
+          </span>
+        </div>
+        <div className="flex gap-4 text-xs text-ink/50">
+          <span>Scratch: {(scratchRtp * 100).toFixed(1)}%</span>
+          <span>Spin: {(spinRtp * 100).toFixed(1)}%</span>
+          <span>Mise: 1 CRC</span>
+          <span>Gain moyen: {combinedRtp.toFixed(3)} CRC</span>
+        </div>
+        {combinedRtp > 1 && <p className="text-xs text-red-600 font-semibold">Tu perds de l argent ! Le RTP depasse 100%.</p>}
+        {combinedRtp <= 1 && <p className="text-xs text-green-600 font-semibold">Marge plateforme : {((1 - combinedRtp) * 100).toFixed(1)}%</p>}
+      </div>
+
       <RewardTable title="Scratch Card — Tableau de gains" tableKey="scratch" entries={editScratch} />
       <RewardTable title="Roue — Segments" tableKey="spin" entries={editSpin} />
 
