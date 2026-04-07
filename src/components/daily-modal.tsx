@@ -302,25 +302,7 @@ export default function DailyModal() {
             {/* Content */}
             <div className="px-5 py-4">
 
-              {/* Jackpot bar — always visible */}
-              {jackpot && (
-                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-3 mb-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Trophy className="w-4 h-4 text-amber-600" />
-                    <span className="text-sm font-bold text-amber-800">{t.jackpotLabel[locale]}</span>
-                  </div>
-                  <div className="w-full bg-amber-200 rounded-full h-3 mb-1.5 overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-amber-500 to-orange-500 h-full rounded-full transition-all duration-1000"
-                      style={{ width: `${jackpot.percentage}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-amber-700">
-                    <span>{jackpot.total} / {jackpot.threshold} CRC</span>
-                    <span>{jackpot.contributors} {t.contributors[locale]}</span>
-                  </div>
-                </div>
-              )}
+              {/* Jackpot bar — disabled, will be reimplemented as independent system */}
 
               {/* ─── PHASE: INIT ─── */}
               {phase === "init" && (
