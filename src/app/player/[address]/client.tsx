@@ -25,6 +25,36 @@ interface BadgeData {
   earnedAt: string | null;
 }
 
+interface GameStat {
+  game: string;
+  played: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number;
+}
+
+interface HistoryEntry {
+  game: string;
+  slug: string;
+  opponent: string | null;
+  result: "win" | "loss" | "draw";
+  betCrc: number;
+  date: string;
+}
+
+interface StatsData {
+  totalGames: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number;
+  totalBet: number;
+  totalWon: number;
+  byGame: GameStat[];
+  history: HistoryEntry[];
+}
+
 interface Props {
   address: string;
   name: string;
@@ -37,6 +67,7 @@ interface Props {
   streak: number;
   levels: LevelDef[];
   badges: BadgeData[];
+  stats: StatsData;
 }
 
 const CATEGORY_ORDER = ["event", "game", "activity", "secret"];
@@ -71,8 +102,16 @@ function CollapsibleSection({ title, defaultOpen = false, count, children }: {
   );
 }
 
+import { GAME_LABELS, GAME_ICONS } from "@/lib/game-registry";
+
+const RESULT_COLORS: Record<string, string> = {
+  win: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/30",
+  loss: "text-red-500 bg-red-50 dark:text-red-400 dark:bg-red-900/30",
+  draw: "text-ink/50 bg-ink/5 dark:text-ink/40 dark:bg-ink/10",
+};
+
 export default function PlayerProfileClient({
-  address, name, avatar, xp, level, levelName, toNext, progressPct, streak, levels, badges,
+  address, name, avatar, xp, level, levelName, toNext, progressPct, streak, levels, badges, stats,
 }: Props) {
   const { locale } = useLocale();
   const t = translations.playerProfile;
@@ -180,6 +219,101 @@ export default function PlayerProfileClient({
               <p className="text-xs font-semibold text-citrus/70 ml-auto">{t.bonus7days[locale]}</p>
             )}
           </div>
+        </CollapsibleSection>
+
+        {/* Statistiques — collapsible */}
+        <CollapsibleSection
+          title={t.stats[locale]}
+          defaultOpen={true}
+          count={stats.totalGames > 0 ? `${stats.winRate}% WR` : "—"}
+        >
+          {stats.totalGames === 0 ? (
+            <p className="text-sm text-ink/40 text-center py-4">{t.noGames[locale]}</p>
+          ) : (
+            <div className="space-y-4">
+              {/* Stats globales */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5 p-3 text-center">
+                  <p className="text-2xl font-black text-ink dark:text-white">{stats.totalGames}</p>
+                  <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.gamesPlayed[locale]}</p>
+                </div>
+                <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5 p-3 text-center">
+                  <p className="text-2xl font-black text-marine dark:text-blue-400">{stats.winRate}%</p>
+                  <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.winRate[locale]}</p>
+                </div>
+                <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5 p-3 text-center">
+                  <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{stats.wins}</p>
+                  <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.victories[locale]}</p>
+                </div>
+                <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5 p-3 text-center">
+                  <p className="text-lg font-black text-red-500 dark:text-red-400">{stats.losses}</p>
+                  <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.defeats[locale]}</p>
+                </div>
+              </div>
+
+              {/* CRC misés / gagnés */}
+              <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
+                <div className="text-center flex-1">
+                  <p className="text-sm font-black text-ink dark:text-white">{stats.totalBet} CRC</p>
+                  <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.crcBet[locale]}</p>
+                </div>
+                <div className="w-px h-8 bg-ink/10" />
+                <div className="text-center flex-1">
+                  <p className={`text-sm font-black ${stats.totalWon >= stats.totalBet ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>{stats.totalWon} CRC</p>
+                  <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.crcWon[locale]}</p>
+                </div>
+              </div>
+
+              {/* Par jeu */}
+              {stats.byGame.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{t.byGame[locale]}</p>
+                  {stats.byGame.map(g => (
+                    <div key={g.game} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{GAME_ICONS[g.game]}</span>
+                        <span className="text-sm font-semibold text-ink dark:text-white">{GAME_LABELS[g.game]}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-ink/50">{g.played} {locale === "fr" ? "parties" : "games"}</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{g.wins}W</span>
+                        <span className="font-bold text-red-500 dark:text-red-400">{g.losses}L</span>
+                        <span className="font-bold text-marine dark:text-blue-400">{g.winRate}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Historique récent */}
+              {stats.history.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{t.recentHistory[locale]}</p>
+                  <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                    {stats.history.map((h, i) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-xs">{GAME_ICONS[h.game]}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-ink dark:text-white truncate">
+                              {GAME_LABELS[h.game]} {h.opponent ? `${t.vs[locale]} ${h.opponent.slice(0, 6)}…${h.opponent.slice(-4)}` : ""}
+                            </p>
+                            <p className="text-[10px] text-ink/30">{new Date(h.date).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" })}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-ink/40">{h.betCrc} CRC</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${RESULT_COLORS[h.result]}`}>
+                            {t[h.result][locale]}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </CollapsibleSection>
 
         {/* Badges — collapsible */}

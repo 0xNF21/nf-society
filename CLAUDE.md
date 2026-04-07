@@ -63,18 +63,35 @@ src/
 - NE JAMAIS travailler dans le worktree sans synchroniser vers le main repo
 - En cas de doute : le chemin CORRECT est `C:\Projects\NF-SOCIETY/src/...`
 
-## Checklist — Nouveau jeu multijoueur
+## Framework Multiplayer
 
-Quand on crée un nouveau jeu multijoueur, TOUJOURS inclure :
+Le projet utilise un framework generique pour les jeux multijoueurs.
 
-1. **Schema DB** : colonne `isPrivate: boolean("is_private").notNull().default(false)` dans la table du jeu
-2. **Schema DB** : colonnes `player1_token`/`player2_token` pour le système de tokens joueur
-3. **Route API POST** (création) : accepter `isPrivate` dans le body et le passer à `db.insert(...).values({ ..., isPrivate: !!isPrivate })`
-4. **Page de création** : toggle privé/public avec les icônes Lock/Globe (copier le pattern de morpion/page.tsx)
-5. **Route API lobby** (`src/app/api/lobby/route.ts`) : ajouter une query pour la nouvelle table (même pattern que les 4 existantes)
-6. **Scan route** : générer un token joueur au paiement, le stocker dans `player1_token`/`player2_token`
-7. **Page de jeu** : auto-identification par token localStorage, vérification token sur les moves
-8. **Migration Neon** : exécuter `ALTER TABLE ... ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false` + colonnes tokens
+### Fichiers cles du framework
+- `src/lib/game-registry.ts` — Registre central de tous les jeux (config, table DB, routes, couleurs)
+- `src/lib/multiplayer.ts` — Helpers serveur (createMultiplayerGame, scanGamePayments, getLobbyGames, getPlayerStats)
+- `src/components/game-lobby.tsx` — Composant lobby reutilisable (mise, prive/public, rejoindre)
+- `src/components/game-payment.tsx` — Composant paiement reutilisable (QR, scan, boutons)
+- `src/hooks/use-player-token.ts` — Hook token joueur (localStorage + URL injection)
+- `src/hooks/use-game-polling.ts` — Hook polling etat de jeu
+
+### Checklist — Nouveau jeu multijoueur
+
+1. **Logique jeu** : `src/lib/{jeu}.ts` (types, regles, fonctions pures)
+2. **Schema DB** : `src/lib/db/schema/{jeu}.ts` avec colonnes communes (slug, betCrc, recipientAddress, commissionPct, player1/2Address, player1/2TxHash, player1/2Token, isPrivate, status, winnerAddress, payoutStatus, payoutTxHash, createdAt, updatedAt) + colonnes specifiques
+3. **Export schema** : ajouter dans `src/lib/db/schema.ts`
+4. **Enregistrer dans le registre** : ajouter une entree dans `GAME_REGISTRY` de `src/lib/game-registry.ts`
+5. **i18n** : ajouter section `{jeu}` + `landing{Jeu}` dans `src/lib/i18n.ts` (cles lobby standardisees : back, title, subtitle, createGame, betPerPlayer, crcPerPlayer, winnerGets, commission, creating, createBtn, joinGame, gameCode, join, payToStart, payToJoin, payCrc, copied, copyPayLink, inviteP2, scanningPayments, scanPayments)
+6. **API create** : `src/app/api/{jeu}/route.ts` — POST appelle `createMultiplayerGame("{jeu}", body)`
+7. **API scan** : `src/app/api/{jeu}-scan/route.ts` — POST appelle `scanGamePayments("{jeu}", slug)`
+8. **API actions** : `src/app/api/{jeu}/[slug]/route.ts` — GET + POST pour les moves (CUSTOM)
+9. **Page lobby** : `src/app/{jeu}/page.tsx` — utilise `<GameLobby gameKey="{jeu}" />`
+10. **Page jeu** : `src/app/{jeu}/[slug]/page.tsx` — utilise `<GamePayment>`, `usePlayerToken`, `useGamePolling` + UI custom
+11. **Feature flag** : ajouter dans la table `featureFlags`
+12. **Migration DB** : creer la table en production
+13. **Build** : verifier `npx tsc --noEmit`
+
+Lobby, paiement, scan, stats, admin = **automatique via le registre**.
 
 ## Watch Out
 

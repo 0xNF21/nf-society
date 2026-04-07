@@ -2,10 +2,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Copy, Check, RefreshCw, Trophy, Clock, Users, Loader2 } from "lucide-react";
+import { ArrowLeft, Trophy, Clock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { generateGamePaymentLink } from "@/lib/circles";
+import { GamePayment } from "@/components/game-payment";
+import { usePlayerToken } from "@/hooks/use-player-token";
+import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
@@ -284,40 +286,14 @@ function RealMorpionGame({ slug }: { slug: string }) {
   const { theme } = useTheme();
   const t = translations.morpion;
   const te = translations.errors;
-  const [game, setGame] = useState<MorpionGame | null>(null);
+  const { game, loading, fetchGame } = useGamePolling<MorpionGame>("morpion", slug);
+  const playerTokenRef = usePlayerToken("morpion", slug);
   const [myAddress, setMyAddress] = useState("");
   const [addressConfirmed, setAddressConfirmed] = useState(false);
-  const playerTokenRef = useRef<string>("");
-  const [loading, setLoading] = useState(true);
   const [moveError, setMoveError] = useState("");
-  const [scanning, setScanning] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, { name: string; imageUrl: string | null }>>({});
   const [isCreator, setIsCreator] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
-  const [qrCode, setQrCode] = useState("");
-  const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
-  const scanRef = useRef<NodeJS.Timeout | null>(null);
-
-  const fetchGame = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/morpion/${slug}`);
-      if (res.ok) setGame(await res.json());
-    } catch {}
-    setLoading(false);
-  }, [slug]);
-
-  const scanPayments = useCallback(async () => {
-    if (scanning) return;
-    setScanning(true);
-    try {
-      await fetch(`/api/morpion-scan?gameSlug=${slug}`, { method: "POST" });
-      await fetchGame();
-    } catch {}
-    setScanning(false);
-  }, [slug, scanning, fetchGame]);
 
   useEffect(() => {
     setIsCreator(sessionStorage.getItem(`morpion_creator_${slug}`) === "1");
@@ -338,42 +314,6 @@ function RealMorpionGame({ slug }: { slug: string }) {
     }).catch(() => {});
   }, [game?.player1Address, game?.player2Address]);
 
-  useEffect(() => {
-    fetchGame();
-    pollRef.current = setInterval(fetchGame, 2000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [fetchGame]);
-
-  useEffect(() => {
-    if (!game) return;
-    if (game.status === "active" || game.status === "finished") {
-      if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null; }
-      return;
-    }
-    if (!scanRef.current) scanRef.current = setInterval(scanPayments, 5000);
-    return () => { if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null; } };
-  }, [game?.status, scanPayments]);
-
-  // Init player token from URL, localStorage, or generate new
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get("setToken");
-    if (urlToken) {
-      localStorage.setItem(`morpion-${slug}-token`, urlToken);
-      playerTokenRef.current = urlToken;
-      window.history.replaceState({}, "", window.location.pathname);
-    } else {
-      const stored = localStorage.getItem(`morpion-${slug}-token`);
-      if (stored) {
-        playerTokenRef.current = stored;
-      } else {
-        const token = crypto.randomUUID().slice(0, 8);
-        localStorage.setItem(`morpion-${slug}-token`, token);
-        playerTokenRef.current = token;
-      }
-    }
-  }, [slug]);
-
   // Auto-identify player via token match
   useEffect(() => {
     if (!game || !playerTokenRef.current || addressConfirmed) return;
@@ -386,24 +326,6 @@ function RealMorpionGame({ slug }: { slug: string }) {
       setAddressConfirmed(true);
     }
   }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed]);
-
-  // Generate QR code when in payment phase
-  useEffect(() => {
-    if (!game || (game.status !== "waiting_p1" && game.status !== "waiting_p2")) return;
-    let active = true;
-    setQrState("loading");
-    (async () => {
-      try {
-        const { toDataURL } = await import("qrcode");
-        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug, playerTokenRef.current);
-        const url = await toDataURL(link, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } });
-        if (active) { setQrCode(url); setQrState("ready"); }
-      } catch {
-        if (active) { setQrCode(""); setQrState("error"); }
-      }
-    })();
-    return () => { active = false; };
-  }, [game?.status, game?.recipientAddress, game?.betCrc, game?.slug]);
 
   async function activateTestMode() {
     setTestLoading(true);
@@ -432,20 +354,6 @@ function RealMorpionGame({ slug }: { slug: string }) {
       if (!res.ok) throw new Error(data.error);
       await fetchGame();
     } catch { setMoveError(te.invalidMove[locale]); }
-  }
-
-  function copyPaymentLink() {
-    if (!game) return;
-    const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug, playerTokenRef.current);
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  function copyGameLink() {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
   }
 
   if (loading) return (
@@ -479,7 +387,6 @@ function RealMorpionGame({ slug }: { slug: string }) {
   const isMyTurn = mySymbol !== null && game.status === "active" && game.currentTurn === mySymbol;
   const winLine = game.status === "finished" ? getWinLine(game.board) : null;
   const winAmount = game.betCrc * 2 * (1 - game.commissionPct / 100);
-  const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "morpion", game.slug, playerTokenRef.current);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
@@ -563,57 +470,13 @@ function RealMorpionGame({ slug }: { slug: string }) {
         </Card>
 
         {/* Payment section */}
-        {(game.status === "waiting_p1" || game.status === "waiting_p2") && (
-          <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="pt-2 px-4 pb-4 space-y-3">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <span className="text-xs font-semibold text-ink/40 uppercase tracking-widest">
-                  {isCreator ? t.payToStart[locale] : t.payToJoin[locale]}
-                </span>
-                <span className="text-xs font-bold text-marine bg-marine/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{game.betCrc} CRC</span>
-              </div>
-              <a href={paymentLink} target="_blank" rel="noreferrer">
-                <Button className="w-full rounded-xl font-bold" style={{ background: "#251B9F" }}>
-                  {t.payCrc[locale].replace("{bet}", String(game.betCrc))}
-                </Button>
-              </a>
-              <div className={`grid gap-2 ${isCreator && game.status === "waiting_p1" ? "grid-cols-2" : "grid-cols-1"}`}>
-                <Button variant="outline" size="sm" onClick={copyPaymentLink} className="rounded-xl text-xs border-ink/15 gap-1.5">
-                  {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? t.copied[locale] : t.copyPayLink[locale]}
-                </Button>
-                {isCreator && game.status === "waiting_p1" && (
-                  <Button variant="outline" size="sm" onClick={copyGameLink} className="rounded-xl text-xs border-ink/15 gap-1.5">
-                    {copiedLink ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copiedLink ? t.copied[locale] : t.inviteP2[locale]}
-                  </Button>
-                )}
-              </div>
-              {/* QR Code */}
-              <div className="flex justify-center">
-                <div className="bg-white rounded-2xl p-4 shadow-lg border border-ink/5">
-                  {qrState === "loading" && (
-                    <div className="w-[220px] h-[220px] flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-ink/20" />
-                    </div>
-                  )}
-                  {qrState === "ready" && qrCode && <img src={qrCode} alt="QR Code" className="w-[220px] h-[220px]" />}
-                  {qrState === "error" && (
-                    <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">QR Error</div>
-                  )}
-                  <p className="text-xs text-ink/40 mt-2 text-center">
-                    {locale === "fr" ? "Scannez pour ouvrir dans Gnosis App" : "Scan to open in Gnosis App"}
-                  </p>
-                </div>
-              </div>
-
-              <button onClick={scanPayments} disabled={scanning} className="w-full text-xs text-ink/40 hover:text-ink/60 flex items-center justify-center gap-1.5 transition-colors">
-                <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
-                {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
-              </button>
-            </CardContent>
-          </Card>
-        )}
+        <GamePayment
+          gameKey="morpion"
+          game={game}
+          playerToken={playerTokenRef.current}
+          isCreator={isCreator}
+          onScanComplete={fetchGame}
+        />
 
         {/* Spectator notice */}
         {game.status === "active" && !addressConfirmed && (
