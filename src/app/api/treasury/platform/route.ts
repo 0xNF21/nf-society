@@ -161,6 +161,31 @@ export async function GET() {
     const monthlyCommissions = monthlyBets - Number(monthlyPayout.total);
     const lastMonthCommissions = lastMonthBets - Number(lastMonthPayout.total);
 
+    // Daily stats (today)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const [dailyPayout] = await db.select({
+      total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
+    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, today), noTests));
+
+    // Weekly payouts total
+    const [weeklyPayout] = await db.select({
+      total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
+    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisWeek), noTests));
+
+    // Daily/weekly bets
+    let dailyBets = 0;
+    let weeklyBets = 0;
+    for (const config of ALL_SERVER_GAMES) {
+      try {
+        const [dB] = await db.select({ total: sql<number>`COALESCE(SUM(${config.table.betCrc} * 2), 0)` })
+          .from(config.table).where(and(eq(config.table.status, "finished"), gte(config.table.updatedAt, today)));
+        dailyBets += Number(dB.total);
+        const [wB] = await db.select({ total: sql<number>`COALESCE(SUM(${config.table.betCrc} * 2), 0)` })
+          .from(config.table).where(and(eq(config.table.status, "finished"), gte(config.table.updatedAt, thisWeek)));
+        weeklyBets += Number(wB.total);
+      } catch {}
+    }
+
     // Days since first payout
     const firstPayout = await db.select({ min: sql<string>`MIN(${payouts.createdAt})` }).from(payouts);
     const firstDate = firstPayout[0]?.min ? new Date(firstPayout[0].min) : now;
@@ -174,15 +199,11 @@ export async function GET() {
       totalCommissions: round(totalCommissions),
       totalGamesPlayed,
       avgRevenuePerDay: round(avgRevenuePerDay),
-      monthly: {
-        bets: round(monthlyBets),
-        redistributed: round(Number(monthlyPayout.total)),
-        commissions: round(monthlyCommissions),
-      },
-      lastMonth: {
-        bets: round(lastMonthBets),
-        redistributed: round(Number(lastMonthPayout.total)),
-        commissions: round(lastMonthCommissions),
+      periods: {
+        today: { volume: round(dailyBets), commission: round(dailyBets - Number(dailyPayout.total)) },
+        week: { volume: round(weeklyBets), commission: round(weeklyBets - Number(weeklyPayout.total)) },
+        month: { volume: round(monthlyBets), commission: round(monthlyCommissions) },
+        lastMonth: { volume: round(lastMonthBets), commission: round(lastMonthCommissions) },
       },
       lootbox: {
         opens: lootboxOpensCount,

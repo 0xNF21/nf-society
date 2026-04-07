@@ -1026,8 +1026,12 @@ type PlatformTreasuryData = {
   totalCommissions: number;
   totalGamesPlayed: number;
   avgRevenuePerDay: number;
-  monthly: { bets: number; redistributed: number; commissions: number };
-  lastMonth: { bets: number; redistributed: number; commissions: number };
+  periods: {
+    today: { volume: number; commission: number };
+    week: { volume: number; commission: number };
+    month: { volume: number; commission: number };
+    lastMonth: { volume: number; commission: number };
+  };
   lootbox: { opens: number; received: number; paid: number; rtp: number; margin: number };
   daily: { sessions: number; received: number; paid: number; rtp: number; margin: number };
   gameRecaps: { key: string; played: number; totalBet: number; totalPaid: number; margin: number }[];
@@ -1092,7 +1096,7 @@ function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3 text-center">
                   <p className="text-lg font-black text-ink dark:text-white">{data.totalBets} <span className="text-xs font-normal text-ink/40">CRC</span></p>
-                  <p className="text-[10px] text-ink/40">{locale === "fr" ? "Total recu" : "Total received"}</p>
+                  <p className="text-[10px] text-ink/40">{locale === "fr" ? "Volume total" : "Total volume"}</p>
                 </div>
                 <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-3 text-center">
                   <p className={`text-lg font-black ${data.totalCommissions >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.totalCommissions} <span className="text-xs font-normal">CRC</span></p>
@@ -1116,20 +1120,24 @@ function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
                 </div>
               </div>
 
-              {/* Monthly comparison */}
+              {/* Period breakdown */}
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Ce mois vs mois dernier" : "This month vs last month"}</p>
+                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Periodes" : "Periods"}</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3">
-                    <p className="text-[10px] text-ink/40 mb-1">{locale === "fr" ? "Ce mois" : "This month"}</p>
-                    <p className="text-sm font-bold text-ink dark:text-white">{data.monthly.bets} CRC {locale === "fr" ? "recu" : "in"}</p>
-                    <p className={`text-xs font-bold ${data.monthly.commissions >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.monthly.commissions >= 0 ? "+" : ""}{data.monthly.commissions} CRC</p>
-                  </div>
-                  <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3">
-                    <p className="text-[10px] text-ink/40 mb-1">{locale === "fr" ? "Mois dernier" : "Last month"}</p>
-                    <p className="text-sm font-bold text-ink dark:text-white">{data.lastMonth.bets} CRC {locale === "fr" ? "recu" : "in"}</p>
-                    <p className={`text-xs font-bold ${data.lastMonth.commissions >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.lastMonth.commissions >= 0 ? "+" : ""}{data.lastMonth.commissions} CRC</p>
-                  </div>
+                  {[
+                    { label: locale === "fr" ? "Aujourd'hui" : "Today", data: data.periods.today },
+                    { label: locale === "fr" ? "Cette semaine" : "This week", data: data.periods.week },
+                    { label: locale === "fr" ? "Ce mois" : "This month", data: data.periods.month },
+                    { label: locale === "fr" ? "Mois dernier" : "Last month", data: data.periods.lastMonth },
+                  ].map(p => (
+                    <div key={p.label} className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3">
+                      <p className="text-[10px] text-ink/40 mb-1">{p.label}</p>
+                      <p className="text-sm font-bold text-ink dark:text-white">{p.data.volume} CRC <span className="text-[10px] font-normal text-ink/40">volume</span></p>
+                      <p className={`text-xs font-bold ${p.data.commission >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                        {p.data.commission >= 0 ? "+" : ""}{p.data.commission} CRC <span className="font-normal text-ink/40">commission</span>
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
