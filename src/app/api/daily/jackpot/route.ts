@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getJackpotInfo } from "@/lib/daily";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const info = await getJackpotInfo();
