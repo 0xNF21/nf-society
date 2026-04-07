@@ -6,6 +6,8 @@ import Link from "next/link";
 import { ArrowLeft, RefreshCw, Users, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { GAME_REGISTRY, GAME_LABELS } from "@/lib/game-registry";
+import { translations } from "@/lib/i18n";
 
 interface Room {
   slug: string;
@@ -14,14 +16,6 @@ interface Room {
   createdAt: string;
   game: string;
 }
-
-const GAME_INFO: Record<string, { label_fr: string; label_en: string; emoji: string; color: string }> = {
-  morpion: { label_fr: "Morpion", label_en: "Tic-Tac-Toe", emoji: "❌", color: "text-blue-500" },
-  dames: { label_fr: "Dames", label_en: "Checkers", emoji: "♟️", color: "text-amber-500" },
-  relics: { label_fr: "Bataille Navale", label_en: "Naval Battle", emoji: "⚓", color: "text-emerald-500" },
-  memory: { label_fr: "Memory", label_en: "Memory", emoji: "🃏", color: "text-pink-500" },
-  pfc: { label_fr: "Pierre-Feuille-Ciseaux", label_en: "Rock-Paper-Scissors", emoji: "✊", color: "text-red-500" },
-};
 
 function timeAgo(dateStr: string, locale: "fr" | "en") {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -94,11 +88,10 @@ export default function LobbyPage() {
         {/* Filters */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
           {[
-            { key: "all", label_fr: "Tous", label_en: "All" },
-            ...Object.entries(GAME_INFO).map(([key, info]) => ({
-              key,
-              label_fr: info.label_fr,
-              label_en: info.label_en,
+            { key: "all", label: { fr: "Tous", en: "All" } },
+            ...Object.values(GAME_REGISTRY).map((g) => ({
+              key: g.key,
+              label: { fr: GAME_LABELS[g.key] || g.key, en: GAME_LABELS[g.key] || g.key },
             })),
           ].map((f) => (
             <button
@@ -110,7 +103,7 @@ export default function LobbyPage() {
                   : `border-ink/15 dark:border-white/15 text-ink/50 dark:text-white/50 hover:border-ink/30 dark:hover:border-white/30`
               }`}
             >
-              {locale === "fr" ? f.label_fr : f.label_en}
+              {f.label[locale]}
             </button>
           ))}
         </div>
@@ -141,7 +134,10 @@ export default function LobbyPage() {
         {!loading && filtered.length > 0 && (
           <div className="space-y-3">
             {filtered.map((room) => {
-              const info = GAME_INFO[room.game] || { label_fr: room.game, label_en: room.game, emoji: "🎮", color: "text-ink/50" };
+              const reg = GAME_REGISTRY[room.game];
+              const info = reg
+                ? { label: GAME_LABELS[room.game] || room.game, emoji: reg.emoji, color: reg.iconColor }
+                : { label: room.game, emoji: "🎮", color: "text-ink/50" };
               const winAmount = room.betCrc * 2 * (1 - room.commissionPct / 100);
               return (
                 <Link key={`${room.game}-${room.slug}`} href={`/${room.game}/${room.slug}`}>
@@ -161,7 +157,7 @@ export default function LobbyPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className={`text-sm font-bold ${info.color}`}>
-                              {locale === "fr" ? info.label_fr : info.label_en}
+                              {info.label}
                             </span>
                             <span className="text-[10px] font-mono text-ink/30 dark:text-white/30">
                               {room.slug}
@@ -201,15 +197,15 @@ export default function LobbyPage() {
             {locale === "fr" ? "Ou crée ta partie" : "Or create your game"}
           </p>
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(GAME_INFO).map(([key, info]) => (
-              <Link key={key} href={`/${key}`}>
+            {Object.values(GAME_REGISTRY).map((g) => (
+              <Link key={g.key} href={`/${g.key}`}>
                 <Card className={`rounded-xl border-0 shadow-sm hover:shadow-md transition-all cursor-pointer ${
                   isDark ? "bg-white/5 hover:bg-white/10" : "bg-white/60 hover:bg-white/80"
                 } backdrop-blur-sm`}>
                   <CardContent className="p-3 flex items-center gap-2">
-                    <span className="text-lg">{info.emoji}</span>
+                    <span className="text-lg">{g.emoji}</span>
                     <span className="text-xs font-bold text-ink dark:text-white">
-                      {locale === "fr" ? info.label_fr : info.label_en}
+                      {GAME_LABELS[g.key] || g.key}
                     </span>
                   </CardContent>
                 </Card>
