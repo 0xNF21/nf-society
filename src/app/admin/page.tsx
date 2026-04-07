@@ -1213,20 +1213,22 @@ function DailyTab({ password }: { password: string }) {
               <div>
                 <label className="text-[10px] text-ink/40 font-bold">Prob %</label>
                 <input type="number" step="0.1" min={0} max={100}
-                  value={Math.round(entry.prob * 1000) / 10}
-                  onChange={e => updateEntry(tableKey, i, "prob", (parseFloat(e.target.value) || 0) / 100)}
+                  defaultValue={Math.round(entry.prob * 1000) / 10}
+                  onBlur={e => updateEntry(tableKey, i, "prob", (parseFloat(e.target.value) || 0) / 100)}
                   className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
               </div>
               <div>
                 <label className="text-[10px] text-ink/40 font-bold">CRC</label>
-                <input type="number" min={0} value={entry.crcValue}
-                  onChange={e => updateEntry(tableKey, i, "crcValue", parseInt(e.target.value) || 0)}
+                <input type="number" step="0.1" min={0}
+                  defaultValue={entry.crcValue}
+                  onBlur={e => updateEntry(tableKey, i, "crcValue", parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
               </div>
               <div>
                 <label className="text-[10px] text-ink/40 font-bold">XP</label>
-                <input type="number" min={0} value={entry.xpValue}
-                  onChange={e => updateEntry(tableKey, i, "xpValue", parseInt(e.target.value) || 0)}
+                <input type="number" step="1" min={0}
+                  defaultValue={entry.xpValue}
+                  onBlur={e => updateEntry(tableKey, i, "xpValue", parseFloat(e.target.value) || 0)}
                   className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
               </div>
               <div>
