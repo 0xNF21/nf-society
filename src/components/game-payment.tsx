@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Copy, Check, RefreshCw, Loader2 } from "lucide-react";
+import { Copy, Check, RefreshCw, Loader2, CheckCircle2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { generateGamePaymentLink } from "@/lib/circles";
@@ -101,6 +101,60 @@ export function GamePayment({
 
   if (game.status !== "waiting_p1" && game.status !== "waiting_p2") return null;
 
+  // J1 has paid, waiting for J2 — show confirmation + invite
+  if (game.status === "waiting_p2" && isCreator) {
+    return (
+      <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
+        <CardContent className="pt-4 px-4 pb-4 space-y-4">
+          {/* Payment confirmed */}
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                {locale === "fr" ? "Paiement reçu !" : "Payment received!"}
+              </p>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                {game.betCrc} CRC
+              </p>
+            </div>
+          </div>
+
+          {/* Waiting for P2 */}
+          <div className="flex items-center gap-2 justify-center text-ink/50 dark:text-white/50">
+            <Users className="w-4 h-4" />
+            <span className="text-sm font-semibold">
+              {locale === "fr" ? "En attente du joueur 2..." : "Waiting for player 2..."}
+            </span>
+          </div>
+
+          {/* Share game link */}
+          <div className="space-y-2">
+            <p className="text-xs text-ink/40 dark:text-white/40 text-center">
+              {locale === "fr" ? "Partage ce lien pour inviter un adversaire" : "Share this link to invite an opponent"}
+            </p>
+            <div className="flex gap-2">
+              <code className="flex-1 px-3 py-2.5 rounded-xl border border-ink/10 bg-white/80 dark:bg-white/5 text-xs font-mono text-ink/70 dark:text-white/70 truncate text-center">
+                {game.slug}
+              </code>
+              <Button variant="outline" size="sm" onClick={copyGameLink} className="rounded-xl border-ink/15 gap-1.5 shrink-0">
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedLink ? t.copied[locale] : t.inviteP2[locale]}
+              </Button>
+            </div>
+          </div>
+
+          {/* Manual scan */}
+          <button onClick={scanPayments} disabled={scanning}
+            className="w-full text-xs text-ink/40 hover:text-ink/60 flex items-center justify-center gap-1.5 transition-colors">
+            <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
+            {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
+          </button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show payment form (J1 needs to pay, or J2 needs to pay)
   return (
     <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
       <CardContent className="pt-2 px-4 pb-4 space-y-3">
