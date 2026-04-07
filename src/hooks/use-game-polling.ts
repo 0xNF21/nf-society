@@ -37,12 +37,10 @@ export function useGamePolling<T = Record<string, unknown>>(
 
           // Auto-scan if waiting for payment
           const status = g?.status;
-          console.log(`[GamePolling] ${gameKey}/${slug} status=${status} scanRoute=${scanRoute}`);
           if ((status === "waiting_p1" || status === "waiting_p2") && scanRoute) {
             const now = Date.now();
             if (now - lastScanRef.current > 4000) {
               lastScanRef.current = now;
-              console.log(`[GamePolling] Scanning ${scanRoute}?gameSlug=${slug}`);
               try {
                 await fetch(`${scanRoute}?gameSlug=${slug}`, { method: "POST" });
                 // Re-fetch after scan

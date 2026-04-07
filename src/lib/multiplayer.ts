@@ -113,11 +113,6 @@ export async function scanGamePayments(gameKey: string, slug: string) {
   const newPayments = await checkAllNewPayments(game.betCrc, game.recipientAddress);
   let claimedCount = 0;
 
-  console.log(`[Scan ${gameKey}] Found ${newPayments.length} payments for ${game.betCrc} CRC, slug=${slug}`);
-  for (const p of newPayments) {
-    console.log(`[Scan ${gameKey}] tx=${p.transactionHash.slice(0,12)}... gameData=${JSON.stringify(p.gameData)} claimed=${globalClaimedTxHashes.has(p.transactionHash.toLowerCase())}`);
-  }
-
   for (const payment of newPayments) {
     const txHash = payment.transactionHash.toLowerCase();
     const playerAddress = payment.sender.toLowerCase();
