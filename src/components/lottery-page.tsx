@@ -605,12 +605,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
             </div>
           )}
 
-          <footer className="mt-12 pt-8 border-t border-ink/5 flex flex-col items-center gap-4">
-            <Link href="/admin" className="flex items-center gap-1 text-xs text-ink/20 hover:text-ink/40 transition-colors">
-              <Lock className="h-3 w-3" />
-              {l.adminZone[locale]}
-            </Link>
-          </footer>
+          <footer className="mt-12 pt-8 border-t border-ink/5" />
         </div>
       </main>
     </div>

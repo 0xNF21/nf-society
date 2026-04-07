@@ -247,10 +247,6 @@ export default function HomePage() {
           <p className="text-xs text-ink/50">
             {h.footer[locale]}
           </p>
-          <Link href="/admin" className="flex items-center gap-1 text-xs text-ink/20 hover:text-ink/40 transition-colors">
-            <Lock className="h-3 w-3" />
-            {h.adminZone[locale]}
-          </Link>
         </footer>
       </div>
     </main>

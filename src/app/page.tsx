@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, BarChart3, Dice5, Swords, ArrowLeftRight, ShoppingBag, FlaskConical } from "lucide-react";
+import { ArrowRight, BarChart3, Dice5, Swords, ArrowLeftRight, ShoppingBag, FlaskConical, Lock } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
@@ -141,6 +141,10 @@ export default function LandingPage() {
             <p className="text-xs text-ink/40">
               {t.footer[locale]}
             </p>
+            <Link href="/admin" className="inline-flex items-center gap-1 text-xs text-ink/20 dark:text-white/20 hover:text-ink/40 dark:hover:text-white/40 transition-colors">
+              <Lock className="h-3 w-3" />
+              Admin
+            </Link>
           </footer>
         </div>
       </div>
