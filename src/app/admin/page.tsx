@@ -1231,8 +1231,9 @@ function DailyTab({ password }: { password: string }) {
             <div className="grid grid-cols-4 gap-2">
               <div>
                 <label className="text-[10px] text-ink/40 font-bold">Prob %</label>
-                <input type="number" step="0.1" min={0} max={100}
-                  defaultValue={Math.round(entry.prob * 1000) / 10}
+                <input type="text" inputMode="decimal"
+                  defaultValue={entry.prob * 100}
+                  key={`prob-${tableKey}-${i}-${scratch.length}`}
                   onBlur={e => updateEntry(tableKey, i, "prob", (parseFloat(e.target.value) || 0) / 100)}
                   className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
               </div>
@@ -1281,8 +1282,10 @@ function DailyTab({ password }: { password: string }) {
     setTesting(false);
   }
 
+  // RTP calculation — exclude jackpot (pool-based, not fixed CRC)
   const scratchRtp = editScratch.reduce((s, r) => s + r.prob * r.crcValue, 0);
-  const spinRtp = editSpin.reduce((s, r) => s + r.prob * r.crcValue, 0);
+  const spinRtp = editSpin.filter(r => r.type !== "jackpot").reduce((s, r) => s + r.prob * r.crcValue, 0);
+  const jackpotProb = editSpin.find(r => r.type === "jackpot")?.prob || 0;
   const combinedRtp = scratchRtp + spinRtp;
   const rtpColor = combinedRtp > 1 ? "text-red-600 bg-red-100" : combinedRtp > 0.95 ? "text-amber-600 bg-amber-100" : "text-green-600 bg-green-100";
 
@@ -1296,11 +1299,12 @@ function DailyTab({ password }: { password: string }) {
             {(combinedRtp * 100).toFixed(1)}%
           </span>
         </div>
-        <div className="flex gap-4 text-xs text-ink/50">
+        <div className="flex flex-wrap gap-3 text-xs text-ink/50">
           <span>Scratch: {(scratchRtp * 100).toFixed(1)}%</span>
           <span>Spin: {(spinRtp * 100).toFixed(1)}%</span>
           <span>Mise: 1 CRC</span>
           <span>Gain moyen: {combinedRtp.toFixed(3)} CRC</span>
+          {jackpotProb > 0 && <span>Jackpot: {(jackpotProb * 100).toFixed(2)}% (pool, hors RTP)</span>}
         </div>
         {combinedRtp > 1 && <p className="text-xs text-red-600 font-semibold">Tu perds de l argent ! Le RTP depasse 100%. Sauvegarde bloquee.</p>}
         {combinedRtp < 0.97 && <p className="text-xs text-red-600 font-semibold">RTP trop bas (min 97%). Sauvegarde bloquee.</p>}
