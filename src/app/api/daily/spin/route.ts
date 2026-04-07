@@ -35,10 +35,12 @@ export async function POST(req: NextRequest) {
     const seed = session.txHash + session.address;
     let result = await determineSpinResult(seed);
 
-    // If jackpot, set crcValue to current pool total
+    // If jackpot, set crcValue to pool total minus 5% commission
     if (result.type === "jackpot") {
       const jackpot = await getJackpotInfo();
-      result = { ...result, crcValue: Math.max(jackpot.total, 10) }; // minimum 10 CRC jackpot
+      const poolTotal = Math.max(jackpot.total, 10); // minimum 10 CRC jackpot
+      const commission = poolTotal * 0.05; // 5% platform commission
+      result = { ...result, crcValue: poolTotal - commission };
     }
 
     // Safe balance check
