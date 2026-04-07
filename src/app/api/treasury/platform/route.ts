@@ -172,7 +172,7 @@ export async function GET() {
       total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
     }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisWeek), noTests));
 
-    // Daily/weekly bets
+    // Daily/weekly bets (games + lootbox + daily)
     let dailyBets = 0;
     let weeklyBets = 0;
     for (const config of ALL_SERVER_GAMES) {
@@ -185,6 +185,28 @@ export async function GET() {
         weeklyBets += Number(wB.total);
       } catch {}
     }
+
+    // Add lootbox + daily to period volumes
+    try {
+      const prices = await db.select({ id: lootboxes.id, price: lootboxes.pricePerOpenCrc }).from(lootboxes);
+      const priceMap = new Map(prices.map(l => [l.id, l.price]));
+
+      const dailyLootbox = await db.select({ lootboxId: lootboxOpens.lootboxId }).from(lootboxOpens).where(gte(lootboxOpens.openedAt, today));
+      for (const o of dailyLootbox) dailyBets += priceMap.get(o.lootboxId) || 0;
+
+      const weeklyLootbox = await db.select({ lootboxId: lootboxOpens.lootboxId }).from(lootboxOpens).where(gte(lootboxOpens.openedAt, thisWeek));
+      for (const o of weeklyLootbox) weeklyBets += priceMap.get(o.lootboxId) || 0;
+    } catch {}
+
+    try {
+      const [dDaily] = await db.select({ count: sql<number>`COUNT(*)` }).from(dailySessions)
+        .where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, today)));
+      dailyBets += Number(dDaily.count);
+
+      const [wDaily] = await db.select({ count: sql<number>`COUNT(*)` }).from(dailySessions)
+        .where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, thisWeek)));
+      weeklyBets += Number(wDaily.count);
+    } catch {}
 
     // Days since first payout
     const firstPayout = await db.select({ min: sql<string>`MIN(${payouts.createdAt})` }).from(payouts);
