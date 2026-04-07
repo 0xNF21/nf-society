@@ -85,8 +85,7 @@ export async function POST(
       if (gameWinner) {
         const winnerAddress = gameWinner === "p1" ? game.player1Address : game.player2Address;
         const pot = game.betCrc * 2;
-        const fee = Math.ceil(pot * game.commissionPct / 100);
-        const winAmount = pot - fee;
+        const winAmount = pot * (1 - game.commissionPct / 100);
 
         await db.update(pfcGames).set({
           gameState: state,
