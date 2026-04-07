@@ -20,20 +20,110 @@ function shortenAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
+// ─── Hand images for visual duel ───
+
+const HAND_IMAGES: Record<Move, string> = {
+  pierre: "✊",
+  feuille: "✋",
+  ciseaux: "✌️",
+};
+
+// ─── Player Banner ───
+
+function PlayerBanner({
+  p1Address, p2Address, myRole, profiles
+}: {
+  p1Address: string | null;
+  p2Address: string | null;
+  myRole: "p1" | "p2" | null;
+  profiles: Record<string, { name: string; imageUrl: string | null }>;
+}) {
+  const { locale } = useLocale();
+
+  function PlayerCard({ addr, label, isMe, side }: { addr: string | null; label: string; isMe: boolean; side: "left" | "right" }) {
+    const profile = addr ? profiles[addr.toLowerCase()] : null;
+    const name = profile?.name || (addr ? shortenAddress(addr) : "???");
+    return (
+      <div className={`flex items-center gap-2 ${side === "right" ? "flex-row-reverse" : ""}`}>
+        {profile?.imageUrl ? (
+          <img src={profile.imageUrl} alt={name} className="w-10 h-10 rounded-full object-cover border-2 border-white/20 shadow" />
+        ) : (
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow text-sm font-black ${
+            side === "left" ? "bg-marine/20 text-marine" : "bg-citrus/20 text-citrus"
+          }`}>
+            {addr ? name.slice(0, 2).toUpperCase() : "?"}
+          </div>
+        )}
+        <div className={side === "right" ? "text-right" : ""}>
+          <p className="text-xs font-bold text-ink dark:text-white truncate max-w-[100px]">{name}</p>
+          <p className="text-[10px] text-ink/40">
+            {label} {isMe ? (locale === "fr" ? "(vous)" : "(you)") : ""}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-ink/5">
+      <PlayerCard addr={p1Address} label="J1" isMe={myRole === "p1"} side="left" />
+      <span className="text-lg font-black text-ink/20">VS</span>
+      <PlayerCard addr={p2Address} label="J2" isMe={myRole === "p2"} side="right" />
+    </div>
+  );
+}
+
+// ─── Duel Animation ───
+
+function DuelDisplay({ p1Move, p2Move, winner, locale }: {
+  p1Move: Move; p2Move: Move; winner: "p1" | "p2" | "draw"; locale: "fr" | "en"
+}) {
+  const t = translations.pfc;
+  return (
+    <Card className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-around">
+          <div className="text-center space-y-1">
+            <div className={`text-6xl transition-transform duration-500 ${winner === "p1" ? "scale-110" : winner === "p2" ? "opacity-50 scale-90" : ""}`}>
+              {HAND_IMAGES[p1Move]}
+            </div>
+            <p className="text-xs text-ink/50">{MOVE_EMOJI[p1Move]} {t[p1Move][locale]}</p>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xl font-black text-ink/20">VS</span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+              winner === "draw" ? "bg-ink/5 text-ink/50" :
+              "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+            }`}>
+              {winner === "p1" ? "J1 ✓" : winner === "p2" ? "J2 ✓" : "="}
+            </span>
+          </div>
+          <div className="text-center space-y-1">
+            <div className={`text-6xl transition-transform duration-500 ${winner === "p2" ? "scale-110" : winner === "p1" ? "opacity-50 scale-90" : ""}`}>
+              {HAND_IMAGES[p2Move]}
+            </div>
+            <p className="text-xs text-ink/50">{MOVE_EMOJI[p2Move]} {t[p2Move][locale]}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Move Buttons ───
 
 function MoveButtons({ onMove, disabled }: { onMove: (m: Move) => void; disabled: boolean }) {
   const { locale } = useLocale();
   const t = translations.pfc;
-  const moves: { move: Move; emoji: string; label: string }[] = [
-    { move: "pierre", emoji: "🪨", label: t.pierre[locale] },
-    { move: "feuille", emoji: "📄", label: t.feuille[locale] },
-    { move: "ciseaux", emoji: "✂️", label: t.ciseaux[locale] },
+  const moves: { move: Move; hand: string; label: string }[] = [
+    { move: "pierre", hand: "✊", label: t.pierre[locale] },
+    { move: "feuille", hand: "✋", label: t.feuille[locale] },
+    { move: "ciseaux", hand: "✌️", label: t.ciseaux[locale] },
   ];
 
   return (
     <div className="grid grid-cols-3 gap-3">
-      {moves.map(({ move, emoji, label }) => (
+      {moves.map(({ move, hand, label }) => (
         <button
           key={move}
           onClick={() => !disabled && onMove(move)}
@@ -41,10 +131,10 @@ function MoveButtons({ onMove, disabled }: { onMove: (m: Move) => void; disabled
           className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
             disabled
               ? "border-ink/5 bg-ink/[0.02] opacity-50 cursor-not-allowed"
-              : "border-ink/10 bg-white/80 hover:border-marine/40 hover:bg-marine/5 active:scale-95 cursor-pointer"
+              : "border-ink/10 bg-white/80 hover:border-marine/40 hover:bg-marine/5 active:scale-95 cursor-pointer hover:shadow-lg"
           }`}
         >
-          <span className="text-4xl">{emoji}</span>
+          <span className="text-5xl">{hand}</span>
           <span className="text-xs font-bold text-ink/60">{label}</span>
         </button>
       ))}
@@ -60,19 +150,20 @@ function RoundHistory({ rounds, locale }: { rounds: RoundResult[]; locale: "fr" 
 
   return (
     <div className="space-y-1.5">
+      <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Historique" : "History"}</p>
       {rounds.map((r, i) => (
         <div key={i} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
           <span className="text-xs text-ink/40">{t.round[locale]} {i + 1}</span>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{MOVE_EMOJI[r.p1]}</span>
-            <span className="text-xs text-ink/30">vs</span>
-            <span className="text-lg">{MOVE_EMOJI[r.p2]}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{HAND_IMAGES[r.p1]}</span>
+            <span className="text-xs text-ink/30 font-bold">VS</span>
+            <span className="text-2xl">{HAND_IMAGES[r.p2]}</span>
           </div>
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
             r.winner === "draw" ? "text-ink/50 bg-ink/5" :
             "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/30"
           }`}>
-            {r.winner === "p1" ? "J1" : r.winner === "p2" ? "J2" : "="}
+            {r.winner === "p1" ? "J1 ✓" : r.winner === "p2" ? "J2 ✓" : "="}
           </span>
         </div>
       ))}
@@ -162,16 +253,18 @@ function DemoPfcGame({ slug }: { slug: string }) {
 
         {/* Revealing animation */}
         {revealing && myMove && botMove && (
-          <Card className="bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 flex items-center justify-around">
-              <div className="text-center">
-                <span className="text-5xl animate-bounce">{MOVE_EMOJI[myMove]}</span>
-                <p className="text-xs text-ink/40 mt-1">{demoPlayer.name}</p>
-              </div>
-              <span className="text-xl font-black text-ink/30">VS</span>
-              <div className="text-center">
-                <span className="text-5xl animate-bounce">{MOVE_EMOJI[botMove]}</span>
-                <p className="text-xs text-ink/40 mt-1">Bot</p>
+          <Card className="bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl overflow-hidden">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-around">
+                <div className="text-center space-y-1">
+                  <div className="text-6xl animate-bounce">{HAND_IMAGES[myMove]}</div>
+                  <p className="text-xs text-ink/50">{demoPlayer.name}</p>
+                </div>
+                <span className="text-xl font-black text-ink/20">VS</span>
+                <div className="text-center space-y-1">
+                  <div className="text-6xl animate-bounce">{HAND_IMAGES[botMove]}</div>
+                  <p className="text-xs text-ink/50">Bot 🤖</p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -332,10 +425,26 @@ function RealPfcGame({ slug }: { slug: string }) {
           onScanComplete={fetchGame}
         />
 
+        {/* Player banner */}
+        {game.status !== "waiting_p1" && game.status !== "waiting_p2" && (
+          <PlayerBanner
+            p1Address={game.player1Address}
+            p2Address={game.player2Address}
+            myRole={myRole}
+            profiles={profiles}
+          />
+        )}
+
         {/* Score bar */}
         {state && game.status !== "waiting_p1" && game.status !== "waiting_p2" && (
           <ScoreBar score={score} bestOf={state.bestOf} locale={locale} />
         )}
+
+        {/* Last round duel display */}
+        {state && state.rounds.length > 0 && game.status === "playing" && (() => {
+          const lastRound = state.rounds[state.rounds.length - 1];
+          return <DuelDisplay p1Move={lastRound.p1} p2Move={lastRound.p2} winner={lastRound.winner} locale={locale} />;
+        })()}
 
         {/* Status */}
         {game.status === "playing" && !winner && (
