@@ -50,15 +50,19 @@ export function GamePayment({
     playerToken,
   );
 
+  const scanningRef = useRef(false);
+
   const scanPayments = useCallback(async () => {
-    if (scanning) return;
+    if (scanningRef.current) return;
+    scanningRef.current = true;
     setScanning(true);
     try {
       await fetch(`${config.scanRoute}?gameSlug=${game.slug}`, { method: "POST" });
       onScanComplete();
     } catch {}
+    scanningRef.current = false;
     setScanning(false);
-  }, [scanning, config.scanRoute, game.slug, onScanComplete]);
+  }, [config.scanRoute, game.slug, onScanComplete]);
 
   // Auto-scan payments
   useEffect(() => {
@@ -66,7 +70,7 @@ export function GamePayment({
       if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null; }
       return;
     }
-    if (!scanRef.current) scanRef.current = setInterval(scanPayments, scanInterval);
+    scanRef.current = setInterval(scanPayments, scanInterval);
     return () => { if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null; } };
   }, [game.status, scanPayments, scanInterval]);
 
