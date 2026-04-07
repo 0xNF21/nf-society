@@ -1355,19 +1355,38 @@ function DailyTab({ password }: { password: string }) {
 /* ─── Badges Tab ─── */
 
 const CONDITION_TYPES = [
-  { value: "manual", label: "Manuel (attribuer a la main)" },
-  { value: "first", label: "Premiere fois (action)" },
-  { value: "streak", label: "Streak (X jours/wins de suite)" },
-  { value: "count", label: "Compteur (X fois total)" },
-  { value: "hour_before", label: "Heure avant (check-in avant Xh)" },
-  { value: "hour_between", label: "Heure entre (check-in entre X et Y)" },
-  { value: "lose_streak", label: "Serie de defaites (X de suite)" },
-  { value: "xp_threshold", label: "Seuil XP (atteindre X XP)" },
-  { value: "level_threshold", label: "Seuil niveau (atteindre niveau X)" },
-  { value: "games_played", label: "Parties jouees (jouer X parties)" },
-  { value: "games_won", label: "Victoires totales (gagner X fois)" },
-  { value: "crc_won", label: "CRC gagnes (gagner X CRC total)" },
-  { value: "multi_game", label: "Multi-jeu (jouer a X jeux differents)" },
+  { value: "manual", label: "Attribuer manuellement", desc: "Tu choisis a qui donner ce badge", needsAction: false, needsValue: false },
+  { value: "first", label: "Premiere fois", desc: "Quand le joueur fait cette action pour la 1ere fois", needsAction: true, needsValue: false },
+  { value: "streak", label: "Serie consecutive", desc: "X jours de suite ou X victoires de suite", needsAction: true, needsValue: true, valueLabel: "Combien de fois de suite ?" },
+  { value: "count", label: "Compteur total", desc: "Quand le joueur atteint X fois au total", needsAction: true, needsValue: true, valueLabel: "Combien de fois ?" },
+  { value: "xp_threshold", label: "Seuil d'XP", desc: "Quand le joueur atteint X XP au total", needsAction: false, needsValue: true, valueLabel: "Combien d'XP ?" },
+  { value: "level_threshold", label: "Seuil de niveau", desc: "Quand le joueur atteint le niveau X", needsAction: false, needsValue: true, valueLabel: "Quel niveau ?" },
+  { value: "games_played", label: "Parties jouees", desc: "Quand le joueur a joue X parties au total", needsAction: false, needsValue: true, valueLabel: "Combien de parties ?" },
+  { value: "games_won", label: "Victoires totales", desc: "Quand le joueur a gagne X parties au total", needsAction: false, needsValue: true, valueLabel: "Combien de victoires ?" },
+  { value: "crc_won", label: "CRC gagnes", desc: "Quand le joueur a gagne X CRC au total", needsAction: false, needsValue: true, valueLabel: "Combien de CRC ?" },
+  { value: "hour_before", label: "Heure matinale", desc: "Quand le joueur se connecte avant Xh du matin", needsAction: true, needsValue: true, valueLabel: "Avant quelle heure ?" },
+  { value: "hour_between", label: "Plage horaire", desc: "Quand le joueur se connecte entre Xh et Yh", needsAction: true, needsValue: false },
+  { value: "lose_streak", label: "Serie de defaites", desc: "Quand le joueur perd X fois de suite", needsAction: true, needsValue: true, valueLabel: "Combien de defaites ?" },
+  { value: "multi_game", label: "Multi-jeu", desc: "Quand le joueur a joue a X jeux differents", needsAction: false, needsValue: true, valueLabel: "Combien de jeux ?" },
+];
+
+const ACTION_EXAMPLES = [
+  { value: "*_win", label: "Gagner (tous les jeux)" },
+  { value: "*_lose", label: "Perdre (tous les jeux)" },
+  { value: "morpion_win", label: "Gagner au Morpion" },
+  { value: "pfc_win", label: "Gagner au PFC" },
+  { value: "dames_win", label: "Gagner aux Dames" },
+  { value: "relics_win", label: "Gagner a Relics" },
+  { value: "memory_win", label: "Gagner au Memory" },
+  { value: "daily_checkin", label: "Check-in quotidien" },
+  { value: "lootbox_open", label: "Ouvrir une lootbox" },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: "game", label: "🎮 Jeu", desc: "Lie aux jeux multijoueur" },
+  { value: "activity", label: "📊 Activite", desc: "Lie a l'activite generale" },
+  { value: "event", label: "🎉 Evenement", desc: "Evenement special / temporaire" },
+  { value: "secret", label: "🔒 Secret", desc: "Cache jusqu'a deblocage" },
 ];
 
 const BADGE_CATEGORIES = ["game", "activity", "event", "secret"];
@@ -1491,44 +1510,137 @@ function BadgesTab({ password }: { password: string }) {
       </div>
 
       {/* New badge form */}
-      {showNew && (
-        <div className="p-4 rounded-xl border-2 border-dashed border-marine/30 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <input placeholder="slug (ex: speed_demon)" value={newBadge.slug} onChange={e => setNewBadge(p => ({ ...p, slug: e.target.value }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
-            <input placeholder="Nom" value={newBadge.name} onChange={e => setNewBadge(p => ({ ...p, name: e.target.value }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
-          </div>
-          <input placeholder="Description" value={newBadge.description} onChange={e => setNewBadge(p => ({ ...p, description: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-ink/10 text-sm" />
-          <div className="grid grid-cols-3 gap-2">
-            <input placeholder="Emoji" value={newBadge.icon} onChange={e => setNewBadge(p => ({ ...p, icon: e.target.value }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm text-center text-xl" />
-            <select value={newBadge.category} onChange={e => setNewBadge(p => ({ ...p, category: e.target.value }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm">
-              {BADGE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-ink/10 text-sm cursor-pointer">
-              <input type="checkbox" checked={newBadge.secret} onChange={e => setNewBadge(p => ({ ...p, secret: e.target.checked }))} /> Secret
-            </label>
-          </div>
-          <select value={newBadge.condition.type} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, type: e.target.value } }))} className="w-full px-3 py-2 rounded-lg border border-ink/10 text-sm">
-            {CONDITION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-          {newBadge.condition.type !== "manual" && (
-            <div className="grid grid-cols-2 gap-2">
-              <input placeholder="Action (ex: *_win)" value={newBadge.condition.action} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, action: e.target.value } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
-              {["streak", "count", "hour_before", "lose_streak", "xp_threshold", "level_threshold", "games_played", "games_won", "crc_won", "multi_game"].includes(newBadge.condition.type) && (
-                <input type="number" min={1} value={newBadge.condition.value} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, value: parseInt(e.target.value) || 1 } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" />
-              )}
-              {newBadge.condition.type === "hour_between" && (
-                <>
-                  <input type="number" min={0} max={23} value={newBadge.condition.min} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, min: parseInt(e.target.value) || 0 } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" placeholder="Min h" />
-                  <input type="number" min={0} max={24} value={newBadge.condition.max} onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, max: parseInt(e.target.value) || 4 } }))} className="px-3 py-2 rounded-lg border border-ink/10 text-sm" placeholder="Max h" />
-                </>
-              )}
+      {showNew && (() => {
+        const condType = CONDITION_TYPES.find(t => t.value === newBadge.condition.type);
+        const conditionSummary = (() => {
+          if (newBadge.condition.type === "manual") return "Tu l'attribues manuellement a qui tu veux.";
+          const actionLabel = ACTION_EXAMPLES.find(a => a.value === newBadge.condition.action)?.label || newBadge.condition.action || "...";
+          if (newBadge.condition.type === "first") return `Se debloque la premiere fois que le joueur fait : ${actionLabel}`;
+          if (newBadge.condition.type === "streak") return `Se debloque apres ${newBadge.condition.value} ${actionLabel} de suite`;
+          if (newBadge.condition.type === "count") return `Se debloque apres ${newBadge.condition.value} fois : ${actionLabel}`;
+          if (newBadge.condition.type === "xp_threshold") return `Se debloque quand le joueur atteint ${newBadge.condition.value} XP`;
+          if (newBadge.condition.type === "level_threshold") return `Se debloque quand le joueur atteint le niveau ${newBadge.condition.value}`;
+          if (newBadge.condition.type === "games_played") return `Se debloque apres ${newBadge.condition.value} parties jouees`;
+          if (newBadge.condition.type === "games_won") return `Se debloque apres ${newBadge.condition.value} victoires`;
+          if (newBadge.condition.type === "crc_won") return `Se debloque apres ${newBadge.condition.value} CRC gagnes`;
+          if (newBadge.condition.type === "hour_before") return `Se debloque si check-in avant ${newBadge.condition.value}h`;
+          if (newBadge.condition.type === "hour_between") return `Se debloque si check-in entre ${newBadge.condition.min}h et ${newBadge.condition.max}h`;
+          if (newBadge.condition.type === "lose_streak") return `Se debloque apres ${newBadge.condition.value} defaites de suite`;
+          if (newBadge.condition.type === "multi_game") return `Se debloque quand le joueur a joue a ${newBadge.condition.value} jeux differents`;
+          return "";
+        })();
+
+        return (
+        <div className="p-5 rounded-2xl border-2 border-marine/20 bg-white/40 dark:bg-white/5 space-y-5">
+          {/* Preview */}
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
+            <div className="w-14 h-14 rounded-xl bg-white dark:bg-white/10 flex items-center justify-center text-3xl shadow-sm">
+              {newBadge.icon || "🏆"}
             </div>
-          )}
-          <button onClick={createBadge} disabled={saving || !newBadge.slug || !newBadge.name} className="w-full py-2 rounded-lg bg-marine text-white text-sm font-bold hover:opacity-90 disabled:opacity-50">
-            {saving ? "Creation..." : "Creer le badge"}
+            <div className="flex-1">
+              <p className="font-bold text-ink dark:text-white">{newBadge.name || "Nom du badge"}</p>
+              <p className="text-xs text-ink/50">{newBadge.description || "Description..."}</p>
+              <p className="text-[10px] text-marine font-semibold mt-0.5">{conditionSummary}</p>
+            </div>
+            {newBadge.secret && <span className="text-xs bg-ink/10 px-2 py-0.5 rounded-full">🔒 Secret</span>}
+          </div>
+
+          {/* Step 1: Identity */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">1. Identite du badge</p>
+            <div className="grid grid-cols-[80px_1fr] gap-2">
+              <input value={newBadge.icon} onChange={e => setNewBadge(p => ({ ...p, icon: e.target.value }))}
+                className="px-3 py-3 rounded-xl border border-ink/10 text-center text-2xl bg-white dark:bg-white/10" placeholder="🏆" />
+              <input placeholder="Nom du badge (ex: Champion)" value={newBadge.name}
+                onChange={e => setNewBadge(p => ({ ...p, name: e.target.value, slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") }))}
+                className="px-3 py-3 rounded-xl border border-ink/10 text-sm font-semibold" />
+            </div>
+            <input placeholder="Description (ex: Gagner 10 parties)" value={newBadge.description}
+              onChange={e => setNewBadge(p => ({ ...p, description: e.target.value }))}
+              className="w-full px-3 py-2.5 rounded-xl border border-ink/10 text-sm" />
+          </div>
+
+          {/* Step 2: Category */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">2. Categorie</p>
+            <div className="grid grid-cols-2 gap-2">
+              {CATEGORY_OPTIONS.map(c => (
+                <button key={c.value} onClick={() => setNewBadge(p => ({ ...p, category: c.value, secret: c.value === "secret" }))}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${
+                    newBadge.category === c.value ? "border-marine bg-marine/5" : "border-ink/10 hover:border-ink/20"
+                  }`}>
+                  <p className="text-sm font-bold">{c.label}</p>
+                  <p className="text-[10px] text-ink/40">{c.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Step 3: Condition */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">3. Comment debloquer ce badge ?</p>
+            <div className="grid grid-cols-2 gap-2">
+              {CONDITION_TYPES.map(t => (
+                <button key={t.value} onClick={() => setNewBadge(p => ({ ...p, condition: { ...p.condition, type: t.value } }))}
+                  className={`p-2.5 rounded-xl border-2 text-left transition-all ${
+                    newBadge.condition.type === t.value ? "border-marine bg-marine/5" : "border-ink/10 hover:border-ink/20"
+                  }`}>
+                  <p className="text-xs font-bold">{t.label}</p>
+                  <p className="text-[10px] text-ink/40">{t.desc}</p>
+                </button>
+              ))}
+            </div>
+
+            {/* Action selector */}
+            {condType?.needsAction && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-ink/40 font-bold">Quelle action ?</p>
+                <select value={newBadge.condition.action}
+                  onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, action: e.target.value } }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-ink/10 text-sm">
+                  <option value="">Choisir une action...</option>
+                  {ACTION_EXAMPLES.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Value input */}
+            {condType?.needsValue && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-ink/40 font-bold">{condType.valueLabel}</p>
+                <input type="number" min={1} value={newBadge.condition.value}
+                  onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, value: parseInt(e.target.value) || 1 } }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-ink/10 text-sm font-bold" />
+              </div>
+            )}
+
+            {/* Hour between */}
+            {newBadge.condition.type === "hour_between" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-ink/40 font-bold">De (heure)</p>
+                  <input type="number" min={0} max={23} value={newBadge.condition.min}
+                    onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, min: parseInt(e.target.value) || 0 } }))}
+                    className="w-full px-3 py-2.5 rounded-xl border border-ink/10 text-sm font-bold" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-ink/40 font-bold">A (heure)</p>
+                  <input type="number" min={0} max={24} value={newBadge.condition.max}
+                    onChange={e => setNewBadge(p => ({ ...p, condition: { ...p.condition, max: parseInt(e.target.value) || 4 } }))}
+                    className="w-full px-3 py-2.5 rounded-xl border border-ink/10 text-sm font-bold" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Create button */}
+          <button onClick={createBadge} disabled={saving || !newBadge.name || !newBadge.description}
+            className="w-full py-3 rounded-xl bg-marine text-white text-sm font-bold hover:opacity-90 disabled:opacity-50">
+            {saving ? "Creation..." : `Creer "${newBadge.name || "..."}"`}
           </button>
         </div>
-      )}
+        );
+      })()}
 
       {/* Badge list */}
       {allBadges.map(badge => (
