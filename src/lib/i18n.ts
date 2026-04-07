@@ -569,6 +569,7 @@ export const translations = {
     notYourTurn: { fr: "Ce n'est pas votre tour", en: "Not your turn" },
     waiting: { fr: "En attente...", en: "Waiting..." },
     youPlay: { fr: "Vous jouez", en: "You play" },
+    rules: { fr: "**Morpion (Tic-Tac-Toe)**\n- Chaque joueur mise des CRC\n- Le joueur 1 joue X, le joueur 2 joue O\n- Alignez 3 symboles en ligne, colonne ou diagonale pour gagner\n- Le gagnant remporte la mise des 2 joueurs (moins 5% de commission)\n- En cas d'egalite, les mises sont remboursees", en: "**Tic-Tac-Toe**\n- Each player bets CRC\n- Player 1 plays X, Player 2 plays O\n- Align 3 symbols in a row, column or diagonal to win\n- Winner takes both bets (minus 5% commission)\n- In case of draw, bets are refunded" },
   },
   playerProfile: {
     home: { fr: "Accueil", en: "Home" },
@@ -619,6 +620,7 @@ export const translations = {
     easyDesc: { fr: "3×4 — 6 paires", en: "3×4 — 6 pairs" },
     mediumDesc: { fr: "4×4 — 8 paires", en: "4×4 — 8 pairs" },
     hardDesc: { fr: "4×6 — 12 paires", en: "4×6 — 12 pairs" },
+    rules: { fr: "**Memory**\n- Choisissez la difficulte (facile, moyen, difficile)\n- Chaque joueur mise des CRC\n- Trouvez toutes les paires de cartes\n- Le joueur avec le plus de paires gagne\n- En cas d'egalite : le plus rapide gagne\n- Le gagnant remporte la mise des 2 joueurs (moins 5% de commission)", en: "**Memory**\n- Choose difficulty (easy, medium, hard)\n- Each player bets CRC\n- Find all matching card pairs\n- Player with most pairs wins\n- Tie-breaker: fastest player wins\n- Winner takes both bets (minus 5% commission)" },
     gameLabel: { fr: "Partie", en: "Game" },
     waitingP1: { fr: "En attente du paiement J1…", en: "Waiting for P1 payment…" },
     waitingP2: { fr: "En attente du joueur 2…", en: "Waiting for player 2…" },
@@ -792,6 +794,7 @@ export const translations = {
     waitingP2: { fr: "En attente du joueur 2…", en: "Waiting for player 2…" },
     yourAddress: { fr: "Votre adresse", en: "Your address" },
     enterAddress: { fr: "Entrez votre adresse pour jouer", en: "Enter your address to play" },
+    rules: { fr: "**Relics (Bataille Navale)**\n- Chaque joueur mise des CRC\n- Placez vos 5 artefacts sur votre grille\n- Tirez a tour de role sur la grille adverse\n- Touche = vous rejouez, a l'eau = tour de l'adversaire\n- Coulez tous les artefacts adverses pour gagner\n- Le gagnant remporte la mise des 2 joueurs (moins 5% de commission)", en: "**Relics (Battleship)**\n- Each player bets CRC\n- Place your 5 relics on your grid\n- Take turns shooting at opponent's grid\n- Hit = play again, miss = opponent's turn\n- Sink all opponent's relics to win\n- Winner takes both bets (minus 5% commission)" },
   },
   landingRelics: {
     title: { fr: "Relics", en: "Relics" },
@@ -836,6 +839,7 @@ export const translations = {
     opponentTurn: { fr: "⏳ Adversaire", en: "⏳ Opponent" },
     victory: { fr: "🏆 Victoire !", en: "🏆 Victory!" },
     defeat: { fr: "💀 Défaite", en: "💀 Defeat" },
+    rules: { fr: "**Dames (Checkers)**\n- Chaque joueur mise des CRC\n- Deplacez vos pions en diagonale\n- Capturez les pions adverses en sautant par-dessus\n- Les captures sont obligatoires (rafale)\n- Un pion arrive au bout = dame (se deplace en diagonale sans limite)\n- Capturez tous les pions adverses pour gagner\n- Le gagnant remporte la mise des 2 joueurs (moins 5% de commission)", en: "**Checkers**\n- Each player bets CRC\n- Move your pieces diagonally\n- Capture opponent pieces by jumping over them\n- Captures are mandatory (chain captures)\n- Piece reaches the end = king (moves diagonally without limit)\n- Capture all opponent pieces to win\n- Winner takes both bets (minus 5% commission)" },
   },
   landingPfc: {
     title: { fr: "Pierre-Feuille-Ciseaux", en: "Rock-Paper-Scissors" },
@@ -886,6 +890,7 @@ export const translations = {
     gameOver: { fr: "Partie terminée", en: "Game over" },
     betWon: { fr: "Mise remportée :", en: "Winnings:" },
     waiting: { fr: "En attente...", en: "Waiting..." },
+    rules: { fr: "**Pierre-Feuille-Ciseaux**\n- Choisissez Best of 3 ou Best of 5\n- Chaque joueur mise des CRC\n- A chaque round, choisissez Pierre, Feuille ou Ciseaux\n- Pierre bat Ciseaux, Ciseaux bat Feuille, Feuille bat Pierre\n- Les coups sont simultanes (caches jusqu'a ce que les 2 jouent)\n- Egalite de round = on rejoue\n- Premier a 2 rounds (BO3) ou 3 rounds (BO5) gagne\n- Le gagnant remporte la mise des 2 joueurs (moins 5% de commission)", en: "**Rock-Paper-Scissors**\n- Choose Best of 3 or Best of 5\n- Each player bets CRC\n- Each round, choose Rock, Paper or Scissors\n- Rock beats Scissors, Scissors beats Paper, Paper beats Rock\n- Moves are simultaneous (hidden until both play)\n- Round tie = replay\n- First to 2 rounds (BO3) or 3 rounds (BO5) wins\n- Winner takes both bets (minus 5% commission)" },
   },
   leaderboard: {
     back: { fr: "Accueil", en: "Home" },

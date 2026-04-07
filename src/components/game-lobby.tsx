@@ -10,6 +10,7 @@ import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY } from "@/lib/game-registry";
+import { GameRulesModal } from "@/components/game-rules-modal";
 
 interface GameLobbyProps {
   gameKey: string;
@@ -98,6 +99,9 @@ export function GameLobby({
           </div>
           <h1 className="text-3xl font-bold text-ink mb-2">{t.title[locale]}</h1>
           <p className="text-ink/50 text-sm">{t.subtitle[locale]}</p>
+          <div className="mt-3 flex justify-center">
+            <GameRulesModal gameKey={gameKey} />
+          </div>
         </div>
 
         {/* Create game */}
