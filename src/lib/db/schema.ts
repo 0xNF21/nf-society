@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, uniqueIndex, real, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, uniqueIndex, real, boolean, jsonb } from "drizzle-orm/pg-core";
 
 export const lotteries = pgTable("lotteries", {
   id: serial("id").primaryKey(),
@@ -279,7 +279,7 @@ export const featureFlags = pgTable("feature_flags", {
 
 export const dailyRewardsConfig = pgTable("daily_rewards_config", {
   key: text("key").primaryKey(),
-  rewards: text("rewards").notNull(), // JSON string
+  rewards: jsonb("rewards").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

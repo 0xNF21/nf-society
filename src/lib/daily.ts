@@ -59,7 +59,7 @@ async function getScratchProbs() {
     const { eq } = await import("drizzle-orm");
     const [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "scratch"));
     if (row) {
-      cachedScratch = JSON.parse(row.rewards);
+      cachedScratch = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards as typeof DEFAULT_SCRATCH_PROBS;
       dailyCacheTime = Date.now();
       return cachedScratch!;
     }
@@ -74,7 +74,7 @@ async function getSpinProbs() {
     const { eq } = await import("drizzle-orm");
     const [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "spin"));
     if (row) {
-      cachedSpin = JSON.parse(row.rewards);
+      cachedSpin = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards as typeof DEFAULT_SPIN_PROBS;
       dailyCacheTime = Date.now();
       return cachedSpin!;
     }

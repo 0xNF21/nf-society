@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const rows = await db.select().from(dailyRewardsConfig);
   const result: Record<string, unknown> = {};
   for (const row of rows) {
-    result[row.key] = JSON.parse(row.rewards);
+    result[row.key] = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards;
   }
   return NextResponse.json(result);
 }
