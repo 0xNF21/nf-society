@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { RELICS, RELIC_ORDER, GRID_SIZE, buildCellMap, placeRelic, removeRelic, canPlace, allRelicsPlaced, emptyGrid, processShot, isDefeated } from "@/lib/relics"
 import type { RelicId, Orientation, PlayerGrid } from "@/lib/relics"
@@ -7,10 +7,12 @@ import type { RelicsGameRow } from "@/lib/db/schema/relics"
 import { useDemo } from "@/components/demo-provider"
 import { useLocale } from "@/components/language-provider"
 import { useTheme } from "@/components/theme-provider"
-import { generateGamePaymentLink } from "@/lib/circles"
+import { GamePayment } from "@/components/game-payment"
+import { usePlayerToken } from "@/hooks/use-player-token"
+import { useGamePolling } from "@/hooks/use-game-polling"
 import { translations } from "@/lib/i18n"
 import Link from "next/link"
-import { ArrowLeft, RotateCcw, Copy, Check, RefreshCw, Trophy, Clock, Users, Loader2 } from "lucide-react"
+import { ArrowLeft, RotateCcw, Trophy, Clock, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -419,19 +421,14 @@ function RealRelicsGame({ id }: { id: string }) {
   const isDark = theme === "dark"
   const t = translations.relics
 
-  const [game, setGame] = useState<RelicsGameRow | null>(null)
+  const { game, loading, fetchGame, setGame } = useGamePolling<RelicsGameRow>("relics", id)
+  const playerTokenRef = usePlayerToken("relics", id)
   const [myAddress, setMyAddress] = useState("")
   const [addressConfirmed, setAddressConfirmed] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [scanning, setScanning] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [copiedLink, setCopiedLink] = useState(false)
   const [isCreator, setIsCreator] = useState(false)
   const [error, setError] = useState("")
   const [lastResult, setLastResult] = useState("")
   const [profiles, setProfiles] = useState<Record<string, { name: string; imageUrl: string | null }>>({})
-  const [qrCode, setQrCode] = useState("")
-  const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle")
 
   // Placement state
   const [myGrid, setMyGrid] = useState<PlayerGrid>(emptyGrid())
@@ -439,50 +436,8 @@ function RealRelicsGame({ id }: { id: string }) {
   const [orientation, setOrientation] = useState<Orientation>("H")
   const [previewCells, setPreviewCells] = useState<[number, number][]>([])
 
-  const pollRef = useRef<NodeJS.Timeout | null>(null)
-  const scanRef = useRef<NodeJS.Timeout | null>(null)
-  const playerTokenRef = useRef<string>("")
-
-  const fetchGame = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/relics?id=${id}`)
-      if (res.ok) setGame(await res.json())
-    } catch {}
-    setLoading(false)
-  }, [id])
-
-  const scanPayments = useCallback(async () => {
-    if (scanning) return
-    setScanning(true)
-    try {
-      await fetch(`/api/relics-scan?gameId=${id}`, { method: "POST" })
-      await fetchGame()
-    } catch {}
-    setScanning(false)
-  }, [id, scanning, fetchGame])
-
   useEffect(() => {
     setIsCreator(sessionStorage.getItem(`relics_creator_${id}`) === "1")
-  }, [id])
-
-  // Init player token from URL, localStorage, or generate new
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const urlToken = urlParams.get("setToken")
-    if (urlToken) {
-      localStorage.setItem(`relics-${id}-token`, urlToken)
-      playerTokenRef.current = urlToken
-      window.history.replaceState({}, "", window.location.pathname)
-    } else {
-      const stored = localStorage.getItem(`relics-${id}-token`)
-      if (stored) {
-        playerTokenRef.current = stored
-      } else {
-        const token = crypto.randomUUID().slice(0, 8)
-        localStorage.setItem(`relics-${id}-token`, token)
-        playerTokenRef.current = token
-      }
-    }
   }, [id])
 
   // Auto-identify player via token match
@@ -513,56 +468,6 @@ function RealRelicsGame({ id }: { id: string }) {
       if (data.profiles) setProfiles(prev => ({ ...prev, ...data.profiles }))
     }).catch(() => {})
   }, [game?.player1Address, game?.player2Address])
-
-  // Polling
-  useEffect(() => {
-    fetchGame()
-    pollRef.current = setInterval(fetchGame, 2000)
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [fetchGame])
-
-  // Auto-scan payments
-  useEffect(() => {
-    if (!game) return
-    if (game.status === "placing" || game.status === "playing" || game.status === "finished") {
-      if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null }
-      return
-    }
-    if (!scanRef.current) scanRef.current = setInterval(scanPayments, 5000)
-    return () => { if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null } }
-  }, [game?.status, scanPayments])
-
-  // Generate QR code when in payment phase
-  useEffect(() => {
-    if (!game || (game.status !== "waiting_p1" && game.status !== "waiting_p2")) return
-    let active = true
-    setQrState("loading")
-    ;(async () => {
-      try {
-        const { toDataURL } = await import("qrcode")
-        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug, playerTokenRef.current)
-        const url = await toDataURL(link, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } })
-        if (active) { setQrCode(url); setQrState("ready") }
-      } catch {
-        if (active) { setQrCode(""); setQrState("error") }
-      }
-    })()
-    return () => { active = false }
-  }, [game?.status, game?.recipientAddress, game?.betCrc, game?.slug])
-
-  function copyPaymentLink() {
-    if (!game) return
-    const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug, playerTokenRef.current)
-    navigator.clipboard.writeText(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  function copyGameLink() {
-    navigator.clipboard.writeText(window.location.href)
-    setCopiedLink(true)
-    setTimeout(() => setCopiedLink(false), 2000)
-  }
 
   // Placement handlers
   function handleGridHover(row: number, col: number) {
@@ -706,7 +611,6 @@ function RealRelicsGame({ id }: { id: string }) {
   const isFinished = game.status === "finished"
   const isWaiting = game.status === "waiting_p1" || game.status === "waiting_p2"
   const winAmount = game.betCrc * 2 * (1 - game.commissionPct / 100)
-  const paymentLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, "relics", game.slug, playerTokenRef.current)
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-6">
@@ -765,58 +669,13 @@ function RealRelicsGame({ id }: { id: string }) {
         </Card>
 
         {/* Payment section */}
-        {isWaiting && (
-          <Card className="mb-4 bg-white/60 dark:bg-white/5 backdrop-blur-sm border-ink/10 dark:border-white/10 shadow-sm rounded-2xl">
-            <CardContent className="pt-2 px-4 pb-4 space-y-3">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <span className="text-xs font-semibold text-ink/40 dark:text-white/40 uppercase tracking-widest">
-                  {isCreator ? t.payToStart[locale] : t.payToJoin[locale]}
-                </span>
-                <span className="text-xs font-bold text-marine dark:text-blue-400 bg-marine/10 dark:bg-blue-400/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{game.betCrc} CRC</span>
-              </div>
-              <a href={paymentLink} target="_blank" rel="noreferrer">
-                <Button className="w-full rounded-xl font-bold" style={{ background: "#251B9F" }}>
-                  {t.payCrc[locale].replace("{bet}", String(game.betCrc))}
-                </Button>
-              </a>
-              <div className={`grid gap-2 ${isCreator && game.status === "waiting_p1" ? "grid-cols-2" : "grid-cols-1"}`}>
-                <Button variant="outline" size="sm" onClick={copyPaymentLink} className="rounded-xl text-xs border-ink/15 dark:border-white/15 gap-1.5">
-                  {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? t.copied[locale] : t.copyPayLink[locale]}
-                </Button>
-                {isCreator && game.status === "waiting_p1" && (
-                  <Button variant="outline" size="sm" onClick={copyGameLink} className="rounded-xl text-xs border-ink/15 dark:border-white/15 gap-1.5">
-                    {copiedLink ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copiedLink ? t.copied[locale] : t.inviteP2[locale]}
-                  </Button>
-                )}
-              </div>
-              {/* QR Code */}
-              <div className="flex justify-center">
-                <div className="bg-white rounded-2xl p-4 shadow-lg border border-ink/5">
-                  {qrState === "loading" && (
-                    <div className="w-[220px] h-[220px] flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-ink/20" />
-                    </div>
-                  )}
-                  {qrState === "ready" && qrCode && <img src={qrCode} alt="QR Code" className="w-[220px] h-[220px]" />}
-                  {qrState === "error" && (
-                    <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">QR Error</div>
-                  )}
-                  <p className="text-xs text-ink/40 dark:text-white/40 mt-2 text-center">
-                    {locale === "fr" ? "Scannez pour ouvrir dans Gnosis App" : "Scan to open in Gnosis App"}
-                  </p>
-                </div>
-              </div>
-
-              <button onClick={scanPayments} disabled={scanning}
-                className="w-full text-xs text-ink/40 dark:text-white/40 hover:text-ink/60 dark:hover:text-white/60 flex items-center justify-center gap-1.5 transition-colors">
-                <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
-                {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
-              </button>
-            </CardContent>
-          </Card>
-        )}
+        <GamePayment
+          gameKey="relics"
+          game={game}
+          playerToken={playerTokenRef.current}
+          isCreator={isCreator}
+          onScanComplete={fetchGame}
+        />
 
         {/* Spectator notice */}
         {(isPlacing || isPlaying) && !addressConfirmed && (

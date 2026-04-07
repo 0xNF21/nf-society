@@ -1,8 +1,8 @@
 'use client'
 import { useParams } from 'next/navigation'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Copy, Check, RefreshCw, Trophy, Clock, Loader2 } from 'lucide-react'
+import { ArrowLeft, Trophy, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useDemo } from '@/components/demo-provider'
@@ -12,7 +12,9 @@ import { translations } from '@/lib/i18n'
 import { createInitialState, applyMove, getBotMove, GRID_SIZE } from '@/lib/dames'
 import type { DamesState, Move, Player, Board } from '@/lib/dames'
 import { DamesBoard } from '@/components/dames-board'
-import { generateGamePaymentLink } from '@/lib/circles'
+import { GamePayment } from '@/components/game-payment'
+import { usePlayerToken } from '@/hooks/use-player-token'
+import { useGamePolling } from '@/hooks/use-game-polling'
 import type { DamesGameRow } from '@/lib/db/schema/dames'
 
 // ─── Scoreboard ──────────────────────────────────────────────────────────────
@@ -236,62 +238,12 @@ function RealGame({ id }: { id: string }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const t = translations.dames
-  const [game, setGame] = useState<DamesGameRow | null>(null)
+  const { game, loading, fetchGame, setGame } = useGamePolling<DamesGameRow>('dames', id)
+  const playerTokenRef = usePlayerToken('dames', id)
   const [address, setAddress] = useState('')
   const [addressConfirmed, setAddressConfirmed] = useState(false)
-  const [scanning, setScanning] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [copiedPayLink, setCopiedPayLink] = useState(false)
   const [error, setError] = useState('')
   const [moveLog, setMoveLog] = useState<string[]>([])
-  const [qrCode, setQrCode] = useState('')
-  const [qrState, setQrState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
-  const playerTokenRef = useRef<string>('')
-
-  const fetchGame = useCallback(async () => {
-    const res = await fetch(`/api/dames?id=${id}`)
-    if (res.ok) { const d = await res.json(); setGame(d.game) }
-  }, [id])
-
-  const scanPayments = useCallback(async () => {
-    setScanning(true)
-    const res = await fetch(`/api/dames-scan?gameId=${id}`, { method: 'POST' })
-    if (res.ok) { const d = await res.json(); setGame(d.game) }
-    setScanning(false)
-  }, [id])
-
-  useEffect(() => {
-    fetchGame()
-    const poll = setInterval(fetchGame, 2000)
-    return () => clearInterval(poll)
-  }, [fetchGame])
-
-  useEffect(() => {
-    if (game?.status === 'waiting_p1' || game?.status === 'waiting_p2') {
-      const interval = setInterval(scanPayments, 5000)
-      return () => clearInterval(interval)
-    }
-  }, [game?.status, scanPayments])
-
-  // Init player token from URL, localStorage, or generate new
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const urlToken = urlParams.get('setToken')
-    if (urlToken) {
-      localStorage.setItem(`dames-${id}-token`, urlToken)
-      playerTokenRef.current = urlToken
-      window.history.replaceState({}, '', window.location.pathname)
-    } else {
-      const stored = localStorage.getItem(`dames-${id}-token`)
-      if (stored) {
-        playerTokenRef.current = stored
-      } else {
-        const token = crypto.randomUUID().slice(0, 8)
-        localStorage.setItem(`dames-${id}-token`, token)
-        playerTokenRef.current = token
-      }
-    }
-  }, [id])
 
   // Auto-identify player via token match
   useEffect(() => {
@@ -305,24 +257,6 @@ function RealGame({ id }: { id: string }) {
       setAddressConfirmed(true)
     }
   }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed])
-
-  // Generate QR code when in payment phase
-  useEffect(() => {
-    if (!game || (game.status !== 'waiting_p1' && game.status !== 'waiting_p2')) return
-    let active = true
-    setQrState('loading')
-    ;(async () => {
-      try {
-        const { toDataURL } = await import('qrcode')
-        const link = generateGamePaymentLink(game.recipientAddress, game.betCrc, 'dames', game.slug, playerTokenRef.current)
-        const url = await toDataURL(link, { width: 220, margin: 1, color: { dark: '#1b1b1f', light: '#ffffff' } })
-        if (active) { setQrCode(url); setQrState('ready') }
-      } catch {
-        if (active) { setQrCode(''); setQrState('error') }
-      }
-    })()
-    return () => { active = false }
-  }, [game?.status, game?.recipientAddress, game?.betCrc, game?.slug])
 
   async function handleMove(move: Move) {
     if (!address) return
@@ -357,16 +291,6 @@ function RealGame({ id }: { id: string }) {
     : null)
     : null
   const isMyTurn = state && myPlayer && state.currentPlayer === myPlayer
-  const payLink = generateGamePaymentLink(game.recipientAddress, game.betCrc, 'dames', game.slug, playerTokenRef.current)
-
-  async function copyId() {
-    await navigator.clipboard.writeText(id)
-    setCopied(true); setTimeout(() => setCopied(false), 2000)
-  }
-  async function copyPayment() {
-    await navigator.clipboard.writeText(payLink)
-    setCopiedPayLink(true); setTimeout(() => setCopiedPayLink(false), 2000)
-  }
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-8">
@@ -408,78 +332,14 @@ function RealGame({ id }: { id: string }) {
           </Card>
         )}
 
-        {/* J1 déjà payé — attend J2 */}
-        {game.status === 'waiting_p2' && addressConfirmed && (
-          <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-5 space-y-4">
-              <p className="text-sm font-semibold text-ink">{t.waitingP2[locale]}</p>
-              <p className="text-xs text-ink/50">{t.inviteP2[locale]}</p>
-              <div className="flex gap-2">
-                <code className="flex-1 px-3 py-2.5 rounded-xl border border-ink/10 bg-white/80 text-xs font-mono text-ink/70 truncate">{id}</code>
-                <Button variant="outline" size="sm" onClick={copyId} className="rounded-xl border-ink/20">
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </Button>
-              </div>
-              <Button variant="ghost" onClick={scanPayments} disabled={scanning}
-                className="w-full rounded-xl text-ink/40">
-                <RefreshCw className={`w-3 h-3 mr-1 ${scanning ? 'animate-spin' : ''}`} />
-                {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Paiement — J1 pas encore payé OU J2 qui doit payer */}
-        {((game.status === 'waiting_p1') || (game.status === 'waiting_p2' && !addressConfirmed)) && (
-          <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-5 space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-semibold text-ink/40 uppercase tracking-widest">
-                  {game.status === 'waiting_p1' ? t.payToStart[locale] : t.payToJoin[locale]}
-                </span>
-                <span className="text-xs font-bold text-marine bg-marine/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{game.betCrc} CRC</span>
-              </div>
-              <a href={payLink} target="_blank" rel="noopener noreferrer">
-                <Button className="w-full rounded-xl font-bold" style={{ background: '#251B9F' }}>
-                  {t.payCrc[locale].replace('{amount}', String(game.betCrc))}
-                </Button>
-              </a>
-              <Button variant="outline" onClick={copyPayment}
-                className="w-full rounded-xl border-ink/20 hover:border-marine/40 text-ink/60">
-                {copiedPayLink ? <><Check className="w-4 h-4" /> {t.copied[locale]}</> : <><Copy className="w-4 h-4" /> {locale === 'fr' ? 'Copier le lien de paiement' : 'Copy payment link'}</>}
-              </Button>
-
-              {/* QR Code */}
-              <div className="flex justify-center">
-                <div className="bg-white rounded-2xl p-4 shadow-lg border border-ink/5">
-                  {qrState === 'loading' && (
-                    <div className="w-[220px] h-[220px] flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-ink/20" />
-                    </div>
-                  )}
-                  {qrState === 'ready' && qrCode && <img src={qrCode} alt="QR Code" className="w-[220px] h-[220px]" />}
-                  {qrState === 'error' && (
-                    <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">QR Error</div>
-                  )}
-                  <p className="text-xs text-ink/40 mt-2 text-center">
-                    {locale === 'fr' ? 'Scannez pour ouvrir dans Gnosis App' : 'Scan to open in Gnosis App'}
-                  </p>
-                </div>
-              </div>
-
-              <Button variant="ghost" onClick={scanPayments} disabled={scanning}
-                className="w-full rounded-xl text-ink/40">
-                <RefreshCw className={`w-3 h-3 mr-1 ${scanning ? 'animate-spin' : ''}`} />
-                {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
-              </Button>
-
-              <div className="p-3 rounded-xl bg-ink/[0.03] border border-ink/5 text-xs text-ink/50 text-center space-y-0.5">
-                <p>{locale === 'fr' ? 'Paiement via Circles sur Gnosis Chain' : 'Payment via Circles on Gnosis Chain'}</p>
-                <p>🏆 {locale === 'fr' ? 'Gain du gagnant' : 'Winner gets'}: <span className="font-bold text-ink">{game.betCrc * 2 * 0.95} CRC</span> (5% commission)</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Payment section */}
+        <GamePayment
+          gameKey="dames"
+          game={game}
+          playerToken={playerTokenRef.current}
+          isCreator={isCreator}
+          onScanComplete={fetchGame}
+        />
 
         {/* Spectator notice */}
         {game.status === 'playing' && !addressConfirmed && (
