@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(game, { status: 201 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to create game";
+    console.error("[Morpion] Create error:", error);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

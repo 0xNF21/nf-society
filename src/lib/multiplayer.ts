@@ -30,18 +30,23 @@ export async function createMultiplayerGame(
     if (err) throw new Error(err);
   }
 
-  const recipient = process.env.SAFE_ADDRESS;
+  const recipient = (body.recipientAddress as string) || process.env.SAFE_ADDRESS;
   if (!recipient) throw new Error("No recipient address configured");
 
-  // Generate unique slug
+  // Generate unique slug with collision check
   let slug = generateGameCode();
   let attempts = 0;
   while (attempts < 10) {
-    const existing = await db.select({ slug: config.table.slug })
-      .from(config.table)
-      .where(eq(config.table.slug, slug))
-      .limit(1);
-    if (existing.length === 0) break;
+    try {
+      const existing = await db.select({ s: config.table.slug })
+        .from(config.table)
+        .where(eq(config.table.slug, slug))
+        .limit(1);
+      if (existing.length === 0) break;
+    } catch {
+      // If slug check fails, just use the generated slug
+      break;
+    }
     slug = generateGameCode();
     attempts++;
   }
