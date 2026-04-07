@@ -1154,7 +1154,21 @@ function DailyTab({ password }: { password: string }) {
 
   function updateEntry(table: "scratch" | "spin", index: number, field: string, value: unknown) {
     const setter = table === "scratch" ? setEditScratch : setEditSpin;
-    setter(prev => prev.map((e, i) => i === index ? { ...e, [field]: value } : e));
+    setter(prev => {
+      const updated = prev.map((e, i) => i === index ? { ...e, [field]: value } : e);
+
+      // Auto-balance: when changing a prob, adjust "nothing" (first entry) to keep total = 100%
+      if (field === "prob") {
+        const nothingIdx = updated.findIndex(e => e.type === "nothing");
+        if (nothingIdx >= 0 && nothingIdx !== index) {
+          const othersTotal = updated.reduce((s, e, i) => i === nothingIdx ? s : s + e.prob, 0);
+          const newNothingProb = Math.max(0, 1 - othersTotal);
+          updated[nothingIdx] = { ...updated[nothingIdx], prob: Math.round(newNothingProb * 1000) / 1000 };
+        }
+      }
+
+      return updated;
+    });
   }
 
   async function saveTable(key: "scratch" | "spin") {
@@ -1198,8 +1212,9 @@ function DailyTab({ password }: { password: string }) {
               Total: {(total * 100).toFixed(1)}%
             </span>
             {hasChanges(tableKey) && (
-              <button onClick={() => saveTable(tableKey)} disabled={saving === tableKey || !isValid}
-                className="px-3 py-1 rounded-lg bg-marine text-white text-xs font-bold hover:opacity-90 disabled:opacity-50">
+              <button onClick={() => saveTable(tableKey)} disabled={saving === tableKey || !isValid || combinedRtp < 0.97 || combinedRtp > 1.0}
+                className="px-3 py-1 rounded-lg bg-marine text-white text-xs font-bold hover:opacity-90 disabled:opacity-50"
+                title={combinedRtp < 0.97 || combinedRtp > 1.0 ? "RTP doit être entre 97% et 100%" : ""}>
                 {saving === tableKey ? <Loader2 className="h-3 w-3 animate-spin" /> : "Sauvegarder"}
               </button>
             )}
@@ -1287,8 +1302,9 @@ function DailyTab({ password }: { password: string }) {
           <span>Mise: 1 CRC</span>
           <span>Gain moyen: {combinedRtp.toFixed(3)} CRC</span>
         </div>
-        {combinedRtp > 1 && <p className="text-xs text-red-600 font-semibold">Tu perds de l argent ! Le RTP depasse 100%.</p>}
-        {combinedRtp <= 1 && <p className="text-xs text-green-600 font-semibold">Marge plateforme : {((1 - combinedRtp) * 100).toFixed(1)}%</p>}
+        {combinedRtp > 1 && <p className="text-xs text-red-600 font-semibold">Tu perds de l argent ! Le RTP depasse 100%. Sauvegarde bloquee.</p>}
+        {combinedRtp < 0.97 && <p className="text-xs text-red-600 font-semibold">RTP trop bas (min 97%). Sauvegarde bloquee.</p>}
+        {combinedRtp >= 0.97 && combinedRtp <= 1 && <p className="text-xs text-green-600 font-semibold">Marge plateforme : {((1 - combinedRtp) * 100).toFixed(1)}%</p>}
       </div>
 
       <RewardTable title="Scratch Card — Tableau de gains" tableKey="scratch" entries={editScratch} />
