@@ -282,3 +282,6 @@ export type { RelicsGameRow, NewRelicsGame } from "./schema/relics";
 
 export { damesGames } from "./schema/dames";
 export type { DamesGameRow, NewDamesGame } from "./schema/dames";
+
+export { pfcGames } from "./schema/pfc";
+export type { PfcGameRow, NewPfcGame } from "./schema/pfc";

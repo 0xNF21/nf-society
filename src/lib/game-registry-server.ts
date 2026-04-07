@@ -3,7 +3,7 @@
  * ONLY import this from server-side code (API routes, server components).
  */
 
-import { morpionGames, memoryGames, relicsGames, damesGames } from "@/lib/db/schema";
+import { morpionGames, memoryGames, relicsGames, damesGames, pfcGames } from "@/lib/db/schema";
 
 export type GameServerConfig = {
   key: string;
@@ -56,6 +56,16 @@ export const GAME_SERVER_REGISTRY: Record<string, GameServerConfig> = {
       const { createInitialState } = require("@/lib/dames");
       return { gameState: createInitialState() };
     },
+  },
+  pfc: {
+    key: "pfc",
+    table: pfcGames,
+    activeStatus: "playing",
+    skipStatuses: ["playing", "finished"],
+    createExtraFields: (body) => ({
+      bestOf: body.bestOf === 5 ? 5 : 3,
+      gameState: { rounds: [], currentRound: {}, bestOf: body.bestOf === 5 ? 5 : 3 },
+    }),
   },
 };
 

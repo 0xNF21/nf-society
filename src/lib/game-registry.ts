@@ -81,6 +81,20 @@ export const GAME_REGISTRY: Record<string, GameClientConfig> = {
     apiRoute: "/api/dames",
     scanRoute: "/api/dames-scan",
   },
+  pfc: {
+    key: "pfc",
+    featureFlag: "pfc",
+    emoji: "✊",
+    iconColor: "text-red-500",
+    iconBg: "bg-red-50",
+    iconBgHover: "group-hover:bg-red-100",
+    borderHover: "hover:border-red-200",
+    accentColor: "#DC2626",
+    translationKey: "pfc",
+    landingTranslationKey: "landingPfc",
+    apiRoute: "/api/pfc",
+    scanRoute: "/api/pfc-scan",
+  },
 };
 
 export const ALL_GAMES = Object.values(GAME_REGISTRY);
@@ -91,6 +105,7 @@ export const GAME_LABELS: Record<string, string> = {
   memory: "Memory",
   relics: "Relics",
   dames: "Dames",
+  pfc: "Pierre-Feuille-Ciseaux",
 };
 
 /** Game icons for stats display */
@@ -99,4 +114,5 @@ export const GAME_ICONS: Record<string, string> = {
   memory: "🃏",
   relics: "⚓",
   dames: "♟️",
+  pfc: "✊📄✂️",
 };
