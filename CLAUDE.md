@@ -81,7 +81,7 @@ Le projet utilise un framework generique pour les jeux multijoueurs.
 2. **Schema DB** : `src/lib/db/schema/{jeu}.ts` avec colonnes communes (slug, betCrc, recipientAddress, commissionPct, player1/2Address, player1/2TxHash, player1/2Token, isPrivate, status, winnerAddress, payoutStatus, payoutTxHash, createdAt, updatedAt) + colonnes specifiques
 3. **Export schema** : ajouter dans `src/lib/db/schema.ts`
 4. **Enregistrer dans le registre** : ajouter une entree dans `GAME_REGISTRY` de `src/lib/game-registry.ts`
-5. **i18n** : ajouter section `{jeu}` + `landing{Jeu}` dans `src/lib/i18n.ts` (cles lobby standardisees : back, title, subtitle, createGame, betPerPlayer, crcPerPlayer, winnerGets, commission, creating, createBtn, joinGame, gameCode, join, payToStart, payToJoin, payCrc, copied, copyPayLink, inviteP2, scanningPayments, scanPayments)
+5. **i18n** : ajouter section `{jeu}` + `landing{Jeu}` dans `src/lib/i18n.ts` (cles lobby standardisees : back, title, subtitle, createGame, betPerPlayer, crcPerPlayer, winnerGets, commission, creating, createBtn, joinGame, gameCode, join, payToStart, payToJoin, payCrc, copied, copyPayLink, inviteP2, scanningPayments, scanPayments, **rules** — texte multi-lignes avec \n, **bold** et - bullets)
 6. **API create** : `src/app/api/{jeu}/route.ts` — POST appelle `createMultiplayerGame("{jeu}", body)`
 7. **API scan** : `src/app/api/{jeu}-scan/route.ts` — POST appelle `scanGamePayments("{jeu}", slug)`
 8. **API actions** : `src/app/api/{jeu}/[slug]/route.ts` — GET + POST pour les moves (CUSTOM)
