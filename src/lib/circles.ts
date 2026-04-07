@@ -417,28 +417,43 @@ async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { g
         const input = res?.result?.input;
         if (!input || input.length < 10) continue;
 
-        const inputData = input.slice(10);
-        const hexStr = inputData.replace(/^0+/, "");
-        if (hexStr.length < 2) continue;
+        const inputHex = input.slice(2); // remove 0x prefix
 
-        // Try to decode the entire input as UTF-8 text first (new format: "game:id:token")
-        try {
-          const cleanHex = inputData.replace(/0+$/, ""); // trim trailing zeros
-          if (cleanHex.length >= 2) {
-            const fullBytes = new Uint8Array(cleanHex.length / 2);
-            for (let k = 0; k < cleanHex.length; k += 2) {
-              fullBytes[k / 2] = parseInt(cleanHex.slice(k, k + 2), 16);
+        // Search for known game key patterns in the hex data
+        // Each game key (morpion, memory, relics, dames) followed by ":" (3a in hex)
+        const gameKeys = ["morpion", "memory", "relics", "dames"];
+        let found = false;
+
+        for (const gk of gameKeys) {
+          const pattern = Array.from(new TextEncoder().encode(gk + ":")).map(b => b.toString(16).padStart(2, "0")).join("");
+          const idx = inputHex.indexOf(pattern);
+          if (idx === -1) continue;
+
+          // Found! Extract text from this position until null bytes or end
+          const remaining = inputHex.slice(idx);
+          try {
+            const bytes = new Uint8Array(remaining.length / 2);
+            for (let k = 0; k < remaining.length; k += 2) {
+              bytes[k / 2] = parseInt(remaining.slice(k, k + 2), 16);
             }
-            const fullText = new TextDecoder().decode(fullBytes).replace(/\0/g, "").trim();
-            const decoded = decodeGameData(fullText);
-            if (decoded) {
-              results.set(batch[j].toLowerCase(), decoded);
-              continue;
+            const text = new TextDecoder().decode(bytes);
+            // Extract until null byte or non-printable char
+            const match = text.match(/^[a-zA-Z0-9:_\-]+/);
+            if (match) {
+              const decoded = decodeGameData(match[0]);
+              if (decoded) {
+                results.set(batch[j].toLowerCase(), decoded);
+                found = true;
+                break;
+              }
             }
-          }
-        } catch {}
+          } catch {}
+        }
+
+        if (found) continue;
 
         // Fallback: scan for JSON object (legacy format: {"game":"morpion",...})
+        const inputData = inputHex.slice(8); // skip function selector
         for (let offset = 0; offset < inputData.length - 4; offset += 2) {
           const byte = parseInt(inputData.slice(offset, offset + 2), 16);
           if (byte === 0x7b) {
