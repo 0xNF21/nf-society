@@ -51,6 +51,8 @@ export function GamePayment({
   );
 
   const scanningRef = useRef(false);
+  const onScanCompleteRef = useRef(onScanComplete);
+  onScanCompleteRef.current = onScanComplete;
 
   const scanPayments = useCallback(async () => {
     if (scanningRef.current) return;
@@ -58,11 +60,11 @@ export function GamePayment({
     setScanning(true);
     try {
       await fetch(`${config.scanRoute}?gameSlug=${game.slug}`, { method: "POST" });
-      onScanComplete();
+      onScanCompleteRef.current();
     } catch {}
     scanningRef.current = false;
     setScanning(false);
-  }, [config.scanRoute, game.slug, onScanComplete]);
+  }, [config.scanRoute, game.slug]);
 
   // Auto-scan payments
   useEffect(() => {
@@ -70,8 +72,9 @@ export function GamePayment({
       if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null; }
       return;
     }
-    scanRef.current = setInterval(scanPayments, scanInterval);
-    return () => { if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null; } };
+    const id = setInterval(scanPayments, scanInterval);
+    scanRef.current = id;
+    return () => clearInterval(id);
   }, [game.status, scanPayments, scanInterval]);
 
   // Generate QR code
