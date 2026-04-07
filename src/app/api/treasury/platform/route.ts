@@ -12,28 +12,31 @@ export async function GET() {
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    // Total payouts (redistributed to players)
+    // Exclude test payouts from calculations
+    const noTests = sql`${payouts.gameType} NOT LIKE '%test%' AND ${payouts.gameId} NOT LIKE '%test%'`;
+
+    // Total payouts (redistributed to players, excluding tests)
     const [totalPayout] = await db.select({
       total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
       count: sql<number>`COUNT(*)`,
-    }).from(payouts).where(eq(payouts.status, "success"));
+    }).from(payouts).where(and(eq(payouts.status, "success"), noTests));
 
     // Monthly payouts
     const [monthlyPayout] = await db.select({
       total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
-    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisMonth)));
+    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisMonth), noTests));
 
     // Weekly payouts
     const [weeklyPayout] = await db.select({
       total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
-    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisWeek)));
+    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisWeek), noTests));
 
-    // Payouts by game type
+    // Payouts by game type (excluding tests)
     const payoutsByGame = await db.select({
       gameType: payouts.gameType,
       total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
       count: sql<number>`COUNT(*)`,
-    }).from(payouts).where(eq(payouts.status, "success")).groupBy(payouts.gameType);
+    }).from(payouts).where(and(eq(payouts.status, "success"), noTests)).groupBy(payouts.gameType);
 
     // Total bets from multiplayer games
     let totalBets = 0;

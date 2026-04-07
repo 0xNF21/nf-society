@@ -476,6 +476,9 @@ export default function DashboardDaoPage() {
               </div>
             )}
 
+            {/* Platform Treasury */}
+            <PlatformTreasury locale={locale} />
+
             {(() => {
               const crcValueUsd = crcPrice ? totalCRC * crcPrice : 0;
               const allHoldings: TreasuryHolding[] = [];
@@ -948,9 +951,6 @@ export default function DashboardDaoPage() {
                 </Accordion>
               </div>
             </div>
-
-            {/* Platform Treasury Section */}
-            <PlatformTreasury locale={locale} />
 
             <footer className="text-center space-y-2 pt-4 pb-8">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-ink/30">
