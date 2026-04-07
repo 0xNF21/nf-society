@@ -7,6 +7,7 @@ import { ArrowLeft, Trophy, Clock, Users, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GamePayment } from "@/components/game-payment";
+import { PlayerBanner } from "@/components/player-banner";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
@@ -469,6 +470,18 @@ function RealMemoryGame({ slug }: { slug: string }) {
           isCreator={isCreator}
           onScanComplete={fetchGame}
         />
+
+        {/* Player banner */}
+        {game.status !== "waiting_p1" && game.status !== "waiting_p2" && (
+          <div className="mb-4">
+            <PlayerBanner
+              p1Address={game.player1Address}
+              p2Address={game.player2Address}
+              myRole={isP1 ? "p1" : isP2 ? "p2" : null}
+              profiles={profiles}
+            />
+          </div>
+        )}
 
         {/* Spectator notice */}
         {game.status === "playing" && !addressConfirmed && (

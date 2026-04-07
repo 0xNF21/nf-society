@@ -6,6 +6,7 @@ import { ArrowLeft, Trophy, Clock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GamePayment } from "@/components/game-payment";
+import { PlayerBanner } from "@/components/player-banner";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
@@ -477,6 +478,20 @@ function RealMorpionGame({ slug }: { slug: string }) {
           isCreator={isCreator}
           onScanComplete={fetchGame}
         />
+
+        {/* Player banner */}
+        {game.status !== "waiting_p1" && game.status !== "waiting_p2" && (
+          <div className="mb-4">
+            <PlayerBanner
+              p1Address={game.player1Address}
+              p2Address={game.player2Address}
+              myRole={game.player1Address?.toLowerCase() === myAddress.toLowerCase() ? "p1" : game.player2Address?.toLowerCase() === myAddress.toLowerCase() ? "p2" : null}
+              profiles={profiles}
+              p1Label="X"
+              p2Label="O"
+            />
+          </div>
+        )}
 
         {/* Spectator notice */}
         {game.status === "active" && !addressConfirmed && (

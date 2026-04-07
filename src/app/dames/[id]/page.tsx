@@ -13,6 +13,7 @@ import { createInitialState, applyMove, getBotMove, GRID_SIZE } from '@/lib/dame
 import type { DamesState, Move, Player, Board } from '@/lib/dames'
 import { DamesBoard } from '@/components/dames-board'
 import { GamePayment } from '@/components/game-payment'
+import { PlayerBanner } from '@/components/player-banner'
 import { usePlayerToken } from '@/hooks/use-player-token'
 import { useGamePolling } from '@/hooks/use-game-polling'
 import type { DamesGameRow } from '@/lib/db/schema/dames'
@@ -244,6 +245,23 @@ function RealGame({ id }: { id: string }) {
   const [addressConfirmed, setAddressConfirmed] = useState(false)
   const [error, setError] = useState('')
   const [moveLog, setMoveLog] = useState<string[]>([])
+  const [profiles, setProfiles] = useState<Record<string, { name: string; imageUrl: string | null }>>({})
+
+  // Fetch profiles
+  useEffect(() => {
+    if (!game) return
+    const addresses = [game.player1Address, game.player2Address].filter(Boolean) as string[]
+    if (addresses.length === 0) return
+    const unknown = addresses.filter(a => !profiles[a.toLowerCase()])
+    if (unknown.length === 0) return
+    fetch('/api/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addresses: unknown }),
+    }).then(r => r.json()).then(data => {
+      if (data.profiles) setProfiles(prev => ({ ...prev, ...data.profiles }))
+    }).catch(() => {})
+  }, [game?.player1Address, game?.player2Address])
 
   // Auto-identify player via token match
   useEffect(() => {
@@ -340,6 +358,18 @@ function RealGame({ id }: { id: string }) {
           isCreator={isCreator}
           onScanComplete={fetchGame}
         />
+
+        {/* Player banner */}
+        {game.status !== 'waiting_p1' && game.status !== 'waiting_p2' && (
+          <div className="mb-4">
+            <PlayerBanner
+              p1Address={game.player1Address}
+              p2Address={game.player2Address}
+              myRole={myPlayer === 1 ? "p1" : myPlayer === 2 ? "p2" : null}
+              profiles={profiles}
+            />
+          </div>
+        )}
 
         {/* Spectator notice */}
         {game.status === 'playing' && !addressConfirmed && (

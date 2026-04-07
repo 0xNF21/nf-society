@@ -8,6 +8,7 @@ import { useDemo } from "@/components/demo-provider"
 import { useLocale } from "@/components/language-provider"
 import { useTheme } from "@/components/theme-provider"
 import { GamePayment } from "@/components/game-payment"
+import { PlayerBanner } from "@/components/player-banner"
 import { usePlayerToken } from "@/hooks/use-player-token"
 import { useGamePolling } from "@/hooks/use-game-polling"
 import { translations } from "@/lib/i18n"
@@ -676,6 +677,18 @@ function RealRelicsGame({ id }: { id: string }) {
           isCreator={isCreator}
           onScanComplete={fetchGame}
         />
+
+        {/* Player banner */}
+        {!isWaiting && (
+          <div className="mb-4">
+            <PlayerBanner
+              p1Address={game.player1Address}
+              p2Address={game.player2Address}
+              myRole={isP1 ? "p1" : isP2 ? "p2" : null}
+              profiles={profiles}
+            />
+          </div>
+        )}
 
         {/* Spectator notice */}
         {(isPlacing || isPlaying) && !addressConfirmed && (

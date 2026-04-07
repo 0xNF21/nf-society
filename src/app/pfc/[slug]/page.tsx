@@ -7,6 +7,7 @@ import { ArrowLeft, Trophy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GamePayment } from "@/components/game-payment";
+import { PlayerBanner } from "@/components/player-banner";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
@@ -27,51 +28,6 @@ const HAND_IMAGES: Record<Move, string> = {
   feuille: "✋",
   ciseaux: "✌️",
 };
-
-// ─── Player Banner ───
-
-function PlayerBanner({
-  p1Address, p2Address, myRole, profiles
-}: {
-  p1Address: string | null;
-  p2Address: string | null;
-  myRole: "p1" | "p2" | null;
-  profiles: Record<string, { name: string; imageUrl: string | null }>;
-}) {
-  const { locale } = useLocale();
-
-  function PlayerCard({ addr, label, isMe, side }: { addr: string | null; label: string; isMe: boolean; side: "left" | "right" }) {
-    const profile = addr ? profiles[addr.toLowerCase()] : null;
-    const name = profile?.name || (addr ? shortenAddress(addr) : "???");
-    return (
-      <div className={`flex items-center gap-2 ${side === "right" ? "flex-row-reverse" : ""}`}>
-        {profile?.imageUrl ? (
-          <img src={profile.imageUrl} alt={name} className="w-10 h-10 rounded-full object-cover border-2 border-white/20 shadow" />
-        ) : (
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow text-sm font-black ${
-            side === "left" ? "bg-marine/20 text-marine" : "bg-citrus/20 text-citrus"
-          }`}>
-            {addr ? name.slice(0, 2).toUpperCase() : "?"}
-          </div>
-        )}
-        <div className={side === "right" ? "text-right" : ""}>
-          <p className="text-xs font-bold text-ink dark:text-white truncate max-w-[100px]">{name}</p>
-          <p className="text-[10px] text-ink/40">
-            {label} {isMe ? (locale === "fr" ? "(vous)" : "(you)") : ""}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-ink/5">
-      <PlayerCard addr={p1Address} label="J1" isMe={myRole === "p1"} side="left" />
-      <span className="text-lg font-black text-ink/20">VS</span>
-      <PlayerCard addr={p2Address} label="J2" isMe={myRole === "p2"} side="right" />
-    </div>
-  );
-}
 
 // ─── Duel Animation ───
 
