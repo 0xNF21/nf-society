@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, BarChart3, Dice5, Swords, ArrowLeftRight, ShoppingBag, FlaskConical, Lock } from "lucide-react";
+import { ArrowRight, BarChart3, Dice5, Swords, ArrowLeftRight, ShoppingBag, FlaskConical, Lock, Trophy } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
@@ -35,6 +35,16 @@ export default function LandingPage() {
       title: t.sectionMultiplayer[locale],
       desc: t.sectionMultiplayerDesc[locale],
       color: "text-violet-500",
+    },
+    {
+      href: "/leaderboard",
+      flag: null,
+      icon: <Trophy className="h-8 w-8 text-amber-500" />,
+      iconBg: "bg-amber-50 group-hover:bg-amber-100",
+      borderHover: "hover:border-amber-200",
+      title: locale === "fr" ? "Classement" : "Leaderboard",
+      desc: locale === "fr" ? "Les meilleurs joueurs de NF Society" : "Top NF Society players",
+      color: "text-amber-500",
     },
     {
       href: "/dashboard-dao",

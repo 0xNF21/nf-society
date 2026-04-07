@@ -887,6 +887,12 @@ export const translations = {
     betWon: { fr: "Mise remportée :", en: "Winnings:" },
     waiting: { fr: "En attente...", en: "Waiting..." },
   },
+  leaderboard: {
+    back: { fr: "Accueil", en: "Home" },
+    title: { fr: "Classement", en: "Leaderboard" },
+    subtitle: { fr: "Les meilleurs joueurs de NF Society", en: "Top NF Society players" },
+    empty: { fr: "Aucun joueur pour le moment", en: "No players yet" },
+  },
 } as const;
 
 export function t(section: string, key: string, locale: Locale): string {
