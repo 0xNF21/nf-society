@@ -1,4 +1,5 @@
 import { encodeGameData } from "@/lib/game-data";
+import { ALL_GAMES } from "@/lib/game-registry";
 
 const DEFAULT_CIRCLES_RPC_URL = "https://rpc.aboutcircles.com/";
 const DEFAULT_RECIPIENT_ADDRESS = "0xbf57dc790ba892590c640dc27b26b2665d30104f";
@@ -421,8 +422,8 @@ async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { g
 
         // Search for known game key patterns in the hex data
         // Each game key (morpion, memory, relics, dames) followed by ":" (3a in hex)
-        // All known payment data prefixes — add new ones here when creating new payment types
-        const gameKeys = ["morpion", "memory", "relics", "dames", "pfc", "daily", "shop_auth"];
+        // Auto-generated from registry + non-game payment types
+        const gameKeys = [...ALL_GAMES.map(g => g.key), "daily", "shop_auth"];
         let found = false;
 
         for (const gk of gameKeys) {

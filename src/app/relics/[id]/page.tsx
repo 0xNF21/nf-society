@@ -253,7 +253,7 @@ function DemoRelicsGame() {
       if (isDefeated(newGrid)) {
         setPhase("finished")
         setWinner("bot")
-        setXpGained(addXp("morpion_lose"))
+        setXpGained(addXp("relics_lose"))
       } else {
         setIsMyTurn(true)
       }

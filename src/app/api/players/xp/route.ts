@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       newBadges = await checkAndAwardBadges(addr, action, {
         hour,
         isFirstLootbox: action === "lootbox_open" && isNew,
-        isFirstWin: action === "morpion_win" && isNew,
+        isFirstWin: action.endsWith("_win") && isNew,
       });
       // Supreme founder check on first daily_checkin
       if (action === "daily_checkin" && isNew) {

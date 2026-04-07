@@ -32,6 +32,8 @@ export const XP_REWARDS: Record<string, number> = {
   dames_lose:         5,
   relics_win:        20,
   relics_lose:        5,
+  pfc_win:           15,
+  pfc_lose:           5,
 };
 
 export function computeLevel(xp: number): number {

@@ -139,7 +139,7 @@ function DemoPfcGame({ slug }: { slug: string }) {
       if (isGameOver(newState) && !xpAdded.current) {
         xpAdded.current = true;
         const w = getWinner(newState);
-        setXpGained(addXp(w === "p1" ? "morpion_win" : "morpion_lose"));
+        setXpGained(addXp(w === "p1" ? "pfc_win" : "pfc_lose"));
       }
     }, 1500);
   }
