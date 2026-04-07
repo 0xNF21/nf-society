@@ -949,6 +949,9 @@ export default function DashboardDaoPage() {
               </div>
             </div>
 
+            {/* Platform Treasury Section */}
+            <PlatformTreasury locale={locale} />
+
             <footer className="text-center space-y-2 pt-4 pb-8">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-ink/30">
                 <span>
@@ -1010,6 +1013,133 @@ function StatCard({ icon, value, label, sub }: { icon: React.ReactNode; value: n
         {sub && <p className="text-xs font-semibold text-green-600">{sub}</p>}
         <p className="text-[10px] text-ink/40">{label}</p>
       </div>
+    </div>
+  );
+}
+
+/* ─── Platform Treasury Section ─── */
+
+type PlatformTreasuryData = {
+  totalBets: number;
+  totalRedistributed: number;
+  totalCommissions: number;
+  totalGamesPlayed: number;
+  totalPayouts: number;
+  monthlyBets: number;
+  monthlyRedistributed: number;
+  weeklyRedistributed: number;
+  byGameType: { gameType: string; total: number; count: number }[];
+};
+
+const GAME_TYPE_LABELS: Record<string, string> = {
+  morpion: "Morpion", memory: "Memory", relics: "Relics", dames: "Dames", pfc: "PFC",
+  "daily-scratch": "Daily Scratch", "daily-spin": "Daily Spin", "daily-scratch-test": "Test Scratch",
+  "daily-spin-test": "Test Spin", shop_crc: "Shop CRC",
+};
+
+function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
+  const [data, setData] = useState<PlatformTreasuryData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/treasury/platform")
+      .then(r => r.json())
+      .then(d => { if (!d.error) setData(d); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="rounded-2xl border border-ink/5 bg-white shadow-sm overflow-hidden">
+      <button onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-5 hover:bg-ink/[0.02] transition-colors">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+            <Wallet className="h-5 w-5 text-emerald-500" />
+          </div>
+          <div className="text-left">
+            <h3 className="text-sm font-bold text-ink">
+              {locale === "fr" ? "Trésorerie Plateforme" : "Platform Treasury"}
+            </h3>
+            <p className="text-[10px] text-ink/40">
+              {locale === "fr" ? "Revenus, commissions et redistribution" : "Revenue, commissions and redistribution"}
+            </p>
+          </div>
+        </div>
+        <ChevronDown className={`h-4 w-4 text-ink/30 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 space-y-4">
+          {loading && <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-ink/20" /></div>}
+
+          {data && (
+            <>
+              {/* Main stats */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-ink/[0.03] p-3 text-center">
+                  <p className="text-lg font-black text-ink">{data.totalBets} <span className="text-xs font-normal text-ink/40">CRC</span></p>
+                  <p className="text-[10px] text-ink/40">{locale === "fr" ? "Total misé" : "Total bet"}</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-3 text-center">
+                  <p className="text-lg font-black text-emerald-600">{data.totalCommissions} <span className="text-xs font-normal text-emerald-400">CRC</span></p>
+                  <p className="text-[10px] text-emerald-600/60">{locale === "fr" ? "Commissions" : "Commissions"}</p>
+                </div>
+                <div className="rounded-xl bg-blue-50 p-3 text-center">
+                  <p className="text-lg font-black text-blue-600">{data.totalRedistributed} <span className="text-xs font-normal text-blue-400">CRC</span></p>
+                  <p className="text-[10px] text-blue-600/60">{locale === "fr" ? "Redistribué" : "Redistributed"}</p>
+                </div>
+              </div>
+
+              {/* Activity */}
+              <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03]">
+                <span className="text-xs text-ink/50">{locale === "fr" ? "Parties jouées" : "Games played"}</span>
+                <span className="text-sm font-bold text-ink">{data.totalGamesPlayed}</span>
+              </div>
+              <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03]">
+                <span className="text-xs text-ink/50">{locale === "fr" ? "Payouts effectués" : "Payouts sent"}</span>
+                <span className="text-sm font-bold text-ink">{data.totalPayouts}</span>
+              </div>
+
+              {/* Monthly */}
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Ce mois" : "This month"}</p>
+                <div className="flex gap-2">
+                  <div className="flex-1 rounded-xl bg-ink/[0.03] p-2 text-center">
+                    <p className="text-sm font-bold text-ink">{data.monthlyBets} CRC</p>
+                    <p className="text-[10px] text-ink/40">{locale === "fr" ? "Misé" : "Bet"}</p>
+                  </div>
+                  <div className="flex-1 rounded-xl bg-ink/[0.03] p-2 text-center">
+                    <p className="text-sm font-bold text-ink">{data.monthlyRedistributed} CRC</p>
+                    <p className="text-[10px] text-ink/40">{locale === "fr" ? "Redistribué" : "Redistributed"}</p>
+                  </div>
+                  <div className="flex-1 rounded-xl bg-ink/[0.03] p-2 text-center">
+                    <p className="text-sm font-bold text-ink">{data.weeklyRedistributed} CRC</p>
+                    <p className="text-[10px] text-ink/40">{locale === "fr" ? "Cette semaine" : "This week"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* By game type */}
+              {data.byGameType.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Par type" : "By type"}</p>
+                  {data.byGameType.sort((a, b) => b.total - a.total).map(g => (
+                    <div key={g.gameType} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-ink/[0.02]">
+                      <span className="text-xs text-ink/60">{GAME_TYPE_LABELS[g.gameType] || g.gameType}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-ink/30">{g.count}x</span>
+                        <span className="text-xs font-bold text-ink">{g.total} CRC</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
