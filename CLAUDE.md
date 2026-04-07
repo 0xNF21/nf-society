@@ -69,7 +69,7 @@ Le projet utilise un framework generique pour les jeux multijoueurs.
 
 ### Fichiers cles du framework
 - `src/lib/game-registry.ts` — Registre central de tous les jeux (config, table DB, routes, couleurs)
-- `src/lib/multiplayer.ts` — Helpers serveur (createMultiplayerGame, scanGamePayments, getLobbyGames, getPlayerStats)
+- `src/lib/multiplayer.ts` — Helpers serveur (createMultiplayerGame, scanGamePayments, calculateWinAmount, getLobbyGames, getPlayerStats)
 - `src/components/game-lobby.tsx` — Composant lobby reutilisable (mise, prive/public, rejoindre)
 - `src/components/game-payment.tsx` — Composant paiement reutilisable (QR, scan, boutons)
 - `src/hooks/use-player-token.ts` — Hook token joueur (localStorage + URL injection)

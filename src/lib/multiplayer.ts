@@ -12,6 +12,14 @@ import { getServerGameConfig, ALL_SERVER_GAMES } from "@/lib/game-registry-serve
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
+// ─── PAYOUT CALCULATION ───
+
+/** Calculate winner payout: pot * (1 - commission%). Use this for ALL games. */
+export function calculateWinAmount(betCrc: number, commissionPct: number): number {
+  const pot = betCrc * 2;
+  return pot * (1 - commissionPct / 100);
+}
+
 // ─── CREATE GAME ───
 
 export async function createMultiplayerGame(

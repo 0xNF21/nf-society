@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { resolveRound, getWinner, isValidMove } from "@/lib/pfc";
 import type { PfcState, Move } from "@/lib/pfc";
 import { executePayout } from "@/lib/payout";
+import { calculateWinAmount } from "@/lib/multiplayer";
 
 export async function GET(
   _req: NextRequest,
@@ -84,8 +85,7 @@ export async function POST(
       const gameWinner = getWinner(state);
       if (gameWinner) {
         const winnerAddress = gameWinner === "p1" ? game.player1Address : game.player2Address;
-        const pot = game.betCrc * 2;
-        const winAmount = pot * (1 - game.commissionPct / 100);
+        const winAmount = calculateWinAmount(game.betCrc, game.commissionPct);
 
         await db.update(pfcGames).set({
           gameState: state,
