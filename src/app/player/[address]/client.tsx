@@ -316,6 +316,9 @@ export default function PlayerProfileClient({
           )}
         </CollapsibleSection>
 
+        {/* Transactions — lazy loaded */}
+        <TransactionHistory address={address} locale={locale} />
+
         {/* Badges — collapsible */}
         <CollapsibleSection
           title="Badges"
@@ -367,6 +370,94 @@ export default function PlayerProfileClient({
           </div>
         </CollapsibleSection>
       </main>
+    </div>
+  );
+}
+
+/* ─── Transaction History ─── */
+
+type Tx = { type: "in" | "out"; amount: number; label: string; category: string; date: string };
+
+function TransactionHistory({ address, locale }: { address: string; locale: "fr" | "en" }) {
+  const [txs, setTxs] = useState<Tx[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  function load() {
+    if (loaded) { setOpen(!open); return; }
+    setOpen(true);
+    setLoading(true);
+    fetch(`/api/players/${address}/transactions`)
+      .then(r => r.json())
+      .then(d => { setTxs(d.transactions || []); setLoaded(true); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }
+
+  const totalIn = txs.filter(t => t.type === "in").reduce((s, t) => s + t.amount, 0);
+  const totalOut = txs.filter(t => t.type === "out").reduce((s, t) => s + t.amount, 0);
+
+  return (
+    <div className="rounded-2xl bg-white/70 backdrop-blur-sm border border-ink/10 shadow-sm overflow-hidden">
+      <button onClick={load}
+        className="w-full flex items-center justify-between p-5 text-left hover:bg-ink/[0.02] transition-colors">
+        <span className="text-xs text-ink/40 font-bold uppercase tracking-widest">
+          {locale === "fr" ? "Transactions" : "Transactions"}
+        </span>
+        <div className="flex items-center gap-2">
+          {loaded && <span className="text-xs text-ink/30 font-semibold">{txs.length}</span>}
+          <ChevronDown className={`h-4 w-4 text-ink/30 transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 space-y-3">
+          {loading && <p className="text-center text-xs text-ink/40 py-4">{locale === "fr" ? "Chargement..." : "Loading..."}</p>}
+
+          {loaded && txs.length === 0 && (
+            <p className="text-center text-xs text-ink/40 py-4">{locale === "fr" ? "Aucune transaction" : "No transactions"}</p>
+          )}
+
+          {loaded && txs.length > 0 && (
+            <>
+              {/* Summary */}
+              <div className="flex gap-2">
+                <div className="flex-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-2 text-center">
+                  <p className="text-sm font-bold text-emerald-600">+{Math.round(totalIn * 10) / 10} CRC</p>
+                  <p className="text-[10px] text-emerald-600/60">{locale === "fr" ? "Recu" : "Received"}</p>
+                </div>
+                <div className="flex-1 rounded-xl bg-red-50 dark:bg-red-900/20 p-2 text-center">
+                  <p className="text-sm font-bold text-red-500">-{Math.round(totalOut * 10) / 10} CRC</p>
+                  <p className="text-[10px] text-red-500/60">{locale === "fr" ? "Depense" : "Spent"}</p>
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                {txs.map((tx, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className={`text-sm ${tx.type === "in" ? "text-emerald-500" : "text-red-400"}`}>
+                        {tx.type === "in" ? "📥" : "📤"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs text-ink dark:text-white truncate">{tx.label}</p>
+                        <p className="text-[10px] text-ink/30">
+                          {new Date(tx.date).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold whitespace-nowrap ${tx.type === "in" ? "text-emerald-600" : "text-red-500"}`}>
+                      {tx.type === "in" ? "+" : "-"}{tx.amount} CRC
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
