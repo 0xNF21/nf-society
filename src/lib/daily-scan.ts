@@ -94,12 +94,8 @@ export async function runDailyScan(): Promise<number> {
         txHash: txHash,
       }).where(eq(dailySessions.id, session.id));
 
-      await db.insert(jackpotPool).values({
-        address: playerAddress,
-        amountCrc: 1,
-        txHash: txHash,
-        date: today,
-      }).onConflictDoNothing();
+      // Jackpot pool disabled — will be reimplemented as independent system
+      // await db.insert(jackpotPool).values({ ... });
 
       await db.insert(claimedPayments).values({
         txHash,
