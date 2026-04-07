@@ -28,9 +28,9 @@ export function GameRulesModal({ gameKey }: GameRulesModalProps) {
   return (
     <>
       <button onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 text-xs text-ink/40 dark:text-white/40 hover:text-ink/60 dark:hover:text-white/60 transition-colors">
-        <HelpCircle className="w-3.5 h-3.5" />
-        {locale === "fr" ? "Règles" : "Rules"}
+        className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-ink/10 dark:border-white/10 bg-white/60 dark:bg-white/5 text-sm font-semibold text-ink/60 dark:text-white/60 hover:border-marine/40 hover:text-marine transition-all">
+        <HelpCircle className="w-4 h-4" />
+        {locale === "fr" ? "Règles du jeu" : "Game Rules"}
       </button>
 
       {open && (
