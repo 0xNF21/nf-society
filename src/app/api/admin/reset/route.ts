@@ -9,14 +9,31 @@ function checkAuth(req: NextRequest) {
   return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
 }
 
-const RESET_TARGETS: Record<string, { label: string; tables: string[] }> = {
-  payouts: { label: "Payouts", tables: ["payouts"] },
+const RESET_TARGETS: Record<string, { label: string; tables: string[]; where?: string }> = {
+  // Payouts
+  payouts_all: { label: "Tous les payouts", tables: ["payouts"] },
+  payouts_lootbox: { label: "Payouts lootbox seulement", tables: ["payouts"], where: "game_type = 'lootbox'" },
+  payouts_games: { label: "Payouts jeux multi seulement", tables: ["payouts"], where: "game_type IN ('morpion','memory','relics','dames','pfc')" },
+  payouts_daily: { label: "Payouts daily seulement", tables: ["payouts"], where: "game_type LIKE 'daily-%'" },
+  payouts_shop: { label: "Payouts shop seulement", tables: ["payouts"], where: "game_type LIKE 'shop%'" },
+  payouts_tests: { label: "Payouts tests seulement", tables: ["payouts"], where: "game_type LIKE '%test%' OR game_id LIKE '%test%'" },
+  // Lootbox
   lootbox_opens: { label: "Lootbox Opens", tables: ["lootbox_opens"] },
+  // Claimed
   claimed_payments: { label: "Claimed Payments", tables: ["claimed_payments"] },
+  // Daily
   daily_sessions: { label: "Daily Sessions + Jackpot", tables: ["daily_sessions", "jackpot_pool"] },
-  games: { label: "Toutes les parties (morpion, memory, relics, dames, pfc)", tables: ["morpion_moves", "morpion_games", "memory_games", "relics_games", "dames_games", "pfc_games"] },
+  // Games
+  games_all: { label: "Toutes les parties (tous les jeux)", tables: ["morpion_moves", "morpion_games", "memory_games", "relics_games", "dames_games", "pfc_games"] },
+  games_morpion: { label: "Parties morpion", tables: ["morpion_moves", "morpion_games"] },
+  games_memory: { label: "Parties memory", tables: ["memory_games"] },
+  games_relics: { label: "Parties relics", tables: ["relics_games"] },
+  games_dames: { label: "Parties dames", tables: ["dames_games"] },
+  games_pfc: { label: "Parties PFC", tables: ["pfc_games"] },
+  // Players
   player_badges: { label: "Badges joueurs (pas les definitions)", tables: ["player_badges"] },
   player_stats: { label: "Stats joueurs (XP, level, streak)", tables: ["players"] },
+  // Shop
   shop_history: { label: "Historique achats shop", tables: ["shop_purchases", "shop_coupons"] },
 };
 
@@ -73,10 +90,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Delete data
+    const whereClause = RESET_TARGETS[target].where;
     for (const table of tables) {
       try {
-        await db.execute(sql.raw(`DELETE FROM ${table}`));
-        results.push(`${table}: cleared`);
+        const query = whereClause
+          ? `DELETE FROM ${table} WHERE ${whereClause}`
+          : `DELETE FROM ${table}`;
+        await db.execute(sql.raw(query));
+        results.push(`${table}: cleared${whereClause ? ` (${whereClause})` : ""}`);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "error";
         results.push(`${table}: ${msg}`);
