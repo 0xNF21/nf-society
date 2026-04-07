@@ -1146,6 +1146,10 @@ function DailyTab({ password }: { password: string }) {
     setLoading(false);
   }, [password]);
 
+  const [testAddress, setTestAddress] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
+
   useEffect(() => { fetchData(); }, [fetchData]);
 
   function updateEntry(table: "scratch" | "spin", index: number, field: string, value: unknown) {
@@ -1244,10 +1248,61 @@ function DailyTab({ password }: { password: string }) {
     );
   }
 
+  async function runTest() {
+    if (!testAddress) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/admin/daily-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({ address: testAddress }),
+      });
+      const data = await res.json();
+      setTestResult(data);
+    } catch (e) {
+      setTestResult({ error: "Request failed" });
+    }
+    setTesting(false);
+  }
+
   return (
     <div className="space-y-8">
       <RewardTable title="Scratch Card — Tableau de gains" tableKey="scratch" entries={editScratch} />
       <RewardTable title="Roue — Segments" tableKey="spin" entries={editSpin} />
+
+      {/* Test mode */}
+      <div className="p-4 rounded-xl border-2 border-dashed border-amber-300/50 bg-amber-50/30 dark:bg-amber-900/10 space-y-3">
+        <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest">Test Daily (vrai payout, sans payer 1 CRC)</p>
+        <div className="flex gap-2">
+          <input placeholder="Adresse 0x..." value={testAddress} onChange={e => setTestAddress(e.target.value)}
+            className="flex-1 px-3 py-2 rounded-lg border border-ink/10 text-sm font-mono" />
+          <button onClick={runTest} disabled={testing || !testAddress}
+            className="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-bold hover:opacity-90 disabled:opacity-50">
+            {testing ? "Test..." : "Lancer"}
+          </button>
+        </div>
+        {testResult && (
+          <div className="p-3 rounded-xl bg-white/80 dark:bg-white/5 border border-ink/5 space-y-2 text-sm">
+            {testResult.error ? (
+              <p className="text-red-500">{testResult.error}</p>
+            ) : (
+              <>
+                <p className="font-bold text-ink dark:text-white">Scratch : {testResult.scratch?.result?.label}
+                  {testResult.scratch?.result?.crcValue > 0 && <span className="text-emerald-600"> → {testResult.scratch.result.crcValue} CRC envoye</span>}
+                  {testResult.scratch?.result?.xpValue > 0 && <span className="text-violet-600"> → +{testResult.scratch.result.xpValue} XP</span>}
+                  {testResult.scratch?.payout?.error && <span className="text-red-500"> (payout erreur: {testResult.scratch.payout.error})</span>}
+                </p>
+                <p className="font-bold text-ink dark:text-white">Spin : {testResult.spin?.result?.label}
+                  {testResult.spin?.result?.crcValue > 0 && <span className="text-emerald-600"> → {testResult.spin.result.crcValue} CRC envoye</span>}
+                  {testResult.spin?.result?.xpValue > 0 && <span className="text-violet-600"> → +{testResult.spin.result.xpValue} XP</span>}
+                  {testResult.spin?.payout?.error && <span className="text-red-500"> (payout erreur: {testResult.spin.payout.error})</span>}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
