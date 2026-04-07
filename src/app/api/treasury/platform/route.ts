@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { payouts } from "@/lib/db/schema";
+import { payouts, lootboxOpens, lootboxes, dailySessions } from "@/lib/db/schema";
 import { sql, eq, gte, and } from "drizzle-orm";
 import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 
@@ -35,7 +35,7 @@ export async function GET() {
       count: sql<number>`COUNT(*)`,
     }).from(payouts).where(eq(payouts.status, "success")).groupBy(payouts.gameType);
 
-    // Total bets (revenue) — sum of all bets from finished games
+    // Total bets from multiplayer games
     let totalBets = 0;
     let totalGamesPlayed = 0;
     let monthlyBets = 0;
@@ -57,6 +57,50 @@ export async function GET() {
         monthlyBets += Number(monthly.total);
       } catch {}
     }
+
+    // Lootbox revenue — sum of pricePerOpenCrc for each open
+    try {
+      const lootboxOpensList = await db.select({
+        lootboxId: lootboxOpens.lootboxId,
+      }).from(lootboxOpens);
+
+      const lootboxPrices = await db.select({
+        id: lootboxes.id,
+        price: lootboxes.pricePerOpenCrc,
+      }).from(lootboxes);
+      const priceMap = new Map(lootboxPrices.map(l => [l.id, l.price]));
+
+      for (const open of lootboxOpensList) {
+        totalBets += priceMap.get(open.lootboxId) || 0;
+      }
+
+      // Monthly lootbox
+      const monthlyLootbox = await db.select({
+        lootboxId: lootboxOpens.lootboxId,
+      }).from(lootboxOpens).where(gte(lootboxOpens.openedAt, thisMonth));
+
+      for (const open of monthlyLootbox) {
+        monthlyBets += priceMap.get(open.lootboxId) || 0;
+      }
+    } catch {}
+
+    // Daily revenue — 1 CRC per confirmed session
+    try {
+      const [dailyTotal] = await db.select({
+        count: sql<number>`COUNT(*)`,
+      }).from(dailySessions).where(sql`${dailySessions.address} IS NOT NULL`);
+
+      totalBets += Number(dailyTotal.count); // 1 CRC each
+
+      const [dailyMonthly] = await db.select({
+        count: sql<number>`COUNT(*)`,
+      }).from(dailySessions).where(and(
+        sql`${dailySessions.address} IS NOT NULL`,
+        gte(dailySessions.createdAt, thisMonth),
+      ));
+
+      monthlyBets += Number(dailyMonthly.count);
+    } catch {}
 
     const totalRedistributed = Number(totalPayout.total);
     const totalCommissions = totalBets - totalRedistributed;
