@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { players, shopPurchases } from "@/lib/db/schema";
 import { eq, and, gt, sql } from "drizzle-orm";
-import { computeLevel, getLevelName, xpToNextLevel, getXpForAction } from "@/lib/xp";
+import { computeLevel, getLevelName, xpToNextLevel } from "@/lib/xp";
+import { loadXpConfig } from "@/lib/xp-server";
 import { checkAndAwardBadges, awardSupremeFounder } from "@/lib/badges";
 
 export async function POST(req: NextRequest) {
@@ -13,7 +14,8 @@ export async function POST(req: NextRequest) {
     }
 
     const addr = address.toLowerCase();
-    let xpGained = typeof xpOverride === "number" && xpOverride > 0 ? xpOverride : getXpForAction(action);
+    const { rewards, levels } = await loadXpConfig();
+    let xpGained = typeof xpOverride === "number" && xpOverride > 0 ? xpOverride : (rewards[action] ?? 0);
     if (xpGained === 0) {
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
       // Nouveau joueur
       newXp = xpGained;
       newStreak = action === "daily_checkin" ? 1 : 0;
-      const level = computeLevel(newXp);
+      const level = computeLevel(newXp, levels);
       await db.insert(players).values({
         address: addr,
         xp: newXp,
@@ -63,7 +65,7 @@ export async function POST(req: NextRequest) {
         createdAt: now,
       });
     } else {
-      const prevLevel = computeLevel(existing.xp);
+      const prevLevel = computeLevel(existing.xp, levels);
 
       // Gestion daily checkin + streak
       if (action === "daily_checkin") {
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({
             xp: existing.xp,
             level: prevLevel,
-            levelName: getLevelName(prevLevel),
+            levelName: getLevelName(prevLevel, levels),
             xpGained: 0,
             levelUp: false,
             message: "Already checked in today",
@@ -92,10 +94,10 @@ export async function POST(req: NextRequest) {
 
       // Bonus streak 7 jours
       if (action === "daily_checkin" && newStreak === 7) {
-        newXp += 50; // streak_7days bonus
+        newXp += rewards["streak_7days"] ?? 50;
       }
 
-      const newLevel = computeLevel(newXp);
+      const newLevel = computeLevel(newXp, levels);
       leveledUp = newLevel > prevLevel;
 
       await db.update(players)
@@ -121,14 +123,14 @@ export async function POST(req: NextRequest) {
       console.error("[Badge check error]", badgeErr);
     }
 
-    const finalLevel = computeLevel(newXp);
+    const finalLevel = computeLevel(newXp, levels);
     return NextResponse.json({
       xp: newXp,
       level: finalLevel,
-      levelName: getLevelName(finalLevel),
+      levelName: getLevelName(finalLevel, levels),
       xpGained,
       levelUp: leveledUp,
-      xpToNext: xpToNextLevel(newXp),
+      xpToNext: xpToNextLevel(newXp, levels),
       streak: newStreak,
       newBadges,
     });

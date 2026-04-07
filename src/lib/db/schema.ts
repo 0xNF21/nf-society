@@ -277,6 +277,14 @@ export const featureFlags = pgTable("feature_flags", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const xpConfig = pgTable("xp_config", {
+  key: text("key").primaryKey(),
+  value: integer("value").notNull(),
+  category: text("category").notNull().default("reward"),
+  label: text("label").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export { relicsGames } from "./schema/relics";
 export type { RelicsGameRow, NewRelicsGame } from "./schema/relics";
 
