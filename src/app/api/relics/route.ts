@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const game = await createMultiplayerGame("relics", body)
+    const { game } = await createMultiplayerGame("relics", body)
     return NextResponse.json(game, { status: 201 })
   } catch (e: any) {
     console.error('[Relics] Create error:', e)

@@ -8,7 +8,7 @@ import { claimedPayments } from "@/lib/db/schema";
 import { eq, and, or, desc } from "drizzle-orm";
 import { generateGameCode } from "@/lib/utils";
 import { checkAllNewPayments } from "@/lib/circles";
-import { getGameConfig, ALL_GAMES, GAME_LABELS } from "@/lib/game-registry";
+import { getServerGameConfig, ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
@@ -18,7 +18,7 @@ export async function createMultiplayerGame(
   gameKey: string,
   body: { betCrc: number; isPrivate?: boolean; [key: string]: unknown }
 ) {
-  const config = getGameConfig(gameKey);
+  const config = getServerGameConfig(gameKey);
 
   if (!body.betCrc || typeof body.betCrc !== "number" || body.betCrc <= 0) {
     throw new Error("betCrc must be a positive number");
@@ -68,7 +68,7 @@ export async function createMultiplayerGame(
 // ─── GET GAME ───
 
 export async function getMultiplayerGame(gameKey: string, slug: string) {
-  const config = getGameConfig(gameKey);
+  const config = getServerGameConfig(gameKey);
   const [game] = await db.select()
     .from(config.table)
     .where(eq(config.table.slug, slug))
@@ -79,7 +79,7 @@ export async function getMultiplayerGame(gameKey: string, slug: string) {
 // ─── SCAN PAYMENTS ───
 
 export async function scanGamePayments(gameKey: string, slug: string) {
-  const config = getGameConfig(gameKey);
+  const config = getServerGameConfig(gameKey);
 
   const [game] = await db.select()
     .from(config.table)
@@ -193,7 +193,7 @@ export type LobbyRoom = {
 };
 
 export async function getLobbyGames(): Promise<LobbyRoom[]> {
-  const queries = ALL_GAMES.map(async (config) => {
+  const queries = ALL_SERVER_GAMES.map(async (config) => {
     const rows = await db.select({
       slug: config.table.slug,
       betCrc: config.table.betCrc,
@@ -261,7 +261,7 @@ export async function getPlayerStats(address: string): Promise<PlayerStats> {
   const addr = address.toLowerCase();
 
   // Query all game tables in parallel
-  const queries = ALL_GAMES.map(async (config) => {
+  const queries = ALL_SERVER_GAMES.map(async (config) => {
     const rows = await db.select()
       .from(config.table)
       .where(
@@ -297,7 +297,7 @@ export async function getPlayerStats(address: string): Promise<PlayerStats> {
   const totalBet = history.reduce((s, h) => s + h.betCrc, 0);
   const totalWon = history.reduce((s, h) => s + (h.result === "win" ? h.betCrc * 2 : 0), 0);
 
-  const byGame: GameStat[] = ALL_GAMES
+  const byGame: GameStat[] = ALL_SERVER_GAMES
     .map(config => {
       const games = history.filter(h => h.game === config.key);
       const w = games.filter(h => h.result === "win").length;

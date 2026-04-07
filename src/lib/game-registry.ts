@@ -1,49 +1,27 @@
 /**
  * Game Registry — single source of truth for all multiplayer games.
+ * This file is SAFE to import from client components (no DB imports).
  *
  * To add a new game, add an entry to GAME_REGISTRY below.
- * Stats, lobby, admin, and multijoueur page will pick it up automatically.
+ * For server-side config (DB tables), update game-registry-server.ts too.
  */
 
-import { morpionGames, memoryGames, relicsGames, damesGames } from "@/lib/db/schema";
-
-export type GameConfig = {
-  // Identity
+export type GameClientConfig = {
   key: string;
   featureFlag: string;
-
-  // Display
   emoji: string;
   iconColor: string;
   iconBg: string;
   iconBgHover: string;
   borderHover: string;
   accentColor: string;
-
-  // i18n — keys in translations object
   translationKey: string;
   landingTranslationKey: string;
-
-  // DB — drizzle table reference
-  table: any;
-
-  // API routes
   apiRoute: string;
   scanRoute: string;
-
-  // Game flow
-  activeStatus: string; // status after both players paid: "active", "playing", "placing"
-  skipStatuses: string[]; // statuses that mean "already started or finished"
-
-  // Game-specific creation fields
-  createExtraFields?: (body: Record<string, unknown>) => Record<string, unknown>;
-  createExtraValidation?: (body: Record<string, unknown>) => string | null;
-
-  // Called when both players have paid — return extra fields to set on the game row
-  onBothPlayersPaid?: () => Record<string, unknown>;
 };
 
-export const GAME_REGISTRY: Record<string, GameConfig> = {
+export const GAME_REGISTRY: Record<string, GameClientConfig> = {
   morpion: {
     key: "morpion",
     featureFlag: "morpion",
@@ -55,11 +33,8 @@ export const GAME_REGISTRY: Record<string, GameConfig> = {
     accentColor: "#251B9F",
     translationKey: "morpion",
     landingTranslationKey: "landingMorpion",
-    table: morpionGames,
     apiRoute: "/api/morpion",
     scanRoute: "/api/morpion-scan",
-    activeStatus: "active",
-    skipStatuses: ["active", "finished", "cancelled"],
   },
 
   memory: {
@@ -73,21 +48,8 @@ export const GAME_REGISTRY: Record<string, GameConfig> = {
     accentColor: "#EC4899",
     translationKey: "memory",
     landingTranslationKey: "landingMemory",
-    table: memoryGames,
     apiRoute: "/api/memory",
     scanRoute: "/api/memory-scan",
-    activeStatus: "playing",
-    skipStatuses: ["playing", "finished", "cancelled"],
-    createExtraFields: (body) => ({
-      difficulty: body.difficulty || "medium",
-      gridSeed: Math.random().toString(36).slice(2, 10),
-    }),
-    createExtraValidation: (body) => {
-      if (body.difficulty && !["easy", "medium", "hard"].includes(body.difficulty as string)) {
-        return "Invalid difficulty";
-      }
-      return null;
-    },
   },
 
   relics: {
@@ -101,11 +63,8 @@ export const GAME_REGISTRY: Record<string, GameConfig> = {
     accentColor: "#251B9F",
     translationKey: "relics",
     landingTranslationKey: "landingRelics",
-    table: relicsGames,
     apiRoute: "/api/relics",
     scanRoute: "/api/relics-scan",
-    activeStatus: "placing",
-    skipStatuses: ["placing", "playing", "finished"],
   },
 
   dames: {
@@ -119,27 +78,12 @@ export const GAME_REGISTRY: Record<string, GameConfig> = {
     accentColor: "#251B9F",
     translationKey: "dames",
     landingTranslationKey: "landingDames",
-    table: damesGames,
     apiRoute: "/api/dames",
     scanRoute: "/api/dames-scan",
-    activeStatus: "playing",
-    skipStatuses: ["playing", "finished"],
-    onBothPlayersPaid: () => {
-      // Lazy import to avoid circular deps — will be called server-side only
-      const { createInitialState } = require("@/lib/dames");
-      return { gameState: createInitialState() };
-    },
   },
 };
 
 export const ALL_GAMES = Object.values(GAME_REGISTRY);
-
-/** Get a game config by key, throws if not found */
-export function getGameConfig(key: string): GameConfig {
-  const config = GAME_REGISTRY[key];
-  if (!config) throw new Error(`Unknown game: ${key}`);
-  return config;
-}
 
 /** Game display labels (for stats, lobby, etc.) */
 export const GAME_LABELS: Record<string, string> = {
