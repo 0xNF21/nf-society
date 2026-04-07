@@ -121,10 +121,15 @@ export default function LandingPage() {
             <p className="text-xs text-ink/40">
               {t.footer[locale]}
             </p>
-            <Link href="/admin" className="inline-flex items-center gap-1 text-xs text-ink/20 dark:text-white/20 hover:text-ink/40 dark:hover:text-white/40 transition-colors">
-              <Lock className="h-3 w-3" />
-              Admin
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/docs" className="inline-flex items-center gap-1 text-xs text-ink/30 dark:text-white/30 hover:text-ink/50 dark:hover:text-white/50 transition-colors">
+                Documentation
+              </Link>
+              <Link href="/admin" className="inline-flex items-center gap-1 text-xs text-ink/20 dark:text-white/20 hover:text-ink/40 dark:hover:text-white/40 transition-colors">
+                <Lock className="h-3 w-3" />
+                Admin
+              </Link>
+            </div>
           </footer>
         </div>
       </div>
