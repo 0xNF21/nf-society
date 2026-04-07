@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Dice5, Swords, ShoppingBag } from "lucide-react";
+import { Home, Gamepad2, BarChart3, ArrowLeftRight } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
 
 const NAV_ITEMS = [
   { href: "/", icon: Home, label: { fr: "Accueil", en: "Home" }, flag: null },
-  { href: "/chance", icon: Dice5, label: { fr: "Chance", en: "Chance" }, flag: "chance" },
-  { href: "/multijoueur", icon: Swords, label: { fr: "Jeux", en: "Games" }, flag: "multiplayer" },
-  { href: "/shop", icon: ShoppingBag, label: { fr: "Shop", en: "Shop" }, flag: "shop" },
+  { href: "/hub", icon: Gamepad2, label: { fr: "Jouer", en: "Play" }, flag: null },
+  { href: "/dashboard-dao", icon: BarChart3, label: { fr: "DAO", en: "DAO" }, flag: "governance" },
+  { href: "/exchange", icon: ArrowLeftRight, label: { fr: "Exchange", en: "Exchange" }, flag: "exchange" },
 ] as const;
 
 export default function BottomNav() {
