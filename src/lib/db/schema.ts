@@ -277,6 +277,12 @@ export const featureFlags = pgTable("feature_flags", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const dailyRewardsConfig = pgTable("daily_rewards_config", {
+  key: text("key").primaryKey(),
+  rewards: text("rewards").notNull(), // JSON string
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const xpConfig = pgTable("xp_config", {
   key: text("key").primaryKey(),
   value: integer("value").notNull(),

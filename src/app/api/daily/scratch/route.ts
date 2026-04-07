@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     // Calculate result deterministically
     const seed = session.txHash + session.address;
-    let result = determineScratchResult(seed);
+    let result = await determineScratchResult(seed);
 
     // Safe balance check — replace CRC with XP if low
     if (result.crcValue > 0) {

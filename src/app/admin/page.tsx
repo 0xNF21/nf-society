@@ -13,7 +13,7 @@ import Link from "next/link";
 type FlagStatus = "enabled" | "coming_soon" | "hidden";
 interface FlagRow { key: string; status: FlagStatus; label: string; category: string; updatedAt: string }
 
-type Tab = "flags" | "lotteries" | "lootboxes" | "payouts" | "xp" | "shop";
+type Tab = "flags" | "lotteries" | "lootboxes" | "payouts" | "xp" | "shop" | "daily";
 
 /* ─── Constants ─── */
 const TABS: { key: Tab; label: string; icon: typeof Flag }[] = [
@@ -23,6 +23,7 @@ const TABS: { key: Tab; label: string; icon: typeof Flag }[] = [
   { key: "payouts",   label: "Payouts",   icon: Wallet },
   { key: "xp",        label: "XP",        icon: Sparkles },
   { key: "shop",      label: "Shop",      icon: Gift },
+  { key: "daily",     label: "Daily",     icon: Clock },
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -149,6 +150,7 @@ export default function AdminPage() {
           {activeTab === "payouts" && <PayoutsTab password={password} />}
           {activeTab === "xp" && <XpTab password={password} />}
           {activeTab === "shop" && <ShopTab password={password} />}
+          {activeTab === "daily" && <DailyTab password={password} />}
         </div>
       </div>
     </main>
@@ -1108,6 +1110,142 @@ function ShopTab({ password }: { password: string }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ─── Daily Rewards Tab ─── */
+
+interface DailyRewardEntry {
+  prob: number;
+  type: string;
+  label: string;
+  crcValue: number;
+  xpValue: number;
+  symbol?: string;
+  color?: string;
+}
+
+function DailyTab({ password }: { password: string }) {
+  const [scratch, setScratch] = useState<DailyRewardEntry[]>([]);
+  const [spin, setSpin] = useState<DailyRewardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [editScratch, setEditScratch] = useState<DailyRewardEntry[]>([]);
+  const [editSpin, setEditSpin] = useState<DailyRewardEntry[]>([]);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/daily", { headers: { "x-admin-password": password } });
+      const data = await res.json();
+      setScratch(data.scratch || []);
+      setSpin(data.spin || []);
+      setEditScratch(data.scratch || []);
+      setEditSpin(data.spin || []);
+    } catch {}
+    setLoading(false);
+  }, [password]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  function updateEntry(table: "scratch" | "spin", index: number, field: string, value: unknown) {
+    const setter = table === "scratch" ? setEditScratch : setEditSpin;
+    setter(prev => prev.map((e, i) => i === index ? { ...e, [field]: value } : e));
+  }
+
+  async function saveTable(key: "scratch" | "spin") {
+    setSaving(key);
+    const rewards = key === "scratch" ? editScratch : editSpin;
+    try {
+      const res = await fetch("/api/admin/daily", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({ key, rewards }),
+      });
+      const data = await res.json();
+      if (!res.ok) alert(data.error);
+      else await fetchData();
+    } catch {}
+    setSaving(null);
+  }
+
+  function hasChanges(key: "scratch" | "spin") {
+    const original = key === "scratch" ? scratch : spin;
+    const edited = key === "scratch" ? editScratch : editSpin;
+    return JSON.stringify(original) !== JSON.stringify(edited);
+  }
+
+  function totalProb(entries: DailyRewardEntry[]) {
+    return entries.reduce((s, e) => s + e.prob, 0);
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-ink/30" /></div>;
+
+  function RewardTable({ title, tableKey, entries }: { title: string; tableKey: "scratch" | "spin"; entries: DailyRewardEntry[] }) {
+    const total = totalProb(entries);
+    const isValid = Math.abs(total - 1.0) <= 0.01;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold text-ink/40 uppercase tracking-widest">{title}</h3>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isValid ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+              Total: {(total * 100).toFixed(1)}%
+            </span>
+            {hasChanges(tableKey) && (
+              <button onClick={() => saveTable(tableKey)} disabled={saving === tableKey || !isValid}
+                className="px-3 py-1 rounded-lg bg-marine text-white text-xs font-bold hover:opacity-90 disabled:opacity-50">
+                {saving === tableKey ? <Loader2 className="h-3 w-3 animate-spin" /> : "Sauvegarder"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {entries.map((entry, i) => (
+          <div key={i} className="p-3 rounded-xl bg-white/60 dark:bg-white/5 border border-ink/5 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{entry.symbol || "🎯"}</span>
+              <input value={entry.label} onChange={e => updateEntry(tableKey, i, "label", e.target.value)}
+                className="flex-1 px-2 py-1 rounded-lg border border-ink/10 text-sm font-semibold" />
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <div>
+                <label className="text-[10px] text-ink/40 font-bold">Prob %</label>
+                <input type="number" step="0.1" min={0} max={100}
+                  value={Math.round(entry.prob * 1000) / 10}
+                  onChange={e => updateEntry(tableKey, i, "prob", (parseFloat(e.target.value) || 0) / 100)}
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
+              </div>
+              <div>
+                <label className="text-[10px] text-ink/40 font-bold">CRC</label>
+                <input type="number" min={0} value={entry.crcValue}
+                  onChange={e => updateEntry(tableKey, i, "crcValue", parseInt(e.target.value) || 0)}
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
+              </div>
+              <div>
+                <label className="text-[10px] text-ink/40 font-bold">XP</label>
+                <input type="number" min={0} value={entry.xpValue}
+                  onChange={e => updateEntry(tableKey, i, "xpValue", parseInt(e.target.value) || 0)}
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
+              </div>
+              <div>
+                <label className="text-[10px] text-ink/40 font-bold">{entry.symbol !== undefined ? "Symbole" : "Couleur"}</label>
+                <input value={entry.symbol || entry.color || ""}
+                  onChange={e => updateEntry(tableKey, i, entry.symbol !== undefined ? "symbol" : "color", e.target.value)}
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <RewardTable title="Scratch Card — Tableau de gains" tableKey="scratch" entries={editScratch} />
+      <RewardTable title="Roue — Segments" tableKey="spin" entries={editSpin} />
     </div>
   );
 }

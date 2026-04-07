@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     // Calculate result deterministically
     const seed = session.txHash + session.address;
-    let result = determineSpinResult(seed);
+    let result = await determineSpinResult(seed);
 
     // If jackpot, set crcValue to current pool total
     if (result.type === "jackpot") {
