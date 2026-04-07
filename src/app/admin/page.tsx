@@ -1,102 +1,82 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { ArrowLeft, Shield, Loader2, Lock, LogIn, Eye, EyeOff, Clock } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import {
+  ArrowLeft, Shield, Loader2, Lock, LogIn, Eye, EyeOff, Clock,
+  Flag, Ticket, Gift, Wallet, Sparkles, Trash2, RefreshCw, Send,
+  ChevronDown, ExternalLink, AlertCircle, CheckCircle, XCircle,
+  Palette, Check, Archive
+} from "lucide-react";
 import Link from "next/link";
 
+/* ─── Types ─── */
 type FlagStatus = "enabled" | "coming_soon" | "hidden";
+interface FlagRow { key: string; status: FlagStatus; label: string; category: string; updatedAt: string }
 
-interface Flag {
-  key: string;
-  status: FlagStatus;
-  label: string;
-  category: string;
-  updatedAt: string;
-}
+type Tab = "flags" | "lotteries" | "lootboxes" | "payouts";
+
+/* ─── Constants ─── */
+const TABS: { key: Tab; label: string; icon: typeof Flag }[] = [
+  { key: "flags",     label: "Flags",     icon: Flag },
+  { key: "lotteries", label: "Loteries",  icon: Ticket },
+  { key: "lootboxes", label: "Lootboxes", icon: Gift },
+  { key: "payouts",   label: "Payouts",   icon: Wallet },
+];
 
 const CATEGORY_COLORS: Record<string, string> = {
   chance: "border-amber-200 bg-amber-50/50",
   multiplayer: "border-violet-200 bg-violet-50/50",
   general: "border-sky-200 bg-sky-50/50",
 };
-
 const CATEGORY_LABELS: Record<string, string> = {
   chance: "Jeux de chance",
   multiplayer: "Jeux multijoueur",
   general: "General",
 };
-
 const STATUS_CONFIG: Record<FlagStatus, { label: string; icon: typeof Eye; color: string; bg: string }> = {
   enabled:     { label: "Actif",       icon: Eye,    color: "text-green-600", bg: "bg-green-100 border-green-300" },
   coming_soon: { label: "Coming Soon", icon: Clock,  color: "text-amber-600", bg: "bg-amber-100 border-amber-300" },
   hidden:      { label: "Cache",       icon: EyeOff, color: "text-ink/40",    bg: "bg-ink/5 border-ink/10" },
 };
-
 const STATUS_ORDER: FlagStatus[] = ["enabled", "coming_soon", "hidden"];
 
+const statusColors: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800",
+  wrapping: "bg-blue-100 text-blue-800",
+  sending: "bg-blue-100 text-blue-800",
+  success: "bg-green-100 text-green-800",
+  failed: "bg-red-100 text-red-800",
+};
+
+/* ─── Main ─── */
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
-  const [flags, setFlags] = useState<Flag[]>([]);
   const [loading, setLoading] = useState(false);
-  const [toggling, setToggling] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<Tab>("flags");
 
-  const fetchFlags = useCallback(async (pwd: string) => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
+    setError("");
     try {
-      const res = await fetch("/api/admin/flags", {
-        headers: { "x-admin-password": pwd },
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
       });
-      if (!res.ok) throw new Error("Unauthorized");
-      const data = await res.json();
-      setFlags(data.flags || []);
-      setAuthenticated(true);
-      setError("");
+      if (res.ok) {
+        setAuthenticated(true);
+      } else {
+        setError("Mot de passe incorrect");
+      }
     } catch {
-      setError("Mot de passe incorrect");
-      setAuthenticated(false);
+      setError("Erreur de connexion");
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchFlags(password);
   };
-
-  const cycleStatus = async (key: string, currentStatus: FlagStatus) => {
-    const currentIdx = STATUS_ORDER.indexOf(currentStatus);
-    const nextStatus = STATUS_ORDER[(currentIdx + 1) % STATUS_ORDER.length];
-    setToggling(key);
-    try {
-      const res = await fetch("/api/admin/flags", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": password,
-        },
-        body: JSON.stringify({ key, status: nextStatus }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      setFlags((prev) =>
-        prev.map((f) => (f.key === key ? { ...f, status: nextStatus } : f))
-      );
-    } catch {
-      setError("Erreur lors du changement");
-    } finally {
-      setToggling(null);
-    }
-  };
-
-  // Group flags by category
-  const grouped = flags.reduce<Record<string, Flag[]>>((acc, flag) => {
-    const cat = flag.category || "general";
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(flag);
-    return acc;
-  }, {});
 
   if (!authenticated) {
     return (
@@ -107,36 +87,20 @@ export default function AdminPage() {
               <Shield className="h-8 w-8 text-marine" />
             </div>
             <h1 className="font-display text-2xl font-bold text-ink dark:text-white">Admin</h1>
-            <p className="text-sm text-ink/50 dark:text-white/50">
-              Panneau d&apos;administration NF Society
-            </p>
+            <p className="text-sm text-ink/50 dark:text-white/50">Panneau d&apos;administration NF Society</p>
           </div>
-
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink/30" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mot de passe admin"
                 className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-ink/10 dark:border-white/10 bg-white dark:bg-white/5 text-ink dark:text-white focus:border-marine focus:outline-none transition-colors"
-                autoFocus
-              />
+                autoFocus />
             </div>
-            {error && (
-              <p className="text-sm text-red-500 text-center">{error}</p>
-            )}
-            <button
-              type="submit"
-              disabled={loading || !password}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-marine text-white font-semibold hover:bg-marine/90 disabled:opacity-50 transition-colors"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <LogIn className="h-4 w-4" />
-              )}
+            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+            <button type="submit" disabled={loading || !password}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-marine text-white font-semibold hover:bg-marine/90 disabled:opacity-50 transition-colors">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
               Connexion
             </button>
           </form>
@@ -148,14 +112,10 @@ export default function AdminPage() {
   return (
     <main className="min-h-screen flex flex-col">
       <div className="flex-1 flex flex-col items-center px-4 py-8">
-        <div className="w-full max-w-2xl flex flex-col gap-6">
+        <div className="w-full max-w-3xl flex flex-col gap-6">
           <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Retour
+            <Link href="/" className="flex items-center gap-2 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
+              <ArrowLeft className="h-4 w-4" /> Retour
             </Link>
           </div>
 
@@ -163,90 +123,726 @@ export default function AdminPage() {
             <div className="mx-auto h-12 w-12 rounded-xl bg-marine/10 flex items-center justify-center">
               <Shield className="h-6 w-6 text-marine" />
             </div>
-            <h1 className="font-display text-3xl font-bold text-ink dark:text-white">
-              Feature Flags
-            </h1>
-            <p className="text-sm text-ink/50 dark:text-white/50">
-              Controle la visibilite de chaque fonctionnalite
-            </p>
-            <div className="flex items-center justify-center gap-4 pt-2">
-              {STATUS_ORDER.map((s) => {
-                const cfg = STATUS_CONFIG[s];
-                const Icon = cfg.icon;
-                return (
-                  <div key={s} className={`flex items-center gap-1.5 text-xs ${cfg.color}`}>
-                    <Icon className="h-3.5 w-3.5" />
-                    <span className="font-medium">{cfg.label}</span>
-                  </div>
-                );
-              })}
-            </div>
+            <h1 className="font-display text-3xl font-bold text-ink dark:text-white">Administration</h1>
           </header>
 
-          {error && (
-            <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-600 dark:text-red-400 text-center">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-6">
-            {Object.entries(grouped).map(([category, categoryFlags]) => (
-              <div key={category} className="space-y-3">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-ink/40 dark:text-white/40 px-1">
-                  {CATEGORY_LABELS[category] || category}
-                </h2>
-                <div className="space-y-2">
-                  {categoryFlags.map((flag) => {
-                    const cfg = STATUS_CONFIG[flag.status] || STATUS_CONFIG.enabled;
-                    const StatusIcon = cfg.icon;
-                    return (
-                      <div
-                        key={flag.key}
-                        className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-                          flag.status === "enabled"
-                            ? CATEGORY_COLORS[category] || "border-ink/10 bg-white/80"
-                            : flag.status === "coming_soon"
-                              ? "border-amber-200 bg-amber-50/30 dark:border-amber-800/50 dark:bg-amber-900/10"
-                              : "border-ink/5 bg-ink/5 dark:border-white/5 dark:bg-white/5 opacity-50"
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-ink dark:text-white text-sm">
-                              {flag.label}
-                            </span>
-                            <span className="text-[10px] font-mono text-ink/30 dark:text-white/30 bg-ink/5 dark:bg-white/10 px-1.5 py-0.5 rounded">
-                              {flag.key}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => cycleStatus(flag.key, flag.status)}
-                          disabled={toggling === flag.key}
-                          className={`shrink-0 ml-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 ${cfg.bg} ${cfg.color}`}
-                        >
-                          {toggling === flag.key ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <StatusIcon className="h-3.5 w-3.5" />
-                          )}
-                          {cfg.label}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+          {/* Tabs */}
+          <div className="flex gap-1 bg-ink/5 dark:bg-white/5 rounded-2xl p-1">
+            {TABS.map(({ key, label, icon: Icon }) => (
+              <button key={key} onClick={() => setActiveTab(key)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === key
+                    ? "bg-white dark:bg-white/10 text-ink dark:text-white shadow-sm"
+                    : "text-ink/40 dark:text-white/40 hover:text-ink/60"
+                }`}>
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
             ))}
           </div>
 
-          {flags.length === 0 && !loading && (
-            <p className="text-center text-ink/40 dark:text-white/40 py-8">
-              Aucun flag configure
-            </p>
-          )}
+          {activeTab === "flags" && <FlagsTab password={password} />}
+          {activeTab === "lotteries" && <LotteriesTab password={password} />}
+          {activeTab === "lootboxes" && <LootboxesTab password={password} />}
+          {activeTab === "payouts" && <PayoutsTab password={password} />}
         </div>
       </div>
     </main>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   FLAGS TAB
+   ═══════════════════════════════════════════════════ */
+function FlagsTab({ password }: { password: string }) {
+  const [flags, setFlags] = useState<FlagRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/flags", { headers: { "x-admin-password": password } });
+        if (res.ok) { const data = await res.json(); setFlags(data.flags || []); }
+      } catch {} finally { setLoading(false); }
+    })();
+  }, [password]);
+
+  const cycleStatus = async (key: string, current: FlagStatus) => {
+    const next = STATUS_ORDER[(STATUS_ORDER.indexOf(current) + 1) % STATUS_ORDER.length];
+    setToggling(key);
+    try {
+      const res = await fetch("/api/admin/flags", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({ key, status: next }),
+      });
+      if (res.ok) setFlags(prev => prev.map(f => f.key === key ? { ...f, status: next } : f));
+    } catch { setError("Erreur"); } finally { setToggling(null); }
+  };
+
+  const grouped = flags.reduce<Record<string, FlagRow[]>>((acc, f) => {
+    const cat = f.category || "general";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(f);
+    return acc;
+  }, {});
+
+  if (loading) return <div className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto text-ink/30" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-center gap-4">
+        {STATUS_ORDER.map(s => {
+          const cfg = STATUS_CONFIG[s]; const Icon = cfg.icon;
+          return <div key={s} className={`flex items-center gap-1.5 text-xs ${cfg.color}`}><Icon className="h-3.5 w-3.5" /><span className="font-medium">{cfg.label}</span></div>;
+        })}
+      </div>
+      {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+      {Object.entries(grouped).map(([cat, catFlags]) => (
+        <div key={cat} className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-ink/40 px-1">{CATEGORY_LABELS[cat] || cat}</h2>
+          <div className="space-y-2">
+            {catFlags.map(flag => {
+              const cfg = STATUS_CONFIG[flag.status] || STATUS_CONFIG.enabled;
+              const StatusIcon = cfg.icon;
+              return (
+                <div key={flag.key} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
+                  flag.status === "enabled" ? (CATEGORY_COLORS[cat] || "border-ink/10 bg-white/80")
+                    : flag.status === "coming_soon" ? "border-amber-200 bg-amber-50/30"
+                      : "border-ink/5 bg-ink/5 opacity-50"
+                }`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-ink text-sm">{flag.label}</span>
+                      <span className="text-[10px] font-mono text-ink/30 bg-ink/5 px-1.5 py-0.5 rounded">{flag.key}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => cycleStatus(flag.key, flag.status)} disabled={toggling === flag.key}
+                    className={`shrink-0 ml-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 ${cfg.bg} ${cfg.color}`}>
+                    {toggling === flag.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <StatusIcon className="h-3.5 w-3.5" />}
+                    {cfg.label}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   LOTTERIES TAB
+   ═══════════════════════════════════════════════════ */
+function LotteriesTab({ password }: { password: string }) {
+  const [lotteries, setLotteries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusChanging, setStatusChanging] = useState<number | null>(null);
+  const [drawLoading, setDrawLoading] = useState<number | null>(null);
+  const [drawResult, setDrawResult] = useState<{ id: number; winner?: string; error?: string } | null>(null);
+
+  // Create form
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ title: "", organizer: "", description: "", ticketPriceCrc: "5", recipientAddress: "", primaryColor: "#251B9F", accentColor: "#FF491B", logoUrl: "", theme: "light", commissionPercent: "5" });
+  const [creating, setCreating] = useState(false);
+  const [createResult, setCreateResult] = useState<{ slug?: string; error?: string } | null>(null);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/lotteries");
+      const data = await res.json();
+      setLotteries(Array.isArray(data) ? data : data.lotteries || []);
+    } catch {} finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const changeStatus = async (slug: string, id: number, newStatus: string) => {
+    setStatusChanging(id);
+    try {
+      await fetch(`/api/lotteries/${slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, status: newStatus }),
+      });
+      await fetchAll();
+    } catch {} finally { setStatusChanging(null); }
+  };
+
+  const performDraw = async (lotteryId: number) => {
+    setDrawLoading(lotteryId);
+    setDrawResult(null);
+    try {
+      const res = await fetch(`/api/draw?lotteryId=${lotteryId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, lotteryId }),
+      });
+      const data = await res.json();
+      if (data.draw) {
+        setDrawResult({ id: lotteryId, winner: data.draw.winnerAddress });
+      } else {
+        setDrawResult({ id: lotteryId, error: data.error || "Erreur" });
+      }
+    } catch (e: any) {
+      setDrawResult({ id: lotteryId, error: e.message });
+    } finally { setDrawLoading(null); }
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    setCreateResult(null);
+    try {
+      const res = await fetch("/api/lotteries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          title: form.title.trim(),
+          organizer: form.organizer.trim(),
+          description: form.description.trim() || null,
+          ticketPriceCrc: parseInt(form.ticketPriceCrc) || 5,
+          recipientAddress: form.recipientAddress.trim().toLowerCase(),
+          primaryColor: form.primaryColor,
+          accentColor: form.accentColor,
+          logoUrl: form.logoUrl.trim() || null,
+          theme: form.theme,
+          commissionPercent: parseInt(form.commissionPercent) || 5,
+        }),
+      });
+      const data = await res.json();
+      if (data.slug) {
+        setCreateResult({ slug: data.slug });
+        setForm({ title: "", organizer: "", description: "", ticketPriceCrc: "5", recipientAddress: "", primaryColor: "#251B9F", accentColor: "#FF491B", logoUrl: "", theme: "light", commissionPercent: "5" });
+        fetchAll();
+      } else {
+        setCreateResult({ error: data.error || "Erreur" });
+      }
+    } catch { setCreateResult({ error: "Erreur de connexion" }); } finally { setCreating(false); }
+  };
+
+  const shortAddr = (a: string) => a ? `${a.slice(0, 6)}...${a.slice(-4)}` : "";
+  const statusBadge = (s: string) => {
+    if (s === "active") return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Actif</span>;
+    if (s === "completed") return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-1"><CheckCircle className="h-3 w-3" />Termine</span>;
+    if (s === "archived") return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium flex items-center gap-1"><Archive className="h-3 w-3" />Archive</span>;
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{s}</span>;
+  };
+
+  if (loading) return <div className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto text-ink/30" /></div>;
+
+  return (
+    <div className="space-y-6">
+      {/* Create button */}
+      <button onClick={() => setShowCreate(!showCreate)}
+        className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-dashed border-ink/10 hover:border-marine/30 hover:bg-marine/5 transition-all">
+        <span className="flex items-center gap-2 text-sm font-semibold text-ink/60">
+          <Sparkles className="h-4 w-4" /> Creer une loterie
+        </span>
+        <ChevronDown className={`h-4 w-4 text-ink/30 transition-transform ${showCreate ? "rotate-180" : ""}`} />
+      </button>
+
+      {showCreate && (
+        <form onSubmit={handleCreate} className="space-y-4 p-5 rounded-2xl border-2 border-ink/10 bg-white/80">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Titre</label>
+              <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Loterie NF #1" className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-marine" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Organisateur</label>
+              <input type="text" value={form.organizer} onChange={e => setForm(f => ({ ...f, organizer: e.target.value }))}
+                placeholder="NF Society" className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-marine" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink/60 mb-1">Description</label>
+            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              rows={2} placeholder="..." className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-marine resize-none" />
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Prix (CRC)</label>
+              <input type="number" min="1" value={form.ticketPriceCrc} onChange={e => setForm(f => ({ ...f, ticketPriceCrc: e.target.value }))}
+                className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-marine" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Commission %</label>
+              <input type="number" min="0" max="50" value={form.commissionPercent} onChange={e => setForm(f => ({ ...f, commissionPercent: e.target.value }))}
+                className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-marine" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Theme</label>
+              <select value={form.theme} onChange={e => setForm(f => ({ ...f, theme: e.target.value }))}
+                className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm bg-white focus:outline-none focus:border-marine">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink/60 mb-1">Adresse de reception (Safe)</label>
+            <input type="text" value={form.recipientAddress} onChange={e => setForm(f => ({ ...f, recipientAddress: e.target.value }))}
+              placeholder="0x..." className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm font-mono focus:outline-none focus:border-marine" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Couleur principale</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.primaryColor} onChange={e => setForm(f => ({ ...f, primaryColor: e.target.value }))} className="h-9 w-9 rounded-lg border cursor-pointer" />
+                <span className="text-xs font-mono text-ink/40">{form.primaryColor}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Couleur accent</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.accentColor} onChange={e => setForm(f => ({ ...f, accentColor: e.target.value }))} className="h-9 w-9 rounded-lg border cursor-pointer" />
+                <span className="text-xs font-mono text-ink/40">{form.accentColor}</span>
+              </div>
+            </div>
+          </div>
+          {createResult?.slug && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700 flex items-center gap-2">
+              <Check className="h-4 w-4" /> Loterie creee : <Link href={`/loterie/${createResult.slug}`} className="underline font-mono">/loterie/{createResult.slug}</Link>
+            </div>
+          )}
+          {createResult?.error && <p className="text-sm text-red-500">{createResult.error}</p>}
+          <button type="submit" disabled={creating || !form.title || !form.organizer || !form.recipientAddress}
+            className="w-full py-2.5 rounded-xl text-white font-semibold disabled:opacity-50 transition-colors" style={{ backgroundColor: form.primaryColor }}>
+            {creating ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Creer la loterie"}
+          </button>
+        </form>
+      )}
+
+      {/* Lotteries list */}
+      {lotteries.length === 0 ? (
+        <p className="text-center text-ink/40 py-8">Aucune loterie</p>
+      ) : (
+        <div className="space-y-3">
+          {lotteries.map((lot: any) => (
+            <div key={lot.id} className={`rounded-2xl border-2 p-4 transition-all ${
+              lot.status === "active" ? "border-ink/10 bg-white/80" : "border-ink/5 bg-ink/5 opacity-70"
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: lot.primaryColor + "20" }}>
+                    <Sparkles className="h-4 w-4" style={{ color: lot.primaryColor }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-ink truncate">{lot.title}</p>
+                    <p className="text-xs text-ink/40">{lot.organizer} &middot; {lot.ticketPriceCrc} CRC &middot; <span className="font-mono">{shortAddr(lot.recipientAddress)}</span></p>
+                  </div>
+                </div>
+                {statusBadge(lot.status)}
+              </div>
+
+              {drawResult && drawResult.id === lot.id && (
+                <div className={`text-sm p-2 rounded-lg mb-2 ${drawResult.winner ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                  {drawResult.winner ? `Gagnant : ${shortAddr(drawResult.winner)}` : drawResult.error}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2 border-t border-ink/5 flex-wrap">
+                {lot.status === "active" && (
+                  <>
+                    <button onClick={() => performDraw(lot.id)} disabled={drawLoading === lot.id}
+                      className="text-xs font-semibold py-1.5 px-3 rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center gap-1">
+                      {drawLoading === lot.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      Tirage
+                    </button>
+                    <button onClick={() => changeStatus(lot.slug, lot.id, "completed")} disabled={statusChanging === lot.id}
+                      className="text-xs font-semibold py-1.5 px-3 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-50">
+                      Terminer
+                    </button>
+                    <button onClick={() => changeStatus(lot.slug, lot.id, "archived")} disabled={statusChanging === lot.id}
+                      className="text-xs font-semibold py-1.5 px-3 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                      Archiver
+                    </button>
+                  </>
+                )}
+                {lot.status === "completed" && (
+                  <>
+                    <button onClick={() => changeStatus(lot.slug, lot.id, "active")} disabled={statusChanging === lot.id}
+                      className="text-xs font-semibold py-1.5 px-3 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors disabled:opacity-50">
+                      Reactiver
+                    </button>
+                    <button onClick={() => changeStatus(lot.slug, lot.id, "archived")} disabled={statusChanging === lot.id}
+                      className="text-xs font-semibold py-1.5 px-3 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                      Archiver
+                    </button>
+                  </>
+                )}
+                {lot.status === "archived" && (
+                  <button onClick={() => changeStatus(lot.slug, lot.id, "active")} disabled={statusChanging === lot.id}
+                    className="text-xs font-semibold py-1.5 px-3 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors disabled:opacity-50">
+                    Reactiver
+                  </button>
+                )}
+                <Link href={`/loterie/${lot.slug}`} className="text-xs font-semibold py-1.5 px-3 rounded-lg border border-ink/10 text-ink/50 hover:bg-ink/5 transition-colors ml-auto">
+                  Voir
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   LOOTBOXES TAB
+   ═══════════════════════════════════════════════════ */
+function LootboxesTab({ password }: { password: string }) {
+  const [lootboxes, setLootboxes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ title: "", slug: "", description: "", pricePerOpenCrc: "10", recipientAddress: "0x960A0784640fD6581D221A56df1c60b65b5ebB6f", accentColor: "#F59E0B" });
+  const [creating, setCreating] = useState(false);
+  const [createResult, setCreateResult] = useState<{ slug?: string; error?: string } | null>(null);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/lootboxes", { cache: "no-store" });
+      if (res.ok) setLootboxes(await res.json());
+    } catch {} finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const handleDelete = async (id: number) => {
+    setDeleting(id);
+    try {
+      await fetch(`/api/lootboxes/${id}`, { method: "DELETE", headers: { "x-admin-password": password } });
+      setConfirmDelete(null);
+      await fetchAll();
+    } catch {} finally { setDeleting(null); }
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    setCreateResult(null);
+    try {
+      const res = await fetch("/api/lootboxes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({
+          slug: form.slug.trim(),
+          title: form.title.trim(),
+          description: form.description.trim() || null,
+          pricePerOpenCrc: parseInt(form.pricePerOpenCrc) || 10,
+          recipientAddress: form.recipientAddress.trim().toLowerCase(),
+          accentColor: form.accentColor,
+        }),
+      });
+      const data = await res.json();
+      if (data.slug) {
+        setCreateResult({ slug: data.slug });
+        setForm({ title: "", slug: "", description: "", pricePerOpenCrc: "10", recipientAddress: "0x960A0784640fD6581D221A56df1c60b65b5ebB6f", accentColor: "#F59E0B" });
+        fetchAll();
+      } else {
+        setCreateResult({ error: data.error || "Erreur" });
+      }
+    } catch { setCreateResult({ error: "Erreur" }); } finally { setCreating(false); }
+  };
+
+  if (loading) return <div className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto text-ink/30" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <button onClick={() => setShowCreate(!showCreate)}
+        className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-dashed border-ink/10 hover:border-amber-300/50 hover:bg-amber-50/30 transition-all">
+        <span className="flex items-center gap-2 text-sm font-semibold text-ink/60"><Gift className="h-4 w-4" /> Creer une lootbox</span>
+        <ChevronDown className={`h-4 w-4 text-ink/30 transition-transform ${showCreate ? "rotate-180" : ""}`} />
+      </button>
+
+      {showCreate && (
+        <form onSubmit={handleCreate} className="space-y-4 p-5 rounded-2xl border-2 border-ink/10 bg-white/80">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Titre</label>
+              <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Lootbox Bronze" className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Slug (URL)</label>
+              <input type="text" value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))}
+                placeholder="lootbox-bronze" className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm font-mono focus:outline-none focus:border-amber-400" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink/60 mb-1">Description</label>
+            <input type="text" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Ouvre pour gagner..." className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-amber-400" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Prix (CRC)</label>
+              <select value={form.pricePerOpenCrc} onChange={e => setForm(f => ({ ...f, pricePerOpenCrc: e.target.value }))}
+                className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm bg-white focus:outline-none focus:border-amber-400">
+                {[10, 20, 30, 40, 50, 100].map(v => <option key={v} value={v}>{v} CRC</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink/60 mb-1">Couleur</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.accentColor} onChange={e => setForm(f => ({ ...f, accentColor: e.target.value }))} className="h-9 w-9 rounded-lg border cursor-pointer" />
+                <span className="text-xs font-mono text-ink/40">{form.accentColor}</span>
+              </div>
+            </div>
+          </div>
+          {createResult?.slug && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700 flex items-center gap-2">
+              <Check className="h-4 w-4" /> Lootbox creee : <Link href={`/lootbox/${createResult.slug}`} className="underline font-mono">/lootbox/{createResult.slug}</Link>
+            </div>
+          )}
+          {createResult?.error && <p className="text-sm text-red-500">{createResult.error}</p>}
+          <button type="submit" disabled={creating || !form.title || !form.slug}
+            className="w-full py-2.5 rounded-xl text-white font-semibold disabled:opacity-50 transition-colors" style={{ backgroundColor: form.accentColor }}>
+            {creating ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Creer la lootbox"}
+          </button>
+        </form>
+      )}
+
+      {lootboxes.length === 0 ? (
+        <p className="text-center text-ink/40 py-8">Aucune lootbox</p>
+      ) : (
+        <div className="space-y-2">
+          {lootboxes.map((lb: any) => (
+            <div key={lb.id} className="flex items-center justify-between bg-white/80 border-2 border-ink/5 rounded-2xl p-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 text-lg" style={{ backgroundColor: (lb.accentColor || "#F59E0B") + "15" }}>
+                  🎁
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm text-ink truncate">{lb.title}</p>
+                  <p className="text-xs text-ink/40 font-mono">/lootbox/{lb.slug} &middot; {lb.pricePerOpenCrc} CRC</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${lb.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                  {lb.status}
+                </span>
+                {confirmDelete === lb.id ? (
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => handleDelete(lb.id)} disabled={deleting === lb.id}
+                      className="px-2 py-1 rounded-lg text-xs font-semibold bg-red-500 text-white hover:bg-red-600 disabled:opacity-50">
+                      {deleting === lb.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Oui"}
+                    </button>
+                    <button onClick={() => setConfirmDelete(null)}
+                      className="px-2 py-1 rounded-lg text-xs font-semibold bg-ink/5 text-ink/50 hover:bg-ink/10">Non</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirmDelete(lb.id)} className="p-1.5 rounded-lg text-ink/30 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   PAYOUTS TAB
+   ═══════════════════════════════════════════════════ */
+function PayoutsTab({ password }: { password: string }) {
+  const [payoutStatus, setPayoutStatus] = useState<any>(null);
+  const [payoutList, setPayoutList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState<number | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({ gameType: "reward", recipientAddress: "", amountCrc: "", reason: "" });
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [manualResult, setManualResult] = useState<any>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [sRes, lRes] = await Promise.all([
+        fetch("/api/payout/status", { cache: "no-store" }),
+        fetch("/api/payout?limit=20", { cache: "no-store", headers: { Authorization: `Bearer ${password}` } }),
+      ]);
+      if (sRes.ok) setPayoutStatus(await sRes.json());
+      if (lRes.ok) { const d = await lRes.json(); setPayoutList(d.payouts || []); }
+    } catch {} finally { setLoading(false); }
+  }, [password]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleRetry = async (id: number) => {
+    setRetrying(id);
+    try {
+      await fetch("/api/payout/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payoutId: id, password }) });
+      await fetchData();
+    } catch {} finally { setRetrying(null); }
+  };
+
+  const handleManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setManualSubmitting(true);
+    setManualResult(null);
+    try {
+      const res = await fetch("/api/payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, gameType: manualForm.gameType, gameId: `manual-${Date.now()}`, recipientAddress: manualForm.recipientAddress.trim().toLowerCase(), amountCrc: parseInt(manualForm.amountCrc) || 0, reason: manualForm.reason || undefined }),
+      });
+      const data = await res.json();
+      setManualResult(data);
+      if (data.success) { setManualForm({ gameType: "reward", recipientAddress: "", amountCrc: "", reason: "" }); fetchData(); }
+    } catch (e: any) { setManualResult({ success: false, error: e.message }); }
+    setManualSubmitting(false);
+  };
+
+  const shortAddr = (a: string) => a ? `${a.slice(0, 6)}...${a.slice(-4)}` : "";
+
+  if (loading) return <div className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto text-ink/30" /></div>;
+
+  return (
+    <div className="space-y-6">
+      {/* Status */}
+      {payoutStatus && !payoutStatus.configured && (
+        <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold text-amber-800">Systeme de payout non configure</p>
+              <p className="text-sm text-amber-700">Variables manquantes : {payoutStatus.missingVars?.join(", ")}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {payoutStatus?.configured && (
+        <div className="rounded-2xl border-2 border-ink/10 bg-white/80 p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+            <div>
+              <p className="text-ink/40 text-xs">Status</p>
+              <p className="font-semibold text-green-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Configure</p>
+            </div>
+            <div>
+              <p className="text-ink/40 text-xs">Bot Gas (xDAI)</p>
+              <p className="font-semibold">{Number(payoutStatus.botXdaiBalance || 0).toFixed(4)}</p>
+            </div>
+            <div>
+              <p className="text-ink/40 text-xs">Bot Wallet</p>
+              <p className="font-mono text-xs">{shortAddr(payoutStatus.botAddress || "")}</p>
+            </div>
+            <div>
+              <p className="text-ink/40 text-xs">Safe Balance (ERC-20)</p>
+              <p className="font-semibold">{Number(payoutStatus.safeBalance?.erc20 || 0).toFixed(2)} CRC</p>
+            </div>
+            <div>
+              <p className="text-ink/40 text-xs">Safe Address</p>
+              <p className="font-mono text-xs">{shortAddr(payoutStatus.safeAddress || "")}</p>
+            </div>
+            <div>
+              <p className="text-ink/40 text-xs">Safe Balance (ERC-1155)</p>
+              <p className="font-semibold">{Number(payoutStatus.safeBalance?.erc1155 || 0).toFixed(2)} CRC</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual payout */}
+      {payoutStatus?.configured && (
+        <div className="rounded-2xl border-2 border-ink/10 bg-white/80 p-4">
+          <button onClick={() => setManualOpen(!manualOpen)} className="w-full flex items-center justify-between text-sm font-semibold text-ink">
+            <span className="flex items-center gap-2"><Send className="h-4 w-4" /> Payout manuel</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${manualOpen ? "rotate-180" : ""}`} />
+          </button>
+          {manualOpen && (
+            <form onSubmit={handleManual} className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-ink/40">Type</label>
+                  <select value={manualForm.gameType} onChange={e => setManualForm(f => ({ ...f, gameType: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="lottery">Lottery</option><option value="lootbox">Lootbox</option><option value="game">Game</option><option value="reward">Reward</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-ink/40">Montant (CRC)</label>
+                  <input type="number" min="1" value={manualForm.amountCrc} onChange={e => setManualForm(f => ({ ...f, amountCrc: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-ink/40">Destinataire</label>
+                <input type="text" placeholder="0x..." value={manualForm.recipientAddress} onChange={e => setManualForm(f => ({ ...f, recipientAddress: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm font-mono" required />
+              </div>
+              <div>
+                <label className="text-xs text-ink/40">Raison</label>
+                <input type="text" value={manualForm.reason} onChange={e => setManualForm(f => ({ ...f, reason: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              </div>
+              {manualResult && (
+                <div className={`text-sm p-2 rounded-lg ${manualResult.success ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                  {manualResult.success ? `Succes — Tx: ${manualResult.transferTxHash?.slice(0, 12)}...` : manualResult.error}
+                </div>
+              )}
+              <button type="submit" disabled={manualSubmitting}
+                className="w-full py-2 rounded-xl bg-ink text-white text-sm font-semibold hover:bg-ink/90 disabled:opacity-50">
+                {manualSubmitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Envoyer le payout"}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {/* Payout list */}
+      <div className="rounded-2xl border-2 border-ink/10 bg-white/80 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-ink">Historique des payouts</h3>
+          <button onClick={fetchData} className="text-ink/40 hover:text-ink/60"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button>
+        </div>
+        {payoutList.length === 0 ? (
+          <p className="text-sm text-ink/40 text-center py-4">Aucun payout</p>
+        ) : (
+          <div className="space-y-2">
+            {payoutList.map((po: any) => (
+              <div key={po.id} className="bg-ink/5 rounded-lg p-3 text-sm space-y-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[po.status] || "bg-gray-100 text-gray-600"}`}>
+                      {po.status}
+                    </span>
+                    <span className="text-xs text-ink/40">{po.gameType}</span>
+                  </div>
+                  <span className="font-semibold">{po.amountCrc} CRC</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-ink/40">
+                  <span className="font-mono">{shortAddr(po.recipientAddress)}</span>
+                  <span>{new Date(po.createdAt).toLocaleDateString()}</span>
+                </div>
+                {po.reason && <p className="text-xs text-ink/50">{po.reason}</p>}
+                <div className="flex items-center gap-2 text-xs">
+                  {po.wrapTxHash && <a href={`https://gnosisscan.io/tx/${po.wrapTxHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-0.5">Wrap <ExternalLink className="h-3 w-3" /></a>}
+                  {po.transferTxHash && <a href={`https://gnosisscan.io/tx/${po.transferTxHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-0.5">Transfer <ExternalLink className="h-3 w-3" /></a>}
+                  {po.status === "failed" && po.attempts < 3 && (
+                    <button onClick={() => handleRetry(po.id)} disabled={retrying === po.id} className="text-amber-600 hover:underline flex items-center gap-0.5">
+                      {retrying === po.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Retry
+                    </button>
+                  )}
+                </div>
+                {po.errorMessage && <p className="text-xs text-red-500">{po.errorMessage}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

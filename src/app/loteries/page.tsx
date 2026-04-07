@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight, Archive, CheckCircle2, Lock, LogOut, RefreshCw, Sparkles, Ticket, Trophy, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Archive, CheckCircle2, Lock, Sparkles, Ticket, Trophy, Users } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
@@ -26,7 +26,6 @@ type LotteryCard = {
 export default function HomePage() {
   const [activeLotteries, setActiveLotteries] = useState<LotteryCard[]>([]);
   const [completedLotteries, setCompletedLotteries] = useState<LotteryCard[]>([]);
-  const [archivedLotteries, setArchivedLotteries] = useState<LotteryCard[]>([]);
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const { locale } = useLocale();
@@ -34,23 +33,16 @@ export default function HomePage() {
   const isDark = theme === "dark";
   const h = translations.home;
 
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminAuth, setAdminAuth] = useState(false);
-  const [authError, setAuthError] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
-  const [statusChanging, setStatusChanging] = useState<number | null>(null);
 
   const fetchLotteries = useCallback(async () => {
     try {
-      const endpoint = adminAuth ? "/api/lotteries" : "/api/lotteries?status=visible";
+      const endpoint = "/api/lotteries?status=visible";
       const res = await fetch(endpoint);
       const data = await res.json();
       const list: LotteryCard[] = Array.isArray(data) ? data : data.lotteries || [];
 
       setActiveLotteries(list.filter((l) => l.status === "active"));
       setCompletedLotteries(list.filter((l) => l.status === "completed"));
-      setArchivedLotteries(list.filter((l) => l.status === "archived"));
 
       if (list.length > 0) {
         const countsMap: Record<number, number> = {};
@@ -71,58 +63,11 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [adminAuth]);
+  }, []);
 
   useEffect(() => {
     fetchLotteries();
   }, [fetchLotteries]);
-
-  const handleAdminLogin = async () => {
-    setAuthLoading(true);
-    setAuthError("");
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword }),
-      });
-      if (res.ok) {
-        setAdminAuth(true);
-        setAuthError("");
-      } else {
-        setAuthError("incorrect");
-      }
-    } catch {
-      setAuthError("incorrect");
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleStatusChange = async (lottery: LotteryCard, newStatus: string) => {
-    const confirmMsg = newStatus === "completed"
-      ? h.confirmComplete[locale]
-      : newStatus === "archived"
-        ? h.confirmArchive[locale]
-        : null;
-
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
-
-    setStatusChanging(lottery.id);
-    try {
-      const res = await fetch(`/api/lotteries/${lottery.slug}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword, status: newStatus }),
-      });
-      if (res.ok) {
-        await fetchLotteries();
-      }
-    } catch {
-    } finally {
-      setStatusChanging(null);
-    }
-  };
 
   const renderStatusBadge = (lottery: LotteryCard) => {
     if (lottery.status === "completed") {
@@ -144,60 +89,7 @@ export default function HomePage() {
     return null;
   };
 
-  const renderAdminButtons = (lottery: LotteryCard) => {
-    if (!adminAuth) return null;
-    const isChanging = statusChanging === lottery.id;
-
-    return (
-      <div className="flex gap-2 mt-3 pt-3 border-t border-ink/5" onClick={(e) => e.preventDefault()}>
-        {lottery.status === "active" && (
-          <>
-            <button
-              onClick={() => handleStatusChange(lottery, "completed")}
-              disabled={isChanging}
-              className="flex-1 text-xs font-semibold py-1.5 px-2 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-50"
-            >
-              {h.markCompleted[locale]}
-            </button>
-            <button
-              onClick={() => handleStatusChange(lottery, "archived")}
-              disabled={isChanging}
-              className="flex-1 text-xs font-semibold py-1.5 px-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              {h.archiveLottery[locale]}
-            </button>
-          </>
-        )}
-        {lottery.status === "completed" && (
-          <>
-            <button
-              onClick={() => handleStatusChange(lottery, "active")}
-              disabled={isChanging}
-              className="flex-1 text-xs font-semibold py-1.5 px-2 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors disabled:opacity-50"
-            >
-              {h.reactivateLottery[locale]}
-            </button>
-            <button
-              onClick={() => handleStatusChange(lottery, "archived")}
-              disabled={isChanging}
-              className="flex-1 text-xs font-semibold py-1.5 px-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              {h.archiveLottery[locale]}
-            </button>
-          </>
-        )}
-        {lottery.status === "archived" && (
-          <button
-            onClick={() => handleStatusChange(lottery, "active")}
-            disabled={isChanging}
-            className="flex-1 text-xs font-semibold py-1.5 px-2 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors disabled:opacity-50"
-          >
-            {h.reactivateLottery[locale]}
-          </button>
-        )}
-      </div>
-    );
-  };
+  // Admin buttons removed — use /admin page instead
 
   const renderLotteryCard = (lottery: LotteryCard) => {
     const isInactive = lottery.status !== "active";
@@ -270,8 +162,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {renderAdminButtons(lottery)}
-      </Link>
+              </Link>
     );
   };
 
@@ -310,7 +201,7 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-        ) : activeLotteries.length === 0 && completedLotteries.length === 0 && !adminAuth ? (
+        ) : activeLotteries.length === 0 && completedLotteries.length === 0 ? (
           <div className="text-center py-16">
             <Ticket className="h-12 w-12 text-ink/20 mx-auto mb-4" />
             <p className="text-lg text-ink/50">{h.noLotteries[locale]}</p>
@@ -342,27 +233,6 @@ export default function HomePage() {
               </section>
             )}
 
-            {adminAuth && archivedLotteries.length > 0 && (
-              <section>
-                <h2 className="font-display text-xl font-bold text-ink/40 mb-5 flex items-center gap-2">
-                  <Archive className="h-5 w-5 text-gray-400" />
-                  {h.archivedLotteries[locale]}
-                </h2>
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {archivedLotteries.map((lottery) => renderLotteryCard(lottery))}
-                </div>
-              </section>
-            )}
-
-            {adminAuth && archivedLotteries.length === 0 && (
-              <section>
-                <h2 className="font-display text-xl font-bold text-ink/40 mb-5 flex items-center gap-2">
-                  <Archive className="h-5 w-5 text-gray-400" />
-                  {h.archivedLotteries[locale]}
-                </h2>
-                <p className="text-sm text-ink/30">{h.noArchivedLotteries[locale]}</p>
-              </section>
-            )}
           </div>
         )}
 
@@ -377,69 +247,10 @@ export default function HomePage() {
           <p className="text-xs text-ink/50">
             {h.footer[locale]}
           </p>
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-xs text-ink/20 hover:text-ink/40 transition-colors">
-              {h.createLottery[locale]}
-            </Link>
-            {adminAuth ? (
-              <button
-                onClick={() => {
-                  setAdminAuth(false);
-                  setAdminPassword("");
-                  setIsAdminOpen(false);
-                  setAuthError("");
-                }}
-                className="flex items-center gap-1 text-xs text-ink/20 hover:text-ink/40 transition-colors"
-              >
-                <LogOut className="h-3 w-3" />
-                {h.logout[locale]}
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsAdminOpen(!isAdminOpen)}
-                className="flex items-center gap-1 text-xs text-ink/20 hover:text-ink/40 transition-colors"
-              >
-                <Lock className="h-3 w-3" />
-                {h.adminZone[locale]}
-              </button>
-            )}
-          </div>
-
-          {isAdminOpen && !adminAuth && (
-            <div className="bg-white border-2 border-ink/10 rounded-2xl p-6 shadow-xl w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <h3 className="text-sm font-bold text-ink mb-3 flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                {h.adminZone[locale]}
-              </h3>
-              <div className="space-y-3">
-                <input
-                  type="password"
-                  placeholder={h.adminPasswordPlaceholder[locale]}
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
-                  className="w-full px-3 py-2 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                />
-                {authError && (
-                  <p className="text-xs text-red-600 font-medium">{h.incorrectPassword[locale]}</p>
-                )}
-                <button
-                  onClick={handleAdminLogin}
-                  disabled={authLoading || !adminPassword.trim()}
-                  className="w-full bg-ink text-white font-semibold text-sm py-2 rounded-xl hover:bg-ink/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  {authLoading ? (
-                    <>
-                      <RefreshCw className="h-3 w-3 animate-spin" />
-                      {h.verifying[locale]}
-                    </>
-                  ) : (
-                    h.login[locale]
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
+          <Link href="/admin" className="flex items-center gap-1 text-xs text-ink/20 hover:text-ink/40 transition-colors">
+            <Lock className="h-3 w-3" />
+            {h.adminZone[locale]}
+          </Link>
         </footer>
       </div>
     </main>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, CheckCircle, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Loader2, Pencil, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
+import { ArrowUpRight, CheckCircle, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Loader2, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,23 +87,13 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const [scanning, setScanning] = useState(false);
   const [winner, setWinner] = useState<any>(null);
   const [winnerProfile, setWinnerProfile] = useState<{ name: string; imageUrl: string | null } | null>(null);
-  const [drawLoading, setDrawLoading] = useState(false);
   const [drawProof, setDrawProof] = useState<DrawProof | null>(null);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminAuth, setAdminAuth] = useState(false);
-  const [authError, setAuthError] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
   const [drawHistory, setDrawHistory] = useState<DrawHistoryItem[]>([]);
   const [historyProfiles, setHistoryProfiles] = useState<Record<string, { name: string; imageUrl: string | null }>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [statusChanging, setStatusChanging] = useState(false);
-  const [lotteryStatus, setLotteryStatus] = useState(lottery.status);
-  const [editingDescription, setEditingDescription] = useState(false);
-  const [descriptionDraft, setDescriptionDraft] = useState(lottery.description || "");
-  const [currentDescription, setCurrentDescription] = useState(lottery.description || "");
-  const [savingDescription, setSavingDescription] = useState(false);
+  const [lotteryStatus] = useState(lottery.status);
+  const [currentDescription] = useState(lottery.description || "");
   const [watchingPayment, setWatchingPayment] = useState(false);
   const [showConfirmed, setShowConfirmed] = useState(false);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -249,140 +239,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     }
   };
 
-  const handleAdminLogin = async () => {
-    if (!adminPassword.trim()) return;
-    setAuthLoading(true);
-    setAuthError("");
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword }),
-      });
-      if (res.ok) {
-        setAdminAuth(true);
-        setAuthError("");
-      } else {
-        setAuthError("incorrectPassword");
-      }
-    } catch {
-      setAuthError("connectionError");
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleStatusChange = async (newStatus: string) => {
-    const confirmMsg = newStatus === "completed"
-      ? l.confirmComplete[locale]
-      : newStatus === "archived"
-        ? l.confirmArchive[locale]
-        : null;
-
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
-
-    setStatusChanging(true);
-    try {
-      const res = await fetch(`/api/lotteries/${lottery.slug}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword, status: newStatus }),
-      });
-      if (res.ok) {
-        setLotteryStatus(newStatus);
-      } else {
-        alert(l.statusUpdateError[locale]);
-      }
-    } catch {
-      alert(l.statusUpdateError[locale]);
-    } finally {
-      setStatusChanging(false);
-    }
-  };
-
-  const handleSaveDescription = async () => {
-    setSavingDescription(true);
-    try {
-      const res = await fetch(`/api/lotteries/${lottery.slug}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword, description: descriptionDraft }),
-      });
-      if (res.ok) {
-        setCurrentDescription(descriptionDraft);
-        setEditingDescription(false);
-      } else {
-        alert(l.descriptionUpdateError[locale]);
-      }
-    } catch {
-      alert(l.descriptionUpdateError[locale]);
-    } finally {
-      setSavingDescription(false);
-    }
-  };
-
-  const handleDraw = async () => {
-    setDrawLoading(true);
-    setWinner(null);
-    setWinnerProfile(null);
-    setDrawProof(null);
-    try {
-      const res = await fetch(`/api/draw?${lotteryQuery}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword, lotteryId: lottery.id }),
-      });
-      const data = await res.json();
-      if (data.error) {
-        if (data.error === "Unauthorized") {
-          setAdminAuth(false);
-          setAuthError("sessionExpired");
-        }
-        return;
-      }
-      if (data.winner) {
-        let profile = null;
-        try {
-          const profRes = await fetch("/api/profiles", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ addresses: [data.winner.address] }),
-          });
-          if (profRes.ok) {
-            const profData = await profRes.json();
-            const p = profData.profiles?.[data.winner.address.toLowerCase()];
-            if (p && (p.name || p.imageUrl)) profile = p;
-          }
-        } catch {}
-        if (data.proof) setDrawProof(data.proof);
-        setWinnerProfile(profile);
-        setWinner(data.winner);
-        try {
-          const histRes = await fetch(`/api/draw/history?${lotteryQuery}`);
-          const histData = await histRes.json();
-          if (histData.draws) {
-            setDrawHistory(histData.draws);
-            const addrs = [...new Set(histData.draws.map((d: DrawHistoryItem) => d.winnerAddress))];
-            try {
-              const hp = await fetch("/api/profiles", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ addresses: addrs }),
-              });
-              if (hp.ok) {
-                const hpData = await hp.json();
-                if (hpData.profiles) setHistoryProfiles(hpData.profiles);
-              }
-            } catch {}
-          }
-        } catch {}
-      }
-    } catch (err) {
-      console.error("Draw failed", err);
-    } finally {
-      setDrawLoading(false);
-    }
-  };
+  // Admin functions removed — use /admin page instead
 
   const isLotteryDark = lottery.theme === "dark";
 
@@ -749,178 +606,10 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
           )}
 
           <footer className="mt-12 pt-8 border-t border-ink/5 flex flex-col items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-ink/20 hover:text-ink/40"
-              onClick={() => {
-                setIsAdminOpen(!isAdminOpen);
-                if (isAdminOpen) {
-                  setAdminAuth(false);
-                  setAdminPassword("");
-                  setAuthError("");
-                }
-              }}
-            >
-              <Lock className="h-3 w-3 mr-1" />
+            <Link href="/admin" className="flex items-center gap-1 text-xs text-ink/20 hover:text-ink/40 transition-colors">
+              <Lock className="h-3 w-3" />
               {l.adminZone[locale]}
-            </Button>
-
-            {isAdminOpen && !adminAuth && (
-              <div className="bg-white border-2 border-ink/10 rounded-3xl p-8 shadow-2xl w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <h3 className="text-lg font-bold text-ink mb-4 flex items-center gap-2">
-                  <Lock className="h-5 w-5" />
-                  {l.authRequired[locale]}
-                </h3>
-                <div className="space-y-4">
-                  <input
-                    type="password"
-                    placeholder={l.adminPasswordPlaceholder[locale]}
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
-                    className="w-full px-4 py-3 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                  />
-                  {authError && (
-                    <p className="text-sm text-red-600 font-medium">{authError === "incorrectPassword" ? l.incorrectPassword[locale] : authError === "connectionError" ? l.connectionError[locale] : authError === "sessionExpired" ? l.sessionExpired[locale] : authError}</p>
-                  )}
-                  <Button
-                    onClick={handleAdminLogin}
-                    disabled={authLoading || !adminPassword.trim()}
-                    className="w-full bg-ink hover:bg-ink/90 text-white font-semibold h-11 disabled:opacity-60"
-                  >
-                    {authLoading ? (
-                      <span className="flex items-center gap-2">
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        {l.verifying[locale]}
-                      </span>
-                    ) : (
-                      l.login[locale]
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {isAdminOpen && adminAuth && (
-              <div className="bg-white border-2 border-red-100 rounded-3xl p-8 shadow-2xl w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2">
-                  {l.drawPanel[locale]}
-                </h3>
-                <p className="text-sm text-ink/60 mb-4">
-                  {l.drawDescription[locale]}
-                </p>
-                <p className="text-sm text-ink/60 mb-6">
-                  {l.participantsInLottery[locale](ticketCount)}
-                </p>
-                <Button onClick={handleDraw} disabled={drawLoading} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 shadow-lg shadow-red-200 disabled:opacity-60">
-                  {drawLoading ? (
-                    <span className="flex items-center gap-2">
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      {l.drawInProgress[locale]}
-                    </span>
-                  ) : (
-                    l.performDraw[locale]
-                  )}
-                </Button>
-
-                <div className="mt-6 pt-6 border-t border-ink/10">
-                  <h4 className="text-sm font-bold text-ink/60 mb-3 flex items-center gap-2">
-                    <Pencil className="h-4 w-4" />
-                    {l.editDescription[locale]}
-                  </h4>
-                  {editingDescription ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={descriptionDraft}
-                        onChange={(e) => setDescriptionDraft(e.target.value)}
-                        rows={4}
-                        className="w-full rounded-xl border border-ink/20 bg-white px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20 resize-none"
-                        placeholder={l.descriptionLabel[locale]}
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleSaveDescription}
-                          disabled={savingDescription}
-                          className="flex-1 bg-ink hover:bg-ink/90 text-white font-semibold h-10"
-                        >
-                          {savingDescription ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                          ) : (
-                            l.saveDescription[locale]
-                          )}
-                        </Button>
-                        <Button
-                          onClick={() => { setEditingDescription(false); setDescriptionDraft(currentDescription); }}
-                          variant="outline"
-                          className="flex-1 border-ink/20 text-ink/60 font-semibold h-10"
-                        >
-                          {l.cancelEdit[locale]}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      onClick={() => { setDescriptionDraft(currentDescription); setEditingDescription(true); }}
-                      variant="outline"
-                      className="w-full border-ink/20 text-ink/70 hover:bg-ink/5 font-semibold"
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      {l.editDescription[locale]}
-                    </Button>
-                  )}
-                </div>
-
-                <div className="mt-6 pt-6 border-t border-ink/10">
-                  <h4 className="text-sm font-bold text-ink/60 mb-3 flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    {l.manageLottery[locale]}
-                  </h4>
-                  <div className="space-y-2">
-                    {lotteryStatus === "active" && (
-                      <Button
-                        onClick={() => handleStatusChange("completed")}
-                        disabled={statusChanging}
-                        variant="outline"
-                        className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold"
-                      >
-                        {l.markCompleted[locale]}
-                      </Button>
-                    )}
-                    {lotteryStatus === "completed" && (
-                      <>
-                        <Button
-                          onClick={() => handleStatusChange("active")}
-                          disabled={statusChanging}
-                          variant="outline"
-                          className="w-full border-green-300 text-green-700 hover:bg-green-50 font-semibold"
-                        >
-                          {l.reactivateLottery[locale]}
-                        </Button>
-                        <Button
-                          onClick={() => handleStatusChange("archived")}
-                          disabled={statusChanging}
-                          variant="outline"
-                          className="w-full border-gray-300 text-gray-500 hover:bg-gray-50 font-semibold"
-                        >
-                          {l.archiveLottery[locale]}
-                        </Button>
-                      </>
-                    )}
-                    {lotteryStatus === "archived" && (
-                      <Button
-                        onClick={() => handleStatusChange("active")}
-                        disabled={statusChanging}
-                        variant="outline"
-                        className="w-full border-green-300 text-green-700 hover:bg-green-50 font-semibold"
-                      >
-                        {l.reactivateLottery[locale]}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+            </Link>
           </footer>
         </div>
       </main>
