@@ -866,6 +866,7 @@ function XpTab({ password }: { password: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, number>>({});
+  const [editLabels, setEditLabels] = useState<Record<string, string>>({});
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState(10);
   const [newLabel, setNewLabel] = useState("");
@@ -878,8 +879,10 @@ function XpTab({ password }: { password: string }) {
       const data = await res.json();
       setConfigs(data.configs || []);
       const values: Record<string, number> = {};
-      for (const c of data.configs || []) values[c.key] = c.value;
+      const labels: Record<string, string> = {};
+      for (const c of data.configs || []) { values[c.key] = c.value; labels[c.key] = c.label; }
       setEditValues(values);
+      setEditLabels(labels);
     } catch {}
     setLoading(false);
   }, [password]);
@@ -889,10 +892,13 @@ function XpTab({ password }: { password: string }) {
   async function saveValue(key: string) {
     setSaving(key);
     try {
+      const original = configs.find(c => c.key === key);
+      const body: Record<string, unknown> = { key, value: editValues[key] };
+      if (editLabels[key] && editLabels[key] !== original?.label) body.label = editLabels[key];
       await fetch("/api/admin/xp", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-admin-password": password },
-        body: JSON.stringify({ key, value: editValues[key] }),
+        body: JSON.stringify(body),
       });
       await fetchConfigs();
     } catch {}
@@ -936,11 +942,21 @@ function XpTab({ password }: { password: string }) {
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-ink/30" /></div>;
 
   function ConfigRow({ c }: { c: XpConfigRow }) {
-    const changed = editValues[c.key] !== c.value;
+    const valueChanged = editValues[c.key] !== c.value;
+    const labelChanged = editLabels[c.key] !== c.label;
+    const changed = valueChanged || labelChanged;
+    const isLevel = c.category === "level";
     return (
       <div key={c.key} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/60 dark:bg-white/5 border border-ink/5">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-ink dark:text-white truncate">{c.label}</p>
+          {isLevel ? (
+            <input value={editLabels[c.key] ?? c.label}
+              onChange={e => setEditLabels(prev => ({ ...prev, [c.key]: e.target.value }))}
+              className="text-sm font-semibold text-ink dark:text-white bg-transparent border-b border-transparent hover:border-ink/20 focus:border-marine/40 focus:outline-none w-full"
+            />
+          ) : (
+            <p className="text-sm font-semibold text-ink dark:text-white truncate">{c.label}</p>
+          )}
           <p className="text-[10px] text-ink/30 font-mono">{c.key}</p>
         </div>
         <input type="number" min={0} value={editValues[c.key] ?? c.value}
