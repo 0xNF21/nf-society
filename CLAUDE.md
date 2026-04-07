@@ -93,6 +93,14 @@ Le projet utilise un framework generique pour les jeux multijoueurs.
 
 Lobby, paiement, scan, stats, admin = **automatique via le registre**.
 
+## Liens de paiement Gnosis
+
+- Le parametre `data` dans l'URL Gnosis DOIT etre du **texte brut**, PAS du hex
+- Format : `game:id:token` (ex: `morpion:K7PCE2:46bcdcd6`)
+- `generateGamePaymentLink()` dans `src/lib/circles.ts` genere le lien correct
+- `decodeGameData()` dans `src/lib/game-data.ts` supporte texte ET ancien JSON hex
+- Doc : https://docs.aboutcircles.com/tutorials-and-examples/circles-x-gnosis-app-starter-kit
+
 ## Watch Out
 
 - Les fichiers `public/` non-trackes par git ne sont pas visibles dans un worktree
@@ -100,3 +108,4 @@ Lobby, paiement, scan, stats, admin = **automatique via le registre**.
 - Le mode demo bypass tous les appels API — tester les deux modes (demo + normal)
 - `translations.X` : verifier que la cle existe dans la bonne section de i18n.ts
 - shadcn/ui dans `src/components/ui/` : ne pas modifier ces fichiers directement
+- **DB Neon** : le `.env.local` pointe vers PostgreSQL local, Vercel utilise Neon (`.env.neon`). Les migrations doivent etre executees sur les DEUX
