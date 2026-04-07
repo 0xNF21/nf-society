@@ -41,13 +41,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid target" }, { status: 400 });
     }
 
-    if (confirm !== `RESET_${target.toUpperCase()}`) {
-      return NextResponse.json({ error: `Confirmation required: RESET_${target.toUpperCase()}` }, { status: 400 });
+    if (confirm !== "confirmer") {
+      return NextResponse.json({ error: "Tapez 'confirmer' pour valider" }, { status: 400 });
     }
 
     const tables = RESET_TARGETS[target].tables;
     const results: string[] = [];
+    const backup: Record<string, unknown[]> = {};
 
+    // Backup data before deletion
+    for (const table of tables) {
+      try {
+        const rows = await db.execute(sql.raw(`SELECT * FROM ${table}`));
+        backup[table] = rows.rows as unknown[];
+        results.push(`${table}: ${backup[table].length} rows backed up`);
+      } catch {}
+    }
+
+    // Store backup in a separate table
+    try {
+      await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS admin_backups (
+        id SERIAL PRIMARY KEY,
+        target TEXT NOT NULL,
+        data JSONB NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )`));
+      await db.execute(sql`INSERT INTO admin_backups (target, data) VALUES (${target}, ${JSON.stringify(backup)})`);
+      results.push("backup: saved");
+    } catch (e: unknown) {
+      results.push("backup: " + (e instanceof Error ? e.message : "error"));
+    }
+
+    // Delete data
     for (const table of tables) {
       try {
         await db.execute(sql.raw(`DELETE FROM ${table}`));

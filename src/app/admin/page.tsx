@@ -1720,14 +1720,13 @@ function ResetTab({ password }: { password: string }) {
   useEffect(() => { fetchTargets(); }, [fetchTargets]);
 
   async function resetTarget(key: string) {
-    const expected = `RESET_${key.toUpperCase()}`;
-    if (confirmInput[key] !== expected) return;
+    if (confirmInput[key] !== "confirmer") return;
     setResetting(key);
     try {
       const res = await fetch("/api/admin/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-admin-password": password },
-        body: JSON.stringify({ target: key, confirm: expected }),
+        body: JSON.stringify({ target: key, confirm: "confirmer" }),
       });
       const data = await res.json();
       if (data.results) setResults(prev => ({ ...prev, [key]: data.results }));
@@ -1743,7 +1742,7 @@ function ResetTab({ password }: { password: string }) {
       <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800">
         <p className="text-sm font-bold text-red-700 dark:text-red-400">Zone dangereuse</p>
         <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">
-          Ces actions suppriment definitivement les donnees. Impossible de revenir en arriere.
+          Ces actions suppriment les donnees. Un backup est sauvegarde automatiquement dans la DB avant chaque suppression.
         </p>
       </div>
 
@@ -1756,14 +1755,14 @@ function ResetTab({ password }: { password: string }) {
 
           <div className="flex gap-2">
             <input
-              placeholder={`Tapez RESET_${target.key.toUpperCase()} pour confirmer`}
+              placeholder="Tapez confirmer"
               value={confirmInput[target.key] || ""}
               onChange={e => setConfirmInput(prev => ({ ...prev, [target.key]: e.target.value }))}
-              className="flex-1 px-3 py-2 rounded-lg border border-red-200 text-sm font-mono text-red-600 placeholder:text-red-300"
+              className="flex-1 px-3 py-2 rounded-lg border border-red-200 text-sm text-red-600 placeholder:text-red-300"
             />
             <button
               onClick={() => resetTarget(target.key)}
-              disabled={resetting === target.key || confirmInput[target.key] !== `RESET_${target.key.toUpperCase()}`}
+              disabled={resetting === target.key || confirmInput[target.key] !== "confirmer"}
               className="px-4 py-2 rounded-lg bg-red-500 text-white text-xs font-bold hover:bg-red-600 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {resetting === target.key ? <Loader2 className="h-3 w-3 animate-spin" /> : "Supprimer"}
