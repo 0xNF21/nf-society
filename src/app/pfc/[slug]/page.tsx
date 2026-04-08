@@ -480,14 +480,6 @@ function RealPfcGame({ slug }: { slug: string }) {
           <RoundHistory rounds={state.rounds} locale={locale} />
         )}
 
-        {/* Play again */}
-        {game.status === "finished" && (
-          <Link href="/pfc">
-            <Button className="w-full rounded-xl font-bold mt-2" style={{ background: "#DC2626" }}>
-              {locale === "fr" ? "Rejouer" : "Play again"}
-            </Button>
-          </Link>
-        )}
 
         {/* Test mode — dev only */}
         {process.env.NODE_ENV === "development" && (

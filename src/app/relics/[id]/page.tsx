@@ -870,13 +870,6 @@ function RealRelicsGame({ id }: { id: string }) {
 
         {error && <p className="text-red-500 text-sm text-center mt-2">{error}</p>}
 
-        {isFinished && (
-          <Link href="/relics" className="block mt-4">
-            <Button className="w-full rounded-xl font-bold" style={{ background: "#251B9F" }}>
-              {locale === "fr" ? "Rejouer" : "Play again"}
-            </Button>
-          </Link>
-        )}
       </div>
     </div>
   )
