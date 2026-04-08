@@ -147,6 +147,25 @@ Structure en 2 composants principaux :
 - Polling du game state toutes les 2s
 ```
 
+**Section rematch** (ecran de fin, mode reel uniquement) :
+```
+import { RematchButton, RematchBanner } from "@/components/rematch-button"
+
+// Apres la card de resultat (victoire/defaite), ajouter :
+{game.status === "finished" && myAddress && (
+  <div className="my-4">
+    {game.rematchSlug ? (
+      <RematchBanner gameKey="{game}" rematchSlug={game.rematchSlug} />
+    ) : (
+      <RematchButton gameKey="{game}" slug={game.slug} rematchSlug={game.rematchSlug} />
+    )}
+  </div>
+)}
+```
+- Le schema DB DOIT inclure `rematchSlug: text("rematch_slug")` dans la table du jeu
+- L'API `/api/rematch` gere tout (creation + patch de l'ancienne partie)
+- Ne PAS ajouter de bouton "Rejouer" separé — la Revanche le remplace
+
 **Section test mode** (NODE_ENV === "development") :
 ```
 - "Injecter joueurs" → POST /api/{game}/{id}/test
@@ -183,6 +202,7 @@ Ajouter une carte dans `src/app/multijoueur/page.tsx` avec icone et lien vers `/
 - `src/components/language-provider.tsx` → `useLocale()` pour FR/EN
 - `src/components/theme-provider.tsx` → `useTheme()` pour dark mode
 - `src/components/ui/button.tsx`, `card.tsx` → composants UI
+- `src/components/rematch-button.tsx` → `RematchButton` + `RematchBanner` (bouton revanche en fin de partie)
 
 ## Checklist
 - [ ] Logique jeu dans `src/lib/{game}.ts`
@@ -197,4 +217,6 @@ Ajouter une carte dans `src/app/multijoueur/page.tsx` avec icone et lien vers `/
 - [ ] i18n ajoutee dans `src/lib/i18n.ts`
 - [ ] Navigation ajoutee dans multijoueur
 - [ ] Payout au gagnant via `executePayout()`
+- [ ] Bouton Rematch sur l'ecran de fin (RematchButton + RematchBanner)
+- [ ] Colonne `rematch_slug` dans le schema DB
 - [ ] Build passe sans erreur
