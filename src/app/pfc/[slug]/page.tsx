@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GamePayment } from "@/components/game-payment";
 import { PlayerBanner } from "@/components/player-banner";
+import { RematchButton, RematchBanner } from "@/components/rematch-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
@@ -434,6 +435,17 @@ function RealPfcGame({ slug }: { slug: string }) {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Rematch */}
+        {game.status === "finished" && myAddress && (
+          <div className="mt-2">
+            {game.rematchSlug ? (
+              <RematchBanner gameKey="pfc" rematchSlug={game.rematchSlug} />
+            ) : (
+              <RematchButton gameKey="pfc" slug={game.slug} rematchSlug={game.rematchSlug} />
+            )}
+          </div>
         )}
 
         {/* Spectator notice */}

@@ -14,6 +14,7 @@ import type { DamesState, Move, Player, Board } from '@/lib/dames'
 import { DamesBoard } from '@/components/dames-board'
 import { GamePayment } from '@/components/game-payment'
 import { PlayerBanner } from '@/components/player-banner'
+import { RematchButton, RematchBanner } from '@/components/rematch-button'
 import { usePlayerToken } from '@/hooks/use-player-token'
 import { useGamePolling } from '@/hooks/use-game-polling'
 import type { DamesGameRow } from '@/lib/db/schema/dames'
@@ -348,6 +349,17 @@ function RealGame({ id }: { id: string }) {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Rematch */}
+        {game.status === 'finished' && address && (
+          <div className="mt-2">
+            {game.rematchSlug ? (
+              <RematchBanner gameKey="dames" rematchSlug={game.rematchSlug} />
+            ) : (
+              <RematchButton gameKey="dames" slug={game.slug} rematchSlug={game.rematchSlug} />
+            )}
+          </div>
         )}
 
         {/* Payment section */}

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GamePayment } from "@/components/game-payment";
 import { PlayerBanner } from "@/components/player-banner";
+import { RematchButton, RematchBanner } from "@/components/rematch-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
@@ -31,6 +32,7 @@ interface MorpionGame {
   status: GameStatus;
   result: string | null;
   winnerAddress: string | null;
+  rematchSlug: string | null;
   payoutStatus: string;
 }
 
@@ -469,6 +471,17 @@ function RealMorpionGame({ slug }: { slug: string }) {
             })()}
           </CardContent>
         </Card>
+
+        {/* Rematch */}
+        {game.status === "finished" && myAddress && (
+          <div className="mt-2">
+            {game.rematchSlug ? (
+              <RematchBanner gameKey="morpion" rematchSlug={game.rematchSlug} />
+            ) : (
+              <RematchButton gameKey="morpion" slug={game.slug} rematchSlug={game.rematchSlug} />
+            )}
+          </div>
+        )}
 
         {/* Payment section */}
         <GamePayment

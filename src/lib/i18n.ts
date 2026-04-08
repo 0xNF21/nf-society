@@ -898,6 +898,12 @@ export const translations = {
     subtitle: { fr: "Les meilleurs joueurs de NF Society", en: "Top NF Society players" },
     empty: { fr: "Aucun joueur pour le moment", en: "No players yet" },
   },
+  rematch: {
+    btn: { fr: "Revanche", en: "Rematch" },
+    creating: { fr: "Cr\u00e9ation...", en: "Creating..." },
+    proposed: { fr: "Revanche propos\u00e9e !", en: "Rematch proposed!" },
+    join: { fr: "Rejoindre la revanche", en: "Join rematch" },
+  },
 } as const;
 
 export function t(section: string, key: string, locale: Locale): string {

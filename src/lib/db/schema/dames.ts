@@ -17,6 +17,7 @@ export const damesGames = pgTable('dames_games', {
   isPrivate:        boolean('is_private').notNull().default(false),
   gameState:        jsonb('game_state').$type<DamesState>(),
   winnerAddress:    text('winner_address'),
+  rematchSlug:      text('rematch_slug'),
   payoutStatus:     text('payout_status').notNull().default('pending'),
   payoutTxHash:     text('payout_tx_hash'),
   createdAt:        timestamp('created_at').notNull().defaultNow(),

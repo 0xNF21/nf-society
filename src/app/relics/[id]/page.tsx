@@ -9,6 +9,7 @@ import { useLocale } from "@/components/language-provider"
 import { useTheme } from "@/components/theme-provider"
 import { GamePayment } from "@/components/game-payment"
 import { PlayerBanner } from "@/components/player-banner"
+import { RematchButton, RematchBanner } from "@/components/rematch-button"
 import { usePlayerToken } from "@/hooks/use-player-token"
 import { useGamePolling } from "@/hooks/use-game-polling"
 import { translations } from "@/lib/i18n"
@@ -668,6 +669,17 @@ function RealRelicsGame({ id }: { id: string }) {
             )}
           </CardContent>
         </Card>
+
+        {/* Rematch */}
+        {isFinished && myAddress && (
+          <div className="mt-2">
+            {game.rematchSlug ? (
+              <RematchBanner gameKey="relics" rematchSlug={game.rematchSlug} />
+            ) : (
+              <RematchButton gameKey="relics" slug={game.slug} rematchSlug={game.rematchSlug} />
+            )}
+          </div>
+        )}
 
         {/* Payment section */}
         <GamePayment

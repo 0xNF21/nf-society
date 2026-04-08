@@ -22,6 +22,7 @@ export const relicsGames = pgTable('relics_games', {
   currentTurn:      text('current_turn'),
   lastShot:         jsonb('last_shot').$type<LastShot>(),
   winnerAddress:    text('winner_address'),
+  rematchSlug:      text('rematch_slug'),
   payoutStatus:     text('payout_status').notNull().default('pending'),
   payoutTxHash:     text('payout_tx_hash'),
   createdAt:        timestamp('created_at').notNull().defaultNow(),
