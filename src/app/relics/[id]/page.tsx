@@ -672,7 +672,7 @@ function RealRelicsGame({ id }: { id: string }) {
 
         {/* Rematch */}
         {isFinished && myAddress && (
-          <div className="mt-2">
+          <div className="my-4">
             {game.rematchSlug ? (
               <RematchBanner gameKey="relics" rematchSlug={game.rematchSlug} />
             ) : (

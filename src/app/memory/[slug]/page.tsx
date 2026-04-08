@@ -466,7 +466,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
 
         {/* Rematch */}
         {game.status === "finished" && myAddress && (
-          <div className="mt-2">
+          <div className="my-4">
             {game.rematchSlug ? (
               <RematchBanner gameKey="memory" rematchSlug={game.rematchSlug} />
             ) : (

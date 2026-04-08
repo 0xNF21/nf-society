@@ -353,7 +353,7 @@ function RealGame({ id }: { id: string }) {
 
         {/* Rematch */}
         {game.status === 'finished' && address && (
-          <div className="mt-2">
+          <div className="my-4">
             {game.rematchSlug ? (
               <RematchBanner gameKey="dames" rematchSlug={game.rematchSlug} />
             ) : (
