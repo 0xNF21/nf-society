@@ -8,7 +8,7 @@ const nextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: "frame-ancestors 'self' https://miniapps.aboutcircles.com https://*.aboutcircles.com",
+            value: "frame-ancestors 'self' https://miniapps.aboutcircles.com https://*.aboutcircles.com https://circles-dev.gnosis.io https://*.gnosis.io",
           },
           {
             key: "X-Frame-Options",
