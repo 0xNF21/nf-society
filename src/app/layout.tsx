@@ -21,8 +21,35 @@ const body = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "NF Society — Loteries décentralisées",
-  description: "Plateforme de loteries transparentes et vérifiables sur la blockchain Circles"
+  title: "NF Society — Community Gaming Platform",
+  description: "Multiplayer games, lotteries & lootboxes with CRC on Gnosis Chain. Play, earn XP, collect badges.",
+  metadataBase: new URL("https://nf-society.vercel.app"),
+  openGraph: {
+    title: "NF Society",
+    description: "Multiplayer games, lotteries & lootboxes with CRC on Gnosis Chain.",
+    url: "https://nf-society.vercel.app",
+    siteName: "NF Society",
+    images: [
+      {
+        url: "/nf-society-logo.png",
+        width: 512,
+        height: 512,
+        alt: "NF Society",
+      },
+    ],
+    locale: "fr_FR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "NF Society",
+    description: "Multiplayer games, lotteries & lootboxes with CRC on Gnosis Chain.",
+    images: ["/nf-society-logo.png"],
+  },
+  icons: {
+    icon: "/nf-society-logo.png",
+    apple: "/nf-society-logo.png",
+  },
 };
 
 export default function RootLayout({
