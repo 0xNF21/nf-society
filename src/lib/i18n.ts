@@ -904,6 +904,13 @@ export const translations = {
     proposed: { fr: "Revanche propos\u00e9e !", en: "Rematch proposed!" },
     join: { fr: "Rejoindre la revanche", en: "Join rematch" },
   },
+  miniapp: {
+    payBtn: { fr: "Payer {amount} CRC", en: "Pay {amount} CRC" },
+    paying: { fr: "Paiement en cours...", en: "Processing..." },
+    txSuccess: { fr: "Paiement envoy\u00e9 !", en: "Payment sent!" },
+    rejected: { fr: "Paiement refus\u00e9", en: "Payment rejected" },
+    connected: { fr: "Connect\u00e9", en: "Connected" },
+  },
 } as const;
 
 export function t(section: string, key: string, locale: Locale): string {

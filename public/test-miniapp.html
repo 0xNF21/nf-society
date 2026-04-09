@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Circles Mini App Host — Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0f0f12; color: #e0e0e0; }
+
+    .toolbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 20px; background: #1a1a24; border-bottom: 1px solid #2a2a3a;
+      flex-wrap: wrap;
+    }
+    .toolbar h1 { font-size: 14px; color: #8b8ba0; margin-right: auto; }
+    .toolbar label { font-size: 12px; color: #8b8ba0; }
+    .toolbar input {
+      background: #252535; border: 1px solid #3a3a4a; color: #e0e0e0;
+      padding: 6px 10px; border-radius: 6px; font-size: 12px; font-family: monospace;
+      width: 360px;
+    }
+    .toolbar button {
+      padding: 6px 14px; border-radius: 6px; border: none; font-size: 12px;
+      font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-connect { background: #22c55e; color: #000; }
+    .btn-connect:hover { background: #16a34a; }
+    .btn-disconnect { background: #ef4444; color: #fff; }
+    .btn-disconnect:hover { background: #dc2626; }
+    .btn-approve { background: #3b82f6; color: #fff; }
+    .btn-approve:hover { background: #2563eb; }
+    .btn-reject { background: #f97316; color: #fff; }
+    .btn-reject:hover { background: #ea580c; }
+
+    .status {
+      padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+    }
+    .status.connected { background: #22c55e20; color: #22c55e; }
+    .status.disconnected { background: #ef444420; color: #ef4444; }
+
+    .main { display: flex; height: calc(100vh - 52px); }
+
+    iframe {
+      flex: 1; border: none; background: #fff;
+    }
+
+    .logs {
+      width: 340px; background: #12121a; border-left: 1px solid #2a2a3a;
+      overflow-y: auto; padding: 12px; font-size: 11px; font-family: monospace;
+    }
+    .logs h2 { font-size: 12px; color: #8b8ba0; margin-bottom: 8px; }
+    .log-entry {
+      padding: 6px 8px; margin-bottom: 4px; border-radius: 4px;
+      background: #1a1a24; word-break: break-all; line-height: 1.4;
+    }
+    .log-entry.incoming { border-left: 3px solid #3b82f6; }
+    .log-entry.outgoing { border-left: 3px solid #22c55e; }
+    .log-entry .dir { font-weight: 700; margin-right: 4px; }
+    .log-entry .dir.in { color: #3b82f6; }
+    .log-entry .dir.out { color: #22c55e; }
+    .log-entry .type { color: #f59e0b; }
+    .log-entry .time { color: #555; }
+
+    .pending-tx {
+      margin: 8px 0; padding: 10px; background: #1e1e30; border: 1px solid #3b82f6;
+      border-radius: 8px;
+    }
+    .pending-tx p { font-size: 11px; margin-bottom: 6px; }
+    .pending-tx .actions { display: flex; gap: 6px; }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>Circles Mini App Host (Test Simulator)</h1>
+  <span id="statusBadge" class="status disconnected">disconnected</span>
+  <label>Wallet:</label>
+  <input id="walletInput" value="0x158a0ec28264d37b6471736f29e8f68f0c927ed5" placeholder="0x...">
+  <button class="btn-connect" onclick="connectWallet()">Connect</button>
+  <button class="btn-disconnect" onclick="disconnectWallet()">Disconnect</button>
+</div>
+
+<div class="main">
+  <iframe id="appFrame" src="http://localhost:3000" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+  <div class="logs">
+    <h2>Message Log</h2>
+    <div id="pendingTxContainer"></div>
+    <div id="logContainer"></div>
+  </div>
+</div>
+
+<script>
+  const frame = document.getElementById('appFrame');
+  const logContainer = document.getElementById('logContainer');
+  const pendingTxContainer = document.getElementById('pendingTxContainer');
+  const walletInput = document.getElementById('walletInput');
+  const statusBadge = document.getElementById('statusBadge');
+  let connected = false;
+
+  function log(direction, data) {
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${direction === 'in' ? 'incoming' : 'outgoing'}`;
+    const time = new Date().toLocaleTimeString();
+    entry.innerHTML = `
+      <span class="dir ${direction}">${direction === 'in' ? 'IN' : 'OUT'}</span>
+      <span class="type">${data.type}</span>
+      <span class="time">${time}</span>
+      <br>${JSON.stringify(data, null, 0)}
+    `;
+    logContainer.prepend(entry);
+  }
+
+  function sendToApp(data) {
+    frame.contentWindow.postMessage(data, '*');
+    log('out', data);
+  }
+
+  function connectWallet() {
+    const address = walletInput.value.trim();
+    if (!address) return alert('Enter a wallet address');
+    connected = true;
+    statusBadge.textContent = address.slice(0, 6) + '...' + address.slice(-4);
+    statusBadge.className = 'status connected';
+    sendToApp({ type: 'wallet_connected', address });
+  }
+
+  function disconnectWallet() {
+    connected = false;
+    statusBadge.textContent = 'disconnected';
+    statusBadge.className = 'status disconnected';
+    sendToApp({ type: 'wallet_disconnected' });
+  }
+
+  function approveTx(requestId) {
+    // Generate a fake tx hash
+    const fakeHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    sendToApp({ type: 'tx_success', hashes: [fakeHash], requestId });
+    document.getElementById(`pending-${requestId}`)?.remove();
+  }
+
+  function rejectTx(requestId) {
+    sendToApp({ type: 'tx_rejected', reason: 'User rejected', requestId });
+    document.getElementById(`pending-${requestId}`)?.remove();
+  }
+
+  // Listen for messages from the Mini App
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (!data || typeof data.type !== 'string') return;
+
+    log('in', data);
+
+    switch (data.type) {
+      case 'request_address':
+        if (connected) {
+          sendToApp({ type: 'wallet_connected', address: walletInput.value.trim() });
+        } else {
+          sendToApp({ type: 'wallet_disconnected' });
+        }
+        break;
+
+      case 'send_transactions':
+        // Show pending tx for manual approve/reject
+        const txDiv = document.createElement('div');
+        txDiv.className = 'pending-tx';
+        txDiv.id = `pending-${data.requestId}`;
+        const txs = data.transactions || [];
+        const txInfo = txs.map(t => `to: ${t.to?.slice(0,10)}... value: ${t.value} data: ${t.data || '-'}`).join('<br>');
+        txDiv.innerHTML = `
+          <p><strong>Transaction Request</strong></p>
+          <p>${txInfo}</p>
+          <div class="actions">
+            <button class="btn-approve" onclick="approveTx('${data.requestId}')">Approve</button>
+            <button class="btn-reject" onclick="rejectTx('${data.requestId}')">Reject</button>
+          </div>
+        `;
+        pendingTxContainer.prepend(txDiv);
+        break;
+
+      case 'sign_message':
+        // Auto-sign with fake signature
+        const fakeSig = '0x' + Array.from({ length: 130 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+        sendToApp({ type: 'signature_success', signature: fakeSig, requestId: data.requestId });
+        break;
+    }
+  });
+</script>
+
+</body>
+</html>
