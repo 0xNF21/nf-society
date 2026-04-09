@@ -492,7 +492,8 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
     try {
       const res = await fetch(`/api/lootbox-opens?lootboxId=${lootbox.id}`, { cache: "no-store" });
       if (!res.ok) return;
-      const data: LootboxOpen[] = await res.json();
+      const json = await res.json();
+      const data: LootboxOpen[] = Array.isArray(json) ? json : json.opens ?? [];
 
       if (!initialLoadDone.current) {
         initialLoadDone.current = true;
