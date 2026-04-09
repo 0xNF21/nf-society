@@ -27,6 +27,7 @@ type PendingTx = {
 
 let walletAddress: string | null = null;
 let walletListeners: Array<(address: string | null) => void> = [];
+let appDataListeners: Array<(data: string) => void> = [];
 let pendingTxs = new Map<string, PendingTx>();
 let messageListenerAttached = false;
 
@@ -76,6 +77,13 @@ function handleMessage(event: MessageEvent) {
       }
       break;
     }
+    case "app_data": {
+      const payload = typeof data.data === "string" ? data.data : "";
+      if (payload) {
+        appDataListeners.forEach((cb) => cb(payload));
+      }
+      break;
+    }
   }
 }
 
@@ -102,6 +110,15 @@ export function onWalletChange(callback: (address: string | null) => void): () =
   if (walletAddress) callback(walletAddress);
   return () => {
     walletListeners = walletListeners.filter((cb) => cb !== callback);
+  };
+}
+
+/** Subscribe to app_data from Circles host (deep link parameters). Returns unsubscribe. */
+export function onAppData(callback: (data: string) => void): () => void {
+  ensureListener();
+  appDataListeners.push(callback);
+  return () => {
+    appDataListeners = appDataListeners.filter((cb) => cb !== callback);
   };
 }
 
@@ -157,6 +174,7 @@ export function cleanup() {
   window.removeEventListener("message", handleMessage);
   messageListenerAttached = false;
   walletListeners = [];
+  appDataListeners = [];
   pendingTxs.clear();
   walletAddress = null;
 }

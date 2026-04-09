@@ -1,10 +1,12 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   isMiniApp as detectMiniApp,
   requestAddress,
   onWalletChange,
+  onAppData,
   sendCrcTransfer,
   cleanup,
 } from "@/lib/miniapp-bridge";
@@ -33,6 +35,7 @@ const WEI_PER_CRC = BigInt("1000000000000000000");
 export function MiniAppProvider({ children }: { children: React.ReactNode }) {
   const [miniApp, setMiniApp] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const isInIframe = detectMiniApp();
@@ -41,18 +44,29 @@ export function MiniAppProvider({ children }: { children: React.ReactNode }) {
     if (!isInIframe) return;
 
     // Listen for wallet changes from the host
-    const unsub = onWalletChange((addr) => {
+    const unsubWallet = onWalletChange((addr) => {
       setWalletAddress(addr);
+    });
+
+    // Listen for deep link data from the host (e.g. "lootbox/bronze", "loterie/weekly")
+    const unsubData = onAppData((data) => {
+      // Navigate to the path received from the host
+      if (data.startsWith("/")) {
+        router.push(data);
+      } else {
+        router.push(`/${data}`);
+      }
     });
 
     // Request the wallet address from the host
     requestAddress();
 
     return () => {
-      unsub();
+      unsubWallet();
+      unsubData();
       cleanup();
     };
-  }, []);
+  }, [router]);
 
   const sendPayment = useCallback(
     async (to: string, amountCrc: number, data?: string): Promise<string[]> => {
