@@ -15,6 +15,7 @@ export default function ExchangeSection() {
   const t = translations.exchange;
   const tm = translations.miniapp;
   const [amount, setAmount] = useState(1);
+  const [amountInput, setAmountInput] = useState("1");
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [qrCode, setQrCode] = useState<string>("");
@@ -86,27 +87,34 @@ export default function ExchangeSection() {
         {/* Amount selector */}
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setAmount(a => Math.max(1, a - 1))}
+            onClick={() => { const v = Math.max(1, amount - 1); setAmount(v); setAmountInput(String(v)); }}
             className="h-10 w-10 rounded-xl border border-ink/10 flex items-center justify-center text-ink/50 hover:bg-ink/5 transition-colors"
           >
             <Minus className="h-4 w-4" />
           </button>
           <div className="flex items-baseline gap-1">
             <input
-              type="number"
-              min={1}
-              max={1000}
-              value={amount}
+              type="text"
+              inputMode="numeric"
+              value={amountInput}
               onChange={e => {
-                const v = parseInt(e.target.value);
-                if (!isNaN(v) && v >= 1 && v <= 1000) setAmount(v);
+                const raw = e.target.value.replace(/[^0-9]/g, "");
+                setAmountInput(raw);
+                const v = parseInt(raw);
+                if (!isNaN(v) && v >= 1 && v <= 5000) setAmount(v);
               }}
-              className="w-16 text-center text-3xl font-bold text-ink bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              onBlur={() => {
+                const v = parseInt(amountInput);
+                if (isNaN(v) || v < 1) { setAmount(1); setAmountInput("1"); }
+                else if (v > 5000) { setAmount(5000); setAmountInput("5000"); }
+                else { setAmount(v); setAmountInput(String(v)); }
+              }}
+              className="w-16 text-center text-3xl font-bold text-ink bg-transparent outline-none"
             />
             <span className="text-lg font-semibold text-ink/40">CRC</span>
           </div>
           <button
-            onClick={() => setAmount(a => Math.min(1000, a + 1))}
+            onClick={() => { const v = Math.min(5000, amount + 1); setAmount(v); setAmountInput(String(v)); }}
             className="h-10 w-10 rounded-xl border border-ink/10 flex items-center justify-center text-ink/50 hover:bg-ink/5 transition-colors"
           >
             <Plus className="h-4 w-4" />
