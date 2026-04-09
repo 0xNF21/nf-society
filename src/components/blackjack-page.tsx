@@ -131,8 +131,6 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
   const t = translations.blackjack;
-  const { addXp } = useDemo();
-
   const [selectedBet, setSelectedBet] = useState<number>(table.betOptions[0] || 5);
   const [gameState, setGameState] = useState<BlackjackState | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -144,11 +142,7 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
     const deck = createDeck(6);
     const state = dealInitialHands(deck, selectedBet);
     setGameState(state);
-    if (state.status === "finished") {
-      // Natural blackjack
-      if (state.playerHands[0]?.outcome === "blackjack") addXp("blackjack_win");
-    }
-  }, [selectedBet, addXp]);
+  }, [selectedBet]);
 
   const doAction = useCallback((action: Action) => {
     if (!gameState || actionLoading) return;
@@ -156,13 +150,9 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
     try {
       const newState = applyAction(gameState, action);
       setGameState(newState);
-      if (newState.status === "finished") {
-        const won = newState.playerHands.some(h => h.outcome === "win" || h.outcome === "blackjack");
-        if (won) addXp("blackjack_win");
-      }
     } catch {}
     setActionLoading(false);
-  }, [gameState, actionLoading, addXp]);
+  }, [gameState, actionLoading]);
 
   const resetGame = useCallback(() => setGameState(null), []);
 

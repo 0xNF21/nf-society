@@ -15,7 +15,7 @@ Quand tu crees un nouveau jeu de type chance (loterie, lootbox, scratch, etc.) q
 2. Si `isDemo` → affiche le `DemoGame` (logique client pure, pas d'API)
 3. La page serveur `[slug]/page.tsx` detecte les slugs `DEMO-*` et retourne une config fake (pas de query DB)
 4. La page `/chance` redirige vers `/jeu/DEMO-slug` quand `isDemo` est true
-5. XP via `addXp()` en demo
+5. PAS d'XP en mode demo — ne JAMAIS appeler `addXp()` en demo
 
 ## Pattern obligatoire
 

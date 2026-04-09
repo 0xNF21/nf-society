@@ -136,7 +136,7 @@ Structure en 2 composants principaux :
 - Active quand `isDemo && id.startsWith("DEMO")`
 - Pas d'appels API, tout en local
 - Bot avec IA basique
-- `addXp()` via `useDemo()` en fin de partie
+- PAS d'XP en mode demo — ne JAMAIS appeler `addXp()` en demo
 - La page serveur `[id]/page.tsx` detecte les slugs `DEMO-*` et retourne une config fake (pas de query DB)
 - La page hub/lobby redirige vers `/{game}/DEMO-slug` quand `isDemo` est true
 - PnlCard a la fin de partie
