@@ -20,13 +20,15 @@ export async function POST(req: NextRequest) {
 
     const isP1 = game.player1Address?.toLowerCase() === player.toLowerCase()
     const isP2 = game.player2Address?.toLowerCase() === player.toLowerCase()
-    if (playerToken) {
-      if (isP1 && game.player1Token && game.player1Token !== playerToken) {
-        return NextResponse.json({ error: 'Invalid player token' }, { status: 403 })
-      }
-      if (isP2 && game.player2Token && game.player2Token !== playerToken) {
-        return NextResponse.json({ error: 'Invalid player token' }, { status: 403 })
-      }
+    // Verify player token (mandatory — anti-cheat)
+    if (!playerToken) {
+      return NextResponse.json({ error: 'Player token required' }, { status: 401 })
+    }
+    if (isP1 && game.player1Token !== playerToken) {
+      return NextResponse.json({ error: 'Invalid player token' }, { status: 401 })
+    }
+    if (isP2 && game.player2Token !== playerToken) {
+      return NextResponse.json({ error: 'Invalid player token' }, { status: 401 })
     }
     const targetGrid = (isP1 ? game.grid2 : game.grid1) as PlayerGrid
 

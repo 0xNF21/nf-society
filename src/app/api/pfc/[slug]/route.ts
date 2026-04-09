@@ -48,19 +48,15 @@ export async function POST(
     const state = game.gameState as PfcState;
     if (!state) return NextResponse.json({ error: "Invalid game state" }, { status: 500 });
 
-    // Identify player by token
-    let playerRole: "p1" | "p2" | null = null;
-    if (playerToken && game.player1Token === playerToken) playerRole = "p1";
-    else if (playerToken && game.player2Token === playerToken) playerRole = "p2";
-
-    // Fallback: identify by address
-    if (!playerRole && body.playerAddress) {
-      const addr = body.playerAddress.toLowerCase();
-      if (game.player1Address?.toLowerCase() === addr) playerRole = "p1";
-      else if (game.player2Address?.toLowerCase() === addr) playerRole = "p2";
+    // Identify player by token (mandatory — anti-cheat)
+    if (!playerToken) {
+      return NextResponse.json({ error: "Player token required" }, { status: 401 });
     }
+    let playerRole: "p1" | "p2" | null = null;
+    if (game.player1Token === playerToken) playerRole = "p1";
+    else if (game.player2Token === playerToken) playerRole = "p2";
 
-    if (!playerRole) return NextResponse.json({ error: "Unknown player" }, { status: 403 });
+    if (!playerRole) return NextResponse.json({ error: "Invalid player token" }, { status: 401 });
 
     // Check if player already played this round
     if (state.currentRound[playerRole]) {
