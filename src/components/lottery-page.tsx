@@ -3,11 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, CheckCircle, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Loader2, Pencil, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
+import { ChevronDown, Clock, HelpCircle, Lock, Loader2, Pencil, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { generatePaymentLink, generateGamePaymentLink } from "@/lib/circles";
 import { encodeGameData } from "@/lib/game-data";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
@@ -15,6 +14,7 @@ import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
 import { darkSafeColor } from "@/lib/utils";
+import { ChancePayment } from "@/components/chance-payment";
 
 export type LotteryConfig = {
   id: number;
@@ -78,10 +78,6 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const displayAccent = darkSafeColor(lottery.accentColor, isDark);
   const l = translations.lottery;
 
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
-  const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [qrCode, setQrCode] = useState("");
-  const [showQr, setShowQr] = useState(false);
   const [ticketCount, setTicketCount] = useState<number>(initialCount ?? 0);
   const [participantList, setParticipantList] = useState<ParticipantEntry[]>(initialParticipants ?? []);
   const [scanning, setScanning] = useState(false);
@@ -107,10 +103,6 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const [watchingPayment, setWatchingPayment] = useState(false);
   const [showConfirmed, setShowConfirmed] = useState(false);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const paymentLink = useMemo(() => {
-    return generateGamePaymentLink(lottery.recipientAddress, lottery.ticketPriceCrc, "lottery", lottery.slug);
-  }, [lottery.recipientAddress, lottery.ticketPriceCrc, lottery.slug]);
 
   const dataValue = useMemo(
     () => encodeGameData({ game: "lottery", id: lottery.slug, v: 1 }),
@@ -214,40 +206,6 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     })();
   }, [lotteryQuery]);
 
-  useEffect(() => {
-    let active = true;
-    if (!paymentLink) return;
-
-    setQrState("loading");
-    (async () => {
-      try {
-        const { toDataURL } = await import("qrcode");
-        const url = await toDataURL(paymentLink, { width: 220, margin: 1 });
-        if (active) {
-          setQrCode(url);
-          setQrState("ready");
-        }
-      } catch {
-        if (active) {
-          setQrCode("");
-          setQrState("error");
-        }
-      }
-    })();
-
-    return () => { active = false; };
-  }, [paymentLink]);
-
-  const handleCopy = async () => {
-    if (!paymentLink) return;
-    try {
-      await navigator.clipboard.writeText(paymentLink);
-      setCopyState("copied");
-      window.setTimeout(() => setCopyState("idle"), 1800);
-    } catch {
-      setCopyState("error");
-    }
-  };
 
   const handleAdminLogin = async () => {
     if (!adminPassword.trim()) return;
@@ -457,57 +415,19 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                   <p className="text-xs text-ink/40 mt-2 uppercase tracking-widest">{l.ticketPrice[locale]}</p>
                 </div>
 
-                <div className="flex flex-col gap-3">
-                  <Button
-                    className="w-full h-12 text-lg"
-                    style={{ backgroundColor: lottery.primaryColor }}
-                    asChild
-                  >
-                    <a href={paymentLink} target="_blank" rel="noreferrer" onClick={async () => { await scanAndRefresh(); setWatchingPayment(true); }}>
-                      {l.buyTicket[locale]}
-                      <ArrowUpRight className="h-5 w-5 ml-2" />
-                    </a>
-                  </Button>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" onClick={handleCopy}>
-                      <Clipboard className="h-4 w-4 mr-2" />
-                      {copyState === "copied" ? l.copied[locale] : l.copyLink[locale]}
-                    </Button>
-                    <Button variant="outline" onClick={async () => { const next = !showQr; setShowQr(next); if (next) { await scanAndRefresh(); setWatchingPayment(true); } }}>
-                      <QrCode className="h-4 w-4 mr-2" />
-                      {showQr ? l.hideQr[locale] : l.showQr[locale]}
-                    </Button>
-                  </div>
-                </div>
-
-                {(watchingPayment || showConfirmed) && (
-                  <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                    showConfirmed
-                      ? "bg-green-50 border border-green-200 text-green-700"
-                      : paymentStatus === "error"
-                        ? "bg-red-50 border border-red-200 text-red-600"
-                        : "bg-sand/40 border border-ink/10 text-ink/60"
-                  }`}>
-                    {showConfirmed ? (
-                      <><CheckCircle className="h-4 w-4 shrink-0 text-green-600" />{locale === "fr" ? "Paiement détecté ! Mise à jour en cours..." : "Payment detected! Updating..."}</>
-                    ) : paymentStatus === "error" ? (
-                      <><span className="h-4 w-4 shrink-0">⚠️</span>{locale === "fr" ? "Erreur de détection" : "Detection error"}</>
-                    ) : (
-                      <><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{locale === "fr" ? "En attente du paiement..." : "Waiting for payment..."}</>
-                    )}
-                  </div>
-                )}
-
-                {showQr && (
-                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-ink/10 bg-white/70 p-4 text-xs text-ink/70 animate-in fade-in zoom-in duration-200">
-                    {qrState === "ready" && qrCode ? (
-                      <Image src={qrCode} alt="QR Code" width={200} height={200} className="rounded-xl border border-ink/10 bg-white p-2" unoptimized />
-                    ) : (
-                      <p>{l.qrGenerating[locale]}</p>
-                    )}
-                    <span>{l.qrScan[locale]}</span>
-                  </div>
-                )}
+                <ChancePayment
+                  recipientAddress={lottery.recipientAddress}
+                  amountCrc={lottery.ticketPriceCrc}
+                  gameType="lottery"
+                  gameId={lottery.slug}
+                  accentColor={lottery.primaryColor}
+                  payLabel={l.buyTicket[locale]}
+                  onPaymentInitiated={async () => { await scanAndRefresh(); setWatchingPayment(true); }}
+                  onScan={scanAndRefresh}
+                  scanning={scanning}
+                  paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
+                  qrLabel={l.qrScan[locale]}
+                />
               </CardContent>
             </Card>
 

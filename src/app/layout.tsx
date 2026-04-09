@@ -4,6 +4,7 @@ import { Space_Grotesk, Sora } from "next/font/google";
 import { LanguageProvider } from "@/components/language-provider";
 import { DemoProvider } from "@/components/demo-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MiniAppProvider } from "@/components/miniapp-provider";
 import DemoBanner from "@/components/demo-banner";
 import ProfileModal from "@/components/profile-modal";
 import DailyModal from "@/components/daily-modal";
@@ -35,11 +36,13 @@ export default function RootLayout({
         <ThemeProvider>
           <DemoProvider>
             <LanguageProvider>
-              <DemoBanner />
-              {children}
-              <ProfileModal />
-              <DailyModal />
-              <BottomNav />
+              <MiniAppProvider>
+                <DemoBanner />
+                {children}
+                <ProfileModal />
+                <DailyModal />
+                <BottomNav />
+              </MiniAppProvider>
             </LanguageProvider>
           </DemoProvider>
         </ThemeProvider>
