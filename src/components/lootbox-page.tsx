@@ -2,17 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle, Copy, Check, Loader2, QrCode, Trophy, Zap, Volume2, VolumeX, HelpCircle, X, ChevronDown } from "lucide-react";
+import { ArrowLeft, Trophy, Volume2, VolumeX, HelpCircle, X, ChevronDown } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
 import { darkSafeColor } from "@/lib/utils";
 import { getRewardTable } from "@/lib/lootbox";
-import { generateGamePaymentLink } from "@/lib/circles";
 import { encodeGameData } from "@/lib/game-data";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { playRollingSound, playRevealSound, setSoundMuted, isSoundMuted } from "@/lib/sounds";
-import { useMiniApp } from "@/components/miniapp-provider";
+import { ChancePayment } from "@/components/chance-payment";
 
 type LootboxData = {
   id: number;
@@ -397,24 +396,15 @@ function SlotMachine({
 export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData }) {
   const { locale } = useLocale();
   const { theme } = useTheme();
-  const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const isDark = theme === "dark";
   const t = translations.lootbox;
-  const tm = translations.miniapp;
 
   const [opens, setOpens] = useState<LootboxOpen[]>([]);
   const [scanning, setScanning] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [watchingPayment, setWatchingPayment] = useState(false);
-  const [initialExcludeReady, setInitialExcludeReady] = useState(false);
   const [showConfirmed, setShowConfirmed] = useState(false);
-  const [showQr, setShowQr] = useState(false);
-  const [qrCode, setQrCode] = useState<string>("");
-  const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [latestOpen, setLatestOpen] = useState<LootboxOpen | null>(null);
   const [animPhase, setAnimPhase] = useState<AnimPhase>("idle");
-  const [miniAppPaying, setMiniAppPaying] = useState(false);
-  const [miniAppError, setMiniAppError] = useState<string | null>(null);
   const [animTrigger, setAnimTrigger] = useState(0);
   const [muted, setMuted] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -427,7 +417,6 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const [showRecentOpens, setShowRecentOpens] = useState(false);
   const [videoOpen, setVideoOpen] = useState<LootboxOpen | null>(null);
   const [profiles, setProfiles] = useState<Record<string, { name?: string; imageUrl?: string | null }>>({});
-  const [claimedHashes, setClaimedHashes] = useState<string[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const prevOpenCount = useRef<number>(0);
@@ -435,10 +424,6 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const animTimers = useRef<NodeJS.Timeout[]>([]);
 
   const paymentAddress = lootbox.recipientAddress;
-  const paymentLink = useMemo(
-    () => generateGamePaymentLink(lootbox.recipientAddress, lootbox.pricePerOpenCrc, "lootbox", lootbox.slug),
-    [lootbox.recipientAddress, lootbox.pricePerOpenCrc, lootbox.slug]
-  );
   const accentColorRaw = lootbox.accentColor;
   const primaryColor = lootbox.primaryColor;
   const accentColor = darkSafeColor(accentColorRaw, isDark);
@@ -508,9 +493,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
       const res = await fetch(`/api/lootbox-opens?lootboxId=${lootbox.id}`, { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
-      // Support both old format (array) and new format ({ opens, claimedTxHashes })
-      const data: LootboxOpen[] = Array.isArray(json) ? json : json.opens;
-      if (json.claimedTxHashes) setClaimedHashes(json.claimedTxHashes);
+      const data: LootboxOpen[] = Array.isArray(json) ? json : json.opens ?? [];
 
       if (!initialLoadDone.current) {
         initialLoadDone.current = true;
@@ -544,12 +527,12 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   );
 
   const excludeTxHashes = useMemo(
-    () => [...opens.map(o => o.transactionHash), ...claimedHashes],
-    [opens, claimedHashes]
+    () => opens.map(o => o.transactionHash),
+    [opens]
   );
 
   const { status: paymentStatus } = usePaymentWatcher({
-    enabled: initialExcludeReady && lootbox.status === "active",
+    enabled: watchingPayment && lootbox.status === "active",
     dataValue,
     minAmountCRC: lootbox.pricePerOpenCrc,
     recipientAddress: lootbox.recipientAddress,
@@ -567,56 +550,14 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   }, [paymentStatus, scanNow]);
 
   useEffect(() => {
-    // On mount: scan first to capture any on-chain txs, then fetch opens
-    // This ensures the exclude list is populated before the watcher starts
-    (async () => {
-      try { await fetch(`/api/lootbox-scan?lootboxId=${lootbox.id}`, { method: "POST", cache: "no-store" }); } catch {}
-      await fetchOpens();
-      setInitialExcludeReady(true);
-    })();
+    fetchOpens();
     intervalRef.current = setInterval(scanNow, 10000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       clearAnimTimers();
     };
-  }, [fetchOpens, scanNow, clearAnimTimers, lootbox.id]);
+  }, [fetchOpens, scanNow, clearAnimTimers]);
 
-  useEffect(() => {
-    if (!showQr) return;
-    let active = true;
-    setQrState("loading");
-    (async () => {
-      try {
-        const { toDataURL } = await import("qrcode");
-        const url = await toDataURL(paymentLink, { width: 220, margin: 1, color: { dark: "#1b1b1f", light: "#ffffff" } });
-        if (active) { setQrCode(url); setQrState("ready"); }
-      } catch {
-        if (active) { setQrCode(""); setQrState("error"); }
-      }
-    })();
-    return () => { active = false; };
-  }, [showQr, paymentLink]);
-
-  async function handleMiniAppPay() {
-    setMiniAppPaying(true);
-    setMiniAppError(null);
-    try {
-      const data = `lootbox:${lootbox.slug}`;
-      await sendPayment(lootbox.recipientAddress, lootbox.pricePerOpenCrc, data);
-      setWatchingPayment(true);
-      setTimeout(scanNow, 2000);
-    } catch (err: any) {
-      setMiniAppError(typeof err === "string" ? err : err?.message || tm.rejected[locale]);
-    } finally {
-      setMiniAppPaying(false);
-    }
-  }
-
-  function handleCopy() {
-    navigator.clipboard.writeText(paymentLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   const tier = latestOpen ? getRewardTier(latestOpen.rewardCrc, lootbox.pricePerOpenCrc) : null;
   const latestProfile = latestOpen ? profiles[latestOpen.playerAddress.toLowerCase()] : null;
@@ -868,109 +809,21 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
           <div className="rounded-2xl border border-ink/10 bg-white/60 backdrop-blur-sm p-6 shadow-sm space-y-4">
             <p className="text-ink/50 text-sm text-center">{t.sendInstructions[locale]}</p>
 
-            {isMiniApp && walletAddress ? (
-              <>
-                <button
-                  onClick={handleMiniAppPay}
-                  disabled={miniAppPaying}
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 shadow-sm w-full"
-                  style={{ backgroundColor: accentColorRaw, color: isDark ? "#000000" : "#ffffff" }}
-                >
-                  {miniAppPaying ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" />{tm.paying[locale]}</>
-                  ) : (
-                    tm.payBtn[locale].replace("{amount}", String(lootbox.pricePerOpenCrc))
-                  )}
-                </button>
-                {miniAppError && <p className="text-xs text-red-500 text-center">{miniAppError}</p>}
-              </>
-            ) : (
-              <>
-                <a
-                  href={paymentLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={async () => { await scanNow(); setWatchingPayment(true); }}
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 shadow-sm w-full"
-                  style={{ backgroundColor: accentColorRaw, color: isDark ? "#000000" : "#ffffff" }}
-                >
-                  {t.payWithCircles[locale]}
-                </a>
-
-                <div className="flex gap-3 w-full">
-                  <button
-                    onClick={handleCopy}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-ink/15 text-ink/60 hover:text-ink hover:border-ink/30 hover:bg-white/80 transition-all text-sm font-medium"
-                  >
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copied ? t.copied[locale] : t.copyLink[locale]}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const next = !showQr;
-                      setShowQr(next);
-                      if (next) {
-                        await scanNow();
-                        setWatchingPayment(true);
-                      }
-                    }}
-                    className="px-4 py-3 rounded-xl border border-ink/15 text-ink/50 hover:text-ink hover:border-ink/30 hover:bg-white/80 transition-all"
-                  >
-                    <QrCode className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={scanNow}
-                    disabled={scanning}
-                    className="px-4 py-3 rounded-xl border border-ink/15 text-ink/50 hover:text-ink hover:border-ink/30 hover:bg-white/80 transition-all disabled:opacity-40"
-                  >
-                    {scanning ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {(watchingPayment || showConfirmed) && (
-              <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                showConfirmed
-                  ? "bg-green-50 border border-green-200 text-green-700"
-                  : paymentStatus === "error"
-                    ? "bg-red-50 border border-red-200 text-red-600"
-                    : "bg-white/60 border border-ink/10 text-ink/60"
-              }`}>
-                {showConfirmed ? (
-                  <><CheckCircle className="h-4 w-4 shrink-0 text-green-600" />{t.paymentDetected[locale]}</>
-                ) : paymentStatus === "error" ? (
-                  <><span className="h-4 w-4 shrink-0">⚠️</span>{t.detectionError[locale]}</>
-                ) : (
-                  <><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{t.waitingPayment[locale]}</>
-                )}
-              </div>
-            )}
-
-            {scanning && !watchingPayment && (
-              <p className="text-xs text-ink/40 animate-pulse text-center">
-                {t.scanning[locale]}
-              </p>
-            )}
+            <ChancePayment
+              recipientAddress={lootbox.recipientAddress}
+              amountCrc={lootbox.pricePerOpenCrc}
+              gameType="lootbox"
+              gameId={lootbox.slug}
+              accentColor={accentColorRaw}
+              payLabel={t.payWithCircles[locale]}
+              onPaymentInitiated={async () => { await scanNow(); setWatchingPayment(true); }}
+              onScan={scanNow}
+              scanning={scanning}
+              paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
+              qrLabel={t.scanQr[locale]}
+            />
 
             <p className="text-xs text-ink/25 font-mono break-all text-center">{paymentAddress}</p>
-
-            {showQr && (
-              <div className="flex justify-center">
-                <div className="bg-white rounded-2xl p-4 shadow-lg border border-ink/5">
-                  {qrState === "loading" && (
-                    <div className="w-[220px] h-[220px] flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-ink/20" />
-                    </div>
-                  )}
-                  {qrState === "ready" && qrCode && <img src={qrCode} alt="QR Code" className="w-[220px] h-[220px]" />}
-                  {qrState === "error" && (
-                    <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">Error</div>
-                  )}
-                  <p className="text-xs text-ink/40 mt-2 text-center">{t.scanQr[locale]}</p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Table des gains — accordéon */}

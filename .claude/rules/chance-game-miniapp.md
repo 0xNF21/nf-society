@@ -42,34 +42,44 @@ async function handleMiniAppPay() {
 }
 ```
 
-### 4. UI conditionnelle
+### 4. Utiliser le composant ChancePayment
+
+Pour les jeux de type chance (lottery, lootbox, et futurs jeux casino), utiliser le composant generique `<ChancePayment>` qui gere automatiquement le dual flow Mini App / standalone :
+
 ```tsx
-{isMiniApp && walletAddress ? (
-  <>
-    <Button onClick={handleMiniAppPay} disabled={miniAppPaying}>
-      {miniAppPaying ? (
-        <><Loader2 className="animate-spin" />{tm.paying[locale]}</>
-      ) : (
-        tm.payBtn[locale].replace("{amount}", String(amount))
-      )}
-    </Button>
-    {miniAppError && <p className="text-xs text-red-500">{miniAppError}</p>}
-  </>
-) : (
-  // Flow standalone existant : lien Gnosis + QR code + copier
-)}
+import { ChancePayment } from "@/components/chance-payment";
+
+<ChancePayment
+  recipientAddress={game.recipientAddress}
+  amountCrc={game.priceCrc}
+  gameType="nom-du-jeu"
+  gameId={game.slug}
+  accentColor={accentColor}
+  payLabel={t.payWithCircles[locale]}
+  onPaymentInitiated={async () => { await scanNow(); setWatchingPayment(true); }}
+  onScan={scanNow}
+  scanning={scanning}
+  paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
+  qrLabel={t.scanQr[locale]}
+/>
 ```
 
+Le composant gere automatiquement :
+- Mode Mini App : wallet indicator + bouton "Payer X CRC" + succes/erreur
+- Mode standalone : lien Gnosis + boutons copier/QR + status paiement
+- Generation QR code (uniquement en standalone)
+
+**NE PAS** implementer le flow paiement manuellement dans les jeux chance — toujours utiliser `<ChancePayment>`.
+
 ## Regles
-- Le QR code ne doit PAS etre genere en mode Mini App (`if (isMiniApp) return;`)
+- Le QR code ne doit PAS etre genere en mode Mini App (gere par ChancePayment)
 - Le scan blockchain reste identique — le serveur detecte la tx on-chain normalement
 - Toujours inclure le `data` dans sendPayment pour identifier le paiement
 - Le flow standalone (QR + lien) doit rester intact quand on n'est PAS dans l'iframe
 
 ## Composants existants avec Mini App
 - `src/components/game-payment.tsx` — jeux multijoueur (deja integre)
-- `src/components/lottery-page.tsx` — loteries
-- `src/components/lootbox-page.tsx` — lootbox
-- `src/components/exchange-section.tsx` — echange CRC
-- `src/components/daily-modal.tsx` — recompense quotidienne
-- `src/app/shop/page.tsx` — boutique (auth par paiement)
+- `src/components/chance-payment.tsx` — jeux chance generique (lottery, lootbox, futurs jeux casino)
+- `src/components/exchange-section.tsx` — echange CRC (flow inline custom)
+- `src/components/daily-modal.tsx` — recompense quotidienne (flow inline custom)
+- `src/app/shop/page.tsx` — boutique auth par paiement (flow inline custom)

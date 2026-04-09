@@ -3,11 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, CheckCircle, ChevronDown, Clipboard, Clock, HelpCircle, Lock, Loader2, QrCode, RefreshCw, Shield, Trophy, Users } from "lucide-react";
+import { ChevronDown, Clock, HelpCircle, Lock, Loader2, Pencil, RefreshCw, Shield, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { generatePaymentLink, generateGamePaymentLink } from "@/lib/circles";
 import { encodeGameData } from "@/lib/game-data";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
@@ -15,7 +14,7 @@ import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
 import { darkSafeColor } from "@/lib/utils";
-import { useMiniApp } from "@/components/miniapp-provider";
+import { ChancePayment } from "@/components/chance-payment";
 
 export type LotteryConfig = {
   id: number;
@@ -74,38 +73,36 @@ function FaqItem({ question, children }: { question: string; children: React.Rea
 export default function LotteryPage({ lottery, initialParticipants, initialCount }: { lottery: LotteryConfig; initialParticipants?: ParticipantEntry[]; initialCount?: number }) {
   const { locale } = useLocale();
   const { theme } = useTheme();
-  const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const isDark = theme === "dark";
   const displayColor = darkSafeColor(lottery.primaryColor, isDark);
   const displayAccent = darkSafeColor(lottery.accentColor, isDark);
   const l = translations.lottery;
-  const tm = translations.miniapp;
 
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
-  const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [qrCode, setQrCode] = useState("");
-  const [showQr, setShowQr] = useState(false);
   const [ticketCount, setTicketCount] = useState<number>(initialCount ?? 0);
   const [participantList, setParticipantList] = useState<ParticipantEntry[]>(initialParticipants ?? []);
   const [scanning, setScanning] = useState(false);
   const [winner, setWinner] = useState<any>(null);
   const [winnerProfile, setWinnerProfile] = useState<{ name: string; imageUrl: string | null } | null>(null);
+  const [drawLoading, setDrawLoading] = useState(false);
   const [drawProof, setDrawProof] = useState<DrawProof | null>(null);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminAuth, setAdminAuth] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
   const [drawHistory, setDrawHistory] = useState<DrawHistoryItem[]>([]);
   const [historyProfiles, setHistoryProfiles] = useState<Record<string, { name: string; imageUrl: string | null }>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [lotteryStatus] = useState(lottery.status);
-  const [currentDescription] = useState(lottery.description || "");
+  const [statusChanging, setStatusChanging] = useState(false);
+  const [lotteryStatus, setLotteryStatus] = useState(lottery.status);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState(lottery.description || "");
+  const [currentDescription, setCurrentDescription] = useState(lottery.description || "");
+  const [savingDescription, setSavingDescription] = useState(false);
   const [watchingPayment, setWatchingPayment] = useState(false);
   const [showConfirmed, setShowConfirmed] = useState(false);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [miniAppPaying, setMiniAppPaying] = useState(false);
-  const [miniAppError, setMiniAppError] = useState<string | null>(null);
-
-  const paymentLink = useMemo(() => {
-    return generateGamePaymentLink(lottery.recipientAddress, lottery.ticketPriceCrc, "lottery", lottery.slug);
-  }, [lottery.recipientAddress, lottery.ticketPriceCrc, lottery.slug]);
 
   const dataValue = useMemo(
     () => encodeGameData({ game: "lottery", id: lottery.slug, v: 1 }),
@@ -209,57 +206,141 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     })();
   }, [lotteryQuery]);
 
-  useEffect(() => {
-    let active = true;
-    if (!paymentLink) return;
 
-    setQrState("loading");
-    (async () => {
-      try {
-        const { toDataURL } = await import("qrcode");
-        const url = await toDataURL(paymentLink, { width: 220, margin: 1 });
-        if (active) {
-          setQrCode(url);
-          setQrState("ready");
-        }
-      } catch {
-        if (active) {
-          setQrCode("");
-          setQrState("error");
-        }
+  const handleAdminLogin = async () => {
+    if (!adminPassword.trim()) return;
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword }),
+      });
+      if (res.ok) {
+        setAdminAuth(true);
+        setAuthError("");
+      } else {
+        setAuthError("incorrectPassword");
       }
-    })();
-
-    return () => { active = false; };
-  }, [paymentLink]);
-
-  const handleMiniAppPay = async () => {
-    setMiniAppPaying(true);
-    setMiniAppError(null);
-    try {
-      const data = `lottery:${lottery.slug}`;
-      await sendPayment(lottery.recipientAddress, lottery.ticketPriceCrc, data);
-      setWatchingPayment(true);
-      setTimeout(scanAndRefresh, 2000);
-    } catch (err: any) {
-      setMiniAppError(typeof err === "string" ? err : err?.message || tm.rejected[locale]);
-    } finally {
-      setMiniAppPaying(false);
-    }
-  };
-
-  const handleCopy = async () => {
-    if (!paymentLink) return;
-    try {
-      await navigator.clipboard.writeText(paymentLink);
-      setCopyState("copied");
-      window.setTimeout(() => setCopyState("idle"), 1800);
     } catch {
-      setCopyState("error");
+      setAuthError("connectionError");
+    } finally {
+      setAuthLoading(false);
     }
   };
 
-  // Admin functions removed — use /admin page instead
+  const handleStatusChange = async (newStatus: string) => {
+    const confirmMsg = newStatus === "completed"
+      ? l.confirmComplete[locale]
+      : newStatus === "archived"
+        ? l.confirmArchive[locale]
+        : null;
+
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+
+    setStatusChanging(true);
+    try {
+      const res = await fetch(`/api/lotteries/${lottery.slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword, status: newStatus }),
+      });
+      if (res.ok) {
+        setLotteryStatus(newStatus);
+      } else {
+        alert(l.statusUpdateError[locale]);
+      }
+    } catch {
+      alert(l.statusUpdateError[locale]);
+    } finally {
+      setStatusChanging(false);
+    }
+  };
+
+  const handleSaveDescription = async () => {
+    setSavingDescription(true);
+    try {
+      const res = await fetch(`/api/lotteries/${lottery.slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword, description: descriptionDraft }),
+      });
+      if (res.ok) {
+        setCurrentDescription(descriptionDraft);
+        setEditingDescription(false);
+      } else {
+        alert(l.descriptionUpdateError[locale]);
+      }
+    } catch {
+      alert(l.descriptionUpdateError[locale]);
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
+  const handleDraw = async () => {
+    setDrawLoading(true);
+    setWinner(null);
+    setWinnerProfile(null);
+    setDrawProof(null);
+    try {
+      const res = await fetch(`/api/draw?${lotteryQuery}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword, lotteryId: lottery.id }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        if (data.error === "Unauthorized") {
+          setAdminAuth(false);
+          setAuthError("sessionExpired");
+        }
+        return;
+      }
+      if (data.winner) {
+        let profile = null;
+        try {
+          const profRes = await fetch("/api/profiles", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ addresses: [data.winner.address] }),
+          });
+          if (profRes.ok) {
+            const profData = await profRes.json();
+            const p = profData.profiles?.[data.winner.address.toLowerCase()];
+            if (p && (p.name || p.imageUrl)) profile = p;
+          }
+        } catch {}
+        if (data.proof) setDrawProof(data.proof);
+        setWinnerProfile(profile);
+        setWinner(data.winner);
+        try {
+          const histRes = await fetch(`/api/draw/history?${lotteryQuery}`);
+          const histData = await histRes.json();
+          if (histData.draws) {
+            setDrawHistory(histData.draws);
+            const addrs = [...new Set(histData.draws.map((d: DrawHistoryItem) => d.winnerAddress))];
+            try {
+              const hp = await fetch("/api/profiles", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ addresses: addrs }),
+              });
+              if (hp.ok) {
+                const hpData = await hp.json();
+                if (hpData.profiles) setHistoryProfiles(hpData.profiles);
+              }
+            } catch {}
+          }
+        } catch {}
+      }
+    } catch (err) {
+      console.error("Draw failed", err);
+    } finally {
+      setDrawLoading(false);
+    }
+  };
 
   const isLotteryDark = lottery.theme === "dark";
 
@@ -334,77 +415,19 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                   <p className="text-xs text-ink/40 mt-2 uppercase tracking-widest">{l.ticketPrice[locale]}</p>
                 </div>
 
-                <div className="flex flex-col gap-3">
-                  {isMiniApp && walletAddress ? (
-                    <>
-                      <Button
-                        className="w-full h-12 text-lg"
-                        style={{ backgroundColor: lottery.primaryColor }}
-                        onClick={handleMiniAppPay}
-                        disabled={miniAppPaying}
-                      >
-                        {miniAppPaying ? (
-                          <><Loader2 className="h-5 w-5 animate-spin mr-2" />{tm.paying[locale]}</>
-                        ) : (
-                          tm.payBtn[locale].replace("{amount}", String(lottery.ticketPriceCrc))
-                        )}
-                      </Button>
-                      {miniAppError && <p className="text-xs text-red-500 text-center">{miniAppError}</p>}
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        className="w-full h-12 text-lg"
-                        style={{ backgroundColor: lottery.primaryColor }}
-                        asChild
-                      >
-                        <a href={paymentLink} target="_blank" rel="noreferrer" onClick={async () => { await scanAndRefresh(); setWatchingPayment(true); }}>
-                          {l.buyTicket[locale]}
-                          <ArrowUpRight className="h-5 w-5 ml-2" />
-                        </a>
-                      </Button>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button variant="outline" onClick={handleCopy}>
-                          <Clipboard className="h-4 w-4 mr-2" />
-                          {copyState === "copied" ? l.copied[locale] : l.copyLink[locale]}
-                        </Button>
-                        <Button variant="outline" onClick={async () => { const next = !showQr; setShowQr(next); if (next) { await scanAndRefresh(); setWatchingPayment(true); } }}>
-                          <QrCode className="h-4 w-4 mr-2" />
-                          {showQr ? l.hideQr[locale] : l.showQr[locale]}
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {(watchingPayment || showConfirmed) && (
-                  <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                    showConfirmed
-                      ? "bg-green-50 border border-green-200 text-green-700"
-                      : paymentStatus === "error"
-                        ? "bg-red-50 border border-red-200 text-red-600"
-                        : "bg-sand/40 border border-ink/10 text-ink/60"
-                  }`}>
-                    {showConfirmed ? (
-                      <><CheckCircle className="h-4 w-4 shrink-0 text-green-600" />{locale === "fr" ? "Paiement détecté ! Mise à jour en cours..." : "Payment detected! Updating..."}</>
-                    ) : paymentStatus === "error" ? (
-                      <><span className="h-4 w-4 shrink-0">⚠️</span>{locale === "fr" ? "Erreur de détection" : "Detection error"}</>
-                    ) : (
-                      <><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{locale === "fr" ? "En attente du paiement..." : "Waiting for payment..."}</>
-                    )}
-                  </div>
-                )}
-
-                {showQr && (
-                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-ink/10 bg-white/70 p-4 text-xs text-ink/70 animate-in fade-in zoom-in duration-200">
-                    {qrState === "ready" && qrCode ? (
-                      <Image src={qrCode} alt="QR Code" width={200} height={200} className="rounded-xl border border-ink/10 bg-white p-2" unoptimized />
-                    ) : (
-                      <p>{l.qrGenerating[locale]}</p>
-                    )}
-                    <span>{l.qrScan[locale]}</span>
-                  </div>
-                )}
+                <ChancePayment
+                  recipientAddress={lottery.recipientAddress}
+                  amountCrc={lottery.ticketPriceCrc}
+                  gameType="lottery"
+                  gameId={lottery.slug}
+                  accentColor={lottery.primaryColor}
+                  payLabel={l.buyTicket[locale]}
+                  onPaymentInitiated={async () => { await scanAndRefresh(); setWatchingPayment(true); }}
+                  onScan={scanAndRefresh}
+                  scanning={scanning}
+                  paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
+                  qrLabel={l.qrScan[locale]}
+                />
               </CardContent>
             </Card>
 
@@ -645,7 +668,180 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
             </div>
           )}
 
-          <footer className="mt-12 pt-8 border-t border-ink/5" />
+          <footer className="mt-12 pt-8 border-t border-ink/5 flex flex-col items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-ink/20 hover:text-ink/40"
+              onClick={() => {
+                setIsAdminOpen(!isAdminOpen);
+                if (isAdminOpen) {
+                  setAdminAuth(false);
+                  setAdminPassword("");
+                  setAuthError("");
+                }
+              }}
+            >
+              <Lock className="h-3 w-3 mr-1" />
+              {l.adminZone[locale]}
+            </Button>
+
+            {isAdminOpen && !adminAuth && (
+              <div className="bg-white border-2 border-ink/10 rounded-3xl p-8 shadow-2xl w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <h3 className="text-lg font-bold text-ink mb-4 flex items-center gap-2">
+                  <Lock className="h-5 w-5" />
+                  {l.authRequired[locale]}
+                </h3>
+                <div className="space-y-4">
+                  <input
+                    type="password"
+                    placeholder={l.adminPasswordPlaceholder[locale]}
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
+                    className="w-full px-4 py-3 border-2 border-ink/10 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                  {authError && (
+                    <p className="text-sm text-red-600 font-medium">{authError === "incorrectPassword" ? l.incorrectPassword[locale] : authError === "connectionError" ? l.connectionError[locale] : authError === "sessionExpired" ? l.sessionExpired[locale] : authError}</p>
+                  )}
+                  <Button
+                    onClick={handleAdminLogin}
+                    disabled={authLoading || !adminPassword.trim()}
+                    className="w-full bg-ink hover:bg-ink/90 text-white font-semibold h-11 disabled:opacity-60"
+                  >
+                    {authLoading ? (
+                      <span className="flex items-center gap-2">
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        {l.verifying[locale]}
+                      </span>
+                    ) : (
+                      l.login[locale]
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {isAdminOpen && adminAuth && (
+              <div className="bg-white border-2 border-red-100 rounded-3xl p-8 shadow-2xl w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2">
+                  {l.drawPanel[locale]}
+                </h3>
+                <p className="text-sm text-ink/60 mb-4">
+                  {l.drawDescription[locale]}
+                </p>
+                <p className="text-sm text-ink/60 mb-6">
+                  {l.participantsInLottery[locale](ticketCount)}
+                </p>
+                <Button onClick={handleDraw} disabled={drawLoading} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-12 shadow-lg shadow-red-200 disabled:opacity-60">
+                  {drawLoading ? (
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      {l.drawInProgress[locale]}
+                    </span>
+                  ) : (
+                    l.performDraw[locale]
+                  )}
+                </Button>
+
+                <div className="mt-6 pt-6 border-t border-ink/10">
+                  <h4 className="text-sm font-bold text-ink/60 mb-3 flex items-center gap-2">
+                    <Pencil className="h-4 w-4" />
+                    {l.editDescription[locale]}
+                  </h4>
+                  {editingDescription ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={descriptionDraft}
+                        onChange={(e) => setDescriptionDraft(e.target.value)}
+                        rows={4}
+                        className="w-full rounded-xl border border-ink/20 bg-white px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20 resize-none"
+                        placeholder={l.descriptionLabel[locale]}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleSaveDescription}
+                          disabled={savingDescription}
+                          className="flex-1 bg-ink hover:bg-ink/90 text-white font-semibold h-10"
+                        >
+                          {savingDescription ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            l.saveDescription[locale]
+                          )}
+                        </Button>
+                        <Button
+                          onClick={() => { setEditingDescription(false); setDescriptionDraft(currentDescription); }}
+                          variant="outline"
+                          className="flex-1 border-ink/20 text-ink/60 font-semibold h-10"
+                        >
+                          {l.cancelEdit[locale]}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => { setDescriptionDraft(currentDescription); setEditingDescription(true); }}
+                      variant="outline"
+                      className="w-full border-ink/20 text-ink/70 hover:bg-ink/5 font-semibold"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      {l.editDescription[locale]}
+                    </Button>
+                  )}
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-ink/10">
+                  <h4 className="text-sm font-bold text-ink/60 mb-3 flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    {l.manageLottery[locale]}
+                  </h4>
+                  <div className="space-y-2">
+                    {lotteryStatus === "active" && (
+                      <Button
+                        onClick={() => handleStatusChange("completed")}
+                        disabled={statusChanging}
+                        variant="outline"
+                        className="w-full border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold"
+                      >
+                        {l.markCompleted[locale]}
+                      </Button>
+                    )}
+                    {lotteryStatus === "completed" && (
+                      <>
+                        <Button
+                          onClick={() => handleStatusChange("active")}
+                          disabled={statusChanging}
+                          variant="outline"
+                          className="w-full border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+                        >
+                          {l.reactivateLottery[locale]}
+                        </Button>
+                        <Button
+                          onClick={() => handleStatusChange("archived")}
+                          disabled={statusChanging}
+                          variant="outline"
+                          className="w-full border-gray-300 text-gray-500 hover:bg-gray-50 font-semibold"
+                        >
+                          {l.archiveLottery[locale]}
+                        </Button>
+                      </>
+                    )}
+                    {lotteryStatus === "archived" && (
+                      <Button
+                        onClick={() => handleStatusChange("active")}
+                        disabled={statusChanging}
+                        variant="outline"
+                        className="w-full border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+                      >
+                        {l.reactivateLottery[locale]}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </footer>
         </div>
       </main>
     </div>

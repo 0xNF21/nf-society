@@ -4,7 +4,6 @@ import { Space_Grotesk, Sora } from "next/font/google";
 import { LanguageProvider } from "@/components/language-provider";
 import { DemoProvider } from "@/components/demo-provider";
 import { ThemeProvider } from "@/components/theme-provider";
-import { FeatureFlagProvider } from "@/components/feature-flag-provider";
 import { MiniAppProvider } from "@/components/miniapp-provider";
 import DemoBanner from "@/components/demo-banner";
 import ProfileModal from "@/components/profile-modal";
@@ -35,19 +34,17 @@ export default function RootLayout({
     <html lang="en" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
       <body className="min-h-screen pb-16 sm:pb-0">
         <ThemeProvider>
-          <FeatureFlagProvider>
-            <DemoProvider>
-              <LanguageProvider>
-                <MiniAppProvider>
-                  <DemoBanner />
-                  {children}
-                  <ProfileModal />
-                  <DailyModal />
-                  <BottomNav />
-                </MiniAppProvider>
-              </LanguageProvider>
-            </DemoProvider>
-          </FeatureFlagProvider>
+          <DemoProvider>
+            <LanguageProvider>
+              <MiniAppProvider>
+                <DemoBanner />
+                {children}
+                <ProfileModal />
+                <DailyModal />
+                <BottomNav />
+              </MiniAppProvider>
+            </LanguageProvider>
+          </DemoProvider>
         </ThemeProvider>
       </body>
     </html>
