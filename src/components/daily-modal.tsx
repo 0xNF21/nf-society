@@ -150,6 +150,44 @@ export default function DailyModal() {
   const handleInit = useCallback(async () => {
     setLoading(true);
     try {
+      // Mini App mode: free claim with wallet address
+      if (isMiniApp && walletAddress) {
+        const res = await fetch("/api/daily/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: walletAddress }),
+        });
+        const data = await res.json();
+        setToken(data.token);
+        setAddress(data.address);
+        localStorage.setItem("nf-daily", JSON.stringify({
+          token: data.token,
+          address: data.address,
+          date: new Date().toISOString().slice(0, 10),
+        }));
+
+        if (data.alreadyClaimed) {
+          // Resume at right phase
+          if (data.scratchPlayed && data.spinPlayed) {
+            setScratchResult(data.scratchResult);
+            setSpinResult(data.spinResult);
+            setPhase("complete");
+          } else if (data.scratchPlayed) {
+            setScratchResult(data.scratchResult);
+            setPhase("spin");
+          } else {
+            setPhase("contribution");
+            setTimeout(() => setPhase("scratch"), 2000);
+          }
+        } else {
+          setPhase("contribution");
+          setTimeout(() => setPhase("scratch"), 2000);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Standalone mode: payment required
       const res = await fetch("/api/daily/init", { method: "POST" });
       const data = await res.json();
       setToken(data.token);
@@ -187,7 +225,7 @@ export default function DailyModal() {
       }
     } catch { /* error */ }
     setLoading(false);
-  }, []);
+  }, [isMiniApp, walletAddress]);
 
   // Play scratch
   const handleScratch = useCallback(async () => {
