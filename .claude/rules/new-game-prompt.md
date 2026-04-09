@@ -91,6 +91,20 @@ Endpoint pour injecter de faux joueurs en dev :
 Selon le jeu : `place/route.ts`, `shot/route.ts`, `move/route.ts`, etc.
 - Toujours verifier `game.status` et `game.currentTurn`
 - Comparer les adresses en `.toLowerCase()`
+- **OBLIGATOIRE — Anti-triche** : verifier le `playerToken` sur CHAQUE endpoint de coup :
+```typescript
+const { playerToken, ...rest } = await req.json()
+// Token obligatoire
+if (!playerToken) {
+  return NextResponse.json({ error: "Player token required" }, { status: 401 })
+}
+if (playerToken !== game.player1Token && playerToken !== game.player2Token) {
+  return NextResponse.json({ error: "Invalid player token" }, { status: 401 })
+}
+// Identifier le joueur par son token
+const isP1 = game.player1Token === playerToken
+```
+Ne JAMAIS accepter un coup sans token. Ne JAMAIS fallback sur l'adresse seule.
 - Quand la partie se termine, appeler `executePayout()` de `src/lib/payout.ts` :
 ```typescript
 const pot = game.betCrc * 2
