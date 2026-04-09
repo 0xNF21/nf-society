@@ -3,6 +3,7 @@ import { dailySessions, jackpotPool, claimedPayments } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { todayString } from "@/lib/daily";
+import { executePayout } from "@/lib/payout";
 
 const SAFE_ADDRESS = process.env.SAFE_ADDRESS || "";
 const WEI_PER_CRC = BigInt("1000000000000000000");
@@ -107,6 +108,17 @@ export async function runDailyScan(): Promise<number> {
 
       globalClaimed.add(txHash);
       processed++;
+
+      // Refund 1 CRC — non-bloquant
+      try {
+        await executePayout({
+          gameType: "daily-refund",
+          gameId: `daily-refund-${session.id}`,
+          recipientAddress: playerAddress,
+          amountCrc: 1,
+          reason: "Daily auth refund",
+        });
+      } catch { /* refund fail silencieux — sera retry manuellement */ }
 
       // XP non-bloquant
       try {
