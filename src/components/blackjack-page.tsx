@@ -5,14 +5,15 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
+import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { encodeGameData } from "@/lib/game-data";
 import { darkSafeColor } from "@/lib/utils";
-import type { Card, Hand, Action, VisibleState } from "@/lib/blackjack";
-import { calculateHandValue, cardDisplay, cardColor } from "@/lib/blackjack";
+import type { Card, Hand, Action, VisibleState, BlackjackState } from "@/lib/blackjack";
+import { calculateHandValue, cardDisplay, cardColor, createDeck, dealInitialHands, applyAction, getVisibleState, getAvailableActions } from "@/lib/blackjack";
 
 type BlackjackTable = {
   id: number;
@@ -122,7 +123,162 @@ function HandDisplay({ cards, label, score, isActive, hidden }: {
 
 // ── Main Component ──────────────────────────────────────
 
+// ── Demo Blackjack (client-only, no payment) ──────────
+
+function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
+  const { locale } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const accentColor = darkSafeColor(table.accentColor, isDark);
+  const t = translations.blackjack;
+  const { addXp } = useDemo();
+
+  const [selectedBet, setSelectedBet] = useState<number>(table.betOptions[0] || 5);
+  const [gameState, setGameState] = useState<BlackjackState | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const visible = gameState ? getVisibleState(gameState) : null;
+  const isFinished = gameState?.status === "finished";
+
+  const startGame = useCallback(() => {
+    const deck = createDeck(6);
+    const state = dealInitialHands(deck, selectedBet);
+    setGameState(state);
+    if (state.status === "finished") {
+      // Natural blackjack
+      if (state.playerHands[0]?.outcome === "blackjack") addXp("blackjack_win");
+    }
+  }, [selectedBet, addXp]);
+
+  const doAction = useCallback((action: Action) => {
+    if (!gameState || actionLoading) return;
+    setActionLoading(true);
+    try {
+      const newState = applyAction(gameState, action);
+      setGameState(newState);
+      if (newState.status === "finished") {
+        const won = newState.playerHands.some(h => h.outcome === "win" || h.outcome === "blackjack");
+        if (won) addXp("blackjack_win");
+      }
+    } catch {}
+    setActionLoading(false);
+  }, [gameState, actionLoading, addXp]);
+
+  const resetGame = useCallback(() => setGameState(null), []);
+
+  const betOptions = table.betOptions as number[];
+
+  const playerScore = visible?.playerHands?.[visible.currentHandIndex]
+    ? calculateHandValue(visible.playerHands[visible.currentHandIndex].cards).value
+    : undefined;
+  const dealerScore = visible && !visible.dealerHoleHidden
+    ? calculateHandValue(visible.dealerVisibleCards).value
+    : visible?.dealerVisibleCards?.[0]
+      ? calculateHandValue([visible.dealerVisibleCards[0]]).value
+      : undefined;
+
+  return (
+    <div className="min-h-screen px-4 py-8 max-w-lg mx-auto">
+      <style>{`@keyframes cardDeal { from { opacity: 0; transform: translateY(-30px) scale(0.8); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
+
+      <div className="mb-6">
+        <Link href="/chance" className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
+          <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
+        </Link>
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: accentColor + "15" }}>🃏</div>
+          <div>
+            <h1 className="text-xl font-bold text-ink">{table.title} <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded ml-1">DEMO</span></h1>
+            <p className="text-xs text-ink/40">Blackjack 3:2 · Dealer Stand 17</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Bet selection */}
+      {!gameState && (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-6 space-y-4">
+            <h2 className="text-sm font-bold text-ink/60 uppercase tracking-widest">{t.chooseBet[locale]}</h2>
+            <div className="grid grid-cols-4 gap-3">
+              {betOptions.map((bet) => (
+                <button key={bet} onClick={() => setSelectedBet(bet)}
+                  className={`py-3 rounded-xl text-sm font-bold transition-all ${selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"}`}
+                  style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
+                  {bet} CRC
+                </button>
+              ))}
+            </div>
+          </div>
+          <button onClick={startGame} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{ backgroundColor: accentColor }}>
+            🧪 {t.betBtn[locale]} {selectedBet} CRC (Demo)
+          </button>
+        </div>
+      )}
+
+      {/* Game table */}
+      {visible && (
+        <div className="space-y-6">
+          <div className="rounded-2xl p-6 sm:p-8 space-y-8" style={{ background: "linear-gradient(135deg, #0d3018, #1a5c2e, #0d3018)", minHeight: 400 }}>
+            <HandDisplay cards={visible.dealerVisibleCards} label="Dealer" score={dealerScore} hidden={visible.dealerHoleHidden} />
+            <div className="flex items-center justify-center"><div className="h-px flex-1 bg-white/10" /><span className="text-xs font-bold text-white/30 px-3">VS</span><div className="h-px flex-1 bg-white/10" /></div>
+            {visible.playerHands.map((playerHand, idx) => {
+              const hVal = calculateHandValue(playerHand.cards);
+              return (
+                <HandDisplay key={idx} cards={playerHand.cards}
+                  label={visible.playerHands.length > 1 ? `${t.hand[locale]} ${idx + 1}${playerHand.doubled ? " (x2)" : ""}` : t.you[locale]}
+                  score={hVal.value} isActive={idx === visible.currentHandIndex && visible.status === "playing"} />
+              );
+            })}
+          </div>
+
+          {/* Actions */}
+          {visible.status === "playing" && visible.availableActions.length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              {visible.availableActions.includes("hit") && <button onClick={() => doAction("hit")} disabled={actionLoading} className="py-3 rounded-xl font-bold text-sm text-white bg-emerald-600 hover:opacity-90 disabled:opacity-50">{t.hit[locale]}</button>}
+              {visible.availableActions.includes("stand") && <button onClick={() => doAction("stand")} disabled={actionLoading} className="py-3 rounded-xl font-bold text-sm text-white bg-red-500 hover:opacity-90 disabled:opacity-50">{t.stand[locale]}</button>}
+              {visible.availableActions.includes("double") && <button onClick={() => doAction("double")} disabled={actionLoading} className="py-3 rounded-xl font-bold text-sm text-white bg-amber-500 hover:opacity-90 disabled:opacity-50">{t.double[locale]}</button>}
+              {visible.availableActions.includes("split") && <button onClick={() => doAction("split")} disabled={actionLoading} className="py-3 rounded-xl font-bold text-sm text-white bg-violet-500 hover:opacity-90 disabled:opacity-50">{t.split[locale]}</button>}
+            </div>
+          )}
+
+          {/* Result */}
+          {isFinished && gameState && (
+            <div className="space-y-4">
+              <div className={`rounded-2xl p-4 text-center ${
+                gameState.totalPayout > selectedBet ? "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800"
+                : gameState.totalPayout === selectedBet ? "bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
+                : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+              }`}>
+                <p className="text-2xl mb-1">
+                  {gameState.playerHands[0]?.outcome === "blackjack" ? "🃏" : gameState.totalPayout > selectedBet ? "🏆" : gameState.totalPayout === selectedBet ? "🤝" : "💔"}
+                </p>
+                <p className="font-bold text-ink">
+                  {gameState.playerHands[0]?.outcome === "blackjack" ? t.blackjack[locale] :
+                   gameState.totalPayout > selectedBet ? t.youWin[locale] :
+                   gameState.totalPayout === selectedBet ? t.push[locale] :
+                   t.youLose[locale]}
+                </p>
+                {gameState.totalPayout > 0 && <p className="text-sm text-emerald-600 font-bold mt-1">+{gameState.totalPayout} CRC</p>}
+              </div>
+              <PnlCard gameType="blackjack" result={gameState.totalPayout > selectedBet ? "win" : gameState.totalPayout === selectedBet ? "draw" : "loss"} betCrc={selectedBet} gainCrc={gameState.totalPayout - selectedBet} playerName="Demo Player" stats={gameState.playerHands[0]?.outcome === "blackjack" ? "Blackjack 3:2" : undefined} date={new Date().toLocaleDateString()} locale={locale} />
+              <button onClick={resetGame} className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90" style={{ backgroundColor: accentColor }}>{t.playAgain[locale]}</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main export (switches demo / real) ──────────────────
+
 export default function BlackjackPageClient({ table }: { table: BlackjackTable }) {
+  const { isDemo } = useDemo();
+  if (isDemo) return <DemoBlackjackGame table={table} />;
+  return <RealBlackjackGame table={table} />;
+}
+
+function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const { locale } = useLocale();
   const { theme } = useTheme();
   const isDark = theme === "dark";

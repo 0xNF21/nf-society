@@ -4,11 +4,13 @@ import Link from "next/link";
 import { ArrowLeft, CalendarCheck, Ticket, Gift, ArrowRight, Spade } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
+import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 
 export default function ChancePage() {
   const { locale } = useLocale();
   const { isVisible, flagStatus } = useFeatureFlags();
+  const { isDemo } = useDemo();
   const t = translations.chance;
 
   const games = [
@@ -48,7 +50,7 @@ export default function ChancePage() {
     {
       type: "link" as const,
       flag: "blackjack",
-      href: "/blackjack",
+      href: isDemo ? "/blackjack/DEMO-classic" : "/blackjack",
       icon: <span className="text-3xl">🃏</span>,
       iconBg: "bg-green-50 group-hover:bg-green-100",
       borderHover: "hover:border-green-200",
