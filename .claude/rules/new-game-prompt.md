@@ -131,11 +131,15 @@ await executePayout({
 ### 5. Page de jeu — `src/app/{game}/[id]/page.tsx`
 Structure en 2 composants principaux :
 
-#### `DemoGame` — jeu client-only vs bot
+#### `DemoGame` — jeu client-only vs bot (OBLIGATOIRE)
+**Chaque nouveau jeu DOIT avoir un mode demo.** Pattern :
 - Active quand `isDemo && id.startsWith("DEMO")`
 - Pas d'appels API, tout en local
 - Bot avec IA basique
 - `addXp()` via `useDemo()` en fin de partie
+- La page serveur `[id]/page.tsx` detecte les slugs `DEMO-*` et retourne une config fake (pas de query DB)
+- La page hub/lobby redirige vers `/{game}/DEMO-slug` quand `isDemo` est true
+- PnlCard a la fin de partie
 
 #### `RealGame` — multijoueur avec paiement
 **Section paiement** (quand status = waiting_p1 ou waiting_p2) :

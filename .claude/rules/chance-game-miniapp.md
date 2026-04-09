@@ -10,6 +10,13 @@ Quand tu crees un nouveau jeu de type chance (loterie, lootbox, scratch, etc.) q
 
 **OBLIGATOIRE — i18n** : Ne JAMAIS hardcoder des textes en francais ou anglais dans les composants. Toujours utiliser les cles i18n de `src/lib/i18n.ts` via `translations.{section}[locale]`. Ajouter une section dediee dans i18n pour chaque nouveau jeu.
 
+**OBLIGATOIRE — Mode demo** : Chaque nouveau jeu chance DOIT avoir un mode demo (client-only, sans paiement). Pattern :
+1. Le composant principal importe `useDemo` de `@/components/demo-provider`
+2. Si `isDemo` → affiche le `DemoGame` (logique client pure, pas d'API)
+3. La page serveur `[slug]/page.tsx` detecte les slugs `DEMO-*` et retourne une config fake (pas de query DB)
+4. La page `/chance` redirige vers `/jeu/DEMO-slug` quand `isDemo` est true
+5. XP via `addXp()` en demo
+
 ## Pattern obligatoire
 
 ### 1. Import
