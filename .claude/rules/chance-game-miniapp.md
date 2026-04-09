@@ -8,6 +8,8 @@ paths:
 
 Quand tu crees un nouveau jeu de type chance (loterie, lootbox, scratch, etc.) qui a un paiement CRC, tu DOIS supporter le mode Mini App Circles en plus du mode standalone (QR + lien Gnosis).
 
+**OBLIGATOIRE — i18n** : Ne JAMAIS hardcoder des textes en francais ou anglais dans les composants. Toujours utiliser les cles i18n de `src/lib/i18n.ts` via `translations.{section}[locale]`. Ajouter une section dediee dans i18n pour chaque nouveau jeu.
+
 ## Pattern obligatoire
 
 ### 1. Import

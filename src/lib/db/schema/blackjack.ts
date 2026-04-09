@@ -8,7 +8,7 @@ export const blackjackTables = pgTable("blackjack_tables", {
   betOptions: jsonb("bet_options").notNull().default([1, 5, 10, 25]),
   recipientAddress: text("recipient_address").notNull(),
   primaryColor: text("primary_color").notNull().default("#1a5c2e"),
-  accentColor: text("accent_color").notNull().default("#10B981"),
+  accentColor: text("accent_color").notNull().default("#1a7a3a"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

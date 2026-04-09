@@ -127,6 +127,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
+  const t = translations.blackjack;
 
   const [selectedBet, setSelectedBet] = useState<number>(table.betOptions[0] || 5);
   const [handId, setHandId] = useState<number | null>(null);
@@ -252,7 +253,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
       {/* Header */}
       <div className="mb-6">
         <Link href="/blackjack" className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
-          <ArrowLeft className="w-4 h-4" /> {locale === "fr" ? "Tables" : "Tables"}
+          <ArrowLeft className="w-4 h-4" /> {t.tables[locale]}
         </Link>
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: accentColor + "15" }}>
@@ -271,7 +272,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
           {/* Bet selector */}
           <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-6 space-y-4">
             <h2 className="text-sm font-bold text-ink/60 uppercase tracking-widest">
-              {locale === "fr" ? "Choisir la mise" : "Choose bet"}
+              {t.chooseBet[locale]}
             </h2>
             <div className="grid grid-cols-4 gap-3">
               {betOptions.map((bet) => (
@@ -299,7 +300,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
               gameType="blackjack"
               gameId={table.slug}
               accentColor={accentColor}
-              payLabel={locale === "fr" ? `Miser ${selectedBet} CRC` : `Bet ${selectedBet} CRC`}
+              payLabel={`${t.betBtn[locale]} ${selectedBet} CRC`}
               onPaymentInitiated={async () => { await scanForHand(); setWatchingPayment(true); }}
               onScan={scanForHand}
               scanning={scanning}
@@ -342,8 +343,8 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
                   cards={playerHand.cards}
                   label={
                     hand.playerHands.length > 1
-                      ? `${locale === "fr" ? "Main" : "Hand"} ${idx + 1}${playerHand.doubled ? " (x2)" : ""}`
-                      : locale === "fr" ? "Vous" : "You"
+                      ? `${t.hand[locale]} ${idx + 1}${playerHand.doubled ? " (x2)" : ""}`
+                      : t.you[locale]
                   }
                   score={hVal.value}
                   isActive={isCurrentHand}
@@ -362,7 +363,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
                   className="py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: "#10B981" }}
                 >
-                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : locale === "fr" ? "Tirer" : "Hit"}
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : t.hit[locale]}
                 </button>
               )}
               {hand.availableActions.includes("stand") && (
@@ -372,7 +373,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
                   className="py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: "#EF4444" }}
                 >
-                  {locale === "fr" ? "Rester" : "Stand"}
+                  {t.stand[locale]}
                 </button>
               )}
               {hand.availableActions.includes("double") && (
@@ -381,7 +382,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
                   disabled={actionLoading}
                   className="py-3 rounded-xl font-bold text-sm bg-amber-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >
-                  {locale === "fr" ? "Doubler" : "Double"}
+                  {t.double[locale]}
                 </button>
               )}
               {hand.availableActions.includes("split") && (
@@ -390,7 +391,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
                   disabled={actionLoading}
                   className="py-3 rounded-xl font-bold text-sm bg-violet-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >
-                  {locale === "fr" ? "Séparer" : "Split"}
+                  {t.split[locale]}
                 </button>
               )}
               {hand.availableActions.includes("insurance") && (
@@ -409,7 +410,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
           {hand.status === "dealer_turn" && (
             <div className="flex items-center justify-center gap-2 py-3 text-ink/60">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm font-medium">{locale === "fr" ? "Le dealer joue..." : "Dealer playing..."}</span>
+              <span className="text-sm font-medium">{t.dealerPlaying[locale]}</span>
             </div>
           )}
 
@@ -428,10 +429,10 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
                   {hand.outcome === "blackjack" ? "🃏" : hand.outcome === "win" ? "🏆" : hand.outcome === "push" ? "🤝" : "💔"}
                 </p>
                 <p className="font-bold text-ink">
-                  {hand.outcome === "blackjack" ? "BLACKJACK!" :
-                   hand.outcome === "win" ? (locale === "fr" ? "Victoire !" : "You win!") :
-                   hand.outcome === "push" ? (locale === "fr" ? "Egalite" : "Push") :
-                   locale === "fr" ? "Perdu" : "You lose"}
+                  {hand.outcome === "blackjack" ? t.blackjack[locale] :
+                   hand.outcome === "win" ? t.youWin[locale] :
+                   hand.outcome === "push" ? t.push[locale] :
+                   t.youLose[locale]}
                 </p>
                 {hand.payoutCrc !== null && hand.payoutCrc > 0 && (
                   <p className="text-sm text-emerald-600 dark:text-emerald-400 font-bold mt-1">
@@ -459,7 +460,7 @@ export default function BlackjackPageClient({ table }: { table: BlackjackTable }
                 className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"
                 style={{ backgroundColor: accentColor }}
               >
-                {locale === "fr" ? "Rejouer" : "Play again"}
+                {t.playAgain[locale]}
               </button>
             </div>
           )}

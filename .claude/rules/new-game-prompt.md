@@ -224,6 +224,7 @@ La PnlCard genere une image PNG telechargeable/partageable avec le resultat du m
 **Race condition demo** : quand `id.startsWith("DEMO")` mais `isDemo` est encore `false` (hydratation), afficher un loader au lieu de "Partie introuvable".
 
 ### 6. i18n — `src/lib/i18n.ts`
+**OBLIGATOIRE** : Ne JAMAIS hardcoder des textes dans les composants (`locale === "fr" ? "..." : "..."`). Toujours utiliser `translations.{game}[locale]`. Chaque nouveau jeu DOIT avoir sa section i18n complete.
 Ajouter 2 sections dans `translations` :
 ```typescript
 landing{Game}: { title, desc, action }  // pour la page d'accueil
