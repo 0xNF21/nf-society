@@ -105,10 +105,9 @@ export async function POST(
 
     return NextResponse.json({
       id: hand.id,
-      status: newState.status,
+      ...visible,
       outcome: updateData.outcome || null,
       payoutCrc: newState.totalPayout,
-      ...visible,
     });
   } catch (error: any) {
     console.error("[Blackjack Action] Error:", error.message);
