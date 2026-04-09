@@ -5,6 +5,7 @@ import Link from "next/link";
 import { User, X, Search, Loader2, ChevronRight, LogOut } from "lucide-react";
 import { LanguageSwitcher, useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
+import { useMiniApp } from "@/components/miniapp-provider";
 import { translations } from "@/lib/i18n";
 import { getLevelName, xpToNextLevel } from "@/lib/xp";
 
@@ -40,6 +41,7 @@ function useDebounce<T>(value: T, delay: number): T {
 export default function ProfileModal() {
   const { locale } = useLocale();
   const { isDemo, demoPlayer } = useDemo();
+  const { isMiniApp, walletAddress } = useMiniApp();
   const tp = translations.profile;
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState<SavedProfile | null>(null);
@@ -58,7 +60,7 @@ export default function ProfileModal() {
     return () => window.removeEventListener("keydown", handler);
   }, [open]);
 
-  // Charger profil sauvegardé au montage (ou injecter démo)
+  // Charger profil sauvegardé au montage (ou injecter démo / Mini App)
   useEffect(() => {
     if (isDemo) {
       setSaved({ address: demoPlayer.address, name: demoPlayer.name, imageUrl: demoPlayer.imageUrl });
@@ -71,11 +73,36 @@ export default function ProfileModal() {
       });
       return;
     }
+    // Mini App: auto-connect avec le wallet Circles
+    if (isMiniApp && walletAddress) {
+      fetch(`/api/profiles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addresses: [walletAddress] }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          const p = data.profiles?.[walletAddress.toLowerCase()];
+          setSaved({
+            address: walletAddress,
+            name: p?.name || `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+            imageUrl: p?.imageUrl || null,
+          });
+        })
+        .catch(() => {
+          setSaved({
+            address: walletAddress,
+            name: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+            imageUrl: null,
+          });
+        });
+      return;
+    }
     try {
       const raw = localStorage.getItem("nfs_profile");
       if (raw) setSaved(JSON.parse(raw));
     } catch {}
-  }, [isDemo, demoPlayer]);
+  }, [isDemo, demoPlayer, isMiniApp, walletAddress]);
 
   // Charger données XP quand profil connu
   useEffect(() => {
