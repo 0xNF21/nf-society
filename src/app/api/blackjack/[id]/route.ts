@@ -26,7 +26,6 @@ export async function GET(
       tableId: hand.tableId,
       playerAddress: hand.playerAddress,
       betCrc: hand.betCrc,
-      status: hand.status,
       outcome: hand.outcome,
       payoutCrc: hand.payoutCrc,
       payoutStatus: hand.payoutStatus,
