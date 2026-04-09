@@ -311,3 +311,6 @@ export type { DamesGameRow, NewDamesGame } from "./schema/dames";
 
 export { pfcGames } from "./schema/pfc";
 export type { PfcGameRow, NewPfcGame } from "./schema/pfc";
+
+export { blackjackTables, blackjackHands } from "./schema/blackjack";
+export type { BlackjackTableRow, BlackjackHandRow, NewBlackjackTable, NewBlackjackHand } from "./schema/blackjack";
