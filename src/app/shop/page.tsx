@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShoppingBag, Lock, Check, Zap, Shield, Sparkles, Coins, Gamepad2, Loader2, Copy, QrCode, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Lock, Check, Zap, Shield, Sparkles, Coins, Gamepad2, Loader2, Copy, QrCode, CheckCircle2, Wallet } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
+import { useMiniApp } from "@/components/miniapp-provider";
 
 type ShopItem = {
   id: number;
@@ -84,7 +85,9 @@ const DEMO_ITEMS: ShopItem[] = [
 export default function ShopPage() {
   const { locale } = useLocale();
   const { isDemo, demoPlayer, spendXp } = useDemo();
+  const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const t = translations.shop;
+  const tm = translations.miniapp;
 
   // Auth state
   const [authState, setAuthState] = useState<AuthState>("idle");
@@ -92,6 +95,8 @@ export default function ShopPage() {
   const [paymentLink, setPaymentLink] = useState("");
   const [qrCode, setQrCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [miniAppPaying, setMiniAppPaying] = useState(false);
+  const [miniAppError, setMiniAppError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Shop state
@@ -207,6 +212,21 @@ export default function ShopPage() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
+
+  const handleMiniAppPay = async () => {
+    if (!paymentLink) return;
+    setMiniAppPaying(true);
+    setMiniAppError(null);
+    try {
+      const match = paymentLink.match(/transfer\/(0x[a-fA-F0-9]+)\//);
+      const recipient = match?.[1] || "";
+      await sendPayment(recipient, 1, `shop_auth:${authToken}`);
+    } catch (err: any) {
+      setMiniAppError(typeof err === "string" ? err : err?.message || tm.rejected[locale]);
+    } finally {
+      setMiniAppPaying(false);
+    }
+  };
 
   const copyLink = () => {
     navigator.clipboard.writeText(paymentLink);
@@ -399,27 +419,46 @@ export default function ShopPage() {
 
         {authState === "waiting" && (
           <div className="space-y-4">
-            {qrCode && (
-              <div className="flex justify-center">
-                <img src={qrCode} alt="QR" className="w-48 h-48 rounded-xl" />
-              </div>
-            )}
-            <p className="text-center text-xs text-ink/50">{t.authScanQr[locale]}</p>
+            {isMiniApp && walletAddress ? (
+              <>
+                <button
+                  onClick={handleMiniAppPay}
+                  disabled={miniAppPaying}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-pink-500 text-white font-bold rounded-xl hover:bg-pink-600 transition-colors disabled:opacity-50"
+                >
+                  {miniAppPaying ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" />{tm.paying[locale]}</>
+                  ) : (
+                    tm.payBtn[locale].replace("{amount}", "1")
+                  )}
+                </button>
+                {miniAppError && <p className="text-xs text-red-500 text-center">{miniAppError}</p>}
+              </>
+            ) : (
+              <>
+                {qrCode && (
+                  <div className="flex justify-center">
+                    <img src={qrCode} alt="QR" className="w-48 h-48 rounded-xl" />
+                  </div>
+                )}
+                <p className="text-center text-xs text-ink/50">{t.authScanQr[locale]}</p>
 
-            <div className="flex items-center gap-2">
-              <input
-                readOnly
-                value={paymentLink}
-                className="flex-1 text-xs bg-ink/[0.03] rounded-lg px-3 py-2 text-ink/60 truncate"
-              />
-              <button
-                onClick={copyLink}
-                className="flex items-center gap-1 px-3 py-2 bg-pink-500 text-white text-xs font-bold rounded-lg hover:bg-pink-600 transition-colors"
-              >
-                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                {copied ? t.authCopied[locale] : t.authOrCopy[locale]}
-              </button>
-            </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={paymentLink}
+                    className="flex-1 text-xs bg-ink/[0.03] rounded-lg px-3 py-2 text-ink/60 truncate"
+                  />
+                  <button
+                    onClick={copyLink}
+                    className="flex items-center gap-1 px-3 py-2 bg-pink-500 text-white text-xs font-bold rounded-lg hover:bg-pink-600 transition-colors"
+                  >
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    {copied ? t.authCopied[locale] : t.authOrCopy[locale]}
+                  </button>
+                </div>
+              </>
+            )}
 
             <div className="flex items-center justify-center gap-2 py-4">
               <Loader2 className="w-4 h-4 animate-spin text-pink-500" />

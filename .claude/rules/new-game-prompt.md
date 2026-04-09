@@ -125,12 +125,17 @@ Structure en 2 composants principaux :
 
 #### `RealGame` — multijoueur avec paiement
 **Section paiement** (quand status = waiting_p1 ou waiting_p2) :
+Utiliser le composant `<GamePayment>` de `src/components/game-payment.tsx` qui gere automatiquement :
+- Le mode Mini App (bouton direct via bridge postMessage)
+- Le mode standalone (QR code + lien Gnosis App)
 ```
-- generateGamePaymentLink(game.recipientAddress, game.betCrc, "{game}", game.id)
-- Bouton "Payer X CRC" → lien Gnosis
-- "Copier lien de paiement" / "Inviter J2"
-- Auto-scan des paiements toutes les 5s
-- Scan manuel avec bouton refresh
+<GamePayment
+  gameKey="{game}"
+  game={game}
+  playerToken={playerToken}
+  isCreator={isCreator}
+  onScanComplete={refreshGame}
+/>
 ```
 
 **Section adresse** (quand partie active, pas encore confirme) :
@@ -203,6 +208,8 @@ Ajouter une carte dans `src/app/multijoueur/page.tsx` avec icone et lien vers `/
 - `src/components/theme-provider.tsx` → `useTheme()` pour dark mode
 - `src/components/ui/button.tsx`, `card.tsx` → composants UI
 - `src/components/rematch-button.tsx` → `RematchButton` + `RematchBanner` (bouton revanche en fin de partie)
+- `src/components/miniapp-provider.tsx` → `useMiniApp()` pour detecter iframe Circles et payer direct
+- `src/lib/miniapp-bridge.ts` → SDK postMessage (isMiniApp, sendCrcTransfer, etc.)
 
 ## Checklist
 - [ ] Logique jeu dans `src/lib/{game}.ts`

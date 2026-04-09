@@ -15,6 +15,7 @@ import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
 import { darkSafeColor } from "@/lib/utils";
+import { useMiniApp } from "@/components/miniapp-provider";
 
 export type LotteryConfig = {
   id: number;
@@ -73,10 +74,12 @@ function FaqItem({ question, children }: { question: string; children: React.Rea
 export default function LotteryPage({ lottery, initialParticipants, initialCount }: { lottery: LotteryConfig; initialParticipants?: ParticipantEntry[]; initialCount?: number }) {
   const { locale } = useLocale();
   const { theme } = useTheme();
+  const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const isDark = theme === "dark";
   const displayColor = darkSafeColor(lottery.primaryColor, isDark);
   const displayAccent = darkSafeColor(lottery.accentColor, isDark);
   const l = translations.lottery;
+  const tm = translations.miniapp;
 
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -97,6 +100,8 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const [watchingPayment, setWatchingPayment] = useState(false);
   const [showConfirmed, setShowConfirmed] = useState(false);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [miniAppPaying, setMiniAppPaying] = useState(false);
+  const [miniAppError, setMiniAppError] = useState<string | null>(null);
 
   const paymentLink = useMemo(() => {
     return generateGamePaymentLink(lottery.recipientAddress, lottery.ticketPriceCrc, "lottery", lottery.slug);
@@ -228,6 +233,21 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     return () => { active = false; };
   }, [paymentLink]);
 
+  const handleMiniAppPay = async () => {
+    setMiniAppPaying(true);
+    setMiniAppError(null);
+    try {
+      const data = `lottery:${lottery.slug}`;
+      await sendPayment(lottery.recipientAddress, lottery.ticketPriceCrc, data);
+      setWatchingPayment(true);
+      setTimeout(scanAndRefresh, 2000);
+    } catch (err: any) {
+      setMiniAppError(typeof err === "string" ? err : err?.message || tm.rejected[locale]);
+    } finally {
+      setMiniAppPaying(false);
+    }
+  };
+
   const handleCopy = async () => {
     if (!paymentLink) return;
     try {
@@ -315,26 +335,46 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  <Button
-                    className="w-full h-12 text-lg"
-                    style={{ backgroundColor: lottery.primaryColor }}
-                    asChild
-                  >
-                    <a href={paymentLink} target="_blank" rel="noreferrer" onClick={async () => { await scanAndRefresh(); setWatchingPayment(true); }}>
-                      {l.buyTicket[locale]}
-                      <ArrowUpRight className="h-5 w-5 ml-2" />
-                    </a>
-                  </Button>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" onClick={handleCopy}>
-                      <Clipboard className="h-4 w-4 mr-2" />
-                      {copyState === "copied" ? l.copied[locale] : l.copyLink[locale]}
-                    </Button>
-                    <Button variant="outline" onClick={async () => { const next = !showQr; setShowQr(next); if (next) { await scanAndRefresh(); setWatchingPayment(true); } }}>
-                      <QrCode className="h-4 w-4 mr-2" />
-                      {showQr ? l.hideQr[locale] : l.showQr[locale]}
-                    </Button>
-                  </div>
+                  {isMiniApp && walletAddress ? (
+                    <>
+                      <Button
+                        className="w-full h-12 text-lg"
+                        style={{ backgroundColor: lottery.primaryColor }}
+                        onClick={handleMiniAppPay}
+                        disabled={miniAppPaying}
+                      >
+                        {miniAppPaying ? (
+                          <><Loader2 className="h-5 w-5 animate-spin mr-2" />{tm.paying[locale]}</>
+                        ) : (
+                          tm.payBtn[locale].replace("{amount}", String(lottery.ticketPriceCrc))
+                        )}
+                      </Button>
+                      {miniAppError && <p className="text-xs text-red-500 text-center">{miniAppError}</p>}
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        className="w-full h-12 text-lg"
+                        style={{ backgroundColor: lottery.primaryColor }}
+                        asChild
+                      >
+                        <a href={paymentLink} target="_blank" rel="noreferrer" onClick={async () => { await scanAndRefresh(); setWatchingPayment(true); }}>
+                          {l.buyTicket[locale]}
+                          <ArrowUpRight className="h-5 w-5 ml-2" />
+                        </a>
+                      </Button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button variant="outline" onClick={handleCopy}>
+                          <Clipboard className="h-4 w-4 mr-2" />
+                          {copyState === "copied" ? l.copied[locale] : l.copyLink[locale]}
+                        </Button>
+                        <Button variant="outline" onClick={async () => { const next = !showQr; setShowQr(next); if (next) { await scanAndRefresh(); setWatchingPayment(true); } }}>
+                          <QrCode className="h-4 w-4 mr-2" />
+                          {showQr ? l.hideQr[locale] : l.showQr[locale]}
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {(watchingPayment || showConfirmed) && (

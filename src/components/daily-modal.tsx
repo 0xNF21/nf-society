@@ -6,7 +6,8 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import ScratchCard from "@/components/scratch-card";
 import SpinWheel from "@/components/spin-wheel";
-import { X, Copy, Check, Loader2, Trophy, Sparkles, ChevronDown } from "lucide-react";
+import { X, Copy, Check, Loader2, Trophy, Sparkles, ChevronDown, Wallet } from "lucide-react";
+import { useMiniApp } from "@/components/miniapp-provider";
 
 type Phase = "init" | "payment" | "contribution" | "scratch" | "spin" | "complete";
 
@@ -20,7 +21,9 @@ type JackpotInfo = {
 export default function DailyModal() {
   const { locale } = useLocale();
   const { isDemo, addXp, addStreak } = useDemo();
+  const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const t = translations.daily;
+  const tm = translations.miniapp;
 
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("init");
@@ -28,6 +31,8 @@ export default function DailyModal() {
   const [paymentLink, setPaymentLink] = useState("");
   const [qrCode, setQrCode] = useState("");
   const [address, setAddress] = useState<string | null>(null);
+  const [miniAppPaying, setMiniAppPaying] = useState(false);
+  const [miniAppError, setMiniAppError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [jackpot, setJackpot] = useState<JackpotInfo | null>(null);
   const [scratchResult, setScratchResult] = useState<any>(null);
@@ -222,6 +227,23 @@ export default function DailyModal() {
     }
   }, [token, spinning]);
 
+  const handleMiniAppPay = useCallback(async () => {
+    if (!paymentLink) return;
+    setMiniAppPaying(true);
+    setMiniAppError(null);
+    try {
+      // Extract recipient from payment link: https://app.gnosis.io/transfer/{address}/crc?...
+      const match = paymentLink.match(/transfer\/(0x[a-fA-F0-9]+)\//);
+      const recipient = match?.[1] || "";
+      await sendPayment(recipient, 1, `daily:${token}`);
+      // Payment sent — poll will detect it
+    } catch (err: any) {
+      setMiniAppError(typeof err === "string" ? err : err?.message || tm.rejected[locale]);
+    } finally {
+      setMiniAppPaying(false);
+    }
+  }, [paymentLink, token, sendPayment, tm, locale]);
+
   const copyLink = useCallback(() => {
     navigator.clipboard.writeText(paymentLink);
     setCopied(true);
@@ -399,35 +421,53 @@ export default function DailyModal() {
               {/* ─── PHASE: PAYMENT ─── */}
               {phase === "payment" && (
                 <div className="text-center py-2">
-                  <p className="text-ink/60 text-sm mb-3">{t.scanQr[locale]}</p>
+                  {isMiniApp && walletAddress ? (
+                    <>
+                      <button
+                        onClick={handleMiniAppPay}
+                        disabled={miniAppPaying}
+                        className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-sm shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] mb-3 disabled:opacity-50"
+                      >
+                        {miniAppPaying ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" />{tm.paying[locale]}</>
+                        ) : (
+                          tm.payBtn[locale].replace("{amount}", "1")
+                        )}
+                      </button>
+                      {miniAppError && <p className="text-xs text-red-500 mb-2">{miniAppError}</p>}
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-ink/60 text-sm mb-3">{t.scanQr[locale]}</p>
 
-                  {qrCode && (
-                    <div className="bg-white rounded-xl p-3 inline-block mb-3 shadow-sm border border-ink/5">
-                      <img src={qrCode} alt="QR Code" className="w-40 h-40" />
-                    </div>
+                      {qrCode && (
+                        <div className="bg-white rounded-xl p-3 inline-block mb-3 shadow-sm border border-ink/5">
+                          <img src={qrCode} alt="QR Code" className="w-40 h-40" />
+                        </div>
+                      )}
+
+                      <a
+                        href={paymentLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-sm shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] mb-3"
+                      >
+                        💳 {locale === "fr" ? "Payer 1 CRC avec Circles" : "Pay 1 CRC with Circles"}
+                      </a>
+
+                      <p className="text-xs text-ink/50 mb-2">{t.orCopy[locale]}</p>
+
+                      <button
+                        onClick={copyLink}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-ink/5 hover:bg-ink/10 rounded-xl transition-colors"
+                      >
+                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                        <span className="text-xs font-mono truncate max-w-[220px]">
+                          {copied ? t.copied[locale] : paymentLink.slice(0, 35) + "..."}
+                        </span>
+                      </button>
+                    </>
                   )}
-
-                  {/* Direct pay button — opens Gnosis app on mobile */}
-                  <a
-                    href={paymentLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-sm shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] mb-3"
-                  >
-                    💳 {locale === "fr" ? "Payer 1 CRC avec Circles" : "Pay 1 CRC with Circles"}
-                  </a>
-
-                  <p className="text-xs text-ink/50 mb-2">{t.orCopy[locale]}</p>
-
-                  <button
-                    onClick={copyLink}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-ink/5 hover:bg-ink/10 rounded-xl transition-colors"
-                  >
-                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                    <span className="text-xs font-mono truncate max-w-[220px]">
-                      {copied ? t.copied[locale] : paymentLink.slice(0, 35) + "..."}
-                    </span>
-                  </button>
 
                   <div className="mt-4 flex items-center justify-center gap-2 text-ink/50">
                     <Loader2 className="w-4 h-4 animate-spin" />
