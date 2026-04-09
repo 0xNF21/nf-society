@@ -52,35 +52,46 @@ function PlayingCard({ card, hidden = false, delay = 0 }: { card?: Card; hidden?
   }, [hidden, delay]);
 
   if (!card || (hidden && !flipped)) {
-    // Card back — NF Society logo
+    // Card back — NF Society logo (full cover)
     return (
       <div
-        className="w-16 h-24 sm:w-20 sm:h-28 rounded-xl border-2 border-white/10 flex items-center justify-center shadow-lg transition-all duration-300"
+        className="w-16 h-24 sm:w-20 sm:h-28 rounded-xl border border-amber-900/30 overflow-hidden shadow-lg transition-all duration-300"
         style={{
-          background: "linear-gradient(135deg, #1a5c2e, #0d3018)",
+          background: "linear-gradient(145deg, #0d3018, #1a5c2e, #0d3018)",
           animation: delay ? `cardDeal 0.4s ease-out ${delay}ms both` : undefined,
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/nf-society-logo.png" alt="" className="w-8 h-8 sm:w-10 sm:h-10 opacity-60" />
+        <img src="/nf-society-logo.png" alt="" className="w-full h-full object-cover opacity-70" />
       </div>
     );
   }
 
   const isRed = cardColor(card) === "red";
+  const suitSymbol = card.suit === "hearts" ? "\u2665" : card.suit === "diamonds" ? "\u2666" : card.suit === "clubs" ? "\u2663" : "\u2660";
   return (
     <div
-      className="w-16 h-24 sm:w-20 sm:h-28 rounded-xl border-2 border-white/20 flex flex-col items-center justify-center shadow-lg transition-all duration-300"
+      className="w-16 h-24 sm:w-20 sm:h-28 rounded-xl border border-amber-700/30 flex flex-col items-center justify-center shadow-lg transition-all duration-300 relative"
       style={{
-        background: "linear-gradient(135deg, #ffffff, #f0f0f0)",
+        background: "linear-gradient(145deg, #0a0a12, #111118, #0a0a12)",
         animation: delay ? `cardDeal 0.4s ease-out ${delay}ms both` : undefined,
       }}
     >
-      <span className={`text-xl sm:text-2xl font-bold ${isRed ? "text-red-600" : "text-gray-900"}`}>
+      {/* Top-left rank */}
+      <span className="absolute top-1 left-1.5 text-[10px] sm:text-xs font-bold" style={{ color: isRed ? "#EF4444" : "#D4A017" }}>
         {card.rank}
       </span>
-      <span className={`text-sm ${isRed ? "text-red-500" : "text-gray-700"}`}>
-        {card.suit === "hearts" ? "\u2665" : card.suit === "diamonds" ? "\u2666" : card.suit === "clubs" ? "\u2663" : "\u2660"}
+      {/* Center suit large */}
+      <span className="text-2xl sm:text-3xl" style={{ color: isRed ? "#EF4444" : "#D4A017" }}>
+        {suitSymbol}
+      </span>
+      {/* Center rank */}
+      <span className="text-lg sm:text-xl font-black" style={{ color: "#D4A017" }}>
+        {card.rank}
+      </span>
+      {/* Bottom-right rank */}
+      <span className="absolute bottom-1 right-1.5 text-[10px] sm:text-xs font-bold rotate-180" style={{ color: isRed ? "#EF4444" : "#D4A017" }}>
+        {card.rank}
       </span>
     </div>
   );
