@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { GamePayment } from "@/components/game-payment";
 import { PlayerBanner } from "@/components/player-banner";
 import { RematchButton, RematchBanner } from "@/components/rematch-button";
+import { PnlCard } from "@/components/pnl-card";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
@@ -447,6 +448,33 @@ function RealPfcGame({ slug }: { slug: string }) {
             )}
           </div>
         )}
+
+        {/* PNL Card */}
+        {game.status === "finished" && myAddress && myRole && (() => {
+          const iWon = game.winnerAddress?.toLowerCase() === myAddress.toLowerCase();
+          const state = game.gameState as any;
+          const myProfile = profiles[myAddress.toLowerCase()];
+          const oppAddr = game.player1Address?.toLowerCase() === myAddress.toLowerCase() ? game.player2Address : game.player1Address;
+          const oppProfile = oppAddr ? profiles[oppAddr.toLowerCase()] : null;
+          const scoreP1 = state?.score?.p1 ?? 0;
+          const scoreP2 = state?.score?.p2 ?? 0;
+          const format = state?.format === 5 ? "BO5" : "BO3";
+          return (
+            <PnlCard
+              gameType="pfc"
+              result={iWon ? "win" : "loss"}
+              betCrc={game.betCrc}
+              gainCrc={iWon ? Math.round(winAmount - game.betCrc) : -game.betCrc}
+              playerName={myProfile?.name}
+              playerAvatar={myProfile?.imageUrl || undefined}
+              opponentName={oppProfile?.name || (oppAddr ? `${oppAddr.slice(0, 6)}...${oppAddr.slice(-4)}` : undefined)}
+              opponentAvatar={oppProfile?.imageUrl || undefined}
+              stats={`${format} — ${scoreP1}-${scoreP2}`}
+              date={new Date().toLocaleDateString()}
+              locale={locale}
+            />
+          );
+        })()}
 
         {/* Spectator notice */}
         {game.status === "playing" && !addressConfirmed && (

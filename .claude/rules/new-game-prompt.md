@@ -185,6 +185,35 @@ import { RematchButton, RematchBanner } from "@/components/rematch-button"
 - L'API `/api/rematch` gere tout (creation + patch de l'ancienne partie)
 - Ne PAS ajouter de bouton "Rejouer" separé — la Revanche le remplace
 
+**Section PNL Card** (ecran de fin, mode reel uniquement) :
+```
+import { PnlCard } from "@/components/pnl-card"
+
+// Apres le rematch, avant le GamePayment :
+{game.status === "finished" && myAddress && (() => {
+  const iWon = game.winnerAddress?.toLowerCase() === myAddress.toLowerCase();
+  const isDraw = !game.winnerAddress;
+  const wAmount = game.betCrc * 2 * (1 - game.commissionPct / 100);
+  const myProfile = profiles[myAddress.toLowerCase()];
+  const oppAddr = game.player1Address?.toLowerCase() === myAddress.toLowerCase() ? game.player2Address : game.player1Address;
+  const oppProfile = oppAddr ? profiles[oppAddr.toLowerCase()] : null;
+  return (
+    <PnlCard
+      gameType="{game}"
+      result={isDraw ? "draw" : iWon ? "win" : "loss"}
+      betCrc={game.betCrc}
+      gainCrc={isDraw ? 0 : iWon ? Math.round(wAmount - game.betCrc) : -game.betCrc}
+      playerName={myProfile?.name}
+      playerAvatar={myProfile?.imageUrl || undefined}
+      opponentName={oppProfile?.name || (oppAddr ? shortenAddress(oppAddr) : undefined)}
+      date={new Date().toLocaleDateString()}
+      locale={locale}
+    />
+  );
+})()}
+```
+La PnlCard genere une image PNG telechargeable/partageable avec le resultat du match. TOUJOURS l'inclure sur l'ecran de fin de chaque jeu multijoueur.
+
 **Section test mode** (NODE_ENV === "development") :
 ```
 - "Injecter joueurs" → POST /api/{game}/{id}/test

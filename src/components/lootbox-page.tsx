@@ -12,6 +12,7 @@ import { encodeGameData } from "@/lib/game-data";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { playRollingSound, playRevealSound, setSoundMuted, isSoundMuted } from "@/lib/sounds";
 import { ChancePayment } from "@/components/chance-payment";
+import { PnlCard } from "@/components/pnl-card";
 
 type LootboxData = {
   id: number;
@@ -797,6 +798,24 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                   </span>
                 )}
               </div>
+            )}
+
+            {/* PNL Card after reveal */}
+            {latestOpen && animPhase === "idle" && (
+              <PnlCard
+                gameType="lootbox"
+                result="reward"
+                gameLabel={`Lootbox ${lootbox.title}`}
+                rewardCrc={latestOpen.rewardCrc}
+                betCrc={lootbox.pricePerOpenCrc}
+                gainCrc={latestOpen.rewardCrc - lootbox.pricePerOpenCrc}
+                playerName={latestProfile?.name || shortenAddress(latestOpen.playerAddress)}
+                playerAvatar={latestProfile?.imageUrl || undefined}
+                tier={tier?.label || undefined}
+                tierColor={tier?.color || undefined}
+                date={new Date().toLocaleDateString()}
+                locale={locale}
+              />
             )}
 
             {animPhase === "rolling" && (

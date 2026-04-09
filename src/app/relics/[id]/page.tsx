@@ -10,6 +10,7 @@ import { useTheme } from "@/components/theme-provider"
 import { GamePayment } from "@/components/game-payment"
 import { PlayerBanner } from "@/components/player-banner"
 import { RematchButton, RematchBanner } from "@/components/rematch-button"
+import { PnlCard } from "@/components/pnl-card"
 import { usePlayerToken } from "@/hooks/use-player-token"
 import { useGamePolling } from "@/hooks/use-game-polling"
 import { translations } from "@/lib/i18n"
@@ -680,6 +681,28 @@ function RealRelicsGame({ id }: { id: string }) {
             )}
           </div>
         )}
+
+        {/* PNL Card */}
+        {isFinished && myAddress && (() => {
+          const iWon = game.winnerAddress?.toLowerCase() === myAddress.toLowerCase();
+          const myProfile = profiles[myAddress.toLowerCase()];
+          const oppAddr = game.player1Address?.toLowerCase() === myAddress.toLowerCase() ? game.player2Address : game.player1Address;
+          const oppProfile = oppAddr ? profiles[oppAddr.toLowerCase()] : null;
+          return (
+            <PnlCard
+              gameType="relics"
+              result={iWon ? "win" : "loss"}
+              betCrc={game.betCrc}
+              gainCrc={iWon ? Math.round(winAmount - game.betCrc) : -game.betCrc}
+              playerName={myProfile?.name}
+              playerAvatar={myProfile?.imageUrl || undefined}
+              opponentName={oppProfile?.name || (oppAddr ? `${oppAddr.slice(0, 6)}...${oppAddr.slice(-4)}` : undefined)}
+              opponentAvatar={oppProfile?.imageUrl || undefined}
+              date={new Date().toLocaleDateString()}
+              locale={locale}
+            />
+          );
+        })()}
 
         {/* Payment section */}
         <GamePayment

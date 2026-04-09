@@ -77,9 +77,34 @@ Le composant gere automatiquement :
 - Toujours inclure le `data` dans sendPayment pour identifier le paiement
 - Le flow standalone (QR + lien) doit rester intact quand on n'est PAS dans l'iframe
 
+## PNL Card (resultat partageable)
+
+Apres le resultat d'un jeu chance (lootbox reward, lottery win), TOUJOURS afficher une `<PnlCard>` :
+
+```tsx
+import { PnlCard } from "@/components/pnl-card";
+
+<PnlCard
+  gameType="lootbox"
+  result="reward"
+  gameLabel="Lootbox Bronze"
+  rewardCrc={rewardAmount}
+  betCrc={priceCrc}
+  gainCrc={rewardAmount - priceCrc}
+  playerName={playerName}
+  tier="LEGENDARY"
+  tierColor="#EF4444"
+  date={new Date().toLocaleDateString()}
+  locale={locale}
+/>
+```
+
+La PnlCard genere une image PNG telechargeable/partageable. TOUJOURS l'inclure apres le resultat de chaque jeu chance.
+
 ## Composants existants avec Mini App
 - `src/components/game-payment.tsx` — jeux multijoueur (deja integre)
 - `src/components/chance-payment.tsx` — jeux chance generique (lottery, lootbox, futurs jeux casino)
+- `src/components/pnl-card.tsx` — carte PNL partageable (tous les jeux)
 - `src/components/exchange-section.tsx` — echange CRC (flow inline custom)
 - `src/components/daily-modal.tsx` — recompense quotidienne (flow inline custom)
 - `src/app/shop/page.tsx` — boutique auth par paiement (flow inline custom)

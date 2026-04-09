@@ -15,6 +15,7 @@ import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
 import { darkSafeColor } from "@/lib/utils";
 import { ChancePayment } from "@/components/chance-payment";
+import { PnlCard } from "@/components/pnl-card";
 
 export type LotteryConfig = {
   id: number;
@@ -513,6 +514,22 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* PNL Card for winner */}
+          {winner && (
+            <PnlCard
+              gameType="lottery"
+              result="reward"
+              gameLabel={`${l.winnerTitle[locale]} — ${lottery.title}`}
+              rewardCrc={ticketCount * lottery.ticketPriceCrc * (1 - lottery.commissionPercent / 100)}
+              betCrc={lottery.ticketPriceCrc}
+              playerName={winnerProfile?.name || `${winner.address.slice(0, 6)}...${winner.address.slice(-4)}`}
+              playerAvatar={winnerProfile?.imageUrl || undefined}
+              stats={`${ticketCount} ${locale === "fr" ? "tickets" : "tickets"}`}
+              date={new Date().toLocaleDateString()}
+              locale={locale}
+            />
           )}
 
           <div className="border-2 border-ink/5 shadow-xl rounded-3xl overflow-hidden">

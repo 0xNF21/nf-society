@@ -15,6 +15,7 @@ import { DamesBoard } from '@/components/dames-board'
 import { GamePayment } from '@/components/game-payment'
 import { PlayerBanner } from '@/components/player-banner'
 import { RematchButton, RematchBanner } from '@/components/rematch-button'
+import { PnlCard } from '@/components/pnl-card'
 import { usePlayerToken } from '@/hooks/use-player-token'
 import { useGamePolling } from '@/hooks/use-game-polling'
 import type { DamesGameRow } from '@/lib/db/schema/dames'
@@ -361,6 +362,30 @@ function RealGame({ id }: { id: string }) {
             )}
           </div>
         )}
+
+        {/* PNL Card */}
+        {game.status === 'finished' && address && (() => {
+          const iWon = game.winnerAddress?.toLowerCase() === address.toLowerCase();
+          const isDraw = !game.winnerAddress;
+          const wAmount = game.betCrc * 2 * (1 - game.commissionPct / 100);
+          const myProfile = profiles[address.toLowerCase()];
+          const oppAddr = game.player1Address?.toLowerCase() === address.toLowerCase() ? game.player2Address : game.player1Address;
+          const oppProfile = oppAddr ? profiles[oppAddr.toLowerCase()] : null;
+          return (
+            <PnlCard
+              gameType="dames"
+              result={isDraw ? 'draw' : iWon ? 'win' : 'loss'}
+              betCrc={game.betCrc}
+              gainCrc={isDraw ? 0 : iWon ? Math.round(wAmount - game.betCrc) : -game.betCrc}
+              playerName={myProfile?.name}
+              playerAvatar={myProfile?.imageUrl || undefined}
+              opponentName={oppProfile?.name || (oppAddr ? `${oppAddr.slice(0, 6)}...${oppAddr.slice(-4)}` : undefined)}
+              opponentAvatar={oppProfile?.imageUrl || undefined}
+              date={new Date().toLocaleDateString()}
+              locale={locale}
+            />
+          );
+        })()}
 
         {/* Payment section */}
         <GamePayment
