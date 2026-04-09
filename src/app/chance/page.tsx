@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CalendarCheck, Ticket, Gift, ArrowRight } from "lucide-react";
+import { ArrowLeft, CalendarCheck, Ticket, Gift, ArrowRight, Spade } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
 import { translations } from "@/lib/i18n";
@@ -44,6 +44,17 @@ export default function ChancePage() {
       title: t.lootboxTitle[locale],
       desc: t.lootboxDesc[locale],
       color: "text-emerald-500",
+    },
+    {
+      type: "link" as const,
+      flag: "blackjack",
+      href: "/blackjack",
+      icon: <span className="text-3xl">🃏</span>,
+      iconBg: "bg-green-50 group-hover:bg-green-100",
+      borderHover: "hover:border-green-200",
+      title: locale === "fr" ? "Blackjack" : "Blackjack",
+      desc: locale === "fr" ? "Blackjack classique contre la banque. 3:2." : "Classic blackjack vs dealer. 3:2.",
+      color: "text-green-600",
     },
   ];
 
