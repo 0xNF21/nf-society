@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lootboxes, lootboxOpens, claimedPayments, shopCoupons } from "@/lib/db/schema";
