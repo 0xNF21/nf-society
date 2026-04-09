@@ -121,6 +121,13 @@ export default function ShopPage() {
       setLoading(false);
       return;
     }
+    // Mini App: auto-auth with connected wallet
+    if (isMiniApp && walletAddress) {
+      setVerifiedAddress(walletAddress);
+      setAuthState("confirmed");
+      setLoading(false);
+      return;
+    }
     // Check for existing session in localStorage
     try {
       const stored = localStorage.getItem("nf-shop-session");
@@ -135,7 +142,7 @@ export default function ShopPage() {
       }
     } catch {}
     setLoading(false);
-  }, [isDemo, demoPlayer]);
+  }, [isDemo, demoPlayer, isMiniApp, walletAddress]);
 
   const fetchShop = useCallback(async (address?: string) => {
     try {
