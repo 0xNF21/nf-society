@@ -78,12 +78,23 @@ export async function GET() {
       trace.push(`transfer ADDED tx=${txKey.slice(0,15)}`);
     }
 
+    // Also call the real checkAllNewPayments to compare
+    let realResult: any = null;
+    try {
+      const { checkAllNewPayments } = await import("@/lib/circles");
+      const payments = await checkAllNewPayments(1, "0x960A0784640fD6581D221A56df1c60b65b5ebB6f");
+      realResult = { count: payments.length, txs: payments.map(p => p.transactionHash.slice(0, 15)) };
+    } catch (err: any) {
+      realResult = { error: err.message };
+    }
+
     return NextResponse.json({
       streamCount: streamLogs.length,
       transferCount: transferLogs.length,
       resultCount: results.length,
       results,
       trace,
+      realCheckAllNewPayments: realResult,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message });
