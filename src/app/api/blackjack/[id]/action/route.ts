@@ -117,6 +117,11 @@ export async function POST(
 
     return NextResponse.json({
       id: hand.id,
+      tableId: hand.tableId,
+      playerAddress: hand.playerAddress,
+      betCrc: hand.betCrc,
+      payoutStatus: hand.payoutStatus,
+      createdAt: hand.createdAt,
       ...visible,
       outcome: updateData.outcome || null,
       payoutCrc: newState.totalPayout,
