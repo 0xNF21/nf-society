@@ -302,6 +302,23 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Restore active hand on mount (after page refresh)
+  useEffect(() => {
+    if (handId || !tokenRef.current) return;
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/blackjack/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const data = await res.json();
+        if (data.hand && active) {
+          setHandId(data.hand.id);
+          setHand(data.hand);
+        }
+      } catch {}
+    })();
+    return () => { active = false; };
+  }, [table.slug, tokenRef.current]);
+
   const dataValue = encodeGameData({ game: "blackjack", id: table.slug, v: 1, t: tokenRef.current || undefined });
 
   const { status: paymentStatus } = usePaymentWatcher({
