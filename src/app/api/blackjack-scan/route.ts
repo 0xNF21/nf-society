@@ -63,10 +63,12 @@ export async function POST(req: NextRequest) {
       if (knownTxHashes.has(txHash)) continue;
       if (globalClaimed.has(txHash)) continue;
 
-      // Check game data — accept table slug and double/split variants (e.g. classic-double-5)
+      // Check game data — only accept initial bets, skip double/split extra payments
       if (payment.gameData) {
         if (payment.gameData.game !== "blackjack") continue;
         if (!payment.gameData.id.startsWith(table.slug)) continue;
+        // Skip double/split payments — they contain "-double-" or "-split-" in the id
+        if (payment.gameData.id.includes("-double-") || payment.gameData.id.includes("-split-")) continue;
       }
 
       // Check amount matches a valid bet option
