@@ -299,6 +299,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const [pendingPaidAction, setPendingPaidAction] = useState<"double" | "split" | null>(null);
   const [watchingActionPayment, setWatchingActionPayment] = useState(false);
   const [actionPaymentConfirmed, setActionPaymentConfirmed] = useState(false);
+  const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -421,6 +422,23 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [handId]);
+
+  // Fetch player profile when hand is available
+  useEffect(() => {
+    if (!hand?.playerAddress || playerProfile) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/profiles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ addresses: [hand.playerAddress] }),
+        });
+        const data = await res.json();
+        const profile = data.profiles?.[hand.playerAddress.toLowerCase()];
+        if (profile) setPlayerProfile(profile);
+      } catch {}
+    })();
+  }, [hand?.playerAddress, playerProfile]);
 
   // Stop polling when finished
   useEffect(() => {
@@ -715,7 +733,8 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                 betCrc={hand.betCrc}
                 gainCrc={(hand.payoutCrc || 0) - hand.betCrc}
                 grossAmount={hand.payoutCrc || 0}
-                playerName={hand.playerAddress ? `${hand.playerAddress.slice(0, 6)}...${hand.playerAddress.slice(-4)}` : undefined}
+                playerName={playerProfile?.name || (hand.playerAddress ? `${hand.playerAddress.slice(0, 6)}...${hand.playerAddress.slice(-4)}` : undefined)}
+                playerAvatar={playerProfile?.imageUrl || undefined}
                 stats={hand.outcome === "blackjack" ? "Blackjack 3:2" : undefined}
                 date={new Date().toLocaleDateString()}
                 locale={locale}
