@@ -302,6 +302,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastFinishedHandRef = useRef<number | null>(null);
 
   // Restore active hand on mount (after page refresh)
   useEffect(() => {
@@ -383,7 +384,10 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
       const data = await res.json();
       if (data.results && data.results.length > 0) {
         const newest = data.results[data.results.length - 1];
-        setHandId(newest.id);
+        // Skip if this is the hand we just finished (prevents ghost reappearance)
+        if (newest.id !== lastFinishedHandRef.current) {
+          setHandId(newest.id);
+        }
       }
     } catch {}
     setScanning(false);
@@ -463,14 +467,16 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   }, [handId, actionLoading, tokenRef]);
 
   const resetGame = useCallback(() => {
+    if (handId) lastFinishedHandRef.current = handId;
     setHandId(null);
     setHand(null);
+    setPlayerProfile(null);
     setWatchingPayment(false);
     setShowConfirmed(false);
     setPendingPaidAction(null);
     setWatchingActionPayment(false);
     setActionPaymentConfirmed(false);
-  }, []);
+  }, [handId]);
 
   const betOptions = table.betOptions as number[];
   const isPlaying = hand && hand.status !== "finished";
