@@ -9,7 +9,6 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
-import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { encodeGameData } from "@/lib/game-data";
 import { darkSafeColor } from "@/lib/utils";
@@ -295,12 +294,10 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const [actionLoading, setActionLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [watchingPayment, setWatchingPayment] = useState(false);
-  const [showConfirmed, setShowConfirmed] = useState(false);
   const [pendingPaidAction, setPendingPaidAction] = useState<"double" | "split" | null>(null);
   const [watchingActionPayment, setWatchingActionPayment] = useState(false);
   const [actionPaymentConfirmed, setActionPaymentConfirmed] = useState(false);
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
-  const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastFinishedHandRef = useRef<number | null>(null);
   const [restoring, setRestoring] = useState(true);
@@ -324,14 +321,6 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   }, [table.slug]);
 
   const dataValue = encodeGameData({ game: "blackjack", id: table.slug, v: 1, t: tokenRef.current || undefined });
-
-  const { status: paymentStatus } = usePaymentWatcher({
-    enabled: watchingPayment,
-    dataValue,
-    minAmountCRC: selectedBet,
-    recipientAddress: table.recipientAddress,
-    excludeTxHashes: [],
-  });
 
   // Poll for double/split extra payment via check-payment endpoint
   useEffect(() => {
@@ -367,17 +356,6 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     const interval = setInterval(checkPayment, 5000);
     return () => { active = false; clearInterval(interval); };
   }, [watchingActionPayment, pendingPaidAction, handId, hand]);
-
-  // When initial payment detected, scan for new hands
-  useEffect(() => {
-    if (paymentStatus === "confirmed") {
-      setWatchingPayment(false);
-      setShowConfirmed(true);
-      scanForHand();
-      if (confirmedTimerRef.current) clearTimeout(confirmedTimerRef.current);
-      confirmedTimerRef.current = setTimeout(() => setShowConfirmed(false), 3000);
-    }
-  }, [paymentStatus]);
 
   const scanForHand = useCallback(async () => {
     setScanning(true);
@@ -474,7 +452,6 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     setHand(null);
     setPlayerProfile(null);
     setWatchingPayment(false);
-    setShowConfirmed(false);
     setPendingPaidAction(null);
     setWatchingActionPayment(false);
     setActionPaymentConfirmed(false);
@@ -564,7 +541,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
               onPaymentInitiated={async () => { await scanForHand(); setWatchingPayment(true); }}
               onScan={scanForHand}
               scanning={scanning}
-              paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
+              paymentStatus={watchingPayment ? "watching" : "idle"}
               playerToken={tokenRef.current}
             />
           </div>
