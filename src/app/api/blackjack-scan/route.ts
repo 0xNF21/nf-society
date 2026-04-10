@@ -8,6 +8,8 @@ import { createDeck, dealInitialHands, getVisibleState } from "@/lib/blackjack";
 import type { BlackjackState } from "@/lib/blackjack";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
+// Blackjack-specific start block — reset after cleanup, only scan recent payments
+const BLACKJACK_START_BLOCK = "0x2B7DE5C";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
     const allPayments = [];
     const seenTx = new Set<string>();
     for (const bet of betOptions) {
-      const payments = await checkAllNewPayments(bet, table.recipientAddress);
+      const payments = await checkAllNewPayments(bet, table.recipientAddress, BLACKJACK_START_BLOCK);
       for (const p of payments) {
         const key = p.transactionHash.toLowerCase();
         if (!seenTx.has(key)) {

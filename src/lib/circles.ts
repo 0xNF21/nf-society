@@ -7,7 +7,7 @@ const GNOSIS_RPC_URL = "https://rpc.gnosis.gateway.fm";
 const CIRCLES_HUB_ADDRESS = "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8";
 const STREAM_COMPLETED_TOPIC = "0xcfe53a731d24ac31b725405f3dca8a4d23512d3e1ade2359fbbe7982bec0fd42";
 const TRANSFER_SINGLE_TOPIC = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62";
-const LOTTERY_START_BLOCK = "0x2B7DE5C";
+const DEFAULT_START_BLOCK = "0x2A80000";
 
 export type CirclesTransferEvent = {
   transactionHash: string;
@@ -123,7 +123,8 @@ function parseStreamCompletedData(data: string): bigint {
 }
 
 async function fetchStreamCompletedFromChain(
-  recipientAddress: string
+  recipientAddress: string,
+  fromBlock?: string,
 ): Promise<CirclesTransferEvent[]> {
   const normalized = normalizeAddress(recipientAddress);
   if (!normalized) return [];
@@ -133,7 +134,7 @@ async function fetchStreamCompletedFromChain(
     id: 1,
     method: "eth_getLogs",
     params: [{
-      fromBlock: LOTTERY_START_BLOCK,
+      fromBlock: fromBlock || DEFAULT_START_BLOCK,
       toBlock: "latest",
       address: CIRCLES_HUB_ADDRESS,
       topics: [
@@ -196,7 +197,8 @@ async function fetchStreamCompletedFromChain(
 }
 
 async function fetchTransferSingleFromChain(
-  recipientAddress: string
+  recipientAddress: string,
+  fromBlock?: string,
 ): Promise<CirclesTransferEvent[]> {
   const normalized = normalizeAddress(recipientAddress);
   if (!normalized) return [];
@@ -206,7 +208,7 @@ async function fetchTransferSingleFromChain(
     id: 1,
     method: "eth_getLogs",
     params: [{
-      fromBlock: LOTTERY_START_BLOCK,
+      fromBlock: fromBlock || DEFAULT_START_BLOCK,
       toBlock: "latest",
       address: CIRCLES_HUB_ADDRESS,
       topics: [
@@ -276,7 +278,8 @@ export async function checkPaymentReceived(
   dataValue: string,
   exactAmountCRC: number,
   recipientAddress?: string | null,
-  excludeTxHashes?: Set<string>
+  excludeTxHashes?: Set<string>,
+  fromBlock?: string,
 ): Promise<CirclesTransferEvent | null> {
   if (exactAmountCRC <= 0) return null;
 
@@ -284,8 +287,8 @@ export async function checkPaymentReceived(
   if (!normalized) return null;
 
   const [streamEvents, transferEvents] = await Promise.all([
-    fetchStreamCompletedFromChain(normalized),
-    fetchTransferSingleFromChain(normalized),
+    fetchStreamCompletedFromChain(normalized, fromBlock),
+    fetchTransferSingleFromChain(normalized, fromBlock),
   ]);
 
   const exactWei = BigInt(exactAmountCRC) * WEI_PER_CRC;
@@ -495,14 +498,15 @@ async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { g
 
 export async function checkAllNewPayments(
   exactAmountCRC: number,
-  recipientAddress: string
+  recipientAddress: string,
+  fromBlock?: string,
 ): Promise<CirclesTransferEvent[]> {
   const normalized = normalizeAddress(recipientAddress);
   if (!normalized || exactAmountCRC <= 0) return [];
 
   const [streamEvents, transferEvents] = await Promise.all([
-    fetchStreamCompletedFromChain(normalized),
-    fetchTransferSingleFromChain(normalized),
+    fetchStreamCompletedFromChain(normalized, fromBlock),
+    fetchTransferSingleFromChain(normalized, fromBlock),
   ]);
 
   const exactWei = BigInt(exactAmountCRC) * WEI_PER_CRC;

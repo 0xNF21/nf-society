@@ -36,23 +36,29 @@ export async function GET(
       return NextResponse.json({ found: false, error: "Invalid token" });
     }
 
-    // Collect ALL known tx hashes to exclude
+    // Collect known tx hashes to exclude (scoped to this table + blackjack claims)
     const knownTxHashes = new Set<string>();
 
-    // 1. All blackjack hand tx hashes (initial bets)
-    const allHands = await db.select({ tx: blackjackHands.transactionHash }).from(blackjackHands);
-    for (const h of allHands) knownTxHashes.add(h.tx.toLowerCase());
+    // 1. Blackjack hand tx hashes for this table only
+    const tableHands = await db.select({ tx: blackjackHands.transactionHash })
+      .from(blackjackHands)
+      .where(eq(blackjackHands.tableId, hand.tableId));
+    for (const h of tableHands) knownTxHashes.add(h.tx.toLowerCase());
 
-    // 2. All claimed payments
-    const allClaimed = await db.select({ tx: claimedPayments.txHash }).from(claimedPayments);
-    for (const c of allClaimed) knownTxHashes.add(c.tx.toLowerCase());
+    // 2. Blackjack claimed payments only
+    const bjClaimed = await db.select({ tx: claimedPayments.txHash })
+      .from(claimedPayments)
+      .where(eq(claimedPayments.gameType, "blackjack"));
+    for (const c of bjClaimed) knownTxHashes.add(c.tx.toLowerCase());
 
     // Fetch payments of the right amount to the table's recipient address
     const [table] = await db.select({ recipientAddress: blackjackTables.recipientAddress })
       .from(blackjackTables).where(eq(blackjackTables.id, hand.tableId)).limit(1);
     if (!table) return NextResponse.json({ found: false, error: "Table not found" });
 
-    const payments = await checkAllNewPayments(amount, table.recipientAddress);
+    // Use blackjack-specific start block to avoid scanning old payments
+    const BLACKJACK_START_BLOCK = "0x2B7DE5C";
+    const payments = await checkAllNewPayments(amount, table.recipientAddress, BLACKJACK_START_BLOCK);
 
     // Find a NEW payment from this player that's not in any known set
     // If token is available, also verify the payment's gameData.t matches
