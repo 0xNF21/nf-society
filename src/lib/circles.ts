@@ -7,7 +7,7 @@ const GNOSIS_RPC_URL = "https://rpc.gnosis.gateway.fm";
 const CIRCLES_HUB_ADDRESS = "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8";
 const STREAM_COMPLETED_TOPIC = "0xcfe53a731d24ac31b725405f3dca8a4d23512d3e1ade2359fbbe7982bec0fd42";
 const TRANSFER_SINGLE_TOPIC = "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62";
-const LOTTERY_START_BLOCK = "0x2A80000";
+const LOTTERY_START_BLOCK = "0x2B7DA79";
 
 export type CirclesTransferEvent = {
   transactionHash: string;
