@@ -129,6 +129,13 @@ if (hand.playerToken) {
 ### Schema DB
 Chaque table de resultats DOIT avoir une colonne `playerToken: text("player_token")`.
 
+### Game key dans circles.ts (CRITIQUE)
+Chaque nouveau jeu chance DOIT etre ajoute a la liste `gameKeys` dans `fetchTxInputGameData()` de `src/lib/circles.ts` :
+```typescript
+const gameKeys = [...ALL_GAMES.map(g => g.key), "blackjack", "lootbox", "lottery", "nouveau_jeu", "daily", "shop_auth"];
+```
+Sans ca, le gameData du paiement ne sera JAMAIS decode (car les jeux chance ne sont pas dans `GAME_REGISTRY`/`ALL_GAMES`). Consequences : playerToken null, double/split non identifie, scan qui cree des mains fantomes.
+
 ## Regles
 - Le QR code ne doit PAS etre genere en mode Mini App (gere par ChancePayment)
 - Le scan blockchain reste identique — le serveur detecte la tx on-chain normalement
