@@ -26,9 +26,20 @@ export async function POST(req: NextRequest) {
       .where(eq(blackjackHands.tableId, table.id));
     const knownTxHashes = new Set(existingHands.map(h => h.transactionHash.toLowerCase()));
 
-    // Scan for all possible bet amounts
-    const minBet = Math.min(...betOptions);
-    const newPayments = await checkAllNewPayments(minBet, table.recipientAddress);
+    // Scan for each bet amount separately (checkAllNewPayments filters by exact amount)
+    const allPayments = [];
+    const seenTx = new Set<string>();
+    for (const bet of betOptions) {
+      const payments = await checkAllNewPayments(bet, table.recipientAddress);
+      for (const p of payments) {
+        const key = p.transactionHash.toLowerCase();
+        if (!seenTx.has(key)) {
+          seenTx.add(key);
+          allPayments.push(p);
+        }
+      }
+    }
+    const newPayments = allPayments;
 
     const candidateTxHashes = newPayments
       .map(p => p.transactionHash.toLowerCase())
