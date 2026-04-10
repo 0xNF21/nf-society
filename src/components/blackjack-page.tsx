@@ -389,11 +389,13 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   }, [table.slug]);
 
   // Poll scan when waiting for initial payment
+  // Always poll when no hand is active — don't wait for watchingPayment
+  // This ensures detection works even if onPaymentInitiated timing is off
   useEffect(() => {
-    if (!watchingPayment || handId) return;
+    if (handId) return;
     const interval = setInterval(scanForHand, 5000);
     return () => clearInterval(interval);
-  }, [watchingPayment, handId, scanForHand]);
+  }, [handId, scanForHand]);
 
 
   // Fetch hand state when handId changes
