@@ -84,7 +84,14 @@ export async function GET(
       }).onConflictDoNothing();
     }
 
-    return NextResponse.json({ found });
+    return NextResponse.json({
+      found,
+      debug: {
+        paymentsCount: payments.length,
+        knownCount: knownTxHashes.size,
+        paymentTxs: payments.map(p => p.transactionHash.slice(0, 15)),
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ found: false, error: error.message });
   }
