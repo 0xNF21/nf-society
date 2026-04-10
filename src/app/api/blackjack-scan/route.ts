@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { blackjackTables, blackjackHands, claimedPayments } from "@/lib/db/schema";
-import { eq, ne, and, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { createDeck, dealInitialHands, getVisibleState } from "@/lib/blackjack";
 import type { BlackjackState } from "@/lib/blackjack";
@@ -54,12 +54,6 @@ export async function POST(req: NextRequest) {
       for (const c of claimed) globalClaimed.add(c.txHash.toLowerCase());
     }
 
-    // Pre-load players with active hands to skip double/split payments
-    const activeHands = await db.select({ playerAddress: blackjackHands.playerAddress })
-      .from(blackjackHands)
-      .where(and(eq(blackjackHands.tableId, table.id), ne(blackjackHands.status, "finished")));
-    const playersWithActiveHands = new Set(activeHands.map(h => h.playerAddress.toLowerCase()));
-
     const created: Array<{ id: number; playerAddress: string; betCrc: number }> = [];
 
     for (const payment of newPayments) {
@@ -76,10 +70,6 @@ export async function POST(req: NextRequest) {
         // Skip double/split payments — they contain "-double-" or "-split-" in the id
         if (payment.gameData.id.includes("-double-") || payment.gameData.id.includes("-split-")) continue;
       }
-
-      // Skip if this player already has an active (non-finished) hand on this table
-      // This prevents double/split payments (which have no gameData) from creating new hands
-      if (playersWithActiveHands.has(playerAddress)) continue;
 
       // Check amount matches a valid bet option
       let betCrc = 0;
