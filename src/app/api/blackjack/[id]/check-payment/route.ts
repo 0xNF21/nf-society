@@ -73,7 +73,14 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ found, debug: { paymentsCount: payments.length, knownCount: knownTxHashes.size, recipientAddress: table.recipientAddress } });
+    const debugPayments = payments.map(p => ({
+      tx: p.transactionHash.slice(0, 15),
+      sender: p.sender.slice(0, 10),
+      value: p.value,
+      inKnown: knownTxHashes.has(p.transactionHash.toLowerCase()),
+      gameData: p.gameData,
+    }));
+    return NextResponse.json({ found, debug: { paymentsCount: payments.length, knownCount: knownTxHashes.size, recipientAddress: table.recipientAddress, payments: debugPayments } });
   } catch (error: any) {
     return NextResponse.json({ found: false, error: error.message });
   }
