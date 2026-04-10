@@ -54,33 +54,31 @@ export async function GET(
 
     const payments = await checkAllNewPayments(amount, table.recipientAddress);
 
-    console.log(`[CheckPayment] hand=${handId} amount=${amount} player=${player} recipientAddress=${table.recipientAddress} payments=${payments.length} known=${knownTxHashes.size}`);
-    for (const p of payments) {
-      console.log(`[CheckPayment] payment tx=${p.transactionHash.slice(0,15)} sender=${p.sender.slice(0,10)} inKnown=${knownTxHashes.has(p.transactionHash.toLowerCase())} gameData=${JSON.stringify(p.gameData)}`);
-    }
-
     // Find a NEW payment from this player that's not in any known set
     // If token is available, also verify the payment's gameData.t matches
     let found = false;
+    let foundTxHash = "";
     for (const p of payments) {
-      const senderMatch = p.sender.toLowerCase() === player;
-      const isKnown = knownTxHashes.has(p.transactionHash.toLowerCase());
-      const tokenMismatch = token && p.gameData?.t && p.gameData.t !== token;
-      console.log(`[CheckPayment] tx=${p.transactionHash.slice(0, 10)} sender=${p.sender.slice(0, 10)} senderMatch=${senderMatch} isKnown=${isKnown} tokenMismatch=${tokenMismatch} gameData=${JSON.stringify(p.gameData)}`);
-      if (senderMatch && !isKnown && !tokenMismatch) {
-        found = true;
-        break;
-      }
+      if (p.sender.toLowerCase() !== player) continue;
+      if (knownTxHashes.has(p.transactionHash.toLowerCase())) continue;
+      if (token && p.gameData?.t && p.gameData.t !== token) continue;
+      found = true;
+      foundTxHash = p.transactionHash.toLowerCase();
+      break;
     }
 
-    const debugPayments = payments.map(p => ({
-      tx: p.transactionHash.slice(0, 15),
-      sender: p.sender.slice(0, 10),
-      value: p.value,
-      inKnown: knownTxHashes.has(p.transactionHash.toLowerCase()),
-      gameData: p.gameData,
-    }));
-    return NextResponse.json({ found, debug: { paymentsCount: payments.length, knownCount: knownTxHashes.size, recipientAddress: table.recipientAddress, payments: debugPayments } });
+    // Claim the found tx to prevent reuse on subsequent checks
+    if (found && foundTxHash) {
+      await db.insert(claimedPayments).values({
+        txHash: foundTxHash,
+        gameType: "blackjack",
+        gameId: hand.tableId,
+        playerAddress: player,
+        amountCrc: amount,
+      }).onConflictDoNothing();
+    }
+
+    return NextResponse.json({ found });
   } catch (error: any) {
     return NextResponse.json({ found: false, error: error.message });
   }
