@@ -162,7 +162,7 @@ function PfcBanner() {
 }
 
 function LootboxBanner({ tier }: { tier: string }) {
-  const key = tier.toLowerCase().replace(/[^a-z]/g, "");
+  const key = tier.toLowerCase().replace(/[^a-z]/g, "") || "common";
   const img = LOOTBOX_IMAGES[key];
   const emoji = LOOTBOX_EMOJIS[key] || "\uD83D\uDCE6";
   const glowColor = STYLES[key]?.amount || "#8B5CF6";
