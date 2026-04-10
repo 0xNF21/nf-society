@@ -87,6 +87,7 @@ async function fetchBlockTimestamps(blockNumbers: string[]): Promise<Map<string,
         body: JSON.stringify(requests),
         signal: AbortSignal.timeout(10000),
       cache: "no-store" as RequestCache,
+      next: { revalidate: 0 } as any,
       });
 
       if (!response.ok) continue;
@@ -153,6 +154,7 @@ async function fetchStreamCompletedFromChain(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
       cache: "no-store" as RequestCache,
+      next: { revalidate: 0 } as any,
     });
 
     if (!response.ok) return [];
@@ -227,6 +229,7 @@ async function fetchTransferSingleFromChain(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
       cache: "no-store" as RequestCache,
+      next: { revalidate: 0 } as any,
     });
 
     if (!response.ok) return [];
@@ -351,6 +354,7 @@ async function fetchTransferDataGameData(
       }),
       signal: AbortSignal.timeout(15000),
       cache: "no-store" as RequestCache,
+      next: { revalidate: 0 } as any,
     });
 
     if (!response.ok) return results;
@@ -415,6 +419,7 @@ async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { g
         body: JSON.stringify(requests),
         signal: AbortSignal.timeout(15000),
       cache: "no-store" as RequestCache,
+      next: { revalidate: 0 } as any,
       });
       if (!response.ok) continue;
 
