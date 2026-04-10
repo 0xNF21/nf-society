@@ -389,13 +389,14 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     setScanning(false);
   }, [table.slug]);
 
-  // Poll scan when waiting for initial payment
+  // Poll scan for initial payment detection
+  // Fast poll (5s) when actively watching, slow poll (15s) as fallback
   useEffect(() => {
-    if (!watchingPayment || handId) return;
-    scanForHand(); // immediate first scan
-    const interval = setInterval(scanForHand, 5000);
+    if (handId) return;
+    const ms = watchingPayment ? 5000 : 15000;
+    const interval = setInterval(scanForHand, ms);
     return () => clearInterval(interval);
-  }, [watchingPayment, handId, scanForHand]);
+  }, [handId, watchingPayment, scanForHand]);
 
 
   // Fetch hand state when handId changes
