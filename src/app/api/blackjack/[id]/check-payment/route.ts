@@ -84,26 +84,7 @@ export async function GET(
       }).onConflictDoNothing();
     }
 
-    // Debug: check why target tx isn't matching
-    const targetTx = payments.find(p => p.transactionHash.toLowerCase().startsWith("0x9b6895e3de624"));
-    const targetDebug = targetTx ? {
-      sender: targetTx.sender,
-      senderMatch: targetTx.sender.toLowerCase() === player,
-      inKnown: knownTxHashes.has(targetTx.transactionHash.toLowerCase()),
-      gameData: targetTx.gameData,
-      tokenMismatch: token && targetTx.gameData?.t && targetTx.gameData.t !== token,
-    } : "not found in payments";
-
-    return NextResponse.json({
-      found,
-      debug: {
-        paymentsCount: payments.length,
-        knownCount: knownTxHashes.size,
-        player,
-        token,
-        targetTx: targetDebug,
-      },
-    });
+    return NextResponse.json({ found });
   } catch (error: any) {
     return NextResponse.json({ found: false, error: error.message });
   }
