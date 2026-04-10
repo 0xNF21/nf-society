@@ -20,12 +20,24 @@ export async function POST(
 
     const body = await req.json();
     const action = body.action as Action;
+    const playerToken = body.playerToken as string | undefined;
     if (!action || !VALID_ACTIONS.includes(action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
     const [hand] = await db.select().from(blackjackHands).where(eq(blackjackHands.id, handId)).limit(1);
     if (!hand) return NextResponse.json({ error: "Hand not found" }, { status: 404 });
+
+    // Anti-cheat: verify player token
+    if (hand.playerToken) {
+      if (!playerToken) {
+        return NextResponse.json({ error: "Player token required" }, { status: 401 });
+      }
+      if (playerToken !== hand.playerToken) {
+        return NextResponse.json({ error: "Invalid player token" }, { status: 401 });
+      }
+    }
+
     if (hand.status === "finished") {
       return NextResponse.json({ error: "Hand already finished" }, { status: 400 });
     }

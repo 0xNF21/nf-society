@@ -19,6 +19,7 @@ export const blackjackHands = pgTable("blackjack_hands", {
   playerAddress: text("player_address").notNull(),
   transactionHash: text("transaction_hash").notNull().unique(),
   betCrc: integer("bet_crc").notNull(),
+  playerToken: text("player_token"),
   // Full game state stored as JSON (deck, hands, dealer, etc.)
   gameState: jsonb("game_state").notNull(),
   status: text("status").notNull().default("dealing"),

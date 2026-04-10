@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { encodeGameData } from "@/lib/game-data";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
+import { usePlayerToken } from "@/hooks/use-player-token";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
@@ -78,6 +79,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const displayColor = darkSafeColor(lottery.primaryColor, isDark);
   const displayAccent = darkSafeColor(lottery.accentColor, isDark);
   const l = translations.lottery;
+  const tokenRef = usePlayerToken("lottery", lottery.slug);
 
   const [ticketCount, setTicketCount] = useState<number>(initialCount ?? 0);
   const [participantList, setParticipantList] = useState<ParticipantEntry[]>(initialParticipants ?? []);
@@ -106,8 +108,8 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const dataValue = useMemo(
-    () => encodeGameData({ game: "lottery", id: lottery.slug, v: 1 }),
-    [lottery.slug]
+    () => encodeGameData({ game: "lottery", id: lottery.slug, v: 1, t: tokenRef.current || undefined }),
+    [lottery.slug, tokenRef]
   );
 
   const excludeTxHashes = useMemo(
@@ -128,8 +130,9 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const scanAndRefresh = useCallback(async () => {
     setScanning(true);
     try {
+      const tokenParam = tokenRef.current ? `&token=${tokenRef.current}` : "";
       await fetch(`/api/scan?${lotteryQuery}`, { method: "POST" });
-      const res = await fetch(`/api/participants?${lotteryQuery}`);
+      const res = await fetch(`/api/participants?${lotteryQuery}${tokenParam}`);
       const data = await res.json();
       if (data.count !== undefined) setTicketCount(data.count);
       if (data.participants) setParticipantList(data.participants);
@@ -138,7 +141,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     } finally {
       setScanning(false);
     }
-  }, [lotteryQuery]);
+  }, [lotteryQuery, tokenRef]);
 
   useEffect(() => {
     if (paymentStatus === "confirmed") {
@@ -428,6 +431,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                   scanning={scanning}
                   paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
                   qrLabel={l.qrScan[locale]}
+                  playerToken={tokenRef.current}
                 />
               </CardContent>
             </Card>

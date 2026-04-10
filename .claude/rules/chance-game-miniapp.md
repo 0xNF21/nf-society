@@ -70,6 +70,7 @@ import { ChancePayment } from "@/components/chance-payment";
   scanning={scanning}
   paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
   qrLabel={t.scanQr[locale]}
+  playerToken={tokenRef.current}
 />
 ```
 
@@ -79,6 +80,54 @@ Le composant gere automatiquement :
 - Generation QR code (uniquement en standalone)
 
 **NE PAS** implementer le flow paiement manuellement dans les jeux chance — toujours utiliser `<ChancePayment>`.
+
+## OBLIGATOIRE — playerToken (identification joueur)
+
+Chaque jeu chance DOIT utiliser un `playerToken` pour identifier le joueur qui a paye. Cela permet :
+- De retrouver ses resultats meme apres fermeture de page
+- D'eviter la confusion quand 2 joueurs paient en meme temps
+- Pour les jeux interactifs (blackjack) : anti-triche sur les actions
+
+### Pattern front-end
+```typescript
+import { usePlayerToken } from "@/hooks/use-player-token";
+
+const tokenRef = usePlayerToken("nom-du-jeu", game.slug);
+
+// 1. Encoder le token dans le dataValue (payment watcher)
+const dataValue = encodeGameData({ game: "nom-du-jeu", id: game.slug, v: 1, t: tokenRef.current || undefined });
+
+// 2. Passer le token au ChancePayment
+<ChancePayment ... playerToken={tokenRef.current} />
+
+// 3. Passer le token aux API calls
+fetch(`/api/scan?gameId=${id}&token=${tokenRef.current}`)
+fetch(`/api/results?gameId=${id}&token=${tokenRef.current}`)
+
+// 4. Pour les jeux interactifs, passer le token aux actions
+body: JSON.stringify({ action, playerToken: tokenRef.current })
+```
+
+### Pattern back-end
+```typescript
+// Scan API : extraire et stocker le token
+const playerToken = payment.gameData?.t || null;
+await db.insert(table).values({ ...data, playerToken });
+
+// GET API : filtrer par token
+const token = req.nextUrl.searchParams.get("token");
+// Si token fourni, filtrer les resultats du joueur
+
+// Action API (jeux interactifs) : verifier le token
+if (hand.playerToken) {
+  if (!playerToken || playerToken !== hand.playerToken) {
+    return NextResponse.json({ error: "Invalid player token" }, { status: 401 });
+  }
+}
+```
+
+### Schema DB
+Chaque table de resultats DOIT avoir une colonne `playerToken: text("player_token")`.
 
 ## Regles
 - Le QR code ne doit PAS etre genere en mode Mini App (gere par ChancePayment)

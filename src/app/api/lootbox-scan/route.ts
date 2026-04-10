@@ -68,6 +68,9 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // Extract player token from payment data
+      const playerToken = payment.gameData?.t || null;
+
       const rewardCrc = getRandomReward(priceCrc);
 
       let openedAt: Date;
@@ -84,6 +87,7 @@ export async function POST(req: NextRequest) {
           lootboxId,
           playerAddress,
           transactionHash: txHash,
+          playerToken,
           rewardCrc,
           payoutStatus: "pending",
           openedAt,

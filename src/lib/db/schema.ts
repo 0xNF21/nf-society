@@ -22,6 +22,7 @@ export const participants = pgTable("participants", {
   lotteryId: integer("lottery_id").references(() => lotteries.id).notNull(),
   address: text("address").notNull(),
   transactionHash: text("transaction_hash").notNull(),
+  playerToken: text("player_token"),
   paidAt: timestamp("paid_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
@@ -75,6 +76,7 @@ export const lootboxOpens = pgTable("lootbox_opens", {
   lootboxId: integer("lootbox_id").references(() => lootboxes.id).notNull(),
   playerAddress: text("player_address").notNull(),
   transactionHash: text("transaction_hash").notNull().unique(),
+  playerToken: text("player_token"),
   rewardCrc: real("reward_crc").notNull(),
   payoutStatus: text("payout_status").notNull().default("pending"),
   payoutTxHash: text("payout_tx_hash"),

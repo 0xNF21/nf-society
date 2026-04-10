@@ -18,6 +18,12 @@ export async function GET(
     const [hand] = await db.select().from(blackjackHands).where(eq(blackjackHands.id, handId)).limit(1);
     if (!hand) return NextResponse.json({ error: "Hand not found" }, { status: 404 });
 
+    // Verify player token if provided
+    const token = req.nextUrl.searchParams.get("token");
+    if (token && hand.playerToken && token !== hand.playerToken) {
+      return NextResponse.json({ error: "Invalid player token" }, { status: 403 });
+    }
+
     const state = hand.gameState as unknown as BlackjackState;
     const visible = getVisibleState(state);
 

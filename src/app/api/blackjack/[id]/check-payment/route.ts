@@ -26,8 +26,15 @@ export async function GET(
       return NextResponse.json({ found: false, error: "Invalid params" });
     }
 
+    const token = req.nextUrl.searchParams.get("token");
+
     const [hand] = await db.select().from(blackjackHands).where(eq(blackjackHands.id, handId)).limit(1);
     if (!hand) return NextResponse.json({ found: false });
+
+    // Verify player token
+    if (hand.playerToken && token !== hand.playerToken) {
+      return NextResponse.json({ found: false, error: "Invalid token" });
+    }
 
     // Collect ALL known tx hashes to exclude
     const knownTxHashes = new Set<string>();
@@ -45,10 +52,13 @@ export async function GET(
     const payments = await checkAllNewPayments(amount, safeAddress);
 
     // Find a NEW payment from this player that's not in any known set
-    const found = payments.some(p =>
-      p.sender.toLowerCase() === player &&
-      !knownTxHashes.has(p.transactionHash.toLowerCase())
-    );
+    // If token is available, also verify the payment's gameData.t matches
+    const found = payments.some(p => {
+      if (p.sender.toLowerCase() !== player) return false;
+      if (knownTxHashes.has(p.transactionHash.toLowerCase())) return false;
+      if (token && p.gameData?.t && p.gameData.t !== token) return false;
+      return true;
+    });
 
     return NextResponse.json({ found });
   } catch (error: any) {

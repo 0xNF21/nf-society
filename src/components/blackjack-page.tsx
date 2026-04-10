@@ -10,6 +10,7 @@ import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
+import { usePlayerToken } from "@/hooks/use-player-token";
 import { encodeGameData } from "@/lib/game-data";
 import { darkSafeColor } from "@/lib/utils";
 import type { Card, Hand, Action, VisibleState, BlackjackState } from "@/lib/blackjack";
@@ -285,6 +286,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
   const t = translations.blackjack;
+  const tokenRef = usePlayerToken("blackjack", table.slug);
 
   const [selectedBet, setSelectedBet] = useState<number>(table.betOptions[0] || 5);
   const [handId, setHandId] = useState<number | null>(null);
@@ -300,7 +302,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const dataValue = encodeGameData({ game: "blackjack", id: table.slug, v: 1 });
+  const dataValue = encodeGameData({ game: "blackjack", id: table.slug, v: 1, t: tokenRef.current || undefined });
 
   const { status: paymentStatus } = usePaymentWatcher({
     enabled: watchingPayment,
@@ -317,7 +319,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
 
     const checkPayment = async () => {
       try {
-        const res = await fetch(`/api/blackjack/${handId}/check-payment?amount=${hand.baseBet}&player=${hand.playerAddress}`);
+        const res = await fetch(`/api/blackjack/${handId}/check-payment?amount=${hand.baseBet}&player=${hand.playerAddress}&token=${tokenRef.current}`);
         const data = await res.json();
         if (data.found && active) {
           setWatchingActionPayment(false);
@@ -328,7 +330,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
             const actionRes = await fetch(`/api/blackjack/${handId}/action`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: pendingPaidAction }),
+              body: JSON.stringify({ action: pendingPaidAction, playerToken: tokenRef.current }),
             });
             const actionData = await actionRes.json();
             if (actionRes.ok) setHand(actionData);
@@ -359,7 +361,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const scanForHand = useCallback(async () => {
     setScanning(true);
     try {
-      const res = await fetch(`/api/blackjack-scan?tableSlug=${table.slug}`, { method: "POST" });
+      const res = await fetch(`/api/blackjack-scan?tableSlug=${table.slug}&token=${tokenRef.current}`, { method: "POST" });
       const data = await res.json();
       if (data.results && data.results.length > 0) {
         const newest = data.results[data.results.length - 1];
@@ -384,7 +386,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
 
     async function fetchHand() {
       try {
-        const res = await fetch(`/api/blackjack/${handId}`);
+        const res = await fetch(`/api/blackjack/${handId}?token=${tokenRef.current}`);
         if (!res.ok) return;
         const data = await res.json();
         if (active) setHand(data);
@@ -415,13 +417,13 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
       const res = await fetch(`/api/blackjack/${handId}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, playerToken: tokenRef.current }),
       });
       const data = await res.json();
       if (res.ok) setHand(data);
     } catch {}
     setActionLoading(false);
-  }, [handId, actionLoading]);
+  }, [handId, actionLoading, tokenRef]);
 
   const resetGame = useCallback(() => {
     setHandId(null);
@@ -511,6 +513,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
               onScan={scanForHand}
               scanning={scanning}
               paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
+              playerToken={tokenRef.current}
             />
           </div>
         </div>
@@ -645,6 +648,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   onPaymentInitiated={() => setWatchingActionPayment(true)}
                   scanning={false}
                   paymentStatus={watchingActionPayment ? "watching" : "idle"}
+                  playerToken={tokenRef.current}
                 />
               )}
             </div>

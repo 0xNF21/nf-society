@@ -31,6 +31,8 @@ interface ChancePaymentProps {
   paymentStatus?: "idle" | "watching" | "confirmed" | "error";
   /** QR scan instruction text */
   qrLabel?: string;
+  /** Player token for identifying the payer (encoded in payment data) */
+  playerToken?: string;
 }
 
 export function ChancePayment({
@@ -45,6 +47,7 @@ export function ChancePayment({
   scanning = false,
   paymentStatus = "idle",
   qrLabel,
+  playerToken,
 }: ChancePaymentProps) {
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
@@ -58,7 +61,7 @@ export function ChancePayment({
   const [miniAppError, setMiniAppError] = useState<string | null>(null);
   const [miniAppSuccess, setMiniAppSuccess] = useState(false);
 
-  const paymentLink = generateGamePaymentLink(recipientAddress, amountCrc, gameType, gameId);
+  const paymentLink = generateGamePaymentLink(recipientAddress, amountCrc, gameType, gameId, playerToken);
 
   // Generate QR code (standalone only)
   useEffect(() => {
@@ -82,7 +85,9 @@ export function ChancePayment({
     setMiniAppPaying(true);
     setMiniAppError(null);
     try {
-      const data = `${gameType}:${gameId}`;
+      const parts = [gameType, gameId];
+      if (playerToken) parts.push(playerToken);
+      const data = parts.join(":");
       await sendPayment(recipientAddress, amountCrc, data);
       setMiniAppSuccess(true);
       onPaymentInitiated?.();

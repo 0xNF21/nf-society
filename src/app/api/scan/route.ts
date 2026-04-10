@@ -97,11 +97,15 @@ export async function POST(req: NextRequest) {
         paidAt = new Date();
       }
 
+      // Extract player token from payment data
+      const playerToken = payment.gameData?.t || null;
+
       try {
         await db.insert(participants).values({
           lotteryId: lotteryId,
           address: addr,
           transactionHash: txHash,
+          playerToken,
           paidAt,
         }).onConflictDoNothing();
 

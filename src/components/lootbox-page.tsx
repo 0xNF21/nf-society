@@ -10,6 +10,7 @@ import { darkSafeColor } from "@/lib/utils";
 import { getRewardTable } from "@/lib/lootbox";
 import { encodeGameData } from "@/lib/game-data";
 import { usePaymentWatcher } from "@/hooks/use-payment-watcher";
+import { usePlayerToken } from "@/hooks/use-player-token";
 import { playRollingSound, playRevealSound, setSoundMuted, isSoundMuted } from "@/lib/sounds";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
@@ -399,6 +400,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const t = translations.lootbox;
+  const tokenRef = usePlayerToken("lootbox", lootbox.slug);
 
   const [opens, setOpens] = useState<LootboxOpen[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -491,7 +493,8 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
 
   const fetchOpens = useCallback(async () => {
     try {
-      const res = await fetch(`/api/lootbox-opens?lootboxId=${lootbox.id}`, { cache: "no-store" });
+      const tokenParam = tokenRef.current ? `&token=${tokenRef.current}` : "";
+      const res = await fetch(`/api/lootbox-opens?lootboxId=${lootbox.id}${tokenParam}`, { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
       const data: LootboxOpen[] = Array.isArray(json) ? json : json.opens ?? [];
@@ -523,8 +526,8 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   }, [lootbox.id, fetchOpens]);
 
   const dataValue = useMemo(
-    () => encodeGameData({ game: "lootbox", id: lootbox.slug, v: 1 }),
-    [lootbox.slug]
+    () => encodeGameData({ game: "lootbox", id: lootbox.slug, v: 1, t: tokenRef.current || undefined }),
+    [lootbox.slug, tokenRef]
   );
 
   const excludeTxHashes = useMemo(
@@ -840,6 +843,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               scanning={scanning}
               paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
               qrLabel={t.scanQr[locale]}
+              playerToken={tokenRef.current}
             />
 
             <p className="text-xs text-ink/25 font-mono break-all text-center">{paymentAddress}</p>

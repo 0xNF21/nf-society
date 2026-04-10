@@ -82,6 +82,9 @@ export async function POST(req: NextRequest) {
         if (betCrc === 0) continue;
       } catch { continue; }
 
+      // Extract player token from payment data
+      const playerToken = payment.gameData?.t || null;
+
       // Deal initial hand
       const deck = createDeck(6);
       const state = dealInitialHands(deck, betCrc);
@@ -92,6 +95,7 @@ export async function POST(req: NextRequest) {
           playerAddress,
           transactionHash: txHash,
           betCrc,
+          playerToken,
           gameState: state as unknown as Record<string, unknown>,
           status: state.status,
           outcome: state.status === "finished" ? (state.playerHands[0]?.outcome || null) : null,
