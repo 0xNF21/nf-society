@@ -89,10 +89,6 @@ export async function POST(req: NextRequest) {
 
       // Deal initial hand
       const deck = createDeck(6);
-      // TEMP: force a pair of 8s for split testing (pop takes from end)
-      const len = deck.length;
-      deck[len - 1] = { rank: "8", suit: "hearts" };  // playerCard1
-      deck[len - 3] = { rank: "8", suit: "spades" };  // playerCard2
       const state = dealInitialHands(deck, betCrc);
 
       try {
