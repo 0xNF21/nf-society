@@ -303,10 +303,11 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastFinishedHandRef = useRef<number | null>(null);
+  const [restoring, setRestoring] = useState(true);
 
   // Restore active hand on mount (after page refresh)
   useEffect(() => {
-    if (handId || !tokenRef.current) return;
+    if (!tokenRef.current) { setRestoring(false); return; }
     let active = true;
     (async () => {
       try {
@@ -317,9 +318,10 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
           setHand(data.hand);
         }
       } catch {}
+      if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug, tokenRef.current]);
+  }, [table.slug]);
 
   const dataValue = encodeGameData({ game: "blackjack", id: table.slug, v: 1, t: tokenRef.current || undefined });
 
@@ -396,11 +398,11 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   // Poll scan for initial payment detection
   // Fast poll (5s) when actively watching, slow poll (15s) as fallback
   useEffect(() => {
-    if (handId) return;
+    if (handId || restoring) return;
     const ms = watchingPayment ? 5000 : 15000;
     const interval = setInterval(scanForHand, ms);
     return () => clearInterval(interval);
-  }, [handId, watchingPayment, scanForHand]);
+  }, [handId, restoring, watchingPayment, scanForHand]);
 
 
   // Fetch hand state when handId changes
@@ -517,8 +519,15 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
         </div>
       </div>
 
+      {/* ── Loading: restoring active hand ── */}
+      {restoring && !hand && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-ink/30" />
+        </div>
+      )}
+
       {/* ── No active hand: bet selection + payment ── */}
-      {!hand && (
+      {!hand && !restoring && (
         <div className="space-y-6">
           {/* Bet selector */}
           <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-6 space-y-4">
