@@ -294,6 +294,9 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const [scanning, setScanning] = useState(false);
   const [watchingPayment, setWatchingPayment] = useState(false);
   const [showConfirmed, setShowConfirmed] = useState(false);
+  const [pendingPaidAction, setPendingPaidAction] = useState<"double" | "split" | null>(null);
+  const [watchingActionPayment, setWatchingActionPayment] = useState(false);
+  const [actionPaymentConfirmed, setActionPaymentConfirmed] = useState(false);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -307,7 +310,41 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     excludeTxHashes: [],
   });
 
-  // When payment detected, scan for new hands
+  // Second watcher for double/split extra payment
+  const actionDataValue = handId ? encodeGameData({ game: "blackjack", id: `${table.slug}-${pendingPaidAction}-${handId}`, v: 1 }) : "";
+  const { status: actionPayStatus } = usePaymentWatcher({
+    enabled: watchingActionPayment && !!pendingPaidAction,
+    dataValue: actionDataValue,
+    minAmountCRC: hand?.baseBet || selectedBet,
+    recipientAddress: table.recipientAddress,
+    excludeTxHashes: [],
+  });
+
+  // When extra payment detected, perform the action
+  useEffect(() => {
+    if (actionPayStatus === "confirmed" && pendingPaidAction && handId) {
+      setWatchingActionPayment(false);
+      setActionPaymentConfirmed(true);
+      // Perform the action now
+      (async () => {
+        setActionLoading(true);
+        try {
+          const res = await fetch(`/api/blackjack/${handId}/action`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: pendingPaidAction }),
+          });
+          const data = await res.json();
+          if (res.ok) setHand(data);
+        } catch {}
+        setActionLoading(false);
+        setPendingPaidAction(null);
+        setActionPaymentConfirmed(false);
+      })();
+    }
+  }, [actionPayStatus, pendingPaidAction, handId]);
+
+  // When initial payment detected, scan for new hands
   useEffect(() => {
     if (paymentStatus === "confirmed") {
       setWatchingPayment(false);
@@ -382,6 +419,9 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     setHand(null);
     setWatchingPayment(false);
     setShowConfirmed(false);
+    setPendingPaidAction(null);
+    setWatchingActionPayment(false);
+    setActionPaymentConfirmed(false);
   }, []);
 
   const betOptions = table.betOptions as number[];
@@ -511,7 +551,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
           </div>
 
           {/* Action buttons */}
-          {hand.status === "playing" && hand.availableActions.length > 0 && (
+          {hand.status === "playing" && hand.availableActions.length > 0 && !pendingPaidAction && (
             <div className="grid grid-cols-2 gap-3">
               {hand.availableActions.includes("hit") && (
                 <button
@@ -533,25 +573,25 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   {t.stand[locale]}
                 </button>
               )}
-              {hand.availableActions.includes("double") && (
+              {hand.availableActions.includes("double") && !pendingPaidAction && (
                 <button
-                  onClick={() => performAction("double")}
+                  onClick={() => { setPendingPaidAction("double"); setWatchingActionPayment(false); setActionPaymentConfirmed(false); }}
                   disabled={actionLoading}
                   className="py-3 rounded-xl font-bold text-sm bg-amber-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >
-                  {t.double[locale]}
+                  {t.double[locale]} (+{hand.baseBet} CRC)
                 </button>
               )}
-              {hand.availableActions.includes("split") && (
+              {hand.availableActions.includes("split") && !pendingPaidAction && (
                 <button
-                  onClick={() => performAction("split")}
+                  onClick={() => { setPendingPaidAction("split"); setWatchingActionPayment(false); setActionPaymentConfirmed(false); }}
                   disabled={actionLoading}
                   className="py-3 rounded-xl font-bold text-sm bg-violet-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >
-                  {t.split[locale]}
+                  {t.split[locale]} (+{hand.baseBet} CRC)
                 </button>
               )}
-              {hand.availableActions.includes("insurance") && (
+              {hand.availableActions.includes("insurance") && !pendingPaidAction && (
                 <button
                   onClick={() => performAction("insurance")}
                   disabled={actionLoading}
@@ -559,6 +599,44 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                 >
                   Insurance ({Math.floor(hand.baseBet / 2)} CRC)
                 </button>
+              )}
+            </div>
+          )}
+
+          {/* Payment panel for Double/Split */}
+          {pendingPaidAction && hand.status === "playing" && (
+            <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-ink">
+                  {pendingPaidAction === "double" ? t.double[locale] : t.split[locale]} — {locale === "fr" ? "Mise supplementaire" : "Extra bet"}
+                </h3>
+                <button
+                  onClick={() => setPendingPaidAction(null)}
+                  className="text-xs text-ink/40 hover:text-ink/60"
+                >
+                  {locale === "fr" ? "Annuler" : "Cancel"}
+                </button>
+              </div>
+
+              {actionPaymentConfirmed ? (
+                <div className="flex items-center justify-center gap-2 py-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+                  <span className="text-sm font-medium text-emerald-600">
+                    {pendingPaidAction === "double" ? t.double[locale] : t.split[locale]}...
+                  </span>
+                </div>
+              ) : (
+                <ChancePayment
+                  recipientAddress={table.recipientAddress}
+                  amountCrc={hand.baseBet}
+                  gameType="blackjack"
+                  gameId={`${table.slug}-${pendingPaidAction}-${handId}`}
+                  accentColor={pendingPaidAction === "double" ? "#F59E0B" : "#8B5CF6"}
+                  payLabel={`${locale === "fr" ? "Payer" : "Pay"} ${hand.baseBet} CRC`}
+                  onPaymentInitiated={() => setWatchingActionPayment(true)}
+                  scanning={false}
+                  paymentStatus={watchingActionPayment ? "watching" : "idle"}
+                />
               )}
             </div>
           )}
