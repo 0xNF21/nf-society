@@ -310,39 +310,40 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     excludeTxHashes: [],
   });
 
-  // Second watcher for double/split extra payment
-  const actionDataValue = handId ? encodeGameData({ game: "blackjack", id: `${table.slug}-${pendingPaidAction}-${handId}`, v: 1 }) : "";
-  const { status: actionPayStatus } = usePaymentWatcher({
-    enabled: watchingActionPayment && !!pendingPaidAction,
-    dataValue: actionDataValue,
-    minAmountCRC: hand?.baseBet || selectedBet,
-    recipientAddress: table.recipientAddress,
-    excludeTxHashes: [],
-  });
-
-  // When extra payment detected, perform the action
+  // Poll for double/split extra payment via check-payment endpoint
   useEffect(() => {
-    if (actionPayStatus === "confirmed" && pendingPaidAction && handId) {
-      setWatchingActionPayment(false);
-      setActionPaymentConfirmed(true);
-      // Perform the action now
-      (async () => {
-        setActionLoading(true);
-        try {
-          const res = await fetch(`/api/blackjack/${handId}/action`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: pendingPaidAction }),
-          });
-          const data = await res.json();
-          if (res.ok) setHand(data);
-        } catch {}
-        setActionLoading(false);
-        setPendingPaidAction(null);
-        setActionPaymentConfirmed(false);
-      })();
-    }
-  }, [actionPayStatus, pendingPaidAction, handId]);
+    if (!watchingActionPayment || !pendingPaidAction || !handId || !hand) return;
+    let active = true;
+
+    const checkPayment = async () => {
+      try {
+        const res = await fetch(`/api/blackjack/${handId}/check-payment?amount=${hand.baseBet}&player=${hand.playerAddress}`);
+        const data = await res.json();
+        if (data.found && active) {
+          setWatchingActionPayment(false);
+          setActionPaymentConfirmed(true);
+          // Perform the action
+          setActionLoading(true);
+          try {
+            const actionRes = await fetch(`/api/blackjack/${handId}/action`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: pendingPaidAction }),
+            });
+            const actionData = await actionRes.json();
+            if (actionRes.ok) setHand(actionData);
+          } catch {}
+          setActionLoading(false);
+          setPendingPaidAction(null);
+          setActionPaymentConfirmed(false);
+        }
+      } catch {}
+    };
+
+    checkPayment();
+    const interval = setInterval(checkPayment, 5000);
+    return () => { active = false; clearInterval(interval); };
+  }, [watchingActionPayment, pendingPaidAction, handId, hand]);
 
   // When initial payment detected, scan for new hands
   useEffect(() => {
@@ -375,12 +376,6 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     return () => clearInterval(interval);
   }, [watchingPayment, handId, scanForHand]);
 
-  // Poll scan when waiting for double/split payment
-  useEffect(() => {
-    if (!watchingActionPayment || !pendingPaidAction) return;
-    const interval = setInterval(scanForHand, 5000);
-    return () => clearInterval(interval);
-  }, [watchingActionPayment, pendingPaidAction, scanForHand]);
 
   // Fetch hand state when handId changes
   useEffect(() => {

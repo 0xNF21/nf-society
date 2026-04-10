@@ -63,9 +63,10 @@ export async function POST(req: NextRequest) {
       if (knownTxHashes.has(txHash)) continue;
       if (globalClaimed.has(txHash)) continue;
 
-      // Check game data
+      // Check game data — accept table slug and double/split variants (e.g. classic-double-5)
       if (payment.gameData) {
-        if (payment.gameData.game !== "blackjack" || payment.gameData.id !== table.slug) continue;
+        if (payment.gameData.game !== "blackjack") continue;
+        if (!payment.gameData.id.startsWith(table.slug)) continue;
       }
 
       // Check amount matches a valid bet option
