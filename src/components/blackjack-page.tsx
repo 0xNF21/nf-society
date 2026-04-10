@@ -368,12 +368,19 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     setScanning(false);
   }, [table.slug]);
 
-  // Poll scan when waiting for payment
+  // Poll scan when waiting for initial payment
   useEffect(() => {
     if (!watchingPayment || handId) return;
     const interval = setInterval(scanForHand, 5000);
     return () => clearInterval(interval);
   }, [watchingPayment, handId, scanForHand]);
+
+  // Poll scan when waiting for double/split payment
+  useEffect(() => {
+    if (!watchingActionPayment || !pendingPaidAction) return;
+    const interval = setInterval(scanForHand, 5000);
+    return () => clearInterval(interval);
+  }, [watchingActionPayment, pendingPaidAction, scanForHand]);
 
   // Fetch hand state when handId changes
   useEffect(() => {
