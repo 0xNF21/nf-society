@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { blackjackHands, claimedPayments } from "@/lib/db/schema";
+import { blackjackHands, blackjackTables, claimedPayments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 
@@ -47,9 +47,12 @@ export async function GET(
     const allClaimed = await db.select({ tx: claimedPayments.txHash }).from(claimedPayments);
     for (const c of allClaimed) knownTxHashes.add(c.tx.toLowerCase());
 
-    // Fetch payments of the right amount to the Safe
-    const safeAddress = process.env.SAFE_ADDRESS || "";
-    const payments = await checkAllNewPayments(amount, safeAddress);
+    // Fetch payments of the right amount to the table's recipient address
+    const [table] = await db.select({ recipientAddress: blackjackTables.recipientAddress })
+      .from(blackjackTables).where(eq(blackjackTables.id, hand.tableId)).limit(1);
+    if (!table) return NextResponse.json({ found: false, error: "Table not found" });
+
+    const payments = await checkAllNewPayments(amount, table.recipientAddress);
 
     // Find a NEW payment from this player that's not in any known set
     // If token is available, also verify the payment's gameData.t matches
