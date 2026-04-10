@@ -493,8 +493,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
 
   const fetchOpens = useCallback(async () => {
     try {
-      const tokenParam = tokenRef.current ? `&token=${tokenRef.current}` : "";
-      const res = await fetch(`/api/lootbox-opens?lootboxId=${lootbox.id}${tokenParam}`, { cache: "no-store" });
+      const res = await fetch(`/api/lootbox-opens?lootboxId=${lootbox.id}`, { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
       const data: LootboxOpen[] = Array.isArray(json) ? json : json.opens ?? [];
