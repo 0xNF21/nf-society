@@ -144,27 +144,44 @@ Sans ca, le gameData du paiement ne sera JAMAIS decode (car les jeux chance ne s
 
 ## PNL Card (resultat partageable)
 
-Apres le resultat d'un jeu chance (lootbox reward, lottery win), TOUJOURS afficher une `<PnlCard>` :
+Apres le resultat d'un jeu chance (lootbox reward, lottery win, blackjack), TOUJOURS afficher une `<PnlCard>` avec le **profil Circles** du joueur (nom + avatar), PAS l'adresse brute.
 
+### Pattern obligatoire : fetch profil + PnlCard
 ```tsx
-import { PnlCard } from "@/components/pnl-card";
+// 1. State pour le profil
+const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
 
+// 2. Fetch le profil quand l'adresse est connue
+useEffect(() => {
+  if (!playerAddress || playerProfile) return;
+  (async () => {
+    try {
+      const res = await fetch("/api/profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addresses: [playerAddress] }),
+      });
+      const data = await res.json();
+      const profile = data.profiles?.[playerAddress.toLowerCase()];
+      if (profile) setPlayerProfile(profile);
+    } catch {}
+  })();
+}, [playerAddress, playerProfile]);
+
+// 3. PnlCard avec profil
 <PnlCard
-  gameType="lootbox"
+  gameType="nom-du-jeu"
   result="reward"
-  gameLabel="Lootbox Bronze"
-  rewardCrc={rewardAmount}
   betCrc={priceCrc}
   gainCrc={rewardAmount - priceCrc}
-  playerName={playerName}
-  tier="LEGENDARY"
-  tierColor="#EF4444"
+  playerName={playerProfile?.name || shortenAddress(playerAddress)}
+  playerAvatar={playerProfile?.imageUrl || undefined}
   date={new Date().toLocaleDateString()}
   locale={locale}
 />
 ```
 
-La PnlCard genere une image PNG telechargeable/partageable. TOUJOURS l'inclure apres le resultat de chaque jeu chance.
+**NE JAMAIS** afficher l'adresse brute dans la PnlCard si un profil Circles est disponible. Toujours fetcher via `/api/profiles` d'abord.
 
 ## Composants existants avec Mini App
 - `src/components/game-payment.tsx` — jeux multijoueur (deja integre)
