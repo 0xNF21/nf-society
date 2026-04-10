@@ -54,16 +54,24 @@ export async function GET(
 
     const payments = await checkAllNewPayments(amount, table.recipientAddress);
 
+    console.log(`[CheckPayment] hand=${handId} amount=${amount} player=${player} token=${token} recipientAddress=${table.recipientAddress}`);
+    console.log(`[CheckPayment] knownTxHashes=${knownTxHashes.size} payments=${payments.length}`);
+
     // Find a NEW payment from this player that's not in any known set
     // If token is available, also verify the payment's gameData.t matches
-    const found = payments.some(p => {
-      if (p.sender.toLowerCase() !== player) return false;
-      if (knownTxHashes.has(p.transactionHash.toLowerCase())) return false;
-      if (token && p.gameData?.t && p.gameData.t !== token) return false;
-      return true;
-    });
+    let found = false;
+    for (const p of payments) {
+      const senderMatch = p.sender.toLowerCase() === player;
+      const isKnown = knownTxHashes.has(p.transactionHash.toLowerCase());
+      const tokenMismatch = token && p.gameData?.t && p.gameData.t !== token;
+      console.log(`[CheckPayment] tx=${p.transactionHash.slice(0, 10)} sender=${p.sender.slice(0, 10)} senderMatch=${senderMatch} isKnown=${isKnown} tokenMismatch=${tokenMismatch} gameData=${JSON.stringify(p.gameData)}`);
+      if (senderMatch && !isKnown && !tokenMismatch) {
+        found = true;
+        break;
+      }
+    }
 
-    return NextResponse.json({ found });
+    return NextResponse.json({ found, debug: { paymentsCount: payments.length, knownCount: knownTxHashes.size, recipientAddress: table.recipientAddress } });
   } catch (error: any) {
     return NextResponse.json({ found: false, error: error.message });
   }
