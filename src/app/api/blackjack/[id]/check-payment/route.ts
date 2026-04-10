@@ -54,8 +54,10 @@ export async function GET(
 
     const payments = await checkAllNewPayments(amount, table.recipientAddress);
 
-    console.log(`[CheckPayment] hand=${handId} amount=${amount} player=${player} token=${token} recipientAddress=${table.recipientAddress}`);
-    console.log(`[CheckPayment] knownTxHashes=${knownTxHashes.size} payments=${payments.length}`);
+    console.log(`[CheckPayment] hand=${handId} amount=${amount} player=${player} recipientAddress=${table.recipientAddress} payments=${payments.length} known=${knownTxHashes.size}`);
+    for (const p of payments) {
+      console.log(`[CheckPayment] payment tx=${p.transactionHash.slice(0,15)} sender=${p.sender.slice(0,10)} inKnown=${knownTxHashes.has(p.transactionHash.toLowerCase())} gameData=${JSON.stringify(p.gameData)}`);
+    }
 
     // Find a NEW payment from this player that's not in any known set
     // If token is available, also verify the payment's gameData.t matches
