@@ -6,17 +6,10 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import ScratchCard from "@/components/scratch-card";
 import SpinWheel from "@/components/spin-wheel";
-import { X, Copy, Check, Loader2, Trophy, Sparkles, ChevronDown, Wallet } from "lucide-react";
+import { X, Copy, Check, Loader2, Sparkles, ChevronDown } from "lucide-react";
 import { useMiniApp } from "@/components/miniapp-provider";
 
-type Phase = "init" | "payment" | "contribution" | "scratch" | "spin" | "complete";
-
-type JackpotInfo = {
-  total: number;
-  threshold: number;
-  contributors: number;
-  percentage: number;
-};
+type Phase = "init" | "payment" | "scratch" | "spin" | "complete";
 
 export default function DailyModal() {
   const { locale } = useLocale();
@@ -34,7 +27,6 @@ export default function DailyModal() {
   const [miniAppPaying, setMiniAppPaying] = useState(false);
   const [miniAppError, setMiniAppError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [jackpot, setJackpot] = useState<JackpotInfo | null>(null);
   const [scratchResult, setScratchResult] = useState<any>(null);
   const [spinResult, setSpinResult] = useState<any>(null);
   const [spinning, setSpinning] = useState(false);
@@ -56,15 +48,6 @@ export default function DailyModal() {
     return () => window.removeEventListener("open-daily-modal", handler);
   }, []);
 
-  // Load jackpot info when modal opens
-  useEffect(() => {
-    if (open) {
-      fetch("/api/daily/jackpot")
-        .then(r => r.json())
-        .then(setJackpot)
-        .catch(() => {});
-    }
-  }, [open]);
 
   // Check localStorage for existing session on mount
   useEffect(() => {
@@ -130,8 +113,7 @@ export default function DailyModal() {
             address: data.address,
             date: new Date().toISOString().slice(0, 10),
           }));
-          setPhase("contribution");
-          setTimeout(() => setPhase("scratch"), 3000);
+          setPhase("scratch");
         } else if (data.status === "expired") {
           setPhase("init");
           setToken(null);
@@ -176,12 +158,10 @@ export default function DailyModal() {
             setScratchResult(data.scratchResult);
             setPhase("spin");
           } else {
-            setPhase("contribution");
-            setTimeout(() => setPhase("scratch"), 2000);
+            setPhase("scratch");
           }
         } else {
-          setPhase("contribution");
-          setTimeout(() => setPhase("scratch"), 2000);
+          setPhase("scratch");
         }
         setLoading(false);
         return;
@@ -321,8 +301,7 @@ export default function DailyModal() {
     addXp("daily_scratch");
     addXp("daily_spin");
 
-    setPhase("contribution");
-    setTimeout(() => setPhase("scratch"), 2000);
+    setPhase("scratch");
   }, [addXp, addStreak]);
 
   return (
@@ -514,14 +493,6 @@ export default function DailyModal() {
                 </div>
               )}
 
-              {/* ─── PHASE: CONTRIBUTION ─── */}
-              {phase === "contribution" && (
-                <div className="text-center py-8">
-                  <div className="text-5xl mb-3 animate-bounce">🏆</div>
-                  <h3 className="text-lg font-bold mb-1">{t.contributionTitle[locale]}</h3>
-                  <p className="text-ink/60 text-sm">{t.contributionDesc[locale]}</p>
-                </div>
-              )}
 
               {/* ─── PHASE: SCRATCH ─── */}
               {phase === "scratch" && (
