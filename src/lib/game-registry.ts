@@ -99,6 +99,39 @@ export const GAME_REGISTRY: Record<string, GameClientConfig> = {
 
 export const ALL_GAMES = Object.values(GAME_REGISTRY);
 
+/* ═══════════════════════════════════════════════════
+   CHANCE GAMES REGISTRY
+   Jeux de chance / gambling — auto-creates feature flags in admin.
+   To add a new chance game, add an entry here.
+   ═══════════════════════════════════════════════════ */
+export type ChanceGameConfig = {
+  key: string;
+  featureFlag: string;
+  label: string;
+};
+
+export const CHANCE_REGISTRY: Record<string, ChanceGameConfig> = {
+  daily: { key: "daily", featureFlag: "daily", label: "Daily Reward" },
+  lotteries: { key: "lotteries", featureFlag: "lotteries", label: "Loteries" },
+  lootboxes: { key: "lootboxes", featureFlag: "lootboxes", label: "Lootboxes" },
+  blackjack: { key: "blackjack", featureFlag: "blackjack", label: "Blackjack" },
+};
+
+export const ALL_CHANCE_GAMES = Object.values(CHANCE_REGISTRY);
+
+/* ═══════════════════════════════════════════════════
+   CATEGORY FLAGS
+   Sections / categories de la plateforme — auto-creates feature flags in admin.
+   ═══════════════════════════════════════════════════ */
+export const CATEGORY_FLAGS: { key: string; label: string }[] = [
+  { key: "chance", label: "Chance (section)" },
+  { key: "multiplayer", label: "Multijoueur (section)" },
+  { key: "shop", label: "Boutique" },
+  { key: "governance", label: "Gouvernance" },
+  { key: "exchange", label: "Exchange" },
+  { key: "lobby", label: "Lobby multijoueur" },
+];
+
 /** Game display labels (for stats, lobby, etc.) */
 export const GAME_LABELS: Record<string, string> = {
   morpion: "Morpion",

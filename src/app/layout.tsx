@@ -5,6 +5,7 @@ import { LanguageProvider } from "@/components/language-provider";
 import { DemoProvider } from "@/components/demo-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MiniAppProvider } from "@/components/miniapp-provider";
+import { FeatureFlagProvider } from "@/components/feature-flag-provider";
 import DemoBanner from "@/components/demo-banner";
 import ProfileModal from "@/components/profile-modal";
 import DailyModal from "@/components/daily-modal";
@@ -64,11 +65,13 @@ export default function RootLayout({
           <DemoProvider>
             <LanguageProvider>
               <MiniAppProvider>
-                <DemoBanner />
-                {children}
-                <ProfileModal />
-                <DailyModal />
-                <BottomNav />
+                <FeatureFlagProvider>
+                  <DemoBanner />
+                  {children}
+                  <ProfileModal />
+                  <DailyModal />
+                  <BottomNav />
+                </FeatureFlagProvider>
               </MiniAppProvider>
             </LanguageProvider>
           </DemoProvider>
