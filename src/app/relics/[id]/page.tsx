@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import { RELICS, RELIC_ORDER, GRID_SIZE, buildCellMap, placeRelic, removeRelic, canPlace, allRelicsPlaced, emptyGrid, processShot, isDefeated } from "@/lib/relics"
 import type { RelicId, Orientation, PlayerGrid } from "@/lib/relics"
@@ -83,22 +83,16 @@ function GameScoreboard({ myGrid, opponentGrid, locale, isDark }: {
           {RELIC_ORDER.map(rid => {
             const oppRelic = opponentGrid?.relics.find(r => r.id === rid)
             const isSunk = oppRelic?.sunk ?? false
-            const hitCount = oppRelic?.hitCount ?? 0
-            const size = RELICS[rid].size
-            const hasHits = hitCount > 0 && !isSunk
             return (
               <div key={rid} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs transition-all
                 ${isSunk
                   ? "border-red-500/50 bg-red-500/10 dark:bg-red-500/20"
-                  : hasHits
-                    ? "border-amber-500/50 bg-amber-500/10 dark:bg-amber-500/20"
-                    : "border-ink/10 dark:border-white/10"}`}>
+                  : "border-ink/10 dark:border-white/10"}`}>
                 <span>{RELICS[rid].emoji}</span>
-                <span className={`font-medium ${isSunk ? "line-through text-red-500 dark:text-red-400" : hasHits ? "text-amber-600 dark:text-amber-400" : "text-ink/50 dark:text-white/50"}`}>
+                <span className={`font-medium ${isSunk ? "line-through text-red-500 dark:text-red-400" : "text-ink/50 dark:text-white/50"}`}>
                   {locale === "fr" ? RELICS[rid].name_fr : RELICS[rid].name_en}
                 </span>
                 {isSunk && <span className="text-red-500 dark:text-red-400 font-bold">✕</span>}
-                {hasHits && !isSunk && <span className="text-amber-600 dark:text-amber-400 text-[10px] font-bold">{hitCount}/{size}</span>}
               </div>
             )
           })}
@@ -259,6 +253,8 @@ function DemoRelicsGame() {
         setXpGained(addXp("relics_lose"))
       } else {
         setIsMyTurn(true)
+        setLastResult(t.yourTurn[locale])
+        setTimeout(() => setLastResult(""), 3000)
       }
       setBotThinking(false)
     }, 800)
@@ -393,7 +389,7 @@ function DemoRelicsGame() {
         {lastResult && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
             <div className={`px-5 py-3 rounded-2xl text-lg font-black text-white shadow-xl animate-bounce ${
-              lastResult.includes("💥") ? "bg-red-500/90" : lastResult.includes("🔥") ? "bg-orange-500/90" : "bg-blue-500/90"
+              lastResult.includes("💥") ? "bg-red-500/90" : lastResult.includes("🔥") ? "bg-orange-500/90" : lastResult.includes("⚔️") ? "bg-emerald-500/90" : "bg-blue-500/90"
             }`}>
               {lastResult}
             </div>
@@ -455,6 +451,20 @@ function RealRelicsGame({ id }: { id: string }) {
       setAddressConfirmed(true)
     }
   }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed])
+
+  // Detect turn change → show "your turn" popup
+  const prevTurnRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!game || !myAddress || game.status !== "playing") return
+    const currentTurn = game.currentTurn?.toLowerCase() || null
+    const myAddr = myAddress.toLowerCase()
+    // Only trigger when turn switches TO me (not on initial load)
+    if (currentTurn === myAddr && prevTurnRef.current !== null && prevTurnRef.current !== myAddr) {
+      setLastResult(t.yourTurn[locale])
+      setTimeout(() => setLastResult(""), 3000)
+    }
+    prevTurnRef.current = currentTurn
+  }, [game?.currentTurn, game?.status, myAddress])
 
   // Fetch profiles
   useEffect(() => {
@@ -786,7 +796,7 @@ function RealRelicsGame({ id }: { id: string }) {
               {lastResult && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                   <div className={`px-5 py-3 rounded-2xl text-lg font-black text-white shadow-xl animate-bounce ${
-                    lastResult.includes("💥") ? "bg-red-500/90" : lastResult.includes("🔥") ? "bg-orange-500/90" : "bg-blue-500/90"
+                    lastResult.includes("💥") ? "bg-red-500/90" : lastResult.includes("🔥") ? "bg-orange-500/90" : lastResult.includes("⚔️") ? "bg-emerald-500/90" : "bg-blue-500/90"
                   }`}>
                     {lastResult}
                   </div>
