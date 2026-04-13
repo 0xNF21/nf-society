@@ -45,7 +45,7 @@ function GameScoreboard({ myGrid, opponentGrid, locale, isDark }: {
   const oppAttacks = getStats(myGrid)      // opponent shots ON me
 
   return (
-    <div className="w-full max-w-md space-y-3">
+    <div className="w-full max-w-lg space-y-3">
       {/* Score bars */}
       <div className="grid grid-cols-2 gap-2">
         <div className={`rounded-xl p-3 ${isDark ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-emerald-50 border border-emerald-200/50"}`}>
@@ -286,7 +286,7 @@ function DemoRelicsGame() {
             if (isPreview) bg = "bg-amber-400/40"
             return (
               <div key={key}
-                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-sm cursor-pointer border border-ink/5 dark:border-white/5 flex items-center justify-center text-xs transition-colors relative ${bg}`}
+                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-sm cursor-pointer border border-ink/5 dark:border-white/5 flex items-center justify-center text-xs transition-colors relative ${bg}`}
                 onMouseEnter={() => showRelics && handleGridHover(r, c)}
                 onClick={() => { if (showRelics) handleGridClick(r, c); if (clickable) handleShot(r, c) }}>
                 {isHit && !isSunkCell && "💥"}
@@ -364,7 +364,7 @@ function DemoRelicsGame() {
       </div>
 
       {phase === "finished" && (
-        <Card className="w-full max-w-md rounded-xl border-0 shadow-sm bg-white/60 dark:bg-white/5 backdrop-blur-sm">
+        <Card className="w-full max-w-lg rounded-xl border-0 shadow-sm bg-white/60 dark:bg-white/5 backdrop-blur-sm">
           <CardContent className="py-4 text-center">
             {winner === "me" ? (
               <div className="flex flex-col items-center gap-1">
@@ -572,7 +572,7 @@ function RealRelicsGame({ id }: { id: string }) {
             if (isPreview) bg = "bg-amber-400/40"
             return (
               <div key={key}
-                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-sm cursor-pointer border border-ink/5 dark:border-white/5 flex items-center justify-center text-xs transition-colors relative ${bg}`}
+                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-sm cursor-pointer border border-ink/5 dark:border-white/5 flex items-center justify-center text-xs transition-colors relative ${bg}`}
                 onMouseEnter={() => placingMode && handleGridHover(r, c)}
                 onClick={() => { if (placingMode) handleGridClick(r, c); if (clickable) handleShot(r, c) }}>
                 {isHit && !isSunkCell && "💥"}
@@ -589,7 +589,7 @@ function RealRelicsGame({ id }: { id: string }) {
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md space-y-4">
+      <div className="w-full max-w-lg space-y-4">
         <div className="h-16 rounded-xl bg-ink/[0.08] dark:bg-white/[0.08] animate-pulse" />
         <div className="h-64 rounded-2xl bg-ink/[0.08] dark:bg-white/[0.08] animate-pulse" />
       </div>
@@ -600,7 +600,7 @@ function RealRelicsGame({ id }: { id: string }) {
     // If ID looks like a demo game, keep loading (parent will switch to DemoRelicsGame)
     if (id.startsWith("DEMO")) return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md space-y-4">
+        <div className="w-full max-w-lg space-y-4">
           <div className="h-16 rounded-xl bg-ink/[0.08] dark:bg-white/[0.08] animate-pulse" />
           <div className="h-64 rounded-2xl bg-ink/[0.08] dark:bg-white/[0.08] animate-pulse" />
         </div>
@@ -627,7 +627,7 @@ function RealRelicsGame({ id }: { id: string }) {
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-6">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-lg">
 
         {/* Back + Game ID */}
         <div className="mb-6 space-y-2">
