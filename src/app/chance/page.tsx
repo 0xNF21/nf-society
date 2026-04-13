@@ -58,6 +58,17 @@ export default function ChancePage() {
       desc: locale === "fr" ? "Blackjack classique contre la banque. 3:2." : "Classic blackjack vs dealer. 3:2.",
       color: "text-green-600",
     },
+    {
+      type: "link" as const,
+      flag: "coin_flip",
+      href: isDemo ? "/coin-flip/DEMO-classic" : "/coin-flip",
+      icon: <span className="text-3xl">🪙</span>,
+      iconBg: "bg-sky-50 group-hover:bg-sky-100",
+      borderHover: "hover:border-sky-200",
+      title: t.coinFlipTitle[locale],
+      desc: t.coinFlipDesc[locale],
+      color: "text-sky-600",
+    },
   ];
 
   const handleDailyClick = () => {

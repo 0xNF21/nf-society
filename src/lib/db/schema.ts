@@ -316,3 +316,6 @@ export type { PfcGameRow, NewPfcGame } from "./schema/pfc";
 
 export { blackjackTables, blackjackHands } from "./schema/blackjack";
 export type { BlackjackTableRow, BlackjackHandRow, NewBlackjackTable, NewBlackjackHand } from "./schema/blackjack";
+
+export { coinFlipTables, coinFlipResults } from "./schema/coin-flip";
+export type { CoinFlipTableRow, CoinFlipResultRow, NewCoinFlipTable, NewCoinFlipResult } from "./schema/coin-flip";

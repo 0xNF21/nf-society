@@ -13,6 +13,7 @@ const GAME_LABELS: Record<string, { fr: string; en: string; sub?: string }> = {
   pfc: { fr: "Pierre-Feuille-Ciseaux", en: "Rock-Paper-Scissors", sub: "1vs1" },
   lootbox: { fr: "Lootbox", en: "Lootbox" },
   lottery: { fr: "Loterie", en: "Lottery" },
+  coin_flip: { fr: "Pile ou Face", en: "Coin Flip" },
 };
 
 const RESULT_LABELS: Record<string, { fr: string; en: string }> = {
