@@ -30,8 +30,7 @@ export const PAYOUT_MULTIPLIER = 1.96;
 export function flipCoin(): CoinSide {
   if (typeof globalThis.process !== "undefined" && globalThis.process.versions?.node) {
     // Server: use crypto.randomInt for true randomness
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { randomInt } = require("crypto") as typeof import("crypto");
+    const { randomInt } = require("crypto") as typeof import("crypto"); // eslint-disable-line
     return randomInt(2) === 0 ? "heads" : "tails";
   }
   // Client (demo mode only): Math.random is fine for simulation
