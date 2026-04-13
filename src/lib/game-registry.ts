@@ -130,6 +130,7 @@ export const CATEGORY_FLAGS: { key: string; label: string }[] = [
   { key: "governance", label: "Gouvernance" },
   { key: "exchange", label: "Exchange" },
   { key: "lobby", label: "Lobby multijoueur" },
+  { key: "leaderboard", label: "Classement" },
 ];
 
 /** Game display labels (for stats, lobby, etc.) */

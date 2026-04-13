@@ -34,7 +34,7 @@ export default function HubPage() {
     },
     {
       href: "/leaderboard",
-      flag: null,
+      flag: "leaderboard",
       icon: <Trophy className="h-8 w-8 text-amber-500" />,
       iconBg: "bg-amber-50 group-hover:bg-amber-100",
       borderHover: "hover:border-amber-200",
