@@ -322,3 +322,6 @@ export type { CoinFlipTableRow, CoinFlipResultRow, NewCoinFlipTable, NewCoinFlip
 
 export { hiloTables, hiloRounds } from "./schema/hilo";
 export type { HiloTableRow, HiloRoundRow, NewHiloTable, NewHiloRound } from "./schema/hilo";
+
+export { minesTables, minesRounds } from "./schema/mines";
+export type { MinesTableRow, MinesRoundRow, NewMinesTable, NewMinesRound } from "./schema/mines";
