@@ -500,6 +500,7 @@ export const translations = {
     rtpTotal: { fr: "Total RTP déclaré", en: "Total declared RTP" },
     rtpDisclaimer: { fr: "Ces probabilités sont déclarées par la plateforme et non auditées par un tiers.", en: "These probabilities are declared by the platform and not audited by a third party." },
     autoDesc: { fr: "Ouvre pour {price} CRC, gagne jusqu'à {max} CRC instantanément !", en: "Open for {price} CRC, win up to {max} CRC instantly!" },
+    youWon: { fr: "Tu as gagné", en: "You won" },
   },
   profile: {
     button: { fr: "Mon profil", en: "My profile" },

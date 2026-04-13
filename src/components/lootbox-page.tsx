@@ -32,6 +32,7 @@ type LootboxOpen = {
   id: number;
   playerAddress: string;
   transactionHash: string;
+  playerToken: string | null;
   rewardCrc: number;
   payoutStatus: string;
   openedAt: string;
@@ -423,6 +424,8 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const confirmedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const prevOpenCount = useRef<number>(0);
+  const prevMyOpenCount = useRef<number>(0);
+  const pendingMyAnimation = useRef<LootboxOpen | null>(null);
   const profilesRef = useRef<Record<string, { name?: string; imageUrl?: string | null }>>({});
   const animTimers = useRef<NodeJS.Timeout[]>([]);
 
@@ -498,12 +501,24 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
       const json = await res.json();
       const data: LootboxOpen[] = Array.isArray(json) ? json : json.opens ?? [];
 
+      const myToken = tokenRef.current;
+      const myOpens = myToken ? data.filter(o => o.playerToken === myToken) : [];
+
       if (!initialLoadDone.current) {
         initialLoadDone.current = true;
         prevOpenCount.current = data.length;
-      } else if (data.length > prevOpenCount.current) {
-        runAnimation(data[0]);
+        prevMyOpenCount.current = myOpens.length;
+      } else {
+        if (myOpens.length > prevMyOpenCount.current) {
+          const newestMyOpen = myOpens[0];
+          if (document.visibilityState === "visible") {
+            runAnimation(newestMyOpen);
+          } else {
+            pendingMyAnimation.current = newestMyOpen;
+          }
+        }
         prevOpenCount.current = data.length;
+        prevMyOpenCount.current = myOpens.length;
       }
       setOpens(data);
 
@@ -561,6 +576,17 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
     };
   }, [fetchOpens, scanNow, clearAnimTimers]);
 
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && pendingMyAnimation.current) {
+        const pending = pendingMyAnimation.current;
+        pendingMyAnimation.current = null;
+        runAnimation(pending);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [runAnimation]);
 
   const tier = latestOpen ? getRewardTier(latestOpen.rewardCrc, lootbox.pricePerOpenCrc) : null;
   const latestProfile = latestOpen ? profiles[latestOpen.playerAddress.toLowerCase()] : null;
@@ -775,7 +801,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                   return (
                     <button
                       key={mult}
-                      onClick={() => runAnimation({ id: 0, playerAddress: "0x0000000000000000000000000000000000000000", transactionHash: "0xtest", rewardCrc: reward, payoutStatus: "pending", openedAt: new Date().toISOString() })}
+                      onClick={() => runAnimation({ id: 0, playerAddress: "0x0000000000000000000000000000000000000000", transactionHash: "0xtest", playerToken: tokenRef.current, rewardCrc: reward, payoutStatus: "pending", openedAt: new Date().toISOString() })}
                       className="text-xs px-3 py-1 rounded-lg border border-dashed border-ink/20 text-ink/40 hover:text-ink/70 hover:border-ink/40 transition-colors"
                     >
                       Test {reward} CRC
@@ -791,7 +817,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                   <p className="text-2xl font-black animate-bounce" style={{ color: tier.color }}>{tier.label}</p>
                 )}
                 <p className="text-lg font-bold text-ink">
-                  {latestProfile?.name || shortenAddress(latestOpen.playerAddress)} {t.won[locale]}{" "}
+                  {t.youWon[locale]}{" "}
                   <span style={{ color: accentColor }}>{latestOpen.rewardCrc} CRC</span>
                 </p>
                 {tier && tier.label && !tier.isJackpot && (
