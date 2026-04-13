@@ -116,6 +116,7 @@ export const CHANCE_REGISTRY: Record<string, ChanceGameConfig> = {
   lootboxes: { key: "lootboxes", featureFlag: "lootboxes", label: "Lootboxes" },
   blackjack: { key: "blackjack", featureFlag: "blackjack", label: "Blackjack" },
   coin_flip: { key: "coin_flip", featureFlag: "coin_flip", label: "Pile ou Face" },
+  hilo: { key: "hilo", featureFlag: "hilo", label: "Hi-Lo" },
 };
 
 export const ALL_CHANCE_GAMES = Object.values(CHANCE_REGISTRY);

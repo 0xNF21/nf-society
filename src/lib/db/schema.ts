@@ -319,3 +319,6 @@ export type { BlackjackTableRow, BlackjackHandRow, NewBlackjackTable, NewBlackja
 
 export { coinFlipTables, coinFlipResults } from "./schema/coin-flip";
 export type { CoinFlipTableRow, CoinFlipResultRow, NewCoinFlipTable, NewCoinFlipResult } from "./schema/coin-flip";
+
+export { hiloTables, hiloRounds } from "./schema/hilo";
+export type { HiloTableRow, HiloRoundRow, NewHiloTable, NewHiloRound } from "./schema/hilo";

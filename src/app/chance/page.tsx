@@ -69,6 +69,17 @@ export default function ChancePage() {
       desc: t.coinFlipDesc[locale],
       color: "text-sky-600",
     },
+    {
+      type: "link" as const,
+      flag: "hilo",
+      href: isDemo ? "/hilo/DEMO-classic" : "/hilo",
+      icon: <span className="text-3xl">🔼</span>,
+      iconBg: "bg-violet-50 group-hover:bg-violet-100",
+      borderHover: "hover:border-violet-200",
+      title: t.hiloTitle[locale],
+      desc: t.hiloDesc[locale],
+      color: "text-violet-600",
+    },
   ];
 
   const handleDailyClick = () => {
