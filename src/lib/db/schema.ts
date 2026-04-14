@@ -325,3 +325,6 @@ export type { HiloTableRow, HiloRoundRow, NewHiloTable, NewHiloRound } from "./s
 
 export { minesTables, minesRounds } from "./schema/mines";
 export type { MinesTableRow, MinesRoundRow, NewMinesTable, NewMinesRound } from "./schema/mines";
+
+export { diceTables, diceRounds } from "./schema/dice";
+export type { DiceTableRow, DiceRoundRow, NewDiceTable, NewDiceRound } from "./schema/dice";

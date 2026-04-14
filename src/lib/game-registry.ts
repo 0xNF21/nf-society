@@ -118,6 +118,7 @@ export const CHANCE_REGISTRY: Record<string, ChanceGameConfig> = {
   coin_flip: { key: "coin_flip", featureFlag: "coin_flip", label: "Pile ou Face" },
   hilo: { key: "hilo", featureFlag: "hilo", label: "Hi-Lo" },
   mines: { key: "mines", featureFlag: "mines", label: "Mines" },
+  dice: { key: "dice", featureFlag: "dice", label: "Dice" },
 };
 
 export const ALL_CHANCE_GAMES = Object.values(CHANCE_REGISTRY);

@@ -15,6 +15,7 @@ const GAME_LABELS: Record<string, { fr: string; en: string; sub?: string }> = {
   lottery: { fr: "Loterie", en: "Lottery" },
   coin_flip: { fr: "Pile ou Face", en: "Coin Flip" },
   hilo: { fr: "Hi-Lo", en: "Hi-Lo" },
+  dice: { fr: "Dice", en: "Dice" },
 };
 
 const RESULT_LABELS: Record<string, { fr: string; en: string }> = {

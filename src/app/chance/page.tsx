@@ -91,6 +91,17 @@ export default function ChancePage() {
       desc: t.minesDesc[locale],
       color: "text-red-600",
     },
+    {
+      type: "link" as const,
+      flag: "dice",
+      href: isDemo ? "/dice/DEMO-classic" : "/dice",
+      icon: <span className="text-3xl">🎲</span>,
+      iconBg: "bg-amber-50 group-hover:bg-amber-100",
+      borderHover: "hover:border-amber-200",
+      title: t.diceTitle[locale],
+      desc: t.diceDesc[locale],
+      color: "text-amber-600",
+    },
   ];
 
   const handleDailyClick = () => {
