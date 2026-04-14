@@ -34,11 +34,15 @@ export type MinesState = {
   status: "playing" | "cashed_out" | "exploded";
   betCrc: number;
   currentMultiplier: number;
+  /** Index of the mine that was hit (only set when exploded) */
+  explodedIndex: number | null;
 };
 
 export type VisibleCell = {
   index: number;
   state: CellState;
+  /** true if this is the mine the player clicked (caused explosion) */
+  exploded?: boolean;
 };
 
 export type VisibleState = {
@@ -52,6 +56,7 @@ export type VisibleState = {
   status: MinesState["status"];
   betCrc: number;
   canCashout: boolean;
+  explodedIndex: number | null;
 };
 
 // ── Constants ──────────────────────────────────────────
@@ -115,6 +120,7 @@ export function createInitialState(grid: boolean[], betCrc: number): MinesState 
     status: "playing",
     betCrc,
     currentMultiplier: 1.0,
+    explodedIndex: null,
   };
 }
 
@@ -152,6 +158,7 @@ export function applyAction(state: MinesState, action: MinesAction): MinesState 
   if (s.grid[idx]) {
     // Hit a mine
     s.status = "exploded";
+    s.explodedIndex = idx;
   } else {
     // Found a gem
     s.gemsRevealed += 1;
@@ -173,10 +180,12 @@ export function getVisibleState(state: MinesState): VisibleState {
   const cells: VisibleCell[] = [];
 
   for (let i = 0; i < GRID_SIZE; i++) {
+    const isMine = state.grid[i];
+    const isExploded = state.explodedIndex === i;
     if (state.revealed[i]) {
-      cells.push({ index: i, state: state.grid[i] ? "mine" : "gem" });
+      cells.push({ index: i, state: isMine ? "mine" : "gem", exploded: isExploded || undefined });
     } else if (showAll) {
-      cells.push({ index: i, state: state.grid[i] ? "mine" : "gem" });
+      cells.push({ index: i, state: isMine ? "mine" : "gem" });
     } else {
       cells.push({ index: i, state: "hidden" });
     }
@@ -186,6 +195,7 @@ export function getVisibleState(state: MinesState): VisibleState {
 
   return {
     cells,
+    explodedIndex: state.explodedIndex,
     mineCount: state.mineCount,
     gemsRevealed: state.gemsRevealed,
     totalGems,

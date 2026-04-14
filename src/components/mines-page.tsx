@@ -68,12 +68,17 @@ function MineCell({
   }
 
   if (cell.state === "mine") {
+    const isExploded = cell.exploded;
     return (
       <button
         disabled
-        className="aspect-square rounded-xl border-2 border-red-400/50 bg-red-500/10 flex items-center justify-center transition-all"
+        className={`aspect-square rounded-xl border-2 flex items-center justify-center transition-all ${
+          isExploded
+            ? "border-red-500 bg-red-500/30 ring-2 ring-red-500 scale-110 z-10"
+            : "border-red-400/30 bg-red-500/5"
+        }`}
       >
-        <Bomb className="w-5 h-5 sm:w-6 sm:h-6 text-red-400" />
+        <Bomb className={`w-5 h-5 sm:w-6 sm:h-6 ${isExploded ? "text-red-500" : "text-red-400/60"}`} />
       </button>
     );
   }
