@@ -328,3 +328,9 @@ export type { MinesTableRow, MinesRoundRow, NewMinesTable, NewMinesRound } from 
 
 export { diceTables, diceRounds } from "./schema/dice";
 export type { DiceTableRow, DiceRoundRow, NewDiceTable, NewDiceRound } from "./schema/dice";
+
+export { crashDashTables, crashDashRounds } from "./schema/crash-dash";
+export type { CrashDashTableRow, CrashDashRoundRow, NewCrashDashTable, NewCrashDashRound } from "./schema/crash-dash";
+
+export { kenoTables, kenoRounds } from "./schema/keno";
+export type { KenoTableRow, KenoRoundRow, NewKenoTable, NewKenoRound } from "./schema/keno";

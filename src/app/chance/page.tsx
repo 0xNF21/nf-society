@@ -102,6 +102,28 @@ export default function ChancePage() {
       desc: t.diceDesc[locale],
       color: "text-amber-600",
     },
+    {
+      type: "link" as const,
+      flag: "crash_dash",
+      href: isDemo ? "/crash-dash/DEMO-classic" : "/crash-dash",
+      icon: <span className="text-3xl">🌱</span>,
+      iconBg: "bg-green-50 group-hover:bg-green-100",
+      borderHover: "hover:border-green-200",
+      title: t.crashDashTitle[locale],
+      desc: t.crashDashDesc[locale],
+      color: "text-green-600",
+    },
+    {
+      type: "link" as const,
+      flag: "keno",
+      href: isDemo ? "/keno/DEMO-classic" : "/keno",
+      icon: <span className="text-3xl">🎱</span>,
+      iconBg: "bg-indigo-50 group-hover:bg-indigo-100",
+      borderHover: "hover:border-indigo-200",
+      title: t.kenoTitle[locale],
+      desc: t.kenoDesc[locale],
+      color: "text-indigo-600",
+    },
   ];
 
   const handleDailyClick = () => {

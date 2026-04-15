@@ -93,6 +93,51 @@ Le projet utilise un framework generique pour les jeux multijoueurs.
 
 Lobby, paiement, scan, stats, admin = **automatique via le registre**.
 
+## Framework Chance (jeux solo)
+
+Le projet utilise un pattern pour les jeux de chance single-player (coin-flip, blackjack, hilo, mines...).
+
+### Fichiers cles du framework chance
+- `src/lib/game-registry.ts` — `CHANCE_REGISTRY` pour les jeux chance
+- `src/components/chance-payment.tsx` — Composant paiement reutilisable (Mini App + QR)
+- `src/components/pnl-card.tsx` — Carte resultat partageable
+- `src/hooks/use-player-token.ts` — Token joueur (localStorage)
+- `src/lib/payout.ts` — Paiement automatique via Safe + Roles Modifier
+- `src/lib/circles.ts` — Detection paiement on-chain (gameKeys ligne ~439)
+- `src/lib/game-data.ts` — Encodage/decodage gameData dans les tx
+
+### Pattern jeu interactif (type Hi-Lo, Mines)
+- Paiement CRC → scan cree la partie avec etat initial → actions serveur (reveal/cashout) → payout au cashout
+- `gameState` stocke en JSONB dans la DB, mis a jour a chaque action
+- `getVisibleState()` cache les infos sensibles (positions mines, deck) cote client
+- `playerToken` verifie a chaque action (anti-triche)
+
+### Checklist — Nouveau jeu chance
+
+1. **Logique jeu** : `src/lib/{jeu}.ts` (types, regles, fonctions pures, crypto-secure RNG serveur, Math.random client/demo)
+2. **Schema DB** : `src/lib/db/schema/{jeu}.ts` — {jeu}Tables (slug, betOptions, recipientAddress, colors, status) + {jeu}Rounds (playerAddress, transactionHash, betCrc, playerToken, gameState jsonb, status, outcome, payoutCrc, payoutStatus, payoutTxHash, errorMessage, createdAt, updatedAt)
+3. **Export schema** : ajouter dans `src/lib/db/schema.ts`
+4. **Enregistrer** : ajouter dans `CHANCE_REGISTRY` de `src/lib/game-registry.ts`
+5. **gameKeys** : ajouter `"{jeu}"` dans la liste gameKeys de `src/lib/circles.ts` (~ligne 439)
+6. **i18n** : ajouter section `{jeu}` dans `src/lib/i18n.ts` + `{jeu}Title`/`{jeu}Desc` dans section `chance`
+7. **API config** : `src/app/api/{jeu}/route.ts` — GET table config, POST creer table (admin)
+8. **API scan** : `src/app/api/{jeu}-scan/route.ts` — scanner paiements, creer partie, XP
+9. **API active** : `src/app/api/{jeu}/active/route.ts` — restaurer session par token
+10. **API actions** : `src/app/api/{jeu}/[id]/action/route.ts` — POST actions + payout via `executePayout()`
+11. **Lobby page** : `src/app/{jeu}/page.tsx` — liste des tables actives depuis DB
+12. **Server page** : `src/app/{jeu}/[slug]/page.tsx` — detection DEMO + query DB + passe au client
+13. **Client component** : `src/components/{jeu}-page.tsx` — DemoGame (client-only) + RealGame (paiement + polling + actions API)
+14. **Chance hub** : ajouter carte dans `src/app/chance/page.tsx`
+15. **Migration DB locale** : creer route API temporaire `src/app/api/migrate-xxx/route.ts` avec `db.execute(sql\`CREATE TABLE...\`)`, appeler via `preview_eval`, puis supprimer la route
+16. **Migration Neon** : `npx vercel env pull .env.neon-temp --environment=production`, script node avec pg Pool + pool.query(sql), puis `rm .env.neon-temp`
+17. **Creer table classic** : POST via `preview_eval` sur `/api/{jeu}` avec le `recipientAddress` (recuperer depuis une table existante : `fetch('/api/hilo?slug=classic')`)
+18. **Meme chose sur Neon** : INSERT via script node + pg avec les env Vercel
+19. **Build** : verifier `npx tsc --noEmit`
+20. **Commit + push** : deploiement auto Vercel
+
+### SAFE_ADDRESS (Relayer NF Society)
+`0x960A0784640fD6581D221A56df1c60b65b5ebB6f` — utiliser comme recipientAddress pour tous les jeux.
+
 ## Liens de paiement Gnosis
 
 - Le parametre `data` dans l'URL Gnosis DOIT etre du **texte brut**, PAS du hex

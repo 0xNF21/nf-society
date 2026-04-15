@@ -13,7 +13,7 @@ const DEMO_TABLE = {
   title: "Mines Classic",
   description: "Grille 5x5, revelez les gemmes, evitez les mines.",
   betOptions: [1, 5, 10, 25],
-  mineOptions: [1, 3, 5, 10, 24],
+  mineOptions: [1, 3, 5, 10, 15, 24],
   recipientAddress: "",
   primaryColor: "#DC2626",
   accentColor: "#EF4444",

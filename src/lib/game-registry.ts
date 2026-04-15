@@ -119,6 +119,8 @@ export const CHANCE_REGISTRY: Record<string, ChanceGameConfig> = {
   hilo: { key: "hilo", featureFlag: "hilo", label: "Hi-Lo" },
   mines: { key: "mines", featureFlag: "mines", label: "Mines" },
   dice: { key: "dice", featureFlag: "dice", label: "Dice" },
+  crash_dash: { key: "crash_dash", featureFlag: "crash_dash", label: "Demurrage Dash" },
+  keno: { key: "keno", featureFlag: "keno", label: "Keno" },
 };
 
 export const ALL_CHANCE_GAMES = Object.values(CHANCE_REGISTRY);
