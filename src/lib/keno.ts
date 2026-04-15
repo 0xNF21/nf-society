@@ -84,22 +84,24 @@ function hitProbability(n: number, k: number): number {
  */
 function buildPayTable(): Record<number, Record<number, number>> {
   // Minimum hits required to win for each pick count
+  // Lower thresholds = more frequent wins (better player experience)
   const minHits: Record<number, number> = {
-    1: 1, 2: 2, 3: 2, 4: 2, 5: 3, 6: 3, 7: 3, 8: 4, 9: 4, 10: 5,
+    1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3, 9: 3, 10: 4,
   };
 
-  // Raw payout ratios — exponential growth per extra hit above minimum
+  // Raw payout ratios — steep exponential growth for jackpot feel
+  // Low tiers pay small (push/break-even), top tiers pay massive
   const rawRatios: Record<number, number[]> = {
-    1:  [1],
-    2:  [1],
-    3:  [1, 12],
-    4:  [1, 6, 50],
-    5:  [1, 3, 20, 200],
-    6:  [1, 2, 8, 60, 500],
-    7:  [1, 1.5, 5, 25, 150, 1000],
-    8:  [1, 1.5, 3, 12, 60, 400, 2000],
-    9:  [1, 1.5, 2.5, 8, 30, 150, 800, 4000],
-    10: [1, 1.5, 2, 5, 15, 60, 300, 1500, 8000],
+    1:  [1],                                       // 1h
+    2:  [1, 10],                                   // 1h, 2h
+    3:  [1, 18],                                   // 2h, 3h
+    4:  [1, 5, 80],                                // 2h, 3h, 4h
+    5:  [1, 2, 15, 500],                           // 2h, 3h, 4h, 5h
+    6:  [1, 3, 20, 400, 10000],                    // 3h, 4h, 5h, 6h
+    7:  [1, 2, 12, 150, 3000, 80000],              // 3h, 4h, 5h, 6h, 7h
+    8:  [1, 2, 8, 80, 1500, 30000, 500000],        // 3h-8h
+    9:  [1, 1.5, 5, 40, 600, 10000, 200000],       // 3h-9h
+    10: [1, 2, 5, 30, 400, 6000, 100000],          // 4h-10h
   };
 
   const table: Record<number, Record<number, number>> = {};
