@@ -1,0 +1,57 @@
+export const dynamic = "force-dynamic";
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { rouletteTables } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+/**
+ * GET /api/roulette?slug=classic
+ * Returns a roulette table config.
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const slug = req.nextUrl.searchParams.get("slug");
+    if (!slug) return NextResponse.json({ error: "slug required" }, { status: 400 });
+
+    const [table] = await db.select().from(rouletteTables).where(eq(rouletteTables.slug, slug)).limit(1);
+    if (!table) return NextResponse.json({ error: "Table not found" }, { status: 404 });
+
+    return NextResponse.json({
+      table: {
+        ...table,
+        betOptions: (table.betOptions as number[]) || [1, 5, 10, 25],
+      },
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/roulette
+ * Create a new roulette table (admin).
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { slug, title, description, betOptions, recipientAddress, primaryColor, accentColor } = body;
+
+    if (!slug || !title || !recipientAddress) {
+      return NextResponse.json({ error: "slug, title, recipientAddress required" }, { status: 400 });
+    }
+
+    const [table] = await db.insert(rouletteTables).values({
+      slug,
+      title,
+      description: description || null,
+      betOptions: betOptions || [1, 5, 10, 25],
+      recipientAddress,
+      primaryColor: primaryColor || "#DC2626",
+      accentColor: accentColor || "#B91C1C",
+    }).returning();
+
+    return NextResponse.json({ table });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
