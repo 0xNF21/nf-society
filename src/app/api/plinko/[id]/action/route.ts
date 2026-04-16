@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { plinkoRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { dropAllBalls, getVisibleState, calculatePayout, isValidAction } from "@/lib/plinko";
-import type { PlinkoState } from "@/lib/plinko";
+import { dropOneBall, cashout, getVisibleState, calculatePayout, isValidAction } from "@/lib/plinko";
+import type { PlinkoState, PlinkoAction } from "@/lib/plinko";
 import { executePayout } from "@/lib/payout";
 
 export async function POST(
@@ -20,9 +20,9 @@ export async function POST(
     const playerToken = body.playerToken as string | undefined;
 
     // Validate action
-    const action = { type: body.action as string };
+    const action: PlinkoAction = { type: body.action as any };
     if (!isValidAction(action)) {
-      return NextResponse.json({ error: "Invalid action: must be 'drop'" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid action: must be 'drop' or 'cashout'" }, { status: 400 });
     }
 
     const [round] = await db.select().from(plinkoRounds).where(eq(plinkoRounds.id, roundId)).limit(1);
@@ -44,72 +44,80 @@ export async function POST(
 
     const state = round.gameState as unknown as PlinkoState;
 
+    // Apply action
     let newState: PlinkoState;
     try {
-      newState = dropAllBalls(state);
+      if (action.type === "drop") {
+        newState = dropOneBall(state);
+      } else {
+        newState = cashout(state);
+      }
     } catch (err: any) {
       return NextResponse.json({ error: err.message || "Invalid action" }, { status: 400 });
     }
 
     // Update DB
-    const payoutAmount = calculatePayout(newState);
     const updateData: Record<string, unknown> = {
       gameState: newState as unknown as Record<string, unknown>,
       status: newState.status,
       ballPath: newState.balls as unknown as Record<string, unknown>,
-      finalMultiplier: newState.totalMultiplier,
       updatedAt: new Date(),
     };
 
-    if (newState.status === "won") {
-      updateData.outcome = "win";
+    const isGameOver = newState.status === "finished" || newState.status === "cashed_out";
+    if (isGameOver) {
+      const payoutAmount = calculatePayout(newState);
+      const totalMult = newState.totalBet > 0 ? payoutAmount / newState.totalBet : 0;
+      updateData.finalMultiplier = totalMult;
       updateData.payoutCrc = payoutAmount;
-    } else if (newState.status === "lost") {
-      updateData.outcome = "loss";
-      updateData.payoutCrc = payoutAmount;
-      updateData.payoutStatus = payoutAmount > 0 ? "pending" : "none";
+      updateData.outcome = payoutAmount >= newState.totalBet ? "win" : "loss";
     }
 
     await db.update(plinkoRounds).set(updateData).where(eq(plinkoRounds.id, roundId));
 
-    // Process payout if there's any amount to pay
-    if (payoutAmount > 0) {
-      try {
-        const payoutResult = await executePayout({
-          gameType: "plinko",
-          gameId: `plinko-${round.tableId}-${round.transactionHash}`,
-          recipientAddress: round.playerAddress,
-          amountCrc: payoutAmount,
-          reason: `Plinko — ${newState.ballCount} balls — x${(newState.totalMultiplier || 0).toFixed(2)} — ${payoutAmount} CRC`,
-        });
-
-        await db.update(plinkoRounds).set({
-          payoutStatus: payoutResult.success ? "success" : "failed",
-          payoutTxHash: payoutResult.transferTxHash || null,
-          errorMessage: payoutResult.error || null,
-        }).where(eq(plinkoRounds.id, roundId));
-      } catch (err: any) {
-        console.error("[Plinko] Payout error:", err.message);
-        await db.update(plinkoRounds).set({
-          payoutStatus: "failed",
-          errorMessage: err.message?.substring(0, 500),
-        }).where(eq(plinkoRounds.id, roundId));
-      }
-
-      // XP for win
-      if (newState.status === "won") {
+    // Process payout when game is over
+    if (isGameOver) {
+      const payoutAmount = calculatePayout(newState);
+      if (payoutAmount > 0) {
         try {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: round.playerAddress, action: "plinko_win" }),
+          const reasonSuffix = newState.status === "cashed_out"
+            ? `cashout after ${newState.balls.length}/${newState.ballCount} balls`
+            : `${newState.balls.length} balls`;
+          const payoutResult = await executePayout({
+            gameType: "plinko",
+            gameId: `plinko-${round.tableId}-${round.transactionHash}`,
+            recipientAddress: round.playerAddress,
+            amountCrc: payoutAmount,
+            reason: `Plinko — ${reasonSuffix} — ${payoutAmount} CRC`,
           });
-        } catch {}
+
+          await db.update(plinkoRounds).set({
+            payoutStatus: payoutResult.success ? "success" : "failed",
+            payoutTxHash: payoutResult.transferTxHash || null,
+            errorMessage: payoutResult.error || null,
+          }).where(eq(plinkoRounds.id, roundId));
+        } catch (err: any) {
+          console.error("[Plinko] Payout error:", err.message);
+          await db.update(plinkoRounds).set({
+            payoutStatus: "failed",
+            errorMessage: err.message?.substring(0, 500),
+          }).where(eq(plinkoRounds.id, roundId));
+        }
+
+        // XP for any positive outcome
+        if (payoutAmount >= newState.totalBet) {
+          try {
+            const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+            await fetch(`${base}/api/players/xp`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ address: round.playerAddress, action: "plinko_win" }),
+            });
+          } catch {}
+        }
+      } else {
+        await db.update(plinkoRounds).set({ payoutStatus: "none" }).where(eq(plinkoRounds.id, roundId));
       }
-    } else {
-      // No payout needed (0 CRC)
-      await db.update(plinkoRounds).set({ payoutStatus: "none" }).where(eq(plinkoRounds.id, roundId));
     }
 
     const visible = getVisibleState(newState);

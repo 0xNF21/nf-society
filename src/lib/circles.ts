@@ -45,10 +45,12 @@ export function generateGamePaymentLink(
   gameType: string,
   gameSlug: string,
   playerToken?: string,
+  ballValue?: number,
 ): string {
-  // Format: "game:slug:token" as plain text (Gnosis App requires plain text, not hex)
+  // Format: "game:slug[:token[:bv{N}]]" as plain text (Gnosis App requires plain text, not hex)
   const parts = [gameType, gameSlug];
-  if (playerToken) parts.push(playerToken);
+  if (playerToken || ballValue !== undefined) parts.push(playerToken || "");
+  if (ballValue !== undefined && ballValue > 0) parts.push(`bv${ballValue}`);
   const data = parts.join(":");
   return `https://app.gnosis.io/transfer/${recipientAddress}/crc?data=${encodeURIComponent(data)}&amount=${amountCRC}`;
 }

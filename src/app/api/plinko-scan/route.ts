@@ -83,8 +83,23 @@ export async function POST(req: NextRequest) {
       // Extract player token
       const playerToken = payment.gameData?.t || null;
 
+      // Extract ball value (default 1 CRC/ball if not specified)
+      let ballValue = typeof payment.gameData?.bv === "number" && payment.gameData.bv > 0
+        ? payment.gameData.bv
+        : 1;
+
+      // Ensure ball value divides bet evenly; if not, fall back to 1
+      if (betCrc % ballValue !== 0 || ballValue > betCrc) {
+        ballValue = 1;
+      }
+
       // Create initial state (player hasn't dropped yet)
-      const state = createInitialState(betCrc);
+      let state;
+      try {
+        state = createInitialState(betCrc, ballValue);
+      } catch {
+        continue;
+      }
 
       try {
         const inserted = await db.insert(plinkoRounds).values({
@@ -92,6 +107,7 @@ export async function POST(req: NextRequest) {
           playerAddress,
           transactionHash: txHash,
           betCrc,
+          ballValue,
           playerToken,
           gameState: state as unknown as Record<string, unknown>,
           status: state.status,

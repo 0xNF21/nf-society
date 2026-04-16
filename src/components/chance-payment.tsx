@@ -33,6 +33,8 @@ interface ChancePaymentProps {
   qrLabel?: string;
   /** Player token for identifying the payer (encoded in payment data) */
   playerToken?: string;
+  /** Optional ball value (CRC per ball) for games like Plinko — encoded as bv{N} */
+  ballValue?: number;
 }
 
 export function ChancePayment({
@@ -48,6 +50,7 @@ export function ChancePayment({
   paymentStatus = "idle",
   qrLabel,
   playerToken,
+  ballValue,
 }: ChancePaymentProps) {
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
@@ -61,7 +64,7 @@ export function ChancePayment({
   const [miniAppError, setMiniAppError] = useState<string | null>(null);
   const [miniAppSuccess, setMiniAppSuccess] = useState(false);
 
-  const paymentLink = generateGamePaymentLink(recipientAddress, amountCrc, gameType, gameId, playerToken);
+  const paymentLink = generateGamePaymentLink(recipientAddress, amountCrc, gameType, gameId, playerToken, ballValue);
 
   // Generate QR code (standalone only)
   useEffect(() => {
@@ -86,7 +89,8 @@ export function ChancePayment({
     setMiniAppError(null);
     try {
       const parts = [gameType, gameId];
-      if (playerToken) parts.push(playerToken);
+      if (playerToken || ballValue !== undefined) parts.push(playerToken || "");
+      if (ballValue !== undefined && ballValue > 0) parts.push(`bv${ballValue}`);
       const data = parts.join(":");
       await sendPayment(recipientAddress, amountCrc, data);
       setMiniAppSuccess(true);

@@ -19,6 +19,7 @@ export const plinkoRounds = pgTable("plinko_rounds", {
   playerAddress: text("player_address").notNull(),
   transactionHash: text("transaction_hash").notNull().unique(),
   betCrc: integer("bet_crc").notNull(),
+  ballValue: real("ball_value").notNull().default(1),
   playerToken: text("player_token"),
   gameState: jsonb("game_state").notNull(),
   status: text("status").notNull().default("playing"),

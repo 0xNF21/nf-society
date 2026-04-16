@@ -3,6 +3,7 @@ export type GameData = {
   id: string;
   v: number;
   t?: string;
+  bv?: number; // ball value (Plinko: CRC per ball)
 };
 
 const SUPPORTED_VERSIONS = [1];
@@ -46,17 +47,22 @@ export function decodeGameData(raw: string): GameData | null {
       ) {
         const result: GameData = { game: parsed.game, id: parsed.id, v: parsed.v };
         if (typeof parsed.t === "string" && parsed.t.length > 0) result.t = parsed.t;
+        if (typeof parsed.bv === "number" && parsed.bv > 0) result.bv = parsed.bv;
         return result;
       }
     } catch {
       // Not JSON, try text format below
     }
 
-    // Try text format: "game:id" or "game:id:token"
+    // Try text format: "game:id[:token[:bv{N}]]"
     const parts = input.split(":");
     if (parts.length >= 2 && parts[0].length > 0 && parts[1].length > 0) {
       const result: GameData = { game: parts[0], id: parts[1], v: 1 };
       if (parts[2] && parts[2].length > 0) result.t = parts[2];
+      if (parts[3] && parts[3].startsWith("bv")) {
+        const bv = parseFloat(parts[3].slice(2));
+        if (!isNaN(bv) && bv > 0) result.bv = bv;
+      }
       return result;
     }
 

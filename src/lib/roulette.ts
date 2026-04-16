@@ -3,12 +3,14 @@
  *
  * Rules:
  * - European roulette: 37 slots (0–36)
- * - Player places bets on numbers and/or zones (red, black, odd, even, etc.)
+ * - Player places bets on numbers, zones, splits, or corners
  * - Each bet type has its own payout based on coverage
  * - RTP ~99% (1% house edge)
  *
  * Payouts (0.99 * 37 / coverage):
  * - Straight (1 number):  x36.63
+ * - Split (2 numbers):    x18.315
+ * - Corner (4 numbers):   x9.1575
  * - Red/Black/Odd/Even/Low/High (18 numbers): x2.035
  * - Dozen/Column (12 numbers): x3.0525
  */
@@ -16,7 +18,7 @@
 // ── Types ──────────────────────────────────────────────
 
 export type BetType =
-  | "straight"
+  | "straight" | "split" | "corner"
   | "red" | "black"
   | "odd" | "even"
   | "low" | "high"
@@ -25,8 +27,9 @@ export type BetType =
 
 export type RouletteBet = {
   type: BetType;
-  number?: number; // only for "straight"
-  amount: number;  // CRC placed
+  number?: number;    // for "straight"
+  numbers?: number[]; // for "split" (2) and "corner" (4)
+  amount: number;
 };
 
 export type RouletteAction = {
@@ -66,14 +69,16 @@ const HOUSE_FACTOR = 0.99;
 
 /** Payout multiplier per bet type (includes stake) */
 export const BET_PAYOUTS: Record<BetType, number> = {
-  straight: Math.floor(HOUSE_FACTOR * 37 / 1 * 100) / 100,     // 36.63
-  red:      Math.floor(HOUSE_FACTOR * 37 / 18 * 10000) / 10000, // 2.035
+  straight: Math.floor(HOUSE_FACTOR * 37 / 1 * 100) / 100,       // 36.63
+  split:    Math.floor(HOUSE_FACTOR * 37 / 2 * 10000) / 10000,    // 18.315
+  corner:   Math.floor(HOUSE_FACTOR * 37 / 4 * 10000) / 10000,    // 9.1575
+  red:      Math.floor(HOUSE_FACTOR * 37 / 18 * 10000) / 10000,   // 2.035
   black:    Math.floor(HOUSE_FACTOR * 37 / 18 * 10000) / 10000,
   odd:      Math.floor(HOUSE_FACTOR * 37 / 18 * 10000) / 10000,
   even:     Math.floor(HOUSE_FACTOR * 37 / 18 * 10000) / 10000,
   low:      Math.floor(HOUSE_FACTOR * 37 / 18 * 10000) / 10000,
   high:     Math.floor(HOUSE_FACTOR * 37 / 18 * 10000) / 10000,
-  dozen1:   Math.floor(HOUSE_FACTOR * 37 / 12 * 10000) / 10000, // 3.0525
+  dozen1:   Math.floor(HOUSE_FACTOR * 37 / 12 * 10000) / 10000,   // 3.0525
   dozen2:   Math.floor(HOUSE_FACTOR * 37 / 12 * 10000) / 10000,
   dozen3:   Math.floor(HOUSE_FACTOR * 37 / 12 * 10000) / 10000,
   col1:     Math.floor(HOUSE_FACTOR * 37 / 12 * 10000) / 10000,
@@ -82,9 +87,58 @@ export const BET_PAYOUTS: Record<BetType, number> = {
 };
 
 const ALL_BET_TYPES: BetType[] = [
-  "straight", "red", "black", "odd", "even", "low", "high",
+  "straight", "split", "corner",
+  "red", "black", "odd", "even", "low", "high",
   "dozen1", "dozen2", "dozen3", "col1", "col2", "col3",
 ];
+
+/**
+ * Table layout for adjacency checks.
+ * Rows top→bottom: [3,6,9,...,36], [2,5,8,...,35], [1,4,7,...,34]
+ */
+export const TABLE_ROWS: number[][] = [
+  [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36],
+  [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],
+  [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34],
+];
+
+/** Check if two numbers are adjacent on the table (horizontal or vertical) */
+export function areAdjacent(a: number, b: number): boolean {
+  if (a < 1 || a > 36 || b < 1 || b > 36 || a === b) return false;
+  for (let r = 0; r < 3; r++) {
+    const row = TABLE_ROWS[r];
+    const ia = row.indexOf(a);
+    const ib = row.indexOf(b);
+    // Same row, adjacent columns
+    if (ia >= 0 && ib >= 0 && Math.abs(ia - ib) === 1) return true;
+    // Same column, adjacent rows
+    if (ia >= 0) {
+      if (r > 0 && TABLE_ROWS[r - 1][ia] === b) return true;
+      if (r < 2 && TABLE_ROWS[r + 1][ia] === b) return true;
+    }
+  }
+  return false;
+}
+
+/** Check if four numbers form a valid 2x2 corner on the table */
+export function isValidCorner(nums: number[]): boolean {
+  if (nums.length !== 4) return false;
+  const sorted = [...nums].sort((a, b) => a - b);
+  // Find positions in the grid
+  const positions: Array<{ r: number; c: number }> = [];
+  for (const n of sorted) {
+    for (let r = 0; r < 3; r++) {
+      const c = TABLE_ROWS[r].indexOf(n);
+      if (c >= 0) { positions.push({ r, c }); break; }
+    }
+  }
+  if (positions.length !== 4) return false;
+  // Must form a 2x2 block
+  const rows = [...new Set(positions.map(p => p.r))].sort();
+  const cols = [...new Set(positions.map(p => p.c))].sort();
+  return rows.length === 2 && cols.length === 2
+    && rows[1] - rows[0] === 1 && cols[1] - cols[0] === 1;
+}
 
 // ── Functions ──────────────────────────────────────────
 
@@ -99,6 +153,8 @@ export function getNumberColor(n: number): "red" | "black" | "green" {
 export function isBetWinning(bet: RouletteBet, result: number): boolean {
   switch (bet.type) {
     case "straight": return result === bet.number;
+    case "split":    return bet.numbers?.includes(result) ?? false;
+    case "corner":   return bet.numbers?.includes(result) ?? false;
     case "red":      return RED_NUMBERS.includes(result);
     case "black":    return BLACK_NUMBERS.includes(result);
     case "odd":      return result > 0 && result % 2 === 1;
@@ -146,6 +202,16 @@ export function resolveRoll(state: RouletteState, action: RouletteAction): Roule
     if (bet.type === "straight") {
       if (bet.number === undefined || bet.number < 0 || bet.number > 36) {
         throw new Error(`Invalid straight bet number: ${bet.number}`);
+      }
+    }
+    if (bet.type === "split") {
+      if (!bet.numbers || bet.numbers.length !== 2 || !areAdjacent(bet.numbers[0], bet.numbers[1])) {
+        throw new Error("Split bet requires 2 adjacent numbers");
+      }
+    }
+    if (bet.type === "corner") {
+      if (!bet.numbers || !isValidCorner(bet.numbers)) {
+        throw new Error("Corner bet requires 4 numbers forming a 2x2 block");
       }
     }
     totalPlaced += bet.amount;
@@ -205,6 +271,13 @@ export function isValidAction(action: unknown, betCrc: number): action is Roulet
     if (typeof b.amount !== "number" || b.amount < 1 || !Number.isInteger(b.amount)) return false;
     if (b.type === "straight") {
       if (typeof b.number !== "number" || b.number < 0 || b.number > 36) return false;
+    }
+    if (b.type === "split") {
+      if (!Array.isArray(b.numbers) || b.numbers.length !== 2) return false;
+      if (!areAdjacent(b.numbers[0] as number, b.numbers[1] as number)) return false;
+    }
+    if (b.type === "corner") {
+      if (!Array.isArray(b.numbers) || !isValidCorner(b.numbers as number[])) return false;
     }
     total += b.amount;
   }

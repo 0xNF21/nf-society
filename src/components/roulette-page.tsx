@@ -12,8 +12,8 @@ import { PnlCard } from "@/components/pnl-card";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { darkSafeColor } from "@/lib/utils";
 import {
-  RED_NUMBERS, BLACK_NUMBERS, WHEEL_ORDER, BET_PAYOUTS,
-  getNumberColor, generateResult, isBetWinning,
+  RED_NUMBERS, BLACK_NUMBERS, WHEEL_ORDER, BET_PAYOUTS, TABLE_ROWS,
+  getNumberColor, generateResult, isBetWinning, areAdjacent, isValidCorner,
 } from "@/lib/roulette";
 import type { RouletteBet, BetType, VisibleState } from "@/lib/roulette";
 
@@ -47,11 +47,7 @@ const COLOR_HEX: Record<string, string> = {
   green: "#16A34A",
 };
 
-const TABLE_ROWS: number[][] = [
-  [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36],
-  [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],
-  [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34],
-];
+// TABLE_ROWS imported from roulette.ts
 
 // ── Bet indicator — glowing bar + amount ──────────────────
 
@@ -211,34 +207,64 @@ function RouletteWheel({
 function BettingTable({
   bets,
   onAddBet,
+  onRemoveBet,
   onClear,
   disabled,
   remaining,
   betCrc,
+  chipValue,
+  onChipValueChange,
   locale,
 }: {
   bets: RouletteBet[];
-  onAddBet: (bet: Omit<RouletteBet, "amount">) => void;
+  onAddBet: (bet: Omit<RouletteBet, "amount">, amount: number) => void;
+  onRemoveBet: (bet: Omit<RouletteBet, "amount">, amount: number) => void;
   onClear: () => void;
   disabled: boolean;
   remaining: number;
   betCrc: number;
+  chipValue: number;
+  onChipValueChange: (v: number) => void;
   locale: "fr" | "en";
 }) {
   const t = translations.roulette;
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const chipCount = (type: BetType, number?: number): number => {
+  const chipCount = (type: BetType, number?: number, numbers?: number[]): number => {
     return bets
-      .filter((b) => b.type === type && (type !== "straight" || b.number === number))
+      .filter((b) => {
+        if (b.type !== type) return false;
+        if (type === "straight") return b.number === number;
+        if (type === "split" || type === "corner") {
+          if (!b.numbers || !numbers) return false;
+          return b.numbers.length === numbers.length && b.numbers.every((n) => numbers.includes(n));
+        }
+        return true;
+      })
       .reduce((s, b) => s + b.amount, 0);
   };
 
   const canBet = !disabled && remaining > 0;
   const totalPlaced = betCrc - remaining;
+  const effectiveChip = Math.min(chipValue, remaining);
+
+  // Handlers for right-click (desktop) and long-press (mobile)
+  const handleContext = (e: React.MouseEvent, bet: Omit<RouletteBet, "amount">) => {
+    e.preventDefault();
+    onRemoveBet(bet, chipValue);
+  };
+  const handleTouchStart = (bet: Omit<RouletteBet, "amount">) => {
+    longPressTimer.current = setTimeout(() => onRemoveBet(bet, chipValue), 500);
+  };
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  };
 
   // Build bet label for recap
-  const betLabel = (b: RouletteBet, loc: "fr" | "en"): string => {
+  const betLabel = (b: RouletteBet): string => {
     if (b.type === "straight") return `#${b.number}`;
+    if (b.type === "split") return `${b.numbers?.[0]}-${b.numbers?.[1]}`;
+    if (b.type === "corner") return b.numbers?.join("/") || "";
     const labels: Record<string, Record<"fr" | "en", string>> = {
       red: { fr: "Rouge", en: "Red" }, black: { fr: "Noir", en: "Black" },
       odd: { fr: "Impair", en: "Odd" }, even: { fr: "Pair", en: "Even" },
@@ -247,59 +273,76 @@ function BettingTable({
       dozen3: { fr: "25-36", en: "25-36" },
       col1: { fr: "Col.1", en: "Col.1" }, col2: { fr: "Col.2", en: "Col.2" }, col3: { fr: "Col.3", en: "Col.3" },
     };
-    return labels[b.type]?.[loc] || b.type;
+    return labels[b.type]?.[locale] || b.type;
+  };
+
+  // Cell button helper
+  const cellClick = (bet: Omit<RouletteBet, "amount">) => {
+    if (canBet) onAddBet(bet, effectiveChip);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {/* ── Chip denomination selector ── */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold shrink-0">
+          {locale === "fr" ? "Jeton" : "Chip"}
+        </span>
+        <div className="flex gap-1.5 flex-1">
+          {[1, 5, 10].map((v) => (
+            <button
+              key={v}
+              onClick={() => onChipValueChange(v)}
+              className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${
+                chipValue === v
+                  ? "bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 text-amber-900 shadow-lg shadow-yellow-400/30 scale-105"
+                  : "bg-white/10 text-white/60 hover:bg-white/20"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Live bet recap ── */}
       <div className="rounded-xl bg-white/10 p-3 space-y-2">
-        {/* Progress bar */}
         <div className="flex items-center justify-between text-xs text-white/70 mb-1">
           <span className="font-bold">{totalPlaced} / {betCrc} CRC</span>
-          <button
-            onClick={onClear}
-            disabled={bets.length === 0}
-            className="text-red-400 hover:text-red-300 disabled:opacity-30 flex items-center gap-1 font-bold"
-          >
+          <button onClick={onClear} disabled={bets.length === 0}
+            className="text-red-400 hover:text-red-300 disabled:opacity-30 flex items-center gap-1 font-bold">
             <X className="w-3 h-3" /> {t.clear[locale]}
           </button>
         </div>
         <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-300"
-            style={{
-              width: `${betCrc > 0 ? (totalPlaced / betCrc) * 100 : 0}%`,
-              backgroundColor: remaining === 0 ? "#10B981" : "#FBBF24",
-            }}
-          />
+          <div className="h-full rounded-full transition-all duration-300"
+            style={{ width: `${betCrc > 0 ? (totalPlaced / betCrc) * 100 : 0}%`, backgroundColor: remaining === 0 ? "#10B981" : "#FBBF24" }} />
         </div>
-
-        {/* Bet list */}
         {bets.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 mt-1">
             {bets.map((b, i) => (
               <span key={i} className="inline-flex items-center gap-1 text-[11px] font-bold bg-white/10 text-white/90 px-2 py-1 rounded-lg">
                 <span className="text-yellow-400">{b.amount}</span>
-                {betLabel(b, locale)}
+                {betLabel(b)}
                 <span className="text-white/30">x{BET_PAYOUTS[b.type]}</span>
               </span>
             ))}
           </div>
         ) : (
-          <p className="text-[11px] text-white/30 text-center mt-1">
-            {t.placeBets[locale]}
-          </p>
+          <p className="text-[11px] text-white/30 text-center mt-1">{t.placeBets[locale]}</p>
         )}
       </div>
 
-      {/* ── Number grid ── */}
-      <div className="space-y-1.5">
+      {/* ── Number grid with split/corner dots ── */}
+      <div className="space-y-0">
         {/* Zero */}
         <button
-          onClick={() => canBet && onAddBet({ type: "straight", number: 0 })}
+          onClick={() => cellClick({ type: "straight", number: 0 })}
+          onContextMenu={(e) => handleContext(e, { type: "straight", number: 0 })}
+          onTouchStart={() => handleTouchStart({ type: "straight", number: 0 })}
+          onTouchEnd={handleTouchEnd}
           disabled={!canBet}
-          className={`relative w-full h-12 rounded-xl text-sm font-bold text-white transition-all ${
+          className={`relative w-full h-12 rounded-t-xl text-sm font-bold text-white transition-all mb-1 ${
             chipCount("straight", 0) > 0 ? "ring-2 ring-yellow-400 ring-offset-1 ring-offset-[#0d4f2b]" : ""
           } ${canBet ? "hover:brightness-110 active:scale-[0.98]" : "opacity-60"}`}
           style={{ backgroundColor: COLOR_HEX.green }}
@@ -308,94 +351,171 @@ function BettingTable({
           {chipCount("straight", 0) > 0 && <BetBadge amount={chipCount("straight", 0)} />}
         </button>
 
-        {/* 3x12 grid + columns */}
+        {/* Grid rows with split/corner dots */}
         {TABLE_ROWS.map((row, ri) => (
-          <div key={ri} className="flex gap-1">
-            <div className="flex-1 grid grid-cols-12 gap-0.5">
-              {row.map((num) => {
-                const color = getNumberColor(num);
-                const chips = chipCount("straight", num);
+          <div key={ri}>
+            {/* Split dots between this row and the row above */}
+            {ri > 0 && (
+              <div className="flex gap-1 mb-px">
+                <div className="flex-1 grid grid-cols-12 gap-0.5">
+                  {row.map((num, ci) => {
+                    const above = TABLE_ROWS[ri - 1][ci];
+                    const splitNums = [Math.min(num, above), Math.max(num, above)];
+                    const splitChips = chipCount("split", undefined, splitNums);
+                    // Corner dots (intersection of 4)
+                    const hasCornerLeft = ci > 0;
+                    const cornerNums = hasCornerLeft ? [
+                      TABLE_ROWS[ri - 1][ci - 1], TABLE_ROWS[ri - 1][ci],
+                      row[ci - 1], num,
+                    ].sort((a, b) => a - b) : [];
+                    const cornerChips = hasCornerLeft ? chipCount("corner", undefined, cornerNums) : 0;
+                    return (
+                      <div key={`vsplit-${ri}-${ci}`} className="relative h-3 flex items-center justify-center">
+                        {/* Vertical split dot */}
+                        <button
+                          onClick={() => cellClick({ type: "split", numbers: splitNums })}
+                          onContextMenu={(e) => handleContext(e, { type: "split", numbers: splitNums })}
+                          className={`w-3 h-3 rounded-full transition-all z-10 ${
+                            splitChips > 0
+                              ? "bg-yellow-400 shadow-md shadow-yellow-400/50"
+                              : "bg-white/0 hover:bg-white/30"
+                          }`}
+                          title={`Split ${splitNums[0]}-${splitNums[1]}`}
+                        />
+                        {splitChips > 0 && (
+                          <span className="absolute -top-1 left-1/2 translate-x-1 text-[8px] font-black text-yellow-400 z-20">{splitChips}</span>
+                        )}
+                        {/* Corner dot (left side) */}
+                        {hasCornerLeft && (
+                          <>
+                            <button
+                              onClick={() => cellClick({ type: "corner", numbers: cornerNums })}
+                              onContextMenu={(e) => handleContext(e, { type: "corner", numbers: cornerNums })}
+                              className={`absolute -left-1 w-3 h-3 rounded-full transition-all z-10 ${
+                                cornerChips > 0
+                                  ? "bg-yellow-400 shadow-md shadow-yellow-400/50"
+                                  : "bg-white/0 hover:bg-white/30"
+                              }`}
+                              title={`Corner ${cornerNums.join("/")}`}
+                            />
+                            {cornerChips > 0 && (
+                              <span className="absolute -top-1 -left-1 -translate-x-2 text-[8px] font-black text-yellow-400 z-20">{cornerChips}</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="w-10" /> {/* Spacer for column bet */}
+              </div>
+            )}
+
+            {/* Number row + horizontal split dots + column bet */}
+            <div className="flex gap-1">
+              <div className="flex-1 relative">
+                <div className="grid grid-cols-12 gap-0.5">
+                  {row.map((num) => {
+                    const color = getNumberColor(num);
+                    const chips = chipCount("straight", num);
+                    return (
+                      <button
+                        key={num}
+                        onClick={() => cellClick({ type: "straight", number: num })}
+                        onContextMenu={(e) => handleContext(e, { type: "straight", number: num })}
+                        onTouchStart={() => handleTouchStart({ type: "straight", number: num })}
+                        onTouchEnd={handleTouchEnd}
+                        disabled={!canBet}
+                        className={`relative h-12 rounded-lg text-xs font-bold text-white transition-all ${
+                          chips > 0 ? "ring-2 ring-yellow-400 ring-offset-1 ring-offset-[#0d4f2b]" : ""
+                        } ${canBet ? "hover:brightness-125 active:scale-90" : "opacity-60"}`}
+                        style={{ backgroundColor: COLOR_HEX[color] }}
+                      >
+                        {num}
+                        {chips > 0 && <BetBadge amount={chips} />}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Horizontal split dots (between adjacent cells in the same row) */}
+                {row.slice(0, -1).map((num, ci) => {
+                  const right = row[ci + 1];
+                  const splitNums = [Math.min(num, right), Math.max(num, right)];
+                  const splitChips = chipCount("split", undefined, splitNums);
+                  const leftPct = ((ci + 1) / 12) * 100;
+                  return (
+                    <button
+                      key={`hsplit-${ri}-${ci}`}
+                      onClick={() => cellClick({ type: "split", numbers: splitNums })}
+                      onContextMenu={(e) => handleContext(e, { type: "split", numbers: splitNums })}
+                      className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full transition-all z-10 ${
+                        splitChips > 0
+                          ? "bg-yellow-400 shadow-md shadow-yellow-400/50"
+                          : "bg-white/0 hover:bg-white/30"
+                      }`}
+                      style={{ left: `${leftPct}%` }}
+                      title={`Split ${splitNums[0]}-${splitNums[1]}`}
+                    />
+                  );
+                })}
+              </div>
+              {/* Column 2:1 */}
+              {(() => {
+                const colType = `col${3 - ri}` as BetType;
+                const chips = chipCount(colType);
                 return (
                   <button
-                    key={num}
-                    onClick={() => canBet && onAddBet({ type: "straight", number: num })}
+                    onClick={() => cellClick({ type: colType })}
+                    onContextMenu={(e) => handleContext(e, { type: colType })}
                     disabled={!canBet}
-                    className={`relative h-12 rounded-lg text-xs font-bold text-white transition-all ${
-                      chips > 0 ? "ring-2 ring-yellow-400 ring-offset-1 ring-offset-[#0d4f2b]" : ""
-                    } ${canBet ? "hover:brightness-125 active:scale-90" : "opacity-60"}`}
-                    style={{ backgroundColor: COLOR_HEX[color] }}
+                    className={`relative w-10 h-12 rounded-lg text-[10px] font-bold text-white/70 bg-white/10 transition-all ${
+                      chips > 0 ? "ring-2 ring-yellow-400 text-white" : ""
+                    } ${canBet ? "hover:bg-white/20 active:scale-90" : "opacity-60"}`}
                   >
-                    {num}
+                    2:1
                     {chips > 0 && <BetBadge amount={chips} />}
                   </button>
                 );
-              })}
+              })()}
             </div>
-            {/* Column 2:1 */}
-            {(() => {
-              const colType = `col${3 - ri}` as BetType;
-              const chips = chipCount(colType);
-              return (
-                <button
-                  onClick={() => canBet && onAddBet({ type: colType })}
-                  disabled={!canBet}
-                  className={`relative w-10 h-12 rounded-lg text-[10px] font-bold text-white/70 bg-white/10 transition-all ${
-                    chips > 0 ? "ring-2 ring-yellow-400 text-white" : ""
-                  } ${canBet ? "hover:bg-white/20 active:scale-90" : "opacity-60"}`}
-                >
-                  2:1
-                  {chips > 0 && <BetBadge amount={chips} />}
-                </button>
-              );
-            })()}
           </div>
         ))}
       </div>
 
       {/* ── Zone bets ── */}
-      <div className="space-y-2">
-        {/* Dozens */}
+      <div className="space-y-2 mt-2">
         <div className="grid grid-cols-3 gap-1.5">
           {([["dozen1", t.dz1[locale]], ["dozen2", t.dz2[locale]], ["dozen3", t.dz3[locale]]] as const).map(([type, label]) => {
             const chips = chipCount(type as BetType);
             return (
-              <button
-                key={type}
-                onClick={() => canBet && onAddBet({ type: type as BetType })}
+              <button key={type}
+                onClick={() => cellClick({ type: type as BetType })}
+                onContextMenu={(e) => handleContext(e, { type: type as BetType })}
                 disabled={!canBet}
                 className={`h-11 rounded-xl text-xs font-bold text-white/80 bg-white/10 transition-all flex items-center justify-center gap-1 ${
-                  chips > 0 ? "ring-2 ring-yellow-400 text-white bg-white/15" : ""
-                } ${canBet ? "hover:bg-white/20 active:scale-95" : "opacity-60"}`}
-              >
+                  chips > 0 ? "ring-2 ring-yellow-400 text-white bg-white/15" : "" } ${canBet ? "hover:bg-white/20 active:scale-95" : "opacity-60"}`}>
                 {label} <span className="text-[9px] text-white/40">x3</span>
                 {chips > 0 && <ZoneBadge amount={chips} />}
               </button>
             );
           })}
         </div>
-
-        {/* Outside bets */}
         <div className="grid grid-cols-3 gap-1.5">
           {([
-            ["low", t.low[locale], undefined],
-            ["even", t.even[locale], undefined],
-            ["red", t.red[locale], COLOR_HEX.red],
-            ["black", t.black[locale], COLOR_HEX.black],
-            ["odd", t.odd[locale], undefined],
-            ["high", t.high[locale], undefined],
+            ["low", t.low[locale], undefined], ["even", t.even[locale], undefined],
+            ["red", t.red[locale], COLOR_HEX.red], ["black", t.black[locale], COLOR_HEX.black],
+            ["odd", t.odd[locale], undefined], ["high", t.high[locale], undefined],
           ] as const).map(([type, label, bg]) => {
             const chips = chipCount(type as BetType);
             return (
-              <button
-                key={type}
-                onClick={() => canBet && onAddBet({ type: type as BetType })}
+              <button key={type}
+                onClick={() => cellClick({ type: type as BetType })}
+                onContextMenu={(e) => handleContext(e, { type: type as BetType })}
                 disabled={!canBet}
                 className={`h-11 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
-                  bg ? "text-white" : "text-white/80 bg-white/10"
-                } ${chips > 0 ? "ring-2 ring-yellow-400 brightness-110" : ""
+                  bg ? "text-white" : "text-white/80 bg-white/10" } ${chips > 0 ? "ring-2 ring-yellow-400 brightness-110" : ""
                 } ${canBet ? "hover:brightness-110 active:scale-95" : "opacity-60"}`}
-                style={bg ? { backgroundColor: bg } : undefined}
-              >
+                style={bg ? { backgroundColor: bg } : undefined}>
                 {label} <span className="text-[9px] opacity-50">x2</span>
                 {chips > 0 && <ZoneBadge amount={chips} />}
               </button>
@@ -512,23 +632,47 @@ function GameUI({
   const totalPlaced = bets.reduce((s, b) => s + b.amount, 0);
   const remaining = betCrc - totalPlaced;
   const [wheelDone, setWheelDone] = useState(false);
+  const [chipValue, setChipValue] = useState(1);
 
   useEffect(() => { if (!spinning) setWheelDone(false); }, [spinning]);
 
-  const addBet = useCallback((bet: Omit<RouletteBet, "amount">) => {
-    if (remaining <= 0) return;
-    // Merge with existing same-type bet
-    const existing = bets.findIndex(
-      (b) => b.type === bet.type && (bet.type !== "straight" || b.number === bet.number)
-    );
+  // Match bets by type + number/numbers
+  const betMatches = (a: Omit<RouletteBet, "amount">, b: RouletteBet): boolean => {
+    if (a.type !== b.type) return false;
+    if (a.type === "straight") return a.number === b.number;
+    if (a.type === "split" || a.type === "corner") {
+      if (!a.numbers || !b.numbers) return false;
+      return a.numbers.length === b.numbers.length && a.numbers.every((n) => b.numbers!.includes(n));
+    }
+    return true;
+  };
+
+  const addBet = useCallback((bet: Omit<RouletteBet, "amount">, amount: number) => {
+    const toPlace = Math.min(amount, remaining);
+    if (toPlace <= 0) return;
+    const existing = bets.findIndex((b) => betMatches(bet, b));
     if (existing >= 0) {
       const updated = [...bets];
-      updated[existing] = { ...updated[existing], amount: updated[existing].amount + 1 };
+      updated[existing] = { ...updated[existing], amount: updated[existing].amount + toPlace };
       setBets(updated);
     } else {
-      setBets([...bets, { ...bet, amount: 1 } as RouletteBet]);
+      setBets([...bets, { ...bet, amount: toPlace } as RouletteBet]);
     }
   }, [bets, remaining, setBets]);
+
+  const removeBet = useCallback((bet: Omit<RouletteBet, "amount">, amount: number) => {
+    const idx = bets.findIndex((b) => betMatches(bet, b));
+    if (idx < 0) return;
+    const current = bets[idx];
+    const newAmount = current.amount - amount;
+    if (newAmount <= 0) {
+      setBets(bets.filter((_, i) => i !== idx));
+    } else {
+      const updated = [...bets];
+      updated[idx] = { ...updated[idx], amount: newAmount };
+      setBets(updated);
+    }
+  }, [bets, setBets]);
 
   return (
     <div className="space-y-4">
@@ -549,9 +693,12 @@ function GameUI({
         <BettingTable
           bets={bets}
           onAddBet={addBet}
+          onRemoveBet={removeBet}
           onClear={() => setBets([])}
           disabled={spinning}
           remaining={remaining}
+          chipValue={chipValue}
+          onChipValueChange={setChipValue}
           betCrc={betCrc}
           locale={locale}
         />
