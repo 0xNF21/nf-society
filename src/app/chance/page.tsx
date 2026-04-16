@@ -124,6 +124,28 @@ export default function ChancePage() {
       desc: t.kenoDesc[locale],
       color: "text-indigo-600",
     },
+    {
+      type: "link" as const,
+      flag: "roulette",
+      href: isDemo ? "/roulette/DEMO-classic" : "/roulette",
+      icon: <span className="text-3xl">🎰</span>,
+      iconBg: "bg-red-50 group-hover:bg-red-100",
+      borderHover: "hover:border-red-200",
+      title: t.rouletteTitle[locale],
+      desc: t.rouletteDesc[locale],
+      color: "text-red-600",
+    },
+    {
+      type: "link" as const,
+      flag: "plinko",
+      href: isDemo ? "/plinko/DEMO-classic" : "/plinko",
+      icon: <span className="text-3xl">📌</span>,
+      iconBg: "bg-purple-50 group-hover:bg-purple-100",
+      borderHover: "hover:border-purple-200",
+      title: t.plinkoTitle[locale],
+      desc: t.plinkoDesc[locale],
+      color: "text-purple-600",
+    },
   ];
 
   const handleDailyClick = () => {

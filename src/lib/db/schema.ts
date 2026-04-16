@@ -334,3 +334,9 @@ export type { CrashDashTableRow, CrashDashRoundRow, NewCrashDashTable, NewCrashD
 
 export { kenoTables, kenoRounds } from "./schema/keno";
 export type { KenoTableRow, KenoRoundRow, NewKenoTable, NewKenoRound } from "./schema/keno";
+
+export { rouletteTables, rouletteRounds } from "./schema/roulette";
+export type { RouletteTableRow, RouletteRoundRow, NewRouletteTable, NewRouletteRound } from "./schema/roulette";
+
+export { plinkoTables, plinkoRounds } from "./schema/plinko";
+export type { PlinkoTableRow, PlinkoRoundRow, NewPlinkoTable, NewPlinkoRound } from "./schema/plinko";

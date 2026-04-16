@@ -121,6 +121,8 @@ export const CHANCE_REGISTRY: Record<string, ChanceGameConfig> = {
   dice: { key: "dice", featureFlag: "dice", label: "Dice" },
   crash_dash: { key: "crash_dash", featureFlag: "crash_dash", label: "Demurrage Dash" },
   keno: { key: "keno", featureFlag: "keno", label: "Keno" },
+  roulette: { key: "roulette", featureFlag: "roulette", label: "Roulette" },
+  plinko: { key: "plinko", featureFlag: "plinko", label: "Plinko" },
 };
 
 export const ALL_CHANCE_GAMES = Object.values(CHANCE_REGISTRY);
