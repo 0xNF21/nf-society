@@ -245,9 +245,12 @@ export function applyAction(state: BlackjackState, action: Action): BlackjackSta
       if (isBusted(hand.cards)) {
         hand.busted = true;
         advanceToNextHand(s);
-      }
-      // Split aces: only 1 card allowed
-      if (hand.splitFromAces) {
+      } else if (calculateHandValue(hand.cards).value === 21) {
+        // Auto-stand on 21 — no reason to keep hitting
+        hand.stood = true;
+        advanceToNextHand(s);
+      } else if (hand.splitFromAces) {
+        // Split aces: only 1 card allowed
         hand.stood = true;
         advanceToNextHand(s);
       }
