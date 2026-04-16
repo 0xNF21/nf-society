@@ -309,12 +309,12 @@ function ResultPanel({
 // ── Bet Selector ──────────────────────────────────────
 
 function BetSelector({
-  totalOptions, selectedTotal, selectedBallValue, selectedDropMode,
-  onTotalChange, onBallValueChange, onDropModeChange,
+  totalOptions, selectedTotal, selectedBallValue,
+  onTotalChange, onBallValueChange,
   accentColor, locale,
 }: {
-  totalOptions: number[]; selectedTotal: number; selectedBallValue: number; selectedDropMode: DropMode;
-  onTotalChange: (v: number) => void; onBallValueChange: (v: number) => void; onDropModeChange: (m: DropMode) => void;
+  totalOptions: number[]; selectedTotal: number; selectedBallValue: number;
+  onTotalChange: (v: number) => void; onBallValueChange: (v: number) => void;
   accentColor: string; locale: "fr" | "en";
 }) {
   const t = translations.plinko;
@@ -361,25 +361,6 @@ function BetSelector({
         </div>
       </div>
 
-      {/* Drop mode */}
-      <div>
-        <h2 className="text-sm font-bold text-ink/60 uppercase tracking-widest mb-3">{t.dropMode[locale]}</h2>
-        <div className="grid grid-cols-4 gap-2">
-          {DROP_MODES.map((m) => {
-            const label = m === "all" ? t.dropAll[locale] : `×${m}`;
-            return (
-              <button key={String(m)} onClick={() => onDropModeChange(m)}
-                className={`py-3 rounded-xl text-sm font-bold transition-all ${
-                  selectedDropMode === m ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
-                }`}
-                style={selectedDropMode === m ? { backgroundColor: accentColor } : {}}>
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Summary */}
       {validCombo ? (
         <p className="text-xs text-center text-ink/50">
@@ -388,6 +369,39 @@ function BetSelector({
       ) : (
         <p className="text-xs text-center text-red-500">{t.incompatibleCombo[locale]}</p>
       )}
+    </div>
+  );
+}
+
+// ── Drop Mode Selector (during game) ───────────────────
+
+function DropModeSelector({
+  selectedDropMode, onDropModeChange, accentColor, locale, disabled,
+}: {
+  selectedDropMode: DropMode;
+  onDropModeChange: (m: DropMode) => void;
+  accentColor: string;
+  locale: "fr" | "en";
+  disabled?: boolean;
+}) {
+  const t = translations.plinko;
+  return (
+    <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-3">
+      <p className="text-[10px] text-ink/40 uppercase tracking-widest text-center mb-2">{t.dropMode[locale]}</p>
+      <div className="grid grid-cols-4 gap-2">
+        {DROP_MODES.map((m) => {
+          const label = m === "all" ? t.dropAll[locale] : `×${m}`;
+          return (
+            <button key={String(m)} onClick={() => onDropModeChange(m)} disabled={disabled}
+              className={`py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-30 ${
+                selectedDropMode === m ? "text-white shadow" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+              }`}
+              style={selectedDropMode === m ? { backgroundColor: accentColor } : {}}>
+              {label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -529,10 +543,8 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
             totalOptions={table.betOptions as number[]}
             selectedTotal={selectedTotal}
             selectedBallValue={selectedBallValue}
-            selectedDropMode={selectedDropMode}
             onTotalChange={setSelectedTotal}
             onBallValueChange={setSelectedBallValue}
-            onDropModeChange={setSelectedDropMode}
             accentColor={accentColor}
             locale={locale}
           />
@@ -577,6 +589,14 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
               <p className="text-xl font-bold" style={{ color: accentColor }}>{state.accumulatedPayout.toFixed(2)} CRC</p>
             </div>
           </div>
+
+          <DropModeSelector
+            selectedDropMode={selectedDropMode}
+            onDropModeChange={setSelectedDropMode}
+            accentColor={accentColor}
+            locale={locale}
+            disabled={anim.running || batchRemaining > 0}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <button onClick={handleCashout} disabled={anim.running || batchRemaining > 0}
@@ -817,10 +837,8 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
             totalOptions={table.betOptions as number[]}
             selectedTotal={selectedTotal}
             selectedBallValue={selectedBallValue}
-            selectedDropMode={selectedDropMode}
             onTotalChange={setSelectedTotal}
             onBallValueChange={setSelectedBallValue}
-            onDropModeChange={setSelectedDropMode}
             accentColor={accentColor}
             locale={locale}
           />
@@ -873,6 +891,14 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
               <p className="text-xl font-bold" style={{ color: accentColor }}>{round.accumulatedPayout.toFixed(2)} CRC</p>
             </div>
           </div>
+
+          <DropModeSelector
+            selectedDropMode={selectedDropMode}
+            onDropModeChange={setSelectedDropMode}
+            accentColor={accentColor}
+            locale={locale}
+            disabled={anim.running || dropInFlight || batchRemaining > 0}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <button onClick={handleCashout} disabled={anim.running || dropInFlight || batchRemaining > 0}
