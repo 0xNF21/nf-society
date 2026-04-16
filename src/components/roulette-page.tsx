@@ -228,36 +228,33 @@ function BettingTable({
   locale: "fr" | "en";
 }) {
   const t = translations.roulette;
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const chipCount = (type: BetType, number?: number, numbers?: number[]): number => {
-    return bets
-      .filter((b) => {
-        if (b.type !== type) return false;
-        if (type === "straight") return b.number === number;
-        if (type === "split" || type === "corner") {
-          if (!b.numbers || !numbers) return false;
-          return b.numbers.length === numbers.length && b.numbers.every((n) => numbers.includes(n));
-        }
-        return true;
-      })
-      .reduce((s, b) => s + b.amount, 0);
-  };
+  const chipCount = useCallback((type: BetType, number?: number, numbers?: number[]): number => {
+    try {
+      return (bets || [])
+        .filter((b) => {
+          if (!b || b.type !== type) return false;
+          if (type === "straight") return b.number === number;
+          if (type === "split" || type === "corner") {
+            if (!b.numbers || !numbers) return false;
+            return b.numbers.length === numbers.length && b.numbers.every((n) => numbers.includes(n));
+          }
+          return true;
+        })
+        .reduce((s, b) => s + (b.amount || 0), 0);
+    } catch { return 0; }
+  }, [bets]);
 
   const canBet = !disabled && remaining > 0;
   const totalPlaced = betCrc - remaining;
-  const effectiveChip = Math.min(chipValue, remaining);
+  const effectiveChip = Math.min(chipValue, Math.max(remaining, 0));
 
-  // Handlers for right-click (desktop) and long-press (mobile)
+  // Right-click to remove (desktop only — no long-press on mobile to avoid scroll conflicts)
   const handleContext = (e: React.MouseEvent, bet: Omit<RouletteBet, "amount">) => {
-    e.preventDefault();
-    onRemoveBet(bet, chipValue);
-  };
-  const handleTouchStart = (bet: Omit<RouletteBet, "amount">) => {
-    longPressTimer.current = setTimeout(() => onRemoveBet(bet, chipValue), 500);
-  };
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+    try {
+      e.preventDefault();
+      onRemoveBet(bet, chipValue);
+    } catch {}
   };
 
   // Build bet label for recap
@@ -276,9 +273,13 @@ function BettingTable({
     return labels[b.type]?.[locale] || b.type;
   };
 
-  // Cell button helper
+  // Cell button helper — wrapped in try-catch to prevent crash
   const cellClick = (bet: Omit<RouletteBet, "amount">) => {
-    if (canBet) onAddBet(bet, effectiveChip);
+    try {
+      if (canBet && effectiveChip > 0) onAddBet(bet, effectiveChip);
+    } catch (err) {
+      console.error("[Roulette] cellClick error:", err);
+    }
   };
 
   return (
@@ -339,8 +340,6 @@ function BettingTable({
         <button
           onClick={() => cellClick({ type: "straight", number: 0 })}
           onContextMenu={(e) => handleContext(e, { type: "straight", number: 0 })}
-          onTouchStart={() => handleTouchStart({ type: "straight", number: 0 })}
-          onTouchEnd={handleTouchEnd}
           disabled={!canBet}
           className={`relative w-full h-12 rounded-t-xl text-sm font-bold text-white transition-all mb-1 ${
             chipCount("straight", 0) > 0 ? "ring-2 ring-yellow-400 ring-offset-1 ring-offset-[#0d4f2b]" : ""
@@ -423,8 +422,6 @@ function BettingTable({
                         key={num}
                         onClick={() => cellClick({ type: "straight", number: num })}
                         onContextMenu={(e) => handleContext(e, { type: "straight", number: num })}
-                        onTouchStart={() => handleTouchStart({ type: "straight", number: num })}
-                        onTouchEnd={handleTouchEnd}
                         disabled={!canBet}
                         className={`relative h-12 rounded-lg text-xs font-bold text-white transition-all ${
                           chips > 0 ? "ring-2 ring-yellow-400 ring-offset-1 ring-offset-[#0d4f2b]" : ""
@@ -648,30 +645,35 @@ function GameUI({
   };
 
   const addBet = useCallback((bet: Omit<RouletteBet, "amount">, amount: number) => {
-    const toPlace = Math.min(amount, remaining);
-    if (toPlace <= 0) return;
-    const existing = bets.findIndex((b) => betMatches(bet, b));
-    if (existing >= 0) {
-      const updated = [...bets];
-      updated[existing] = { ...updated[existing], amount: updated[existing].amount + toPlace };
-      setBets(updated);
-    } else {
-      setBets([...bets, { ...bet, amount: toPlace } as RouletteBet]);
-    }
+    try {
+      const toPlace = Math.min(amount, Math.max(remaining, 0));
+      if (toPlace <= 0 || !bet || !bet.type) return;
+      const existing = bets.findIndex((b) => betMatches(bet, b));
+      if (existing >= 0) {
+        const updated = [...bets];
+        updated[existing] = { ...updated[existing], amount: updated[existing].amount + toPlace };
+        setBets(updated);
+      } else {
+        setBets([...bets, { ...bet, amount: toPlace } as RouletteBet]);
+      }
+    } catch (err) { console.error("[Roulette] addBet error:", err); }
   }, [bets, remaining, setBets]);
 
   const removeBet = useCallback((bet: Omit<RouletteBet, "amount">, amount: number) => {
-    const idx = bets.findIndex((b) => betMatches(bet, b));
-    if (idx < 0) return;
-    const current = bets[idx];
-    const newAmount = current.amount - amount;
-    if (newAmount <= 0) {
-      setBets(bets.filter((_, i) => i !== idx));
-    } else {
-      const updated = [...bets];
-      updated[idx] = { ...updated[idx], amount: newAmount };
-      setBets(updated);
-    }
+    try {
+      if (!bet || !bet.type) return;
+      const idx = bets.findIndex((b) => betMatches(bet, b));
+      if (idx < 0) return;
+      const current = bets[idx];
+      const newAmount = current.amount - amount;
+      if (newAmount <= 0) {
+        setBets(bets.filter((_, i) => i !== idx));
+      } else {
+        const updated = [...bets];
+        updated[idx] = { ...updated[idx], amount: newAmount };
+        setBets(updated);
+      }
+    } catch (err) { console.error("[Roulette] removeBet error:", err); }
   }, [bets, setBets]);
 
   return (
@@ -836,10 +838,49 @@ function DemoRouletteGame({ table }: { table: RouletteTable }) {
 
 // ── Main export ──────────────────────────────────────────
 
+// ── Error Boundary ──────────────────────────────────────
+
+import React from "react";
+
+class RouletteErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error) { console.error("[Roulette] Crash:", error); }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+function RouletteCrashFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="text-center space-y-4">
+        <p className="text-4xl">🎰</p>
+        <p className="text-lg font-bold text-ink">Oops — erreur de chargement</p>
+        <p className="text-sm text-ink/50">Rechargez la page pour reprendre votre partie.</p>
+        <button onClick={() => window.location.reload()}
+          className="px-6 py-2 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700">
+          Recharger
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function RoulettePageClient({ table }: { table: RouletteTable }) {
   const { isDemo } = useDemo();
-  if (isDemo) return <DemoRouletteGame table={table} />;
-  return <RealRouletteGame table={table} />;
+  return (
+    <RouletteErrorBoundary fallback={<RouletteCrashFallback />}>
+      {isDemo ? <DemoRouletteGame table={table} /> : <RealRouletteGame table={table} />}
+    </RouletteErrorBoundary>
+  );
 }
 
 // ── Real Game ──────────────────────────────────────────
