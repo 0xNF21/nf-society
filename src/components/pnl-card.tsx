@@ -276,11 +276,12 @@ function CardContent({ props }: { props: PnlCardProps }) {
     ? props.tier
     : RESULT_LABELS[props.result]?.[locale] || props.result;
 
-  // Net amount
+  // Net amount (round to 2 decimals to avoid floating-point display artifacts)
   const netAmount = props.gainCrc ?? (props.rewardCrc !== undefined && props.betCrc !== undefined
     ? props.rewardCrc - props.betCrc : props.rewardCrc ?? 0);
   const isPositive = netAmount >= 0;
-  const displayNet = (isPositive ? "+" : "\u2212") + Math.abs(netAmount);
+  const absRounded = Math.round(Math.abs(netAmount) * 1000) / 1000;
+  const displayNet = (isPositive ? "+" : "\u2212") + absRounded;
 
   // Amount color
   const amountColor = isPositive ? (style.amount || "#10B981") : "#EF4444";
@@ -345,7 +346,7 @@ function CardContent({ props }: { props: PnlCardProps }) {
             </div>
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>
               {isPositive && props.betCrc ? (
-                <>{locale === "fr" ? "Gain brut" : "Gross"} <span style={{ color: "rgba(255,255,255,0.35)" }}>+{gross} CRC</span>{commAmt > 0 && <> · Commission <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{commAmt} CRC</span></>}</>
+                <>{locale === "fr" ? "Gain brut" : "Gross"} <span style={{ color: "rgba(255,255,255,0.35)" }}>+{Math.round(gross * 1000) / 1000} CRC</span>{commAmt > 0 && <> · Commission <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{Math.round(commAmt * 1000) / 1000} CRC</span></>}</>
               ) : props.betCrc ? (
                 <>{locale === "fr" ? "Mise perdue" : "Bet lost"} · <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{props.betCrc} CRC</span></>
               ) : null}
@@ -415,7 +416,8 @@ function PnlStyles() {
 function buildTweetText(props: PnlCardProps): string {
   const locale = props.locale || "fr";
   const gameName = GAME_LABELS[props.gameType]?.[locale] || props.gameType;
-  const net = props.gainCrc ?? (props.rewardCrc !== undefined && props.betCrc !== undefined ? props.rewardCrc - props.betCrc : 0);
+  const netRaw = props.gainCrc ?? (props.rewardCrc !== undefined && props.betCrc !== undefined ? props.rewardCrc - props.betCrc : 0);
+  const net = Math.round(netRaw * 1000) / 1000;
   const sign = net >= 0 ? "+" : "";
   if (props.result === "win") {
     return locale === "fr"

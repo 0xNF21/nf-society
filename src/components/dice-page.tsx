@@ -273,7 +273,7 @@ function ResultPanel({
           {t.target[locale]}: {round.target?.toFixed(2)} | {round.direction === "over" ? t.rollOver[locale] : t.rollUnder[locale]} | x{multiplier.toFixed(4)}
         </p>
         {won && payout > 0 && (
-          <p className="text-lg text-emerald-600 font-bold mt-2">+{payout.toFixed(0)} CRC</p>
+          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(payout * 1000) / 1000} CRC</p>
         )}
       </div>
 
@@ -281,7 +281,7 @@ function ResultPanel({
         gameType="dice"
         result={won ? "win" : "loss"}
         betCrc={round.betCrc}
-        gainCrc={won ? Math.round(payout - round.betCrc) : -round.betCrc}
+        gainCrc={won ? Math.round((payout - round.betCrc) * 1000) / 1000 : -round.betCrc}
         playerName={playerName || "Player"}
         playerAvatar={playerAvatar}
         stats={`${t.target[locale]}: ${round.target?.toFixed(2)} | x${multiplier.toFixed(2)}`}

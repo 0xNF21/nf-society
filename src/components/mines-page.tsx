@@ -157,7 +157,7 @@ function MinesBoard({
           className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2 bg-amber-500 text-white"
         >
           <Banknote className="w-5 h-5" />
-          {t.cashoutAmount[locale].replace("{amount}", visible.potentialPayout.toFixed(0))}
+          {t.cashoutAmount[locale].replace("{amount}", String(Math.round(visible.potentialPayout * 1000) / 1000))}
         </button>
       )}
 
@@ -220,7 +220,7 @@ function ResultPanel({
           {t.gemsFound[locale]}: {visible.gemsRevealed} | x{visible.currentMultiplier.toFixed(2)}
         </p>
         {won && payout > 0 && (
-          <p className="text-lg text-emerald-600 font-bold mt-2">+{payout.toFixed(0)} CRC</p>
+          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(payout * 1000) / 1000} CRC</p>
         )}
       </div>
 
@@ -228,7 +228,7 @@ function ResultPanel({
         gameType="mines"
         result={won ? "win" : "loss"}
         betCrc={visible.betCrc}
-        gainCrc={won ? Math.round(payout - visible.betCrc) : -visible.betCrc}
+        gainCrc={won ? Math.round((payout - visible.betCrc) * 1000) / 1000 : -visible.betCrc}
         playerName={playerName || "Demo Player"}
         playerAvatar={playerAvatar}
         stats={`${t.gemsFound[locale]}: ${visible.gemsRevealed} | ${visible.mineCount} mines`}

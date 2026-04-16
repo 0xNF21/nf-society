@@ -384,7 +384,7 @@ function SlotMachine({
             className="rounded-2xl px-6 py-3 text-center shadow-xl"
           >
             <p className="text-3xl font-black" style={{ color: tier?.color || accentColor }}>
-              +{rewardCrc} CRC
+              +{Math.round(rewardCrc * 1000) / 1000} CRC
             </p>
             {tier?.label && (
               <p className="text-sm font-bold" style={{ color: tier.color }}>{tier.label}</p>

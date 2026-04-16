@@ -229,7 +229,7 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
               {result.outcome === "win" ? t.youWin[locale] : t.youLose[locale]}
             </p>
             {result.payoutCrc > 0 && (
-              <p className="text-sm text-emerald-600 font-bold mt-1">+{result.payoutCrc} CRC</p>
+              <p className="text-sm text-emerald-600 font-bold mt-1">+{Math.round(result.payoutCrc * 1000) / 1000} CRC</p>
             )}
           </div>
 
@@ -510,7 +510,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
               {result.outcome === "win" ? t.youWin[locale] : t.youLose[locale]}
             </p>
             {result.outcome === "win" && result.payoutCrc && (
-              <p className="text-sm text-emerald-600 font-bold mt-1">+{result.payoutCrc} CRC</p>
+              <p className="text-sm text-emerald-600 font-bold mt-1">+{Math.round(result.payoutCrc * 1000) / 1000} CRC</p>
             )}
           </div>
 

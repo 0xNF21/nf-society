@@ -259,7 +259,7 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
                    gameState.totalPayout === selectedBet ? t.push[locale] :
                    t.youLose[locale]}
                 </p>
-                {gameState.totalPayout > 0 && <p className="text-sm text-emerald-600 font-bold mt-1">+{gameState.totalPayout} CRC</p>}
+                {gameState.totalPayout > 0 && <p className="text-sm text-emerald-600 font-bold mt-1">+{Math.round(gameState.totalPayout * 1000) / 1000} CRC</p>}
               </div>
               <PnlCard gameType="blackjack" result={gameState.totalPayout > selectedBet ? "win" : gameState.totalPayout === selectedBet ? "draw" : "loss"} betCrc={selectedBet} gainCrc={gameState.totalPayout - selectedBet} playerName="Demo Player" stats={gameState.playerHands[0]?.outcome === "blackjack" ? "Blackjack 3:2" : undefined} date={new Date().toLocaleDateString()} locale={locale} />
               <button onClick={resetGame} className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90" style={{ backgroundColor: accentColor }}>{t.playAgain[locale]}</button>
@@ -638,7 +638,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   disabled={actionLoading}
                   className="col-span-2 py-3 rounded-xl font-bold text-sm bg-sky-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >
-                  Insurance ({Math.floor(hand.baseBet / 2)} CRC)
+                  Insurance ({Math.round(hand.baseBet / 2 * 1000) / 1000} CRC)
                 </button>
               )}
             </div>
@@ -713,7 +713,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                 </p>
                 {hand.payoutCrc !== null && hand.payoutCrc > 0 && (
                   <p className="text-sm text-emerald-600 dark:text-emerald-400 font-bold mt-1">
-                    +{hand.payoutCrc} CRC
+                    +{Math.round(hand.payoutCrc * 1000) / 1000} CRC
                   </p>
                 )}
               </div>

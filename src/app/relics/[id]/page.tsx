@@ -703,7 +703,7 @@ function RealRelicsGame({ id }: { id: string }) {
               gameType="relics"
               result={iWon ? "win" : "loss"}
               betCrc={game.betCrc}
-              gainCrc={iWon ? Math.round(winAmount - game.betCrc) : -game.betCrc}
+              gainCrc={iWon ? Math.round((winAmount - game.betCrc) * 1000) / 1000 : -game.betCrc}
               playerName={myProfile?.name}
               playerAvatar={myProfile?.imageUrl || undefined}
               opponentName={oppProfile?.name || (oppAddr ? `${oppAddr.slice(0, 6)}...${oppAddr.slice(-4)}` : undefined)}

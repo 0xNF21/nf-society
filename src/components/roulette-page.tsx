@@ -458,7 +458,7 @@ function ResultPanel({
           </div>
         )}
         {won && payout > 0 && (
-          <p className="text-xl text-emerald-600 font-black mt-3">+{payout.toFixed(0)} CRC</p>
+          <p className="text-xl text-emerald-600 font-black mt-3">+{Math.round(payout * 1000) / 1000} CRC</p>
         )}
       </div>
 
@@ -466,7 +466,7 @@ function ResultPanel({
         gameType="roulette"
         result={won ? "win" : "loss"}
         betCrc={round.betCrc}
-        gainCrc={won ? Math.round(payout - round.betCrc) : -round.betCrc}
+        gainCrc={won ? Math.round((payout - round.betCrc) * 1000) / 1000 : -round.betCrc}
         playerName={playerName || "Player"}
         playerAvatar={playerAvatar}
         stats={`#${resultNum} ${resultColor}`}

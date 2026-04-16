@@ -280,7 +280,7 @@ function ResultPanel({
           {won && cashoutMultiplier && ` | ${t.harvest[locale]}: ${cashoutMultiplier.toFixed(2)}x`}
         </p>
         {won && payoutCrc > 0 && (
-          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(profit)} CRC</p>
+          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(profit * 1000) / 1000} CRC</p>
         )}
       </div>
 
@@ -288,7 +288,7 @@ function ResultPanel({
         gameType="crash_dash"
         result={won ? "win" : "loss"}
         betCrc={betCrc}
-        gainCrc={Math.round(profit)}
+        gainCrc={Math.round(profit * 1000) / 1000}
         playerName={playerName || "Player"}
         playerAvatar={playerAvatar}
         stats={`Crash: ${crashPoint.toFixed(2)}x${won && cashoutMultiplier ? ` | Harvest: ${cashoutMultiplier.toFixed(2)}x` : ""}`}
@@ -493,12 +493,12 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
       <div className="mt-6 rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4">
         <div className="grid grid-cols-4 gap-3 text-center">
           <div>
-            <p className="text-lg font-bold text-ink">{demoBalance.toFixed(0)}</p>
+            <p className="text-lg font-bold text-ink">{Math.round(demoBalance * 1000) / 1000}</p>
             <p className="text-[9px] text-ink/40 uppercase tracking-widest">{t.balance[locale]}</p>
           </div>
           <div>
             <p className={`text-lg font-bold ${demoProfit >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-              {demoProfit >= 0 ? "+" : ""}{demoProfit.toFixed(0)}
+              {demoProfit >= 0 ? "+" : ""}{Math.round(demoProfit * 1000) / 1000}
             </p>
             <p className="text-[9px] text-ink/40 uppercase tracking-widest">{t.profit[locale]}</p>
           </div>

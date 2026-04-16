@@ -48,7 +48,12 @@ const GROWTH_RATE = 0.00006;
 // ── Functions ──────────────────────────────────────────
 
 /**
- * Generate a crash point with 99% RTP.
+ * Generate a crash point with exactly 99% RTP.
+ *
+ * Formula: ceil(99 / (1 - r)) / 100
+ * Gives P(crash > M) = 0.99/M for all M, so EV = 0.99 regardless of cashout strategy.
+ * ~1% instant crash at 1.00× (house edge).
+ *
  * Uses crypto.randomInt on server, Math.random on client.
  */
 export function generateCrashPoint(): number {
@@ -60,11 +65,9 @@ export function generateCrashPoint(): number {
     r = Math.random();
   }
 
-  // 1% instant crash (house edge)
-  if (r < 0.01) return 1.00;
-
-  const cp = Math.floor((HOUSE_FACTOR / r) * 100) / 100;
-  return Math.max(1.01, cp);
+  // ceil(99 / (1 - r)) / 100 — exact 99% RTP for all strategies
+  const cp = Math.ceil(99 / (1 - r)) / 100;
+  return Math.max(1.00, cp);
 }
 
 /** Create initial game state */

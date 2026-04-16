@@ -50,73 +50,103 @@ function getBucketColor(multiplier: number): string {
   return "#6366F1";
 }
 
-// ── Plinko Board (multi-ball SVG) ──────────────────────
+// ── Plinko Board (multi-ball SVG, physics-like) ──────────
+
+/** In-flight ball state tracked by the animation system */
+type FlyingBall = {
+  ballIdx: number;
+  step: number;         // current discrete row (-1 = not started, PEG_ROWS = landed)
+  subProgress: number;  // 0..1 between current and next row
+};
+
+const SVG_W = 340;
+const SVG_H = 400;
+const PEG_R = 4;
+const BALL_R = 7;
+const TOP_PAD = 30;
+const BOT_PAD = 55;
+const ROW_H = (SVG_H - TOP_PAD - BOT_PAD) / PEG_ROWS;
+
+function getPegX(row: number, col: number) {
+  const pegsInRow = row + 3;
+  const spacing = SVG_W / (pegsInRow + 1);
+  return spacing * (col + 1);
+}
+function getPegY(row: number) { return TOP_PAD + row * ROW_H; }
+
+/** Smooth ball position with sub-step interpolation + wobble */
+function getSmoothBallPos(path: number[], step: number, sub: number): { x: number; y: number } {
+  if (step < 0) {
+    // Dropping in from top
+    const targetY = getPegY(0);
+    return { x: SVG_W / 2, y: TOP_PAD - 15 + sub * (targetY - TOP_PAD + 15) * 0.5 };
+  }
+  if (step >= PEG_ROWS) {
+    // In bucket
+    const bucketIdx = path.reduce((s, d) => s + d, 0);
+    const bucketW = SVG_W / BUCKET_COUNT;
+    return { x: bucketW * bucketIdx + bucketW / 2, y: SVG_H - BOT_PAD + 20 };
+  }
+
+  const cumRight = path.slice(0, step + 1).reduce((s, d) => s + d, 0);
+  const pegsInRow = step + 3;
+  const spacing = SVG_W / (pegsInRow + 1);
+
+  // Current position (at this peg)
+  const curX = spacing * (cumRight + 1) + spacing * path[step] * 0.4;
+  const curY = getPegY(step) + ROW_H * 0.4;
+
+  // Next position
+  let nextX: number, nextY: number;
+  if (step + 1 >= PEG_ROWS) {
+    const bucketIdx = path.reduce((s, d) => s + d, 0);
+    const bucketW = SVG_W / BUCKET_COUNT;
+    nextX = bucketW * bucketIdx + bucketW / 2;
+    nextY = SVG_H - BOT_PAD + 20;
+  } else {
+    const nextCumRight = path.slice(0, step + 2).reduce((s, d) => s + d, 0);
+    const nextPegsInRow = step + 4;
+    const nextSpacing = SVG_W / (nextPegsInRow + 1);
+    nextX = nextSpacing * (nextCumRight + 1) + nextSpacing * path[step + 1] * 0.4;
+    nextY = getPegY(step + 1) + ROW_H * 0.4;
+  }
+
+  // Ease-in interpolation (gravity: accelerate downward)
+  const eased = sub * sub; // quadratic ease-in
+  const x = curX + (nextX - curX) * eased;
+  const y = curY + (nextY - curY) * eased;
+
+  // Add slight random wobble based on step for organic feel
+  const wobble = Math.sin(step * 7.3 + sub * 12) * 2;
+
+  return { x: x + wobble, y };
+}
 
 function PlinkoBoard({
   balls,
-  currentBallIdx,
-  animStep,
-  animating,
+  flyingBalls,
+  finishedCount,
   accentColor,
 }: {
   balls: BallResult[];
-  currentBallIdx: number;
-  animStep: number;
-  animating: boolean;
+  flyingBalls: FlyingBall[];
+  finishedCount: number;
   accentColor: string;
 }) {
-  const rows = PEG_ROWS;
-  const svgW = 340;
-  const svgH = 400;
-  const pegR = 4;
-  const ballR = 7;
-  const topPad = 30;
-  const botPad = 55;
-  const rowH = (svgH - topPad - botPad) / rows;
-
-  const getPegX = (row: number, col: number) => {
-    const pegsInRow = row + 3;
-    const spacing = svgW / (pegsInRow + 1);
-    return spacing * (col + 1);
-  };
-  const getPegY = (row: number) => topPad + row * rowH;
-
-  const getBallPos = (path: number[], step: number) => {
-    if (step < 0) return { x: svgW / 2, y: topPad - 15 };
-    if (step >= rows) {
-      const bucketIdx = path.reduce((s, d) => s + d, 0);
-      const bucketW = svgW / BUCKET_COUNT;
-      return { x: bucketW * bucketIdx + bucketW / 2, y: svgH - botPad + 20 };
-    }
-    const cumRight = path.slice(0, step + 1).reduce((s, d) => s + d, 0);
-    const pegsInRow = step + 3;
-    const spacing = svgW / (pegsInRow + 1);
-    const x = spacing * (cumRight + 1) + spacing * path[step] * 0.5;
-    const y = getPegY(step) + rowH * 0.5;
-    return { x, y };
-  };
-
-  // Count balls per bucket (only finished balls)
-  const finishedBalls = balls.slice(0, animating ? currentBallIdx : balls.length);
+  // Count balls per bucket (finished balls only)
+  const finished = balls.slice(0, finishedCount);
   const bucketCounts: number[] = Array(BUCKET_COUNT).fill(0);
-  for (const b of finishedBalls) bucketCounts[b.bucket]++;
-
-  // Current animating ball
-  const currentBall = animating && currentBallIdx < balls.length ? balls[currentBallIdx] : null;
-  const currentPos = currentBall ? getBallPos(currentBall.path, animStep) : null;
+  for (const b of finished) bucketCounts[b.bucket]++;
 
   return (
     <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4 mb-4">
-      <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full max-w-[340px] mx-auto" style={{ overflow: "visible" }}>
+      <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full max-w-[340px] mx-auto" style={{ overflow: "visible" }}>
         {/* Pegs */}
-        {Array.from({ length: rows }, (_, row) => {
+        {Array.from({ length: PEG_ROWS }, (_, row) => {
           const pegsInRow = row + 3;
           return Array.from({ length: pegsInRow }, (_, col) => (
-            <circle
-              key={`peg-${row}-${col}`}
-              cx={getPegX(row, col)}
-              cy={getPegY(row)}
-              r={pegR}
+            <circle key={`peg-${row}-${col}`}
+              cx={getPegX(row, col)} cy={getPegY(row)} r={PEG_R}
               className="fill-ink/20 dark:fill-white/20"
             />
           ));
@@ -124,19 +154,17 @@ function PlinkoBoard({
 
         {/* Buckets with counts */}
         {MULTIPLIERS.map((mult, i) => {
-          const bucketW = svgW / BUCKET_COUNT;
+          const bucketW = SVG_W / BUCKET_COUNT;
           const x = bucketW * i;
-          const y = svgH - botPad + 5;
+          const y = SVG_H - BOT_PAD + 5;
           const count = bucketCounts[i];
           const isActive = count > 0;
           const color = getBucketColor(mult);
           return (
             <g key={`bucket-${i}`}>
-              <rect
-                x={x + 2} y={y} width={bucketW - 4} height={30} rx={6}
+              <rect x={x + 2} y={y} width={bucketW - 4} height={30} rx={6}
                 fill={color} opacity={isActive ? 1 : 0.25}
-                className="transition-opacity duration-300"
-              />
+                className="transition-opacity duration-300" />
               <text x={x + bucketW / 2} y={y + 12} textAnchor="middle"
                 fontSize={mult >= 10 ? 7 : 8} fontWeight="bold" fill="white"
                 opacity={isActive ? 1 : 0.7}>
@@ -152,13 +180,21 @@ function PlinkoBoard({
           );
         })}
 
-        {/* Current animating ball */}
-        {currentPos && (
-          <circle cx={currentPos.x} cy={currentPos.y} r={ballR}
-            fill={accentColor} className="transition-all duration-75"
-            style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" }}
-          />
-        )}
+        {/* All flying balls (multiple in flight at once!) */}
+        {flyingBalls.map((fb) => {
+          const ball = balls[fb.ballIdx];
+          if (!ball) return null;
+          const pos = getSmoothBallPos(ball.path, fb.step, fb.subProgress);
+          // Slight size variation and opacity for depth
+          const scale = 0.85 + fb.subProgress * 0.15;
+          return (
+            <circle key={`fly-${fb.ballIdx}`}
+              cx={pos.x} cy={pos.y} r={BALL_R * scale}
+              fill={accentColor} opacity={0.9}
+              style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))" }}
+            />
+          );
+        })}
       </svg>
     </div>
   );
@@ -238,58 +274,130 @@ function ResultPanel({
   );
 }
 
-// ── Multi-ball animation hook ──────────────────────────
+// ── Multi-ball animation with overlapping flight + gravity ──
+
+/** Time (ms) for a ball to traverse one peg row. Accelerates with gravity. */
+function rowDuration(row: number): number {
+  // Row 0 ≈ 110ms, row 11 ≈ 55ms (gravity acceleration)
+  return 110 - row * 5;
+}
+
+/** Delay before launching ball i (staggered, overlapping) */
+function launchDelay(i: number, total: number): number {
+  if (total <= 1) return 0;
+  // 1-5 balls: 350ms apart. 10+: 200ms apart. 25+: 120ms apart
+  const gap = total <= 5 ? 350 : total <= 10 ? 200 : 120;
+  return i * gap;
+}
+
+type AnimState = {
+  flyingBalls: FlyingBall[];
+  finishedCount: number;
+};
 
 function useMultiBallAnimation(balls: BallResult[], onComplete: () => void) {
-  const [currentBallIdx, setCurrentBallIdx] = useState(0);
-  const [animStep, setAnimStep] = useState(-1);
+  const [animState, setAnimState] = useState<AnimState>({ flyingBalls: [], finishedCount: 0 });
   const [running, setRunning] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef = useRef<number | null>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
   const start = useCallback(() => {
     if (balls.length === 0) return;
-    setCurrentBallIdx(0);
-    setAnimStep(-1);
+    setAnimState({ flyingBalls: [], finishedCount: 0 });
     setRunning(true);
   }, [balls.length]);
 
   useEffect(() => {
     if (!running || balls.length === 0) return;
 
-    let ballIdx = 0;
-    let step = -1;
+    const startTime = performance.now();
+    const total = balls.length;
 
-    const animateStep = () => {
-      step++;
-      setAnimStep(step);
+    // Per-ball tracking
+    const ballStart: number[] = []; // ms when each ball starts
+    const ballStep: number[] = [];  // current discrete step
+    const ballSub: number[] = [];   // sub-progress within step
+    const ballDone: boolean[] = [];
+    for (let i = 0; i < total; i++) {
+      ballStart.push(launchDelay(i, total));
+      ballStep.push(-1);
+      ballSub.push(0);
+      ballDone.push(false);
+    }
 
-      if (step <= PEG_ROWS) {
-        timerRef.current = setTimeout(animateStep, 80);
-      } else {
-        ballIdx++;
-        setCurrentBallIdx(ballIdx);
-        if (ballIdx < balls.length) {
+    let lastFinished = 0;
+
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const flying: FlyingBall[] = [];
+      let finished = 0;
+
+      for (let i = 0; i < total; i++) {
+        if (ballDone[i]) { finished++; continue; }
+
+        const ballElapsed = elapsed - ballStart[i];
+        if (ballElapsed < 0) continue; // not launched yet
+
+        // Calculate which row the ball is at based on cumulative row durations
+        let cumTime = 0;
+        let step = -1;
+        let sub = 0;
+
+        // Step -1 → 0: entry drop (~120ms)
+        const entryDur = 120;
+        if (ballElapsed < entryDur) {
           step = -1;
-          setAnimStep(-1);
-          timerRef.current = setTimeout(animateStep, 150);
+          sub = ballElapsed / entryDur;
         } else {
-          setTimeout(() => { setRunning(false); onCompleteRef.current(); }, 400);
+          let t = ballElapsed - entryDur;
+          for (let r = 0; r <= PEG_ROWS; r++) {
+            const dur = rowDuration(r);
+            if (t < dur) {
+              step = r;
+              sub = t / dur;
+              break;
+            }
+            t -= dur;
+            if (r === PEG_ROWS) {
+              // Ball has landed
+              step = PEG_ROWS;
+              sub = 1;
+            }
+          }
+          if (step === -1) { step = PEG_ROWS; sub = 1; } // fallback
         }
+
+        if (step >= PEG_ROWS) {
+          ballDone[i] = true;
+          finished++;
+        } else {
+          flying.push({ ballIdx: i, step, subProgress: sub });
+        }
+      }
+
+      setAnimState({ flyingBalls: flying, finishedCount: finished });
+
+      if (finished < total) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        // All done — brief pause then complete
+        setTimeout(() => { setRunning(false); onCompleteRef.current(); }, 300);
       }
     };
 
-    timerRef.current = setTimeout(animateStep, 200);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [running, balls]);
 
   const reset = useCallback(() => {
-    setCurrentBallIdx(0); setAnimStep(-1); setRunning(false);
-    if (timerRef.current) clearTimeout(timerRef.current);
+    setAnimState({ flyingBalls: [], finishedCount: 0 });
+    setRunning(false);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
   }, []);
 
-  return { currentBallIdx, animStep, running, start, reset };
+  return { ...animState, running, start, reset };
 }
 
 // ── Demo Game ──────────────────────────────────────

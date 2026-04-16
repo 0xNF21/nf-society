@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
         losses: stats.losses,
         gamesPlayed: total,
         winRate: total >= 5 ? Math.round((stats.wins / total) * 100) : 0,
-        crcWon: Math.round(stats.crcWon * 10) / 10,
+        crcWon: Math.round(stats.crcWon * 1000) / 1000,
       };
     });
 

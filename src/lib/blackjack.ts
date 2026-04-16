@@ -175,7 +175,7 @@ export function dealInitialHands(deck: Card[], betCrc: number): BlackjackState {
       playerHand.payout = betCrc; // Return bet
     } else if (playerBJ) {
       playerHand.outcome = "blackjack";
-      playerHand.payout = betCrc + Math.floor(betCrc * 1.5); // 3:2
+      playerHand.payout = Math.round((betCrc + betCrc * 1.5) * 1000) / 1000; // 3:2
     } else {
       playerHand.outcome = "loss";
       playerHand.payout = 0;
@@ -304,7 +304,7 @@ export function applyAction(state: BlackjackState, action: Action): BlackjackSta
     }
 
     case "insurance": {
-      s.insuranceBet = Math.floor(s.baseBet / 2);
+      s.insuranceBet = Math.round(s.baseBet / 2 * 1000) / 1000;
       break;
     }
   }
@@ -370,7 +370,7 @@ function resolveAllHands(state: BlackjackState): void {
 
       if (playerBJ && !dealerBJ) {
         hand.outcome = "blackjack";
-        hand.payout = hand.bet + Math.floor(hand.bet * 1.5);
+        hand.payout = Math.round((hand.bet + hand.bet * 1.5) * 1000) / 1000;
       } else if (dealerBusted) {
         hand.outcome = "win";
         hand.payout = hand.bet * 2;

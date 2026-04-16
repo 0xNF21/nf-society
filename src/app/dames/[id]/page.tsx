@@ -376,7 +376,7 @@ function RealGame({ id }: { id: string }) {
               gameType="dames"
               result={isDraw ? 'draw' : iWon ? 'win' : 'loss'}
               betCrc={game.betCrc}
-              gainCrc={isDraw ? 0 : iWon ? Math.round(wAmount - game.betCrc) : -game.betCrc}
+              gainCrc={isDraw ? 0 : iWon ? Math.round((wAmount - game.betCrc) * 1000) / 1000 : -game.betCrc}
               playerName={myProfile?.name}
               playerAvatar={myProfile?.imageUrl || undefined}
               opponentName={oppProfile?.name || (oppAddr ? `${oppAddr.slice(0, 6)}...${oppAddr.slice(-4)}` : undefined)}

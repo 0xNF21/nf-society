@@ -158,7 +158,7 @@ function PayTableDisplay({
                 {row.hits} {t.hits[locale]}
               </span>
               <span className="font-bold" style={{ color: accentColor }}>
-                x{row.multiplier.toFixed(2)} → {Math.floor(betCrc * row.multiplier)} CRC
+                x{row.multiplier.toFixed(2)} → {Math.round(betCrc * row.multiplier * 1000) / 1000} CRC
               </span>
             </div>
           ))}
@@ -280,7 +280,7 @@ function ResultPanel({
           {multiplier > 0 && ` — x${multiplier.toFixed(2)}`}
         </p>
         {won && payout > 0 && (
-          <p className="text-lg text-emerald-600 font-bold mt-2">+{payout.toFixed(0)} CRC</p>
+          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(payout * 1000) / 1000} CRC</p>
         )}
       </div>
 

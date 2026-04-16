@@ -424,11 +424,11 @@ function TransactionHistory({ address, locale }: { address: string; locale: "fr"
               {/* Summary */}
               <div className="flex gap-2">
                 <div className="flex-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-2 text-center">
-                  <p className="text-sm font-bold text-emerald-600">+{Math.round(totalIn * 10) / 10} CRC</p>
+                  <p className="text-sm font-bold text-emerald-600">+{Math.round(totalIn * 1000) / 1000} CRC</p>
                   <p className="text-[10px] text-emerald-600/60">{locale === "fr" ? "Recu" : "Received"}</p>
                 </div>
                 <div className="flex-1 rounded-xl bg-red-50 dark:bg-red-900/20 p-2 text-center">
-                  <p className="text-sm font-bold text-red-500">-{Math.round(totalOut * 10) / 10} CRC</p>
+                  <p className="text-sm font-bold text-red-500">-{Math.round(totalOut * 1000) / 1000} CRC</p>
                   <p className="text-[10px] text-red-500/60">{locale === "fr" ? "Depense" : "Spent"}</p>
                 </div>
               </div>
