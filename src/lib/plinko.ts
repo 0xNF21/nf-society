@@ -1,13 +1,14 @@
 /**
- * Plinko — Pure game logic
+ * Plinko — Pure game logic (multi-ball)
  *
  * Rules:
  * - 12 rows of pegs → 13 buckets (0–12)
- * - Ball drops from the top; at each peg row it goes left (0) or right (1)
+ * - Player pays N CRC → gets N balls (1 CRC per ball)
+ * - Each ball drops independently: at each peg row it goes left (0) or right (1)
  * - Final bucket = sum of all right-moves (0 = far left, 12 = far right)
  * - Each bucket has a fixed multiplier (symmetric, high at edges)
- * - Payout = bet × multiplier
- * - RTP ~99.1% (verified via binomial sum)
+ * - Total payout = sum of (1 CRC × multiplier) for each ball
+ * - RTP ~99.1% per ball (verified via binomial sum)
  *
  * Multiplier table (13 buckets):
  *   [50, 15, 5, 2, 1, 0.5, 0.3, 0.5, 1, 2, 5, 15, 50]
@@ -15,23 +16,27 @@
 
 // ── Types ──────────────────────────────────────────────
 
+/** Result of a single ball drop */
+export type BallResult = {
+  path: number[];      // array of 0 (left) or 1 (right), length = PEG_ROWS
+  bucket: number;      // final bucket index (0–12)
+  multiplier: number;  // multiplier for this ball
+};
+
 export type PlinkoState = {
   status: "playing" | "won" | "lost";
-  betCrc: number;
-  /** Path the ball takes: array of 0 (left) or 1 (right) per row, null until drop */
-  ballPath: number[] | null;
-  /** Final bucket index (0–12), null until drop */
-  finalBucket: number | null;
-  /** Multiplier applied, null until drop */
-  finalMultiplier: number | null;
+  betCrc: number;              // total CRC paid (= number of balls)
+  ballCount: number;           // number of balls
+  balls: BallResult[];         // results per ball (empty before drop)
+  totalMultiplier: number | null;  // sum of all multipliers, null until drop
 };
 
 export type VisibleState = {
   status: PlinkoState["status"];
   betCrc: number;
-  ballPath: number[] | null;
-  finalBucket: number | null;
-  finalMultiplier: number | null;
+  ballCount: number;
+  balls: BallResult[];
+  totalMultiplier: number | null;
   payoutCrc: number;
 };
 
@@ -69,61 +74,71 @@ function randomDirection(): number {
   return Math.random() < 0.5 ? 0 : 1;
 }
 
+/** Drop a single ball, return its result */
+function dropOneBall(): BallResult {
+  const path: number[] = [];
+  for (let i = 0; i < PEG_ROWS; i++) {
+    path.push(randomDirection());
+  }
+  const bucket = path.reduce((sum, d) => sum + d, 0);
+  return { path, bucket, multiplier: MULTIPLIERS[bucket] };
+}
+
 /** Create initial game state (before drop) */
 export function createInitialState(betCrc: number): PlinkoState {
   return {
     status: "playing",
     betCrc,
-    ballPath: null,
-    finalBucket: null,
-    finalMultiplier: null,
+    ballCount: betCrc, // 1 CRC per ball
+    balls: [],
+    totalMultiplier: null,
   };
 }
 
-/** Drop the ball — single action, game finishes immediately */
-export function dropBall(state: PlinkoState): PlinkoState {
+/** Drop all balls at once — single action, game finishes immediately */
+export function dropAllBalls(state: PlinkoState): PlinkoState {
   if (state.status !== "playing") {
     throw new Error("Game is already finished");
   }
 
-  // Generate random path: 12 directions (0=left, 1=right)
-  const path: number[] = [];
-  for (let i = 0; i < PEG_ROWS; i++) {
-    path.push(randomDirection());
+  const balls: BallResult[] = [];
+  for (let i = 0; i < state.ballCount; i++) {
+    balls.push(dropOneBall());
   }
 
-  // Final bucket = sum of all right-moves
-  const bucket = path.reduce((sum, d) => sum + d, 0);
-  const multiplier = MULTIPLIERS[bucket];
-
-  // Won if multiplier >= 1 (gets back at least the bet)
-  const won = multiplier >= 1;
+  const totalMult = Math.round(balls.reduce((sum, b) => sum + b.multiplier, 0) * 10000) / 10000;
+  const totalPayout = Math.floor(totalMult * 100) / 100; // 1 CRC per ball × multiplier
+  const won = totalPayout >= state.betCrc;
 
   return {
     ...state,
     status: won ? "won" : "lost",
-    ballPath: path,
-    finalBucket: bucket,
-    finalMultiplier: multiplier,
+    balls,
+    totalMultiplier: totalMult,
   };
 }
 
-/** Calculate payout amount */
+// Legacy single-ball (kept for compatibility, used in demo for single-ball preview)
+export function dropBall(state: PlinkoState): PlinkoState {
+  return dropAllBalls(state);
+}
+
+/** Calculate payout amount — sum of all ball multipliers × 1 CRC */
 export function calculatePayout(state: PlinkoState): number {
-  if (state.finalMultiplier !== null && (state.status === "won" || state.status === "lost")) {
-    return Math.floor(state.betCrc * state.finalMultiplier * 100) / 100;
+  if (state.totalMultiplier !== null && (state.status === "won" || state.status === "lost")) {
+    return Math.floor(state.totalMultiplier * 100) / 100;
   }
   return 0;
 }
 
-/** Get visible state — safe to send to client (no hidden info in Plinko) */
+/** Get visible state — safe to send to client */
 export function getVisibleState(state: PlinkoState): VisibleState {
   return {
     status: state.status,
     betCrc: state.betCrc,
-    ballPath: state.ballPath,
-    finalBucket: state.finalBucket,
-    finalMultiplier: state.finalMultiplier,
+    ballCount: state.ballCount,
+    balls: state.balls,
+    totalMultiplier: state.totalMultiplier,
     payoutCrc: calculatePayout(state),
   };
 }

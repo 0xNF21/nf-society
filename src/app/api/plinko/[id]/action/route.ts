@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { plinkoRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { dropBall, getVisibleState, calculatePayout, isValidAction } from "@/lib/plinko";
+import { dropAllBalls, getVisibleState, calculatePayout, isValidAction } from "@/lib/plinko";
 import type { PlinkoState } from "@/lib/plinko";
 import { executePayout } from "@/lib/payout";
 
@@ -46,7 +46,7 @@ export async function POST(
 
     let newState: PlinkoState;
     try {
-      newState = dropBall(state);
+      newState = dropAllBalls(state);
     } catch (err: any) {
       return NextResponse.json({ error: err.message || "Invalid action" }, { status: 400 });
     }
@@ -56,9 +56,8 @@ export async function POST(
     const updateData: Record<string, unknown> = {
       gameState: newState as unknown as Record<string, unknown>,
       status: newState.status,
-      ballPath: newState.ballPath,
-      finalBucket: newState.finalBucket,
-      finalMultiplier: newState.finalMultiplier,
+      ballPath: newState.balls as unknown as Record<string, unknown>,
+      finalMultiplier: newState.totalMultiplier,
       updatedAt: new Date(),
     };
 
@@ -81,7 +80,7 @@ export async function POST(
           gameId: `plinko-${round.tableId}-${round.transactionHash}`,
           recipientAddress: round.playerAddress,
           amountCrc: payoutAmount,
-          reason: `Plinko — x${(newState.finalMultiplier || 0).toFixed(2)} — ${payoutAmount} CRC`,
+          reason: `Plinko — ${newState.ballCount} balls — x${(newState.totalMultiplier || 0).toFixed(2)} — ${payoutAmount} CRC`,
         });
 
         await db.update(plinkoRounds).set({
