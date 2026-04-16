@@ -285,8 +285,8 @@ function ResultPanel({
 
 /** Time (ms) for a ball to traverse one peg row. Accelerates with gravity. */
 function rowDuration(row: number): number {
-  // Row 0 ≈ 110ms, row 11 ≈ 55ms (gravity acceleration)
-  return 110 - row * 5;
+  // Row 0 ≈ 150ms, row 11 ≈ 85ms (gravity acceleration)
+  return 150 - row * 6;
 }
 
 /** Delay before launching ball i (staggered, overlapping) */
@@ -339,7 +339,7 @@ function useMultiBallAnimation(balls: BallResult[], onComplete: () => void) {
         let step: number;
         let sub: number;
 
-        const entryDur = 120;
+        const entryDur = 160;
         if (ballElapsed < entryDur) {
           step = -1;
           sub = ballElapsed / entryDur;
