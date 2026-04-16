@@ -84,24 +84,24 @@ function hitProbability(n: number, k: number): number {
  */
 function buildPayTable(): Record<number, Record<number, number>> {
   // Minimum hits required to win for each pick count
-  // Lower thresholds = more frequent wins (better player experience)
+  // Based on standard 40-Ball Keno (Gamesys / Wizard of Odds reference)
   const minHits: Record<number, number> = {
-    1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3, 9: 3, 10: 4,
+    1: 1, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4,
   };
 
-  // Raw payout ratios — steep exponential growth for jackpot feel
-  // Low tiers pay small (push/break-even), top tiers pay massive
+  // Raw payout ratios derived from real 40-Ball Keno pay tables,
+  // then auto-scaled to 99% RTP. Each array starts at minHits.
   const rawRatios: Record<number, number[]> = {
-    1:  [1],                                       // 1h
-    2:  [1, 10],                                   // 1h, 2h
-    3:  [1, 18],                                   // 2h, 3h
-    4:  [1, 5, 80],                                // 2h, 3h, 4h
-    5:  [1, 2, 15, 500],                           // 2h, 3h, 4h, 5h
-    6:  [1, 3, 20, 400, 10000],                    // 3h, 4h, 5h, 6h
-    7:  [1, 2, 12, 150, 3000, 80000],              // 3h, 4h, 5h, 6h, 7h
-    8:  [1, 2, 8, 80, 1500, 30000, 500000],        // 3h-8h
-    9:  [1, 1.5, 5, 40, 600, 10000, 200000],       // 3h-9h
-    10: [1, 2, 5, 30, 400, 6000, 100000],          // 4h-10h
+    1:  [1],                                          // 1h
+    2:  [1],                                             // 2h (all-or-nothing)
+    3:  [1, 4.8],                                     // 2h, 3h
+    4:  [1, 5, 31],                                   // 2h, 3h, 4h
+    5:  [1, 5, 25, 125],                              // 2h, 3h, 4h, 5h
+    6:  [1, 2, 10, 50, 1000],                         // 2h-6h
+    7:  [1, 4, 12.5, 125, 1500],                      // 3h-7h (jackpot > 6p)
+    8:  [1, 4, 8, 250, 1000, 5000],                   // 3h-8h
+    9:  [1, 2, 7, 25, 500, 2500, 10000],              // 3h-9h (5h ratio < 8p for monotonicity)
+    10: [1, 4, 12.5, 125, 625, 5000, 10000],          // 4h-10h
   };
 
   const table: Record<number, Record<number, number>> = {};
