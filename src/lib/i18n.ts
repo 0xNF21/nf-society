@@ -1013,6 +1013,8 @@ export const translations = {
     totalBet: { fr: "Mise totale", en: "Total bet" },
     ballValue: { fr: "Par bille", en: "Per ball" },
     ballsRemaining: { fr: "billes restantes", en: "balls remaining" },
+    dropMode: { fr: "Cadence", en: "Drop rate" },
+    dropAll: { fr: "Tout", en: "All" },
     accumulated: { fr: "Gains accumules", en: "Accumulated gains" },
     drop: { fr: "Lacher", en: "Drop" },
     dropOne: { fr: "Lacher une bille", en: "Drop a ball" },

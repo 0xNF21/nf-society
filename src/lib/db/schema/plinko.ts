@@ -5,7 +5,7 @@ export const plinkoTables = pgTable("plinko_tables", {
   slug: text("slug").notNull().unique(),
   title: text("title").notNull(),
   description: text("description"),
-  betOptions: jsonb("bet_options").notNull().default([1, 5, 10, 25]),
+  betOptions: jsonb("bet_options").notNull().default([1, 5, 10, 25, 50, 100, 150]),
   recipientAddress: text("recipient_address").notNull(),
   primaryColor: text("primary_color").notNull().default("#7C3AED"),
   accentColor: text("accent_color").notNull().default("#8B5CF6"),

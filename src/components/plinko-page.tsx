@@ -13,7 +13,8 @@ import { usePlayerToken } from "@/hooks/use-player-token";
 import { darkSafeColor } from "@/lib/utils";
 import {
   PEG_ROWS, BUCKET_COUNT, MULTIPLIERS,
-  createInitialState, dropAllBalls, calculatePayout,
+  createInitialState, dropOneBall, cashout as cashoutState,
+  calculatePayout, calculateCashoutAmount,
 } from "@/lib/plinko";
 import type { BallResult, VisibleState } from "@/lib/plinko";
 
@@ -39,6 +40,13 @@ type RoundResponse = VisibleState & {
   createdAt: string;
 };
 
+// Ball value options (CRC per ball)
+const BALL_VALUE_OPTIONS = [0.5, 1, 2, 5, 10, 25, 50];
+
+// Drop mode options (how many balls per click). "all" = all remaining
+type DropMode = 1 | 2 | 5 | "all";
+const DROP_MODES: DropMode[] = [1, 2, 5, "all"];
+
 // ── Bucket color helpers ──────────────────────────────
 
 function getBucketColor(multiplier: number): string {
@@ -50,14 +58,7 @@ function getBucketColor(multiplier: number): string {
   return "#6366F1";
 }
 
-// ── Plinko Board (multi-ball SVG, physics-like) ──────────
-
-/** In-flight ball state tracked by the animation system */
-type FlyingBall = {
-  ballIdx: number;
-  step: number;         // current discrete row (-1 = not started, PEG_ROWS = landed)
-  subProgress: number;  // 0..1 between current and next row
-};
+// ── SVG constants & helpers ──────────────────────────
 
 const SVG_W = 340;
 const SVG_H = 400;
@@ -74,35 +75,25 @@ function getPegX(row: number, col: number) {
 }
 function getPegY(row: number) { return TOP_PAD + row * ROW_H; }
 
-/** Smooth ball position with sub-step interpolation + wobble */
 function getSmoothBallPos(path: number[], step: number, sub: number): { x: number; y: number } {
   if (!path || path.length === 0) return { x: SVG_W / 2, y: TOP_PAD - 15 };
-
-  if (step < 0) {
-    // Dropping in from top
-    return { x: SVG_W / 2, y: TOP_PAD - 15 + sub * 20 };
-  }
+  if (step < 0) return { x: SVG_W / 2, y: TOP_PAD - 15 + sub * 20 };
   if (step >= PEG_ROWS) {
-    // In bucket
     const bucketIdx = path.reduce((s, d) => s + d, 0);
     const bucketW = SVG_W / BUCKET_COUNT;
     return { x: bucketW * bucketIdx + bucketW / 2, y: SVG_H - BOT_PAD + 20 };
   }
 
-  // Guard: ensure step is within path bounds
   const safeStep = Math.min(step, path.length - 1);
   if (safeStep < 0) return { x: SVG_W / 2, y: TOP_PAD };
 
   const cumRight = path.slice(0, safeStep + 1).reduce((s, d) => s + d, 0);
   const pegsInRow = safeStep + 3;
   const spacing = SVG_W / (pegsInRow + 1);
-
-  // Current position (at this peg)
   const dir = path[safeStep] ?? 0;
   const curX = spacing * (cumRight + 1) + spacing * dir * 0.4;
   const curY = getPegY(safeStep) + ROW_H * 0.4;
 
-  // Next position
   let nextX: number, nextY: number;
   if (safeStep + 1 >= PEG_ROWS) {
     const bucketIdx = path.reduce((s, d) => s + d, 0);
@@ -118,32 +109,33 @@ function getSmoothBallPos(path: number[], step: number, sub: number): { x: numbe
     nextY = getPegY(safeStep + 1) + ROW_H * 0.4;
   }
 
-  // Ease-in interpolation (gravity: accelerate downward)
-  const eased = sub * sub; // quadratic ease-in
+  const eased = sub * sub;
   const x = curX + (nextX - curX) * eased;
   const y = curY + (nextY - curY) * eased;
-
-  // Add slight wobble for organic feel
   const wobble = Math.sin(safeStep * 7.3 + sub * 12) * 2;
 
   return { x: x + wobble, y };
 }
 
+// ── Plinko Board (single ball) ──────────────────────
+
 function PlinkoBoard({
   balls,
-  flyingBalls,
-  finishedCount,
+  flyingBallPath,
+  animStep,
+  animSub,
   accentColor,
 }: {
   balls: BallResult[];
-  flyingBalls: FlyingBall[];
-  finishedCount: number;
+  flyingBallPath: number[] | null;
+  animStep: number;
+  animSub: number;
   accentColor: string;
 }) {
-  // Count balls per bucket (finished balls only)
-  const finished = balls.slice(0, finishedCount);
   const bucketCounts: number[] = Array(BUCKET_COUNT).fill(0);
-  for (const b of finished) bucketCounts[b.bucket]++;
+  for (const b of balls) bucketCounts[b.bucket]++;
+
+  const flyingPos = flyingBallPath ? getSmoothBallPos(flyingBallPath, animStep, animSub) : null;
 
   return (
     <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4 mb-4">
@@ -159,7 +151,7 @@ function PlinkoBoard({
           ));
         })}
 
-        {/* Buckets with counts */}
+        {/* Buckets */}
         {MULTIPLIERS.map((mult, i) => {
           const bucketW = SVG_W / BUCKET_COUNT;
           const x = bucketW * i;
@@ -187,49 +179,81 @@ function PlinkoBoard({
           );
         })}
 
-        {/* All flying balls (multiple in flight at once!) */}
-        {flyingBalls.map((fb) => {
-          const ball = balls[fb.ballIdx];
-          if (!ball) return null;
-          const pos = getSmoothBallPos(ball.path, fb.step, fb.subProgress);
-          // Slight size variation and opacity for depth
-          const scale = 0.85 + fb.subProgress * 0.15;
-          return (
-            <circle key={`fly-${fb.ballIdx}`}
-              cx={pos.x} cy={pos.y} r={BALL_R * scale}
-              fill={accentColor} opacity={0.9}
-              style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))" }}
-            />
-          );
-        })}
+        {/* Flying ball */}
+        {flyingPos && (
+          <circle cx={flyingPos.x} cy={flyingPos.y} r={BALL_R}
+            fill={accentColor} opacity={0.9}
+            style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))" }}
+          />
+        )}
       </svg>
     </div>
   );
 }
 
-// ── Running total during animation ──────────────────────
+// ── Single-ball animation hook ─────────────────────
 
-function RunningTotal({
-  balls, finishedCount, ballCount, accentColor, locale,
-}: {
-  balls: BallResult[]; finishedCount: number; ballCount: number;
-  accentColor: string; locale: "fr" | "en";
-}) {
-  const t = translations.plinko;
-  const finished = balls.slice(0, finishedCount);
-  const runningGain = Math.floor(finished.reduce((s, b) => s + b.multiplier, 0) * 100) / 100;
+function useSingleBallAnim() {
+  const [flyingPath, setFlyingPath] = useState<number[] | null>(null);
+  const [animStep, setAnimStep] = useState(-1);
+  const [animSub, setAnimSub] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const completeRef = useRef<(() => void) | null>(null);
 
-  return (
-    <div className="text-center py-3 space-y-1">
-      <p className="text-sm text-ink/50">
-        {t.balls[locale]} {finishedCount}/{ballCount}
-      </p>
-      <p className="text-2xl font-black tabular-nums" style={{ color: accentColor }}>
-        {runningGain.toFixed(2)} CRC
-      </p>
-      <p className="text-xs text-ink/30">{t.dropping[locale]}</p>
-    </div>
-  );
+  const start = useCallback((path: number[], onComplete: () => void) => {
+    setFlyingPath(path);
+    setAnimStep(-1);
+    setAnimSub(0);
+    completeRef.current = onComplete;
+
+    const startTime = performance.now();
+    const entryDur = 160;
+    const rowDur = (r: number) => 150 - r * 6;
+    const totalDur = entryDur + Array.from({ length: PEG_ROWS }, (_, r) => rowDur(r)).reduce((s, d) => s + d, 0);
+
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      const elapsed = performance.now() - startTime;
+      let step = -1;
+      let sub = 0;
+
+      if (elapsed < entryDur) {
+        step = -1;
+        sub = elapsed / entryDur;
+      } else {
+        step = PEG_ROWS;
+        sub = 1;
+        let t = elapsed - entryDur;
+        for (let r = 0; r < PEG_ROWS; r++) {
+          const dur = rowDur(r);
+          if (t < dur) { step = r; sub = Math.min(t / dur, 1); break; }
+          t -= dur;
+        }
+      }
+
+      setAnimStep(step);
+      setAnimSub(sub);
+
+      if (elapsed >= totalDur) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setTimeout(() => {
+          setFlyingPath(null);
+          completeRef.current?.();
+        }, 200);
+      }
+    }, 33);
+  }, []);
+
+  const reset = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setFlyingPath(null);
+    setAnimStep(-1);
+    setAnimSub(0);
+  }, []);
+
+  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
+
+  return { flyingPath, animStep, animSub, running: flyingPath !== null, start, reset };
 }
 
 // ── Result Panel ──────────────────────────────────────
@@ -241,35 +265,36 @@ function ResultPanel({
   playerName?: string; playerAvatar?: string; onPlayAgain: () => void;
 }) {
   const t = translations.plinko;
-  const won = round.status === "won";
-  const payout = round.payoutCrc || 0;
-  const totalMult = round.totalMultiplier || 0;
-  const net = payout - round.betCrc;
+  const payout = round.finalPayout;
+  const won = payout > round.totalBet;
+  const cashedOut = round.status === "cashed_out";
+  const net = payout - round.totalBet;
 
   return (
     <div className="space-y-4">
       <div className={`rounded-2xl p-6 text-center ${
         won ? "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800"
+          : cashedOut ? "bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800"
           : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
       }`}>
-        <p className="text-4xl mb-2">{won ? "🎉" : "😔"}</p>
-        <p className={`text-4xl font-black mb-2 ${won ? "text-emerald-600" : "text-red-500"}`}>
+        <p className="text-4xl mb-2">{won ? "🎉" : cashedOut ? "🏁" : "😔"}</p>
+        <p className={`text-4xl font-black mb-2 ${won ? "text-emerald-600" : cashedOut ? "text-sky-600" : "text-red-500"}`}>
           {payout.toFixed(2)} CRC
         </p>
         <p className="font-bold text-lg text-ink">
-          {won ? t.youWin[locale] : t.youLose[locale]}
+          {won ? t.youWin[locale] : cashedOut ? t.cashedOut[locale] : t.youLose[locale]}
         </p>
         <p className="text-sm text-ink/60 mt-1">
-          {round.ballCount} {t.balls[locale]} | {t.totalGain[locale]}: x{totalMult.toFixed(2)}
+          {round.balls.length}/{round.ballCount} {t.balls[locale]} ({round.ballValue} CRC {t.perBall[locale]})
         </p>
         <p className={`text-sm font-bold mt-1 ${net >= 0 ? "text-emerald-600" : "text-red-500"}`}>
           {net >= 0 ? "+" : ""}{net.toFixed(2)} CRC net
         </p>
       </div>
 
-      <PnlCard gameType="plinko" result={won ? "win" : "loss"} betCrc={round.betCrc}
-        gainCrc={Math.round(net * 1000) / 1000} playerName={playerName || "Player"} playerAvatar={playerAvatar}
-        stats={`${round.ballCount} ${t.balls[locale]} | ${payout.toFixed(2)} CRC`}
+      <PnlCard gameType="plinko" result={won ? "win" : "loss"} betCrc={round.totalBet}
+        gainCrc={Math.round(net)} playerName={playerName || "Player"} playerAvatar={playerAvatar}
+        stats={`${round.balls.length}/${round.ballCount} ${t.balls[locale]} | ${payout.toFixed(2)} CRC`}
         date={new Date().toLocaleDateString()} locale={locale} />
 
       <button onClick={onPlayAgain}
@@ -281,109 +306,90 @@ function ResultPanel({
   );
 }
 
-// ── Multi-ball animation with overlapping flight + gravity ──
+// ── Bet Selector ──────────────────────────────────────
 
-/** Time (ms) for a ball to traverse one peg row. Accelerates with gravity. */
-function rowDuration(row: number): number {
-  // Row 0 ≈ 150ms, row 11 ≈ 85ms (gravity acceleration)
-  return 150 - row * 6;
-}
+function BetSelector({
+  totalOptions, selectedTotal, selectedBallValue, selectedDropMode,
+  onTotalChange, onBallValueChange, onDropModeChange,
+  accentColor, locale,
+}: {
+  totalOptions: number[]; selectedTotal: number; selectedBallValue: number; selectedDropMode: DropMode;
+  onTotalChange: (v: number) => void; onBallValueChange: (v: number) => void; onDropModeChange: (m: DropMode) => void;
+  accentColor: string; locale: "fr" | "en";
+}) {
+  const t = translations.plinko;
+  const ballCount = Math.floor(selectedTotal / selectedBallValue);
+  const validCombo = selectedTotal % selectedBallValue === 0 && ballCount >= 1;
+  const validBVs = BALL_VALUE_OPTIONS.filter((v) => Number.isInteger(selectedTotal / v) && v <= selectedTotal);
 
-/** Delay before launching ball i (staggered, overlapping) */
-function launchDelay(i: number, total: number): number {
-  if (total <= 1) return 0;
-  // 1-5 balls: 350ms apart. 10+: 200ms apart. 25+: 120ms apart
-  const gap = total <= 5 ? 350 : total <= 10 ? 200 : 120;
-  return i * gap;
-}
+  return (
+    <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-6 space-y-4">
+      {/* Total bet */}
+      <div>
+        <h2 className="text-sm font-bold text-ink/60 uppercase tracking-widest mb-3">{t.chooseTotal[locale]}</h2>
+        <div className="grid grid-cols-4 gap-2">
+          {totalOptions.map((v) => (
+            <button key={v} onClick={() => onTotalChange(v)}
+              className={`py-3 rounded-xl text-sm font-bold transition-all ${
+                selectedTotal === v ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+              }`}
+              style={selectedTotal === v ? { backgroundColor: accentColor } : {}}>
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
 
-type AnimState = {
-  flyingBalls: FlyingBall[];
-  finishedCount: number;
-};
+      {/* Ball value */}
+      <div>
+        <h2 className="text-sm font-bold text-ink/60 uppercase tracking-widest mb-3">{t.choosePerBall[locale]}</h2>
+        <div className="grid grid-cols-4 gap-2">
+          {BALL_VALUE_OPTIONS.map((v) => {
+            const isValid = validBVs.includes(v);
+            return (
+              <button key={v} onClick={() => isValid && onBallValueChange(v)} disabled={!isValid}
+                className={`py-3 rounded-xl text-sm font-bold transition-all ${
+                  selectedBallValue === v ? "text-white shadow-lg scale-105"
+                    : isValid ? "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                    : "bg-ink/5 dark:bg-white/5 text-ink/20 cursor-not-allowed"
+                }`}
+                style={selectedBallValue === v ? { backgroundColor: accentColor } : {}}>
+                {v}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-function useMultiBallAnimation(balls: BallResult[], onComplete: () => void) {
-  const [animState, setAnimState] = useState<AnimState>({ flyingBalls: [], finishedCount: 0 });
-  const [running, setRunning] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef(0);
-  const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+      {/* Drop mode */}
+      <div>
+        <h2 className="text-sm font-bold text-ink/60 uppercase tracking-widest mb-3">{t.dropMode[locale]}</h2>
+        <div className="grid grid-cols-4 gap-2">
+          {DROP_MODES.map((m) => {
+            const label = m === "all" ? t.dropAll[locale] : `×${m}`;
+            return (
+              <button key={String(m)} onClick={() => onDropModeChange(m)}
+                className={`py-3 rounded-xl text-sm font-bold transition-all ${
+                  selectedDropMode === m ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                }`}
+                style={selectedDropMode === m ? { backgroundColor: accentColor } : {}}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-  const start = useCallback(() => {
-    if (balls.length === 0) return;
-    setAnimState({ flyingBalls: [], finishedCount: 0 });
-    startTimeRef.current = performance.now();
-    setRunning(true);
-  }, [balls.length]);
-
-  useEffect(() => {
-    if (!running || balls.length === 0) return;
-
-    const total = balls.length;
-    const ballDone: boolean[] = new Array(total).fill(false);
-    const launches = balls.map((_, i) => launchDelay(i, total));
-
-    // Use setInterval at ~30fps — avoids the RAF + setState conflict
-    intervalRef.current = setInterval(() => {
-      const elapsed = performance.now() - startTimeRef.current;
-      const flying: FlyingBall[] = [];
-      let finished = 0;
-
-      for (let i = 0; i < total; i++) {
-        if (ballDone[i]) { finished++; continue; }
-
-        const ballElapsed = elapsed - launches[i];
-        if (ballElapsed < 0) continue;
-
-        let step: number;
-        let sub: number;
-
-        const entryDur = 160;
-        if (ballElapsed < entryDur) {
-          step = -1;
-          sub = ballElapsed / entryDur;
-        } else {
-          step = PEG_ROWS;
-          sub = 1;
-          let t = ballElapsed - entryDur;
-          for (let r = 0; r < PEG_ROWS; r++) {
-            const dur = rowDuration(r);
-            if (t < dur) {
-              step = r;
-              sub = Math.min(t / dur, 1);
-              break;
-            }
-            t -= dur;
-          }
-        }
-
-        if (step >= PEG_ROWS) {
-          ballDone[i] = true;
-          finished++;
-        } else {
-          flying.push({ ballIdx: i, step, subProgress: sub });
-        }
-      }
-
-      setAnimState({ flyingBalls: flying, finishedCount: finished });
-
-      if (finished >= total) {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        setTimeout(() => { setRunning(false); onCompleteRef.current(); }, 300);
-      }
-    }, 33); // ~30fps
-
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [running, balls]);
-
-  const reset = useCallback(() => {
-    setAnimState({ flyingBalls: [], finishedCount: 0 });
-    setRunning(false);
-    if (intervalRef.current) clearInterval(intervalRef.current);
-  }, []);
-
-  return { ...animState, running, start, reset };
+      {/* Summary */}
+      {validCombo ? (
+        <p className="text-xs text-center text-ink/50">
+          = <span className="font-bold text-ink">{ballCount} {ballCount === 1 ? t.ball[locale] : t.balls[locale]}</span>
+        </p>
+      ) : (
+        <p className="text-xs text-center text-red-500">{t.incompatibleCombo[locale]}</p>
+      )}
+    </div>
+  );
 }
 
 // ── Demo Game ──────────────────────────────────────
@@ -395,41 +401,110 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
   const accentColor = darkSafeColor(table.accentColor, isDark);
   const t = translations.plinko;
 
-  const [selectedBet, setSelectedBet] = useState<number>(table.betOptions[0] || 5);
+  const [selectedTotal, setSelectedTotal] = useState<number>(table.betOptions[0] || 5);
+  const [selectedBallValue, setSelectedBallValue] = useState<number>(1);
+  const [selectedDropMode, setSelectedDropMode] = useState<DropMode>(1);
+  const [state, setState] = useState<ReturnType<typeof createInitialState> | null>(null);
   const [result, setResult] = useState<RoundResponse | null>(null);
-  const [resolvedBalls, setResolvedBalls] = useState<BallResult[]>([]);
+  const [batchRemaining, setBatchRemaining] = useState(0);
+  const anim = useSingleBallAnim();
 
-  const handleAnimComplete = useCallback(() => {
-    if (resolvedBalls.length === 0) return;
-    const totalMult = Math.round(resolvedBalls.reduce((s, b) => s + b.multiplier, 0) * 10000) / 10000;
-    const payout = Math.floor(totalMult * 100) / 100;
-    const won = payout >= selectedBet;
-    setResult({
-      status: won ? "won" : "lost", betCrc: selectedBet, ballCount: selectedBet,
-      balls: resolvedBalls, totalMultiplier: totalMult, payoutCrc: payout,
-      id: 0, tableId: 0, playerAddress: "", outcome: won ? "win" : "loss",
-      payoutStatus: won ? "success" : "none", createdAt: new Date().toISOString(),
-    });
-  }, [resolvedBalls, selectedBet]);
+  const validCombo = selectedTotal % selectedBallValue === 0;
 
-  const anim = useMultiBallAnimation(resolvedBalls, handleAnimComplete);
-
-  const handleDrop = useCallback(() => {
-    if (anim.running) return;
-    const state = createInitialState(selectedBet);
-    const resolved = dropAllBalls(state);
-    setResolvedBalls(resolved.balls);
-  }, [anim.running, selectedBet]);
-
+  // Keep ball value valid when total changes
   useEffect(() => {
-    if (resolvedBalls.length > 0 && !anim.running && !result) anim.start();
-  }, [resolvedBalls, anim.running, result]);
+    if (selectedTotal % selectedBallValue !== 0) {
+      const validBVs = BALL_VALUE_OPTIONS.filter((v) => selectedTotal % v === 0 && v <= selectedTotal);
+      if (validBVs.length > 0) setSelectedBallValue(validBVs[0]);
+    }
+  }, [selectedTotal, selectedBallValue]);
 
-  const resetGame = useCallback(() => {
-    setResult(null); setResolvedBalls([]); anim.reset();
+  const handleStart = useCallback(() => {
+    if (!validCombo) return;
+    setState(createInitialState(selectedTotal, selectedBallValue));
+    setResult(null);
+  }, [selectedTotal, selectedBallValue, validCombo]);
+
+  // Internal: drop one ball (called at start of each batch step)
+  const dropNextInBatch = useCallback((currentState: typeof state, remaining: number) => {
+    if (!currentState || currentState.status !== "playing") { setBatchRemaining(0); return; }
+    const newState = dropOneBall(currentState);
+    const latestBall = newState.balls[newState.balls.length - 1];
+
+    anim.start(latestBall.path, () => {
+      setState(newState);
+      const newRemaining = remaining - 1;
+      const canContinue = newState.status === "playing" && newRemaining > 0;
+
+      if (newState.status === "finished") {
+        setResult({
+          status: newState.status,
+          totalBet: newState.totalBet,
+          ballValue: newState.ballValue,
+          ballCount: newState.ballCount,
+          ballsRemaining: 0,
+          balls: newState.balls,
+          accumulatedPayout: newState.accumulatedPayout,
+          cashoutAmount: 0,
+          finalPayout: calculatePayout(newState),
+          id: 0, tableId: 0, playerAddress: "",
+          outcome: "win",
+          payoutCrc: calculatePayout(newState),
+          payoutStatus: "success",
+          createdAt: new Date().toISOString(),
+        });
+        setBatchRemaining(0);
+      } else if (canContinue) {
+        setBatchRemaining(newRemaining);
+        setTimeout(() => dropNextInBatch(newState, newRemaining), 100);
+      } else {
+        setBatchRemaining(0);
+      }
+    });
   }, [anim]);
 
-  const showBet = !result && !anim.running && resolvedBalls.length === 0;
+  const handleDrop = useCallback(() => {
+    if (!state || anim.running || batchRemaining > 0 || state.status !== "playing") return;
+    const ballsLeft = state.ballCount - state.balls.length;
+    const batchSize = selectedDropMode === "all" ? ballsLeft : Math.min(selectedDropMode, ballsLeft);
+    setBatchRemaining(batchSize);
+    dropNextInBatch(state, batchSize);
+  }, [state, anim, batchRemaining, selectedDropMode, dropNextInBatch]);
+
+  const handleCashout = useCallback(() => {
+    if (!state || anim.running || state.status !== "playing") return;
+    const newState = cashoutState(state);
+    setResult({
+      status: newState.status,
+      totalBet: newState.totalBet,
+      ballValue: newState.ballValue,
+      ballCount: newState.ballCount,
+      ballsRemaining: newState.ballCount - newState.balls.length,
+      balls: newState.balls,
+      accumulatedPayout: newState.accumulatedPayout,
+      cashoutAmount: 0,
+      finalPayout: calculatePayout(newState),
+      id: 0, tableId: 0, playerAddress: "",
+      outcome: "win",
+      payoutCrc: calculatePayout(newState),
+      payoutStatus: "success",
+      createdAt: new Date().toISOString(),
+    });
+    setState(newState);
+  }, [state, anim]);
+
+  const resetGame = useCallback(() => {
+    setState(null);
+    setResult(null);
+    anim.reset();
+  }, [anim]);
+
+  const showBet = !state && !result;
+  const showGame = state && state.status === "playing" && !result;
+  const showResult = result;
+
+  const cashoutAmount = state ? calculateCashoutAmount(state) : 0;
+  const ballsLeft = state ? state.ballCount - state.balls.length : 0;
 
   return (
     <div className="min-h-screen px-4 py-8 max-w-lg mx-auto">
@@ -450,19 +525,18 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
 
       {showBet && (
         <div className="space-y-6">
-          <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-6 space-y-4">
-            <h2 className="text-sm font-bold text-ink/60 uppercase tracking-widest">{t.chooseBet[locale]}</h2>
-            <div className="grid grid-cols-4 gap-3">
-              {(table.betOptions as number[]).map((bet) => (
-                <button key={bet} onClick={() => setSelectedBet(bet)}
-                  className={`py-3 rounded-xl text-sm font-bold transition-all ${selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"}`}
-                  style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} {t.balls[locale]}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-ink/40 text-center">1 CRC {t.perBall[locale]}</p>
-          </div>
+          <BetSelector
+            totalOptions={table.betOptions as number[]}
+            selectedTotal={selectedTotal}
+            selectedBallValue={selectedBallValue}
+            selectedDropMode={selectedDropMode}
+            onTotalChange={setSelectedTotal}
+            onBallValueChange={setSelectedBallValue}
+            onDropModeChange={setSelectedDropMode}
+            accentColor={accentColor}
+            locale={locale}
+          />
+
           <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4">
             <p className="text-xs text-ink/40 text-center mb-3 uppercase tracking-widest">{t.multiplier[locale]}s</p>
             <div className="flex gap-1 justify-center flex-wrap">
@@ -472,25 +546,61 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
               ))}
             </div>
           </div>
-          <PlinkoBoard balls={[]} flyingBalls={[]} finishedCount={0} accentColor={accentColor} />
-          <button onClick={handleDrop}
-            className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 flex items-center justify-center gap-2"
+
+          <PlinkoBoard balls={[]} flyingBallPath={null} animStep={-1} animSub={0} accentColor={accentColor} />
+
+          <button onClick={handleStart} disabled={!validCombo}
+            className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2"
             style={{ backgroundColor: accentColor }}>
-            📌 {t.drop[locale]} {selectedBet} {t.balls[locale]} — {selectedBet} CRC (Demo)
+            📌 {selectedTotal} CRC (Demo)
           </button>
         </div>
       )}
 
-      {anim.running && (
-        <div>
-          <PlinkoBoard balls={resolvedBalls} flyingBalls={anim.flyingBalls} finishedCount={anim.finishedCount} accentColor={accentColor} />
-          <RunningTotal balls={resolvedBalls} finishedCount={anim.finishedCount} ballCount={selectedBet} accentColor={accentColor} locale={locale} />
+      {showGame && state && (
+        <div className="space-y-4">
+          <PlinkoBoard
+            balls={state.balls}
+            flyingBallPath={anim.flyingPath}
+            animStep={anim.animStep}
+            animSub={anim.animSub}
+            accentColor={accentColor}
+          />
+
+          <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4 grid grid-cols-2 gap-3 text-center">
+            <div>
+              <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.ballsRemaining[locale]}</p>
+              <p className="text-xl font-bold text-ink">{ballsLeft} / {state.ballCount}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.accumulated[locale]}</p>
+              <p className="text-xl font-bold" style={{ color: accentColor }}>{state.accumulatedPayout.toFixed(2)} CRC</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={handleCashout} disabled={anim.running || batchRemaining > 0}
+              className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
+              {t.cashout[locale]} {cashoutAmount.toFixed(2)}
+            </button>
+            <button onClick={handleDrop} disabled={anim.running || batchRemaining > 0 || ballsLeft === 0}
+              className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
+              style={{ backgroundColor: accentColor }}>
+              📌 {selectedDropMode === "all" ? t.dropAll[locale] : selectedDropMode === 1 ? t.dropOne[locale] : `×${selectedDropMode}`}
+            </button>
+          </div>
         </div>
       )}
 
-      {result && !anim.running && (
+      {showResult && result && (
         <div>
-          <PlinkoBoard balls={result.balls} flyingBalls={[]} finishedCount={result.balls.length} accentColor={accentColor} />
+          <PlinkoBoard
+            balls={result.balls}
+            flyingBallPath={null}
+            animStep={-1}
+            animSub={0}
+            accentColor={accentColor}
+          />
           <ResultPanel round={result} accentColor={accentColor} locale={locale} onPlayAgain={resetGame} />
         </div>
       )}
@@ -516,21 +626,29 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
   const t = translations.plinko;
   const tokenRef = usePlayerToken("plinko", table.slug);
 
-  const [selectedBet, setSelectedBet] = useState<number>(table.betOptions[0] || 5);
+  const [selectedTotal, setSelectedTotal] = useState<number>(table.betOptions[0] || 5);
+  const [selectedBallValue, setSelectedBallValue] = useState<number>(1);
+  const [selectedDropMode, setSelectedDropMode] = useState<DropMode>(1);
   const [round, setRound] = useState<RoundResponse | null>(null);
   const [scanning, setScanning] = useState(false);
   const [watchingPayment, setWatchingPayment] = useState(false);
-  const [serverBalls, setServerBalls] = useState<BallResult[]>([]);
-  const [serverData, setServerData] = useState<RoundResponse | null>(null);
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const [dropInFlight, setDropInFlight] = useState(false);
+  const [batchRemaining, setBatchRemaining] = useState(0);
+  const anim = useSingleBallAnim();
 
-  const handleAnimComplete = useCallback(() => {
-    if (serverData) { setRound(serverData); setServerData(null); }
-  }, [serverData]);
+  const validCombo = selectedTotal % selectedBallValue === 0;
 
-  const anim = useMultiBallAnimation(serverBalls, handleAnimComplete);
+  // Keep ball value valid
+  useEffect(() => {
+    if (selectedTotal % selectedBallValue !== 0) {
+      const validBVs = BALL_VALUE_OPTIONS.filter((v) => selectedTotal % v === 0 && v <= selectedTotal);
+      if (validBVs.length > 0) setSelectedBallValue(validBVs[0]);
+    }
+  }, [selectedTotal, selectedBallValue]);
 
+  // Restore active round
   useEffect(() => {
     if (!tokenRef.current) { setRestoring(false); return; }
     let active = true;
@@ -545,6 +663,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
     return () => { active = false; };
   }, [table.slug]);
 
+  // Fetch player profile
   useEffect(() => {
     if (!round?.playerAddress || playerProfile) return;
     (async () => {
@@ -568,6 +687,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
     setScanning(false);
   }, [table.slug]);
 
+  // Poll scan
   useEffect(() => {
     if (round || restoring) return;
     const ms = watchingPayment ? 5000 : 15000;
@@ -575,34 +695,106 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
     return () => clearInterval(interval);
   }, [round, restoring, watchingPayment, scanForRound]);
 
-  const handleDrop = useCallback(async () => {
-    if (!round || anim.running || round.status !== "playing") return;
+  // Drop one ball via server, animate, then call onDone with the result
+  const doOneDrop = useCallback(async (currentRound: RoundResponse, onDone: (next: RoundResponse) => void) => {
     try {
-      const res = await fetch(`/api/plinko/${round.id}/action`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      const res = await fetch(`/api/plinko/${currentRound.id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "drop", playerToken: tokenRef.current }),
       });
-      const data = await res.json();
-      if (!res.ok) { console.error("[Plinko] Action error:", data.error); return; }
-      const balls = (data.balls || []) as BallResult[];
-      setServerData(data);
-      setServerBalls(balls);
-    } catch (err) { console.error("[Plinko] Action fetch error:", err); }
-  }, [round, anim.running]);
+      const data = await res.json() as RoundResponse;
+      if (!res.ok) {
+        console.error("[Plinko] Drop error:", (data as any).error);
+        setDropInFlight(false);
+        setBatchRemaining(0);
+        return;
+      }
 
-  useEffect(() => {
-    if (serverBalls.length > 0 && !anim.running && serverData) anim.start();
-  }, [serverBalls]);
+      const latestBall = data.balls[data.balls.length - 1];
+      if (!latestBall) {
+        setRound(data);
+        onDone(data);
+        return;
+      }
+
+      // Keep the previous state's balls during animation (don't spoil)
+      const prevBalls = currentRound.balls;
+      setRound({ ...data, balls: prevBalls });
+
+      anim.start(latestBall.path, () => {
+        setRound(data);
+        onDone(data);
+      });
+    } catch (err) {
+      console.error("[Plinko] Drop fetch error:", err);
+      setDropInFlight(false);
+      setBatchRemaining(0);
+    }
+  }, [anim]);
+
+  const handleDrop = useCallback(async () => {
+    if (!round || anim.running || dropInFlight || batchRemaining > 0 || round.status !== "playing") return;
+    const ballsLeft = round.ballsRemaining;
+    const batchSize = selectedDropMode === "all" ? ballsLeft : Math.min(selectedDropMode, ballsLeft);
+    if (batchSize <= 0) return;
+    setDropInFlight(true);
+    setBatchRemaining(batchSize);
+
+    const runBatch = (currentRound: RoundResponse, remaining: number) => {
+      if (remaining <= 0 || currentRound.status !== "playing") {
+        setDropInFlight(false);
+        setBatchRemaining(0);
+        return;
+      }
+      doOneDrop(currentRound, (next) => {
+        const newRemaining = remaining - 1;
+        if (newRemaining > 0 && next.status === "playing") {
+          setBatchRemaining(newRemaining);
+          setTimeout(() => runBatch(next, newRemaining), 100);
+        } else {
+          setDropInFlight(false);
+          setBatchRemaining(0);
+        }
+      });
+    };
+
+    runBatch(round, batchSize);
+  }, [round, anim, dropInFlight, batchRemaining, selectedDropMode, doOneDrop]);
+
+  const handleCashout = useCallback(async () => {
+    if (!round || anim.running || dropInFlight || round.status !== "playing") return;
+    setDropInFlight(true);
+    try {
+      const res = await fetch(`/api/plinko/${round.id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cashout", playerToken: tokenRef.current }),
+      });
+      const data = await res.json() as RoundResponse;
+      if (!res.ok) {
+        console.error("[Plinko] Cashout error:", (data as any).error);
+      } else {
+        setRound(data);
+      }
+    } catch (err) {
+      console.error("[Plinko] Cashout fetch error:", err);
+    }
+    setDropInFlight(false);
+  }, [round, anim, dropInFlight]);
 
   const resetGame = useCallback(() => {
     setRound(null); setWatchingPayment(false); setPlayerProfile(null);
-    setServerBalls([]); setServerData(null); anim.reset();
+    setDropInFlight(false);
+    anim.reset();
   }, [anim]);
 
   if (restoring) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-ink/30" /></div>;
 
   const isFinished = round && round.status !== "playing";
   const shortenAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
+  const ballCount = Math.floor(selectedTotal / selectedBallValue);
 
   return (
     <div className="min-h-screen px-4 py-8 max-w-lg mx-auto">
@@ -621,19 +813,18 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
 
       {!round && (
         <div className="space-y-6">
-          <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-6 space-y-4">
-            <h2 className="text-sm font-bold text-ink/60 uppercase tracking-widest">{t.chooseBet[locale]}</h2>
-            <div className="grid grid-cols-4 gap-3">
-              {(table.betOptions as number[]).map((bet) => (
-                <button key={bet} onClick={() => setSelectedBet(bet)}
-                  className={`py-3 rounded-xl text-sm font-bold transition-all ${selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"}`}
-                  style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} {t.balls[locale]}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-ink/40 text-center">1 CRC {t.perBall[locale]}</p>
-          </div>
+          <BetSelector
+            totalOptions={table.betOptions as number[]}
+            selectedTotal={selectedTotal}
+            selectedBallValue={selectedBallValue}
+            selectedDropMode={selectedDropMode}
+            onTotalChange={setSelectedTotal}
+            onBallValueChange={setSelectedBallValue}
+            onDropModeChange={setSelectedDropMode}
+            accentColor={accentColor}
+            locale={locale}
+          />
+
           <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4">
             <p className="text-xs text-ink/40 text-center mb-3 uppercase tracking-widest">{t.multiplier[locale]}s</p>
             <div className="flex gap-1 justify-center flex-wrap">
@@ -643,39 +834,71 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
               ))}
             </div>
           </div>
-          <ChancePayment recipientAddress={table.recipientAddress} amountCrc={selectedBet}
-            gameType="plinko" gameId={table.slug} accentColor={accentColor}
-            payLabel={`Plinko — ${selectedBet} ${t.balls[locale]} (${selectedBet} CRC)`}
-            onPaymentInitiated={async () => { await scanForRound(); setWatchingPayment(true); }}
-            onScan={scanForRound} scanning={scanning}
-            paymentStatus={watchingPayment ? "watching" : "idle"} playerToken={tokenRef.current} />
+
+          {validCombo && (
+            <ChancePayment
+              recipientAddress={table.recipientAddress}
+              amountCrc={selectedTotal}
+              gameType="plinko"
+              gameId={table.slug}
+              accentColor={accentColor}
+              payLabel={`Plinko — ${ballCount} ${ballCount === 1 ? t.ball[locale] : t.balls[locale]} × ${selectedBallValue} CRC`}
+              onPaymentInitiated={async () => { await scanForRound(); setWatchingPayment(true); }}
+              onScan={scanForRound} scanning={scanning}
+              paymentStatus={watchingPayment ? "watching" : "idle"}
+              playerToken={tokenRef.current}
+              ballValue={selectedBallValue}
+            />
+          )}
         </div>
       )}
 
-      {round && !isFinished && !anim.running && (
-        <div>
-          <PlinkoBoard balls={[]} flyingBalls={[]} finishedCount={0} accentColor={accentColor} />
-          <button onClick={handleDrop}
-            className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 flex items-center justify-center gap-2"
-            style={{ backgroundColor: accentColor }}>
-            📌 {t.drop[locale]} {round.ballCount} {t.balls[locale]} — {round.betCrc} CRC
-          </button>
+      {round && !isFinished && (
+        <div className="space-y-4">
+          <PlinkoBoard
+            balls={round.balls}
+            flyingBallPath={anim.flyingPath}
+            animStep={anim.animStep}
+            animSub={anim.animSub}
+            accentColor={accentColor}
+          />
+
+          <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4 grid grid-cols-2 gap-3 text-center">
+            <div>
+              <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.ballsRemaining[locale]}</p>
+              <p className="text-xl font-bold text-ink">{round.ballsRemaining} / {round.ballCount}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.accumulated[locale]}</p>
+              <p className="text-xl font-bold" style={{ color: accentColor }}>{round.accumulatedPayout.toFixed(2)} CRC</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={handleCashout} disabled={anim.running || dropInFlight || batchRemaining > 0}
+              className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
+              {t.cashout[locale]} {round.cashoutAmount.toFixed(2)}
+            </button>
+            <button onClick={handleDrop} disabled={anim.running || dropInFlight || batchRemaining > 0 || round.ballsRemaining === 0}
+              className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
+              style={{ backgroundColor: accentColor }}>
+              📌 {selectedDropMode === "all" ? t.dropAll[locale] : selectedDropMode === 1 ? t.dropOne[locale] : `×${selectedDropMode}`}
+            </button>
+          </div>
         </div>
       )}
 
-      {anim.running && (
+      {round && isFinished && (
         <div>
-          <PlinkoBoard balls={serverBalls} flyingBalls={anim.flyingBalls} finishedCount={anim.finishedCount} accentColor={accentColor} />
-          <RunningTotal balls={serverBalls} finishedCount={anim.finishedCount} ballCount={serverBalls.length} accentColor={accentColor} locale={locale} />
-        </div>
-      )}
-
-      {round && isFinished && !anim.running && (
-        <div>
-          <PlinkoBoard balls={round.balls || []} flyingBalls={[]} finishedCount={(round.balls || []).length} accentColor={accentColor} />
-          <ResultPanel round={round} accentColor={accentColor} locale={locale}
+          <PlinkoBoard balls={round.balls} flyingBallPath={null} animStep={-1} animSub={0} accentColor={accentColor} />
+          <ResultPanel
+            round={round}
+            accentColor={accentColor}
+            locale={locale}
             playerName={playerProfile?.name || (round.playerAddress ? shortenAddress(round.playerAddress) : undefined)}
-            playerAvatar={playerProfile?.imageUrl || undefined} onPlayAgain={resetGame} />
+            playerAvatar={playerProfile?.imageUrl || undefined}
+            onPlayAgain={resetGame}
+          />
         </div>
       )}
     </div>

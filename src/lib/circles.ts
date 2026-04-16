@@ -20,7 +20,7 @@ export type CirclesTransferEvent = {
   transactionIndex: string;
   logIndex: string;
   sender: string;
-  gameData?: { game: string; id: string; v: number; t?: string } | null;
+  gameData?: { game: string; id: string; v: number; t?: string; bv?: number } | null;
 };
 
 export const circlesConfig = {

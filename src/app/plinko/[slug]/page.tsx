@@ -12,7 +12,7 @@ const DEMO_TABLE = {
   slug: "DEMO-classic",
   title: "Plinko Classic",
   description: "Lachez la bille, laissez la gravite decider.",
-  betOptions: [1, 5, 10, 25],
+  betOptions: [1, 5, 10, 25, 50, 100, 150],
   recipientAddress: "",
   primaryColor: "#7C3AED",
   accentColor: "#8B5CF6",
