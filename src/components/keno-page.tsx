@@ -173,11 +173,13 @@ function PayTableDisplay({
 function DrawingAnimation({
   draws,
   picks,
+  onAnimIndex,
   onComplete,
   accentColor,
 }: {
   draws: number[];
   picks: Set<number>;
+  onAnimIndex: (idx: number) => void;
   onComplete: () => void;
   accentColor: string;
 }) {
@@ -190,6 +192,7 @@ function DrawingAnimation({
     let idx = 0;
     const timer = setInterval(() => {
       setCurrentIndex(idx);
+      onAnimIndex(idx);
       idx++;
       if (idx >= draws.length) {
         clearInterval(timer);
@@ -203,7 +206,7 @@ function DrawingAnimation({
     }, 350);
 
     return () => clearInterval(timer);
-  }, [draws, onComplete]);
+  }, [draws, onAnimIndex, onComplete]);
 
   const revealed = draws.slice(0, currentIndex + 1);
   const hitSet = new Set(revealed.filter((d) => picks.has(d)));
@@ -297,7 +300,7 @@ function ResultPanel({
         gameType="keno"
         result={won ? "win" : "loss"}
         betCrc={visible.betCrc}
-        gainCrc={won ? Math.round(payout - visible.betCrc) : -visible.betCrc}
+        gainCrc={won ? Math.round((payout - visible.betCrc) * 1000) / 1000 : -visible.betCrc}
         playerName={playerName || "Player"}
         playerAvatar={playerAvatar}
         stats={`${visible.hits.length}/${visible.pickCount} ${t.hits[locale]} — x${(multiplier || 0).toFixed(2)}`}
@@ -331,6 +334,8 @@ function DemoKenoGame({ table }: { table: KenoTable }) {
   const [result, setResult] = useState<VisibleState | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [drawData, setDrawData] = useState<{ draws: number[]; picks: Set<number> } | null>(null);
+  const [animIdx, setAnimIdx] = useState(-1);
+  const resultRef = useRef<VisibleState | null>(null);
 
   const betOptions = table.betOptions as number[];
 
@@ -354,25 +359,28 @@ function DemoKenoGame({ table }: { table: KenoTable }) {
     setPicks(selected);
   }, [pickCount]);
 
+  const onAnimComplete = useCallback(() => {
+    if (resultRef.current) {
+      setResult(resultRef.current);
+      setDrawing(false);
+      setDrawData(null);
+      setAnimIdx(-1);
+    }
+  }, []);
+
   const handleDraw = useCallback(() => {
     if (picks.size !== pickCount || drawing) return;
     setDrawing(true);
+    setAnimIdx(-1);
 
     const picksArray = Array.from(picks);
     const state = createInitialState(selectedBet, pickCount);
     const finalState = resolveDraw(state, { type: "draw", picks: picksArray });
     const visible = getVisibleState(finalState);
+    resultRef.current = visible;
 
     // Start animation
     setDrawData({ draws: visible.draws, picks });
-
-    // After animation completes, show result
-    // DrawingAnimation will call onComplete
-    setTimeout(() => {
-      setResult(visible);
-      setDrawing(false);
-      setDrawData(null);
-    }, DRAW_COUNT * 350 + 1200);
   }, [picks, pickCount, drawing, selectedBet]);
 
   const resetGame = useCallback(() => {
@@ -380,6 +388,8 @@ function DemoKenoGame({ table }: { table: KenoTable }) {
     setPicks(new Set());
     setDrawData(null);
     setDrawing(false);
+    setAnimIdx(-1);
+    resultRef.current = null;
   }, []);
 
   return (
@@ -503,12 +513,13 @@ function DemoKenoGame({ table }: { table: KenoTable }) {
             disabled={true}
             maxPicks={pickCount}
             accentColor={accentColor}
-            animatingIndex={-1}
+            animatingIndex={animIdx}
           />
           <DrawingAnimation
             draws={drawData.draws}
             picks={drawData.picks}
-            onComplete={() => {}}
+            onAnimIndex={setAnimIdx}
+            onComplete={onAnimComplete}
             accentColor={accentColor}
           />
         </div>
@@ -553,8 +564,10 @@ function RealKenoGame({ table }: { table: KenoTable }) {
   const [watchingPayment, setWatchingPayment] = useState(false);
   const [drawing, setDrawing] = useState(false);
   const [drawData, setDrawData] = useState<{ draws: number[]; picks: Set<number> } | null>(null);
+  const [animIdx, setAnimIdx] = useState(-1);
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const pendingRoundRef = useRef<RoundResponse | null>(null);
 
   const betOptions = table.betOptions as number[];
 
@@ -639,10 +652,21 @@ function RealKenoGame({ table }: { table: KenoTable }) {
     setPicks(selected);
   }, [pickCount]);
 
+  const onAnimComplete = useCallback(() => {
+    if (pendingRoundRef.current) {
+      setRound(pendingRoundRef.current);
+      setDrawing(false);
+      setDrawData(null);
+      setAnimIdx(-1);
+      pendingRoundRef.current = null;
+    }
+  }, []);
+
   // Submit picks and draw
   const handleDraw = useCallback(async () => {
     if (!round || picks.size !== round.pickCount || drawing) return;
     setDrawing(true);
+    setAnimIdx(-1);
 
     try {
       const res = await fetch(`/api/keno/${round.id}/action`, {
@@ -657,14 +681,9 @@ function RealKenoGame({ table }: { table: KenoTable }) {
         return;
       }
 
-      // Start animation, then show result
+      // Store result, start animation — onAnimComplete will show result
+      pendingRoundRef.current = data;
       setDrawData({ draws: data.draws, picks });
-
-      setTimeout(() => {
-        setRound(data);
-        setDrawing(false);
-        setDrawData(null);
-      }, DRAW_COUNT * 350 + 1200);
     } catch (err) {
       console.error(err);
       setDrawing(false);
@@ -676,7 +695,9 @@ function RealKenoGame({ table }: { table: KenoTable }) {
     setPicks(new Set());
     setDrawData(null);
     setDrawing(false);
+    setAnimIdx(-1);
     setPlayerProfile(null);
+    pendingRoundRef.current = null;
   }, []);
 
   if (restoring) {
@@ -833,12 +854,13 @@ function RealKenoGame({ table }: { table: KenoTable }) {
             disabled={true}
             maxPicks={pickCount}
             accentColor={accentColor}
-            animatingIndex={-1}
+            animatingIndex={animIdx}
           />
           <DrawingAnimation
             draws={drawData.draws}
             picks={drawData.picks}
-            onComplete={() => {}}
+            onAnimIndex={setAnimIdx}
+            onComplete={onAnimComplete}
             accentColor={accentColor}
           />
         </div>
