@@ -1,0 +1,31 @@
+name: Payouts Monitor
+
+# Pings the /api/cron/payouts-monitor endpoint every 5 min to:
+#  1) confirm "sending" payouts that have been mined on Gnosis
+#  2) retry "failed" payouts (attempts < 3, last update > 2 min)
+#
+# This compensates for Vercel Hobby's 1/day cron limit. The Vercel cron
+# at 4am still runs as a backup safety net.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # allow manual trigger from Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Hit payouts monitor endpoint
+        run: |
+          response=$(curl -sS -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://nf-society.vercel.app/api/cron/payouts-monitor)
+          body=$(echo "$response" | sed '$d')
+          status=$(echo "$response" | tail -n1)
+          echo "HTTP $status"
+          echo "$body"
+          if [ "$status" -ne 200 ]; then
+            exit 1
+          fi
