@@ -349,3 +349,6 @@ export type { RouletteTableRow, RouletteRoundRow, NewRouletteTable, NewRouletteR
 
 export { plinkoTables, plinkoRounds } from "./schema/plinko";
 export type { PlinkoTableRow, PlinkoRoundRow, NewPlinkoTable, NewPlinkoRound } from "./schema/plinko";
+
+export { supportMessages } from "./schema/support";
+export type { SupportMessageRow, NewSupportMessage } from "./schema/support";

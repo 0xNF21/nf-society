@@ -10,6 +10,7 @@ import DemoBanner from "@/components/demo-banner";
 import ProfileModal from "@/components/profile-modal";
 import DailyModal from "@/components/daily-modal";
 import BottomNav from "@/components/bottom-nav";
+import SupportButton from "@/components/support-button";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -71,6 +72,7 @@ export default function RootLayout({
                   <ProfileModal />
                   <DailyModal />
                   <BottomNav />
+                  <SupportButton />
                 </FeatureFlagProvider>
               </MiniAppProvider>
             </LanguageProvider>

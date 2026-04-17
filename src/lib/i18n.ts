@@ -1174,6 +1174,16 @@ export const translations = {
     rejected: { fr: "Paiement refus\u00e9", en: "Payment rejected" },
     connected: { fr: "Connect\u00e9", en: "Connected" },
   },
+  support: {
+    buttonTooltip: {
+      fr: "Besoin d'aide ?",
+      en: "Need help?",
+    },
+    openingTelegram: {
+      fr: "Ouverture de Telegram...",
+      en: "Opening Telegram...",
+    },
+  },
 } as const;
 
 export function t(section: string, key: string, locale: Locale): string {
