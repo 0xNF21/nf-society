@@ -242,6 +242,27 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
             </div>
           )}
 
+          {/* Warning pre-split if pair of Aces */}
+          {visible.status === "playing" && visible.availableActions.includes("split") && (() => {
+            const current = visible.playerHands[visible.currentHandIndex];
+            if (!current || current.cards.length !== 2) return null;
+            if (current.cards[0].rank !== "A" || current.cards[1].rank !== "A") return null;
+            return (
+              <p className="text-xs text-amber-600 dark:text-amber-400 text-center -mt-1 px-2">
+                {t.splitAcesWarning[locale]}
+              </p>
+            );
+          })()}
+
+          {/* Info banner: split aces rule applied */}
+          {visible.status !== "playing" && visible.playerHands.some(h => h.splitFromAces) && (
+            <div className="rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 p-3">
+              <p className="text-xs text-sky-700 dark:text-sky-300 text-center">
+                {t.splitAcesRule[locale]}
+              </p>
+            </div>
+          )}
+
           {/* Result */}
           {isFinished && gameState && (
             <div className="space-y-4">
@@ -644,6 +665,18 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
             </div>
           )}
 
+          {/* Warning pre-split if pair of Aces */}
+          {hand.status === "playing" && !pendingPaidAction && hand.availableActions.includes("split") && (() => {
+            const current = hand.playerHands[hand.currentHandIndex];
+            if (!current || current.cards.length !== 2) return null;
+            if (current.cards[0].rank !== "A" || current.cards[1].rank !== "A") return null;
+            return (
+              <p className="text-xs text-amber-600 dark:text-amber-400 text-center -mt-1 px-2">
+                {t.splitAcesWarning[locale]}
+              </p>
+            );
+          })()}
+
           {/* Payment panel for Double/Split */}
           {pendingPaidAction && hand.status === "playing" && (
             <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-5 space-y-3">
@@ -680,6 +713,15 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   playerToken={tokenRef.current}
                 />
               )}
+            </div>
+          )}
+
+          {/* Info banner: split aces rule applied */}
+          {hand.status !== "playing" && hand.playerHands.some(h => h.splitFromAces) && (
+            <div className="rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 p-3">
+              <p className="text-xs text-sky-700 dark:text-sky-300 text-center">
+                {t.splitAcesRule[locale]}
+              </p>
             </div>
           )}
 

@@ -941,6 +941,14 @@ export const translations = {
     hand: { fr: "Main", en: "Hand" },
     noTables: { fr: "Aucune table disponible", en: "No tables available" },
     back: { fr: "Tables", en: "Tables" },
+    splitAcesWarning: {
+      fr: "Split d'As : 1 carte par main puis stand force",
+      en: "Split aces: 1 card per hand then auto-stand",
+    },
+    splitAcesRule: {
+      fr: "Regle appliquee : sur split d'As, chaque main recoit 1 carte puis stand automatique.",
+      en: "Rule applied: after splitting aces, each hand gets 1 card then auto-stands.",
+    },
   },
   coinFlip: {
     title: { fr: "Pile ou Face", en: "Coin Flip" },

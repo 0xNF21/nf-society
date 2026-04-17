@@ -117,25 +117,23 @@ function getSmoothBallPos(path: number[], step: number, sub: number): { x: numbe
   return { x: x + wobble, y };
 }
 
-// ── Plinko Board (single ball) ──────────────────────
+// ── Plinko Board (multi-ball concurrent) ──────────────
+
+type FlyingBall = { id: number; path: number[]; step: number; sub: number };
 
 function PlinkoBoard({
-  balls,
-  flyingBallPath,
-  animStep,
-  animSub,
+  settledBalls,
+  flyingBalls,
   accentColor,
 }: {
-  balls: BallResult[];
-  flyingBallPath: number[] | null;
-  animStep: number;
-  animSub: number;
+  /** balls that have landed and should show as counts in buckets */
+  settledBalls: BallResult[];
+  /** balls currently in the air, each at its own animation position */
+  flyingBalls: FlyingBall[];
   accentColor: string;
 }) {
   const bucketCounts: number[] = Array(BUCKET_COUNT).fill(0);
-  for (const b of balls) bucketCounts[b.bucket]++;
-
-  const flyingPos = flyingBallPath ? getSmoothBallPos(flyingBallPath, animStep, animSub) : null;
+  for (const b of settledBalls) bucketCounts[b.bucket]++;
 
   return (
     <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4 mb-4">
@@ -179,81 +177,108 @@ function PlinkoBoard({
           );
         })}
 
-        {/* Flying ball */}
-        {flyingPos && (
-          <circle cx={flyingPos.x} cy={flyingPos.y} r={BALL_R}
-            fill={accentColor} opacity={0.9}
-            style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))" }}
-          />
-        )}
+        {/* All flying balls */}
+        {flyingBalls.map((fb) => {
+          const pos = getSmoothBallPos(fb.path, fb.step, fb.sub);
+          return (
+            <circle key={`fly-${fb.id}`} cx={pos.x} cy={pos.y} r={BALL_R}
+              fill={accentColor} opacity={0.9}
+              style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))" }}
+            />
+          );
+        })}
       </svg>
     </div>
   );
 }
 
-// ── Single-ball animation hook ─────────────────────
+// ── Concurrent multi-ball animation hook ────────────
+// Each launch adds a ball to `flyingBalls`. Multiple can be in flight simultaneously.
+// `onLand` is called per ball when it reaches the bucket, so callers can finalize
+// the ball in their state.
 
-function useSingleBallAnim() {
-  const [flyingPath, setFlyingPath] = useState<number[] | null>(null);
-  const [animStep, setAnimStep] = useState(-1);
-  const [animSub, setAnimSub] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const completeRef = useRef<(() => void) | null>(null);
+const ENTRY_DUR = 160;
+const ROW_DUR = (r: number) => 150 - r * 6;
+const TOTAL_DUR = ENTRY_DUR + Array.from({ length: PEG_ROWS }, (_, r) => ROW_DUR(r)).reduce((s, d) => s + d, 0);
+const LINGER_DUR = 200; // keep ball visible in bucket briefly after landing
 
-  const start = useCallback((path: number[], onComplete: () => void) => {
-    setFlyingPath(path);
-    setAnimStep(-1);
-    setAnimSub(0);
-    completeRef.current = onComplete;
+type InternalBall = { id: number; path: number[]; launchedAt: number; onLand: () => void; landed: boolean };
 
-    const startTime = performance.now();
-    const entryDur = 160;
-    const rowDur = (r: number) => 150 - r * 6;
-    const totalDur = entryDur + Array.from({ length: PEG_ROWS }, (_, r) => rowDur(r)).reduce((s, d) => s + d, 0);
+function useConcurrentBallAnim() {
+  const [flyingBalls, setFlyingBalls] = useState<FlyingBall[]>([]);
+  const ballsRef = useRef<InternalBall[]>([]);
+  const rafRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const nextIdRef = useRef(0);
 
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => {
-      const elapsed = performance.now() - startTime;
-      let step = -1;
-      let sub = 0;
+  const ensureLoop = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = setInterval(() => {
+      const now = performance.now();
+      const visible: FlyingBall[] = [];
+      const toLand: InternalBall[] = [];
+      const still: InternalBall[] = [];
 
-      if (elapsed < entryDur) {
-        step = -1;
-        sub = elapsed / entryDur;
-      } else {
-        step = PEG_ROWS;
-        sub = 1;
-        let t = elapsed - entryDur;
-        for (let r = 0; r < PEG_ROWS; r++) {
-          const dur = rowDur(r);
-          if (t < dur) { step = r; sub = Math.min(t / dur, 1); break; }
-          t -= dur;
+      for (const b of ballsRef.current) {
+        const elapsed = now - b.launchedAt;
+
+        // If fully elapsed + linger → remove
+        if (elapsed >= TOTAL_DUR + LINGER_DUR) continue;
+
+        // If just landed this frame (and not previously) → trigger onLand
+        if (elapsed >= TOTAL_DUR && !b.landed) {
+          b.landed = true;
+          toLand.push(b);
         }
+
+        // Compute position
+        let step = -1;
+        let sub = 0;
+        if (elapsed < ENTRY_DUR) {
+          step = -1;
+          sub = elapsed / ENTRY_DUR;
+        } else {
+          step = PEG_ROWS;
+          sub = 1;
+          let t = elapsed - ENTRY_DUR;
+          for (let r = 0; r < PEG_ROWS; r++) {
+            const dur = ROW_DUR(r);
+            if (t < dur) { step = r; sub = Math.min(t / dur, 1); break; }
+            t -= dur;
+          }
+        }
+
+        visible.push({ id: b.id, path: b.path, step, sub });
+        still.push(b);
       }
 
-      setAnimStep(step);
-      setAnimSub(sub);
+      ballsRef.current = still;
+      setFlyingBalls(visible);
 
-      if (elapsed >= totalDur) {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        setTimeout(() => {
-          setFlyingPath(null);
-          completeRef.current?.();
-        }, 200);
+      // Fire onLand callbacks AFTER state updates
+      for (const b of toLand) b.onLand();
+
+      if (ballsRef.current.length === 0) {
+        if (rafRef.current) { clearInterval(rafRef.current); rafRef.current = null; }
       }
     }, 33);
   }, []);
 
+  /** Launch a single ball with its path. `onLand` fires when it lands in its bucket. */
+  const launch = useCallback((path: number[], onLand: () => void) => {
+    const id = nextIdRef.current++;
+    ballsRef.current.push({ id, path, launchedAt: performance.now(), onLand, landed: false });
+    ensureLoop();
+  }, [ensureLoop]);
+
   const reset = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    setFlyingPath(null);
-    setAnimStep(-1);
-    setAnimSub(0);
+    if (rafRef.current) { clearInterval(rafRef.current); rafRef.current = null; }
+    ballsRef.current = [];
+    setFlyingBalls([]);
   }, []);
 
-  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
+  useEffect(() => () => { if (rafRef.current) clearInterval(rafRef.current); }, []);
 
-  return { flyingPath, animStep, animSub, running: flyingPath !== null, start, reset };
+  return { flyingBalls, running: flyingBalls.length > 0, launch, reset };
 }
 
 // ── Result Panel ──────────────────────────────────────
@@ -418,10 +443,12 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
   const [selectedTotal, setSelectedTotal] = useState<number>(table.betOptions[0] || 5);
   const [selectedBallValue, setSelectedBallValue] = useState<number>(1);
   const [selectedDropMode, setSelectedDropMode] = useState<DropMode>(1);
+  // Committed state = balls that have landed (for bucket counters + cashout calc)
   const [state, setState] = useState<ReturnType<typeof createInitialState> | null>(null);
+  // In-flight count = balls currently animating but not yet landed (reserved from ballCount)
+  const [inFlightCount, setInFlightCount] = useState(0);
   const [result, setResult] = useState<RoundResponse | null>(null);
-  const [batchRemaining, setBatchRemaining] = useState(0);
-  const anim = useSingleBallAnim();
+  const anim = useConcurrentBallAnim();
 
   const validCombo = selectedTotal % selectedBallValue === 0;
 
@@ -437,56 +464,76 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
     if (!validCombo) return;
     setState(createInitialState(selectedTotal, selectedBallValue));
     setResult(null);
+    setInFlightCount(0);
   }, [selectedTotal, selectedBallValue, validCombo]);
 
-  // Internal: drop one ball (called at start of each batch step)
-  const dropNextInBatch = useCallback((currentState: typeof state, remaining: number) => {
-    if (!currentState || currentState.status !== "playing") { setBatchRemaining(0); return; }
-    const newState = dropOneBall(currentState);
-    const latestBall = newState.balls[newState.balls.length - 1];
-
-    anim.start(latestBall.path, () => {
-      setState(newState);
-      const newRemaining = remaining - 1;
-      const canContinue = newState.status === "playing" && newRemaining > 0;
-
-      if (newState.status === "finished") {
-        setResult({
-          status: newState.status,
-          totalBet: newState.totalBet,
-          ballValue: newState.ballValue,
-          ballCount: newState.ballCount,
-          ballsRemaining: 0,
-          balls: newState.balls,
-          accumulatedPayout: newState.accumulatedPayout,
-          cashoutAmount: 0,
-          finalPayout: calculatePayout(newState),
-          id: 0, tableId: 0, playerAddress: "",
-          outcome: "win",
-          payoutCrc: calculatePayout(newState),
-          payoutStatus: "success",
-          createdAt: new Date().toISOString(),
-        });
-        setBatchRemaining(0);
-      } else if (canContinue) {
-        setBatchRemaining(newRemaining);
-        setTimeout(() => dropNextInBatch(newState, newRemaining), 100);
-      } else {
-        setBatchRemaining(0);
-      }
-    });
-  }, [anim]);
-
   const handleDrop = useCallback(() => {
-    if (!state || anim.running || batchRemaining > 0 || state.status !== "playing") return;
-    const ballsLeft = state.ballCount - state.balls.length;
-    const batchSize = selectedDropMode === "all" ? ballsLeft : Math.min(selectedDropMode, ballsLeft);
-    setBatchRemaining(batchSize);
-    dropNextInBatch(state, batchSize);
-  }, [state, anim, batchRemaining, selectedDropMode, dropNextInBatch]);
+    if (!state || state.status !== "playing") return;
+    const totalUsed = state.balls.length + inFlightCount;
+    const ballsAvailable = state.ballCount - totalUsed;
+    if (ballsAvailable <= 0) return;
+
+    const batchSize = selectedDropMode === "all" ? ballsAvailable : Math.min(selectedDropMode, ballsAvailable);
+    if (batchSize <= 0) return;
+
+    // Generate all ball paths up front (so we know their landing positions)
+    // We use the same logic as the server: random paths
+    const newBalls: BallResult[] = [];
+    for (let i = 0; i < batchSize; i++) {
+      const path: number[] = [];
+      for (let j = 0; j < PEG_ROWS; j++) {
+        path.push(Math.random() < 0.5 ? 0 : 1);
+      }
+      const bucket = path.reduce((s, d) => s + d, 0);
+      newBalls.push({ path, bucket, multiplier: MULTIPLIERS[bucket] });
+    }
+
+    setInFlightCount((c) => c + batchSize);
+
+    // Launch each ball with slight stagger for better visual effect
+    newBalls.forEach((ball, idx) => {
+      setTimeout(() => {
+        anim.launch(ball.path, () => {
+          // When ball lands: commit it to state
+          setState((prev) => {
+            if (!prev) return prev;
+            const committed = { ...prev, balls: [...prev.balls, ball] };
+            committed.accumulatedPayout = Math.round((prev.accumulatedPayout + prev.ballValue * ball.multiplier) * 100) / 100;
+            const isLast = committed.balls.length >= committed.ballCount;
+            if (isLast) committed.status = "finished";
+            return committed;
+          });
+          setInFlightCount((c) => c - 1);
+        });
+      }, idx * 120); // 120ms stagger between balls in same batch
+    });
+  }, [state, inFlightCount, selectedDropMode, anim]);
+
+  // Auto-finalize result when game status becomes "finished" and no balls in flight
+  useEffect(() => {
+    if (!state || result) return;
+    if (state.status === "finished" && inFlightCount === 0) {
+      setResult({
+        status: state.status,
+        totalBet: state.totalBet,
+        ballValue: state.ballValue,
+        ballCount: state.ballCount,
+        ballsRemaining: 0,
+        balls: state.balls,
+        accumulatedPayout: state.accumulatedPayout,
+        cashoutAmount: 0,
+        finalPayout: calculatePayout(state),
+        id: 0, tableId: 0, playerAddress: "",
+        outcome: "win",
+        payoutCrc: calculatePayout(state),
+        payoutStatus: "success",
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }, [state, inFlightCount, result]);
 
   const handleCashout = useCallback(() => {
-    if (!state || anim.running || state.status !== "playing") return;
+    if (!state || state.status !== "playing" || inFlightCount > 0) return;
     const newState = cashoutState(state);
     setResult({
       status: newState.status,
@@ -505,11 +552,12 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
       createdAt: new Date().toISOString(),
     });
     setState(newState);
-  }, [state, anim]);
+  }, [state, inFlightCount]);
 
   const resetGame = useCallback(() => {
     setState(null);
     setResult(null);
+    setInFlightCount(0);
     anim.reset();
   }, [anim]);
 
@@ -518,7 +566,7 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
   const showResult = result;
 
   const cashoutAmount = state ? calculateCashoutAmount(state) : 0;
-  const ballsLeft = state ? state.ballCount - state.balls.length : 0;
+  const ballsLeft = state ? state.ballCount - state.balls.length - inFlightCount : 0;
 
   return (
     <div className="min-h-screen px-4 py-8 max-w-lg mx-auto">
@@ -559,7 +607,7 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
             </div>
           </div>
 
-          <PlinkoBoard balls={[]} flyingBallPath={null} animStep={-1} animSub={0} accentColor={accentColor} />
+          <PlinkoBoard settledBalls={[]} flyingBalls={[]} accentColor={accentColor} />
 
           <button onClick={handleStart} disabled={!validCombo}
             className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2"
@@ -572,10 +620,8 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
       {showGame && state && (
         <div className="space-y-4">
           <PlinkoBoard
-            balls={state.balls}
-            flyingBallPath={anim.flyingPath}
-            animStep={anim.animStep}
-            animSub={anim.animSub}
+            settledBalls={state.balls}
+            flyingBalls={anim.flyingBalls}
             accentColor={accentColor}
           />
 
@@ -595,15 +641,14 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
             onDropModeChange={setSelectedDropMode}
             accentColor={accentColor}
             locale={locale}
-            disabled={anim.running || batchRemaining > 0}
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={handleCashout} disabled={anim.running || batchRemaining > 0}
+            <button onClick={handleCashout} disabled={inFlightCount > 0}
               className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
               {t.cashout[locale]} {cashoutAmount.toFixed(2)}
             </button>
-            <button onClick={handleDrop} disabled={anim.running || batchRemaining > 0 || ballsLeft === 0}
+            <button onClick={handleDrop} disabled={ballsLeft === 0}
               className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
               style={{ backgroundColor: accentColor }}>
               📌 {selectedDropMode === "all" ? t.dropAll[locale] : selectedDropMode === 1 ? t.dropOne[locale] : `×${selectedDropMode}`}
@@ -614,13 +659,7 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
 
       {showResult && result && (
         <div>
-          <PlinkoBoard
-            balls={result.balls}
-            flyingBallPath={null}
-            animStep={-1}
-            animSub={0}
-            accentColor={accentColor}
-          />
+          <PlinkoBoard settledBalls={result.balls} flyingBalls={[]} accentColor={accentColor} />
           <ResultPanel round={result} accentColor={accentColor} locale={locale} onPlayAgain={resetGame} />
         </div>
       )}
@@ -654,9 +693,10 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
   const [watchingPayment, setWatchingPayment] = useState(false);
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const [restoring, setRestoring] = useState(true);
-  const [dropInFlight, setDropInFlight] = useState(false);
-  const [batchRemaining, setBatchRemaining] = useState(0);
-  const anim = useSingleBallAnim();
+  const [serverInFlight, setServerInFlight] = useState(false); // waiting for HTTP response
+  // Balls returned by server but not yet landed visually — they are NOT shown in settledBalls yet
+  const [pendingBalls, setPendingBalls] = useState<BallResult[]>([]);
+  const anim = useConcurrentBallAnim();
 
   const validCombo = selectedTotal % selectedBallValue === 0;
 
@@ -715,76 +755,99 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
     return () => clearInterval(interval);
   }, [round, restoring, watchingPayment, scanForRound]);
 
-  // Drop one ball via server, animate, then call onDone with the result
-  const doOneDrop = useCallback(async (currentRound: RoundResponse, onDone: (next: RoundResponse) => void) => {
+  // Drop N balls: server resolves all, client animates them with stagger,
+  // each ball is added to "displayed settled" one by one as it lands.
+  const handleDrop = useCallback(async () => {
+    if (!round || serverInFlight || round.status !== "playing") return;
+    // Balls still available to request = total - already-committed - pending
+    const ballsAvailable = round.ballsRemaining - pendingBalls.length;
+    if (ballsAvailable <= 0) return;
+    const batchSize = selectedDropMode === "all" ? ballsAvailable : Math.min(selectedDropMode, ballsAvailable);
+    if (batchSize <= 0) return;
+
+    setServerInFlight(true);
     try {
-      const res = await fetch(`/api/plinko/${currentRound.id}/action`, {
+      const res = await fetch(`/api/plinko/${round.id}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "drop", playerToken: tokenRef.current }),
+        body: JSON.stringify({ action: "drop", count: batchSize, playerToken: tokenRef.current }),
       });
       const data = await res.json() as RoundResponse;
       if (!res.ok) {
         console.error("[Plinko] Drop error:", (data as any).error);
-        setDropInFlight(false);
-        setBatchRemaining(0);
+        setServerInFlight(false);
         return;
       }
 
-      const latestBall = data.balls[data.balls.length - 1];
-      if (!latestBall) {
-        setRound(data);
-        onDone(data);
-        return;
-      }
+      // The server returned `data.balls` = ALL balls up to now (including new ones).
+      // Slice just the new ones (last `batchSize`):
+      const newBalls = data.balls.slice(-batchSize);
 
-      // Keep the previous state's balls during animation (don't spoil)
-      const prevBalls = currentRound.balls;
-      setRound({ ...data, balls: prevBalls });
+      // Keep current displayed balls, save the incoming ones as "pending"
+      setPendingBalls((prev) => [...prev, ...newBalls]);
 
-      anim.start(latestBall.path, () => {
-        setRound(data);
-        onDone(data);
+      // Keep `round` with the OLD balls (not spoiled) but everything else from new data
+      // (accumulatedPayout will be updated per ball as they land)
+      const displayedBalls = round.balls; // keep what's already shown
+      // We want to know the final round data for when all have landed
+      const finalRoundData = data;
+
+      // Launch each ball with stagger
+      newBalls.forEach((ball, idx) => {
+        setTimeout(() => {
+          anim.launch(ball.path, () => {
+            // Ball landed — move from pending to round.balls, bump accumulated
+            setRound((prev) => {
+              if (!prev) return prev;
+              const newDisplayed = [...prev.balls, ball];
+              const newAcc = Math.round((prev.accumulatedPayout + prev.ballValue * ball.multiplier) * 100) / 100;
+              return {
+                ...prev,
+                balls: newDisplayed,
+                accumulatedPayout: newAcc,
+                ballsRemaining: prev.ballsRemaining - 1,
+                cashoutAmount: Math.round(((prev.ballsRemaining - 1) * prev.ballValue + newAcc) * 100) / 100,
+              };
+            });
+            setPendingBalls((prev) => prev.filter((b) => b !== ball));
+          });
+        }, idx * 120);
       });
+
+      // After all balls have been launched, sync final round data (when last ball lands)
+      const lastIdx = newBalls.length - 1;
+      if (newBalls.length > 0) {
+        // We track completion by counting pending balls; when all land, optionally sync server data
+        // The actual round status update happens automatically via the setRound above.
+        // But we need to reconcile with server when ALL pending are landed
+        const totalDelay = lastIdx * 120 + TOTAL_DUR + 100;
+        setTimeout(() => {
+          // Only apply server's final status/payout data; balls should already be committed
+          setRound((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              status: finalRoundData.status,
+              accumulatedPayout: finalRoundData.accumulatedPayout,
+              finalPayout: finalRoundData.finalPayout,
+              outcome: finalRoundData.outcome,
+              payoutCrc: finalRoundData.payoutCrc,
+              payoutStatus: finalRoundData.payoutStatus,
+            };
+          });
+        }, totalDelay);
+      }
+
+      setServerInFlight(false);
     } catch (err) {
       console.error("[Plinko] Drop fetch error:", err);
-      setDropInFlight(false);
-      setBatchRemaining(0);
+      setServerInFlight(false);
     }
-  }, [anim]);
-
-  const handleDrop = useCallback(async () => {
-    if (!round || anim.running || dropInFlight || batchRemaining > 0 || round.status !== "playing") return;
-    const ballsLeft = round.ballsRemaining;
-    const batchSize = selectedDropMode === "all" ? ballsLeft : Math.min(selectedDropMode, ballsLeft);
-    if (batchSize <= 0) return;
-    setDropInFlight(true);
-    setBatchRemaining(batchSize);
-
-    const runBatch = (currentRound: RoundResponse, remaining: number) => {
-      if (remaining <= 0 || currentRound.status !== "playing") {
-        setDropInFlight(false);
-        setBatchRemaining(0);
-        return;
-      }
-      doOneDrop(currentRound, (next) => {
-        const newRemaining = remaining - 1;
-        if (newRemaining > 0 && next.status === "playing") {
-          setBatchRemaining(newRemaining);
-          setTimeout(() => runBatch(next, newRemaining), 100);
-        } else {
-          setDropInFlight(false);
-          setBatchRemaining(0);
-        }
-      });
-    };
-
-    runBatch(round, batchSize);
-  }, [round, anim, dropInFlight, batchRemaining, selectedDropMode, doOneDrop]);
+  }, [round, serverInFlight, pendingBalls, selectedDropMode, anim]);
 
   const handleCashout = useCallback(async () => {
-    if (!round || anim.running || dropInFlight || round.status !== "playing") return;
-    setDropInFlight(true);
+    if (!round || serverInFlight || pendingBalls.length > 0 || anim.running || round.status !== "playing") return;
+    setServerInFlight(true);
     try {
       const res = await fetch(`/api/plinko/${round.id}/action`, {
         method: "POST",
@@ -800,12 +863,13 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
     } catch (err) {
       console.error("[Plinko] Cashout fetch error:", err);
     }
-    setDropInFlight(false);
-  }, [round, anim, dropInFlight]);
+    setServerInFlight(false);
+  }, [round, serverInFlight, pendingBalls, anim]);
 
   const resetGame = useCallback(() => {
     setRound(null); setWatchingPayment(false); setPlayerProfile(null);
-    setDropInFlight(false);
+    setServerInFlight(false);
+    setPendingBalls([]);
     anim.reset();
   }, [anim]);
 
@@ -874,17 +938,15 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
       {round && !isFinished && (
         <div className="space-y-4">
           <PlinkoBoard
-            balls={round.balls}
-            flyingBallPath={anim.flyingPath}
-            animStep={anim.animStep}
-            animSub={anim.animSub}
+            settledBalls={round.balls}
+            flyingBalls={anim.flyingBalls}
             accentColor={accentColor}
           />
 
           <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4 grid grid-cols-2 gap-3 text-center">
             <div>
               <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.ballsRemaining[locale]}</p>
-              <p className="text-xl font-bold text-ink">{round.ballsRemaining} / {round.ballCount}</p>
+              <p className="text-xl font-bold text-ink">{Math.max(round.ballsRemaining - pendingBalls.length, 0)} / {round.ballCount}</p>
             </div>
             <div>
               <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.accumulated[locale]}</p>
@@ -897,15 +959,14 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
             onDropModeChange={setSelectedDropMode}
             accentColor={accentColor}
             locale={locale}
-            disabled={anim.running || dropInFlight || batchRemaining > 0}
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={handleCashout} disabled={anim.running || dropInFlight || batchRemaining > 0}
+            <button onClick={handleCashout} disabled={serverInFlight || pendingBalls.length > 0 || anim.running}
               className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
               {t.cashout[locale]} {round.cashoutAmount.toFixed(2)}
             </button>
-            <button onClick={handleDrop} disabled={anim.running || dropInFlight || batchRemaining > 0 || round.ballsRemaining === 0}
+            <button onClick={handleDrop} disabled={serverInFlight || (round.ballsRemaining - pendingBalls.length) <= 0}
               className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
               style={{ backgroundColor: accentColor }}>
               📌 {selectedDropMode === "all" ? t.dropAll[locale] : selectedDropMode === 1 ? t.dropOne[locale] : `×${selectedDropMode}`}
@@ -916,7 +977,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
 
       {round && isFinished && (
         <div>
-          <PlinkoBoard balls={round.balls} flyingBallPath={null} animStep={-1} animSub={0} accentColor={accentColor} />
+          <PlinkoBoard settledBalls={round.balls} flyingBalls={[]} accentColor={accentColor} />
           <ResultPanel
             round={round}
             accentColor={accentColor}

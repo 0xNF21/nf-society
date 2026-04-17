@@ -94,7 +94,34 @@ export function createInitialState(totalBet: number, ballValue: number): PlinkoS
   };
 }
 
-/** Drop one ball. Auto-finishes when last ball is dropped. */
+/** Drop N balls at once. Auto-finishes when last ball is dropped. N defaults to 1. */
+export function dropBalls(state: PlinkoState, count: number = 1): PlinkoState {
+  if (state.status !== "playing") throw new Error("Game is not in playing state");
+  if (count < 1) throw new Error("count must be >= 1");
+  const remaining = state.ballCount - state.balls.length;
+  if (remaining < 1) throw new Error("No balls remaining");
+
+  const actualCount = Math.min(count, remaining);
+  const newBalls = [...state.balls];
+  let accumulated = state.accumulatedPayout;
+
+  for (let i = 0; i < actualCount; i++) {
+    const ball = dropRandomBall();
+    newBalls.push(ball);
+    accumulated = round2(accumulated + state.ballValue * ball.multiplier);
+  }
+
+  const isLast = newBalls.length >= state.ballCount;
+
+  return {
+    ...state,
+    balls: newBalls,
+    accumulatedPayout: accumulated,
+    status: isLast ? "finished" : "playing",
+  };
+}
+
+/** Drop one ball — convenience wrapper. Auto-finishes when last ball is dropped. */
 export function dropOneBall(state: PlinkoState): PlinkoState {
   if (state.status !== "playing") throw new Error("Game is not in playing state");
   if (state.balls.length >= state.ballCount) throw new Error("No balls remaining");

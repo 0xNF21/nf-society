@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { plinkoRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { dropOneBall, cashout, getVisibleState, calculatePayout, isValidAction } from "@/lib/plinko";
+import { dropBalls, cashout, getVisibleState, calculatePayout, isValidAction } from "@/lib/plinko";
 import type { PlinkoState, PlinkoAction } from "@/lib/plinko";
 import { executePayout } from "@/lib/payout";
 
@@ -18,6 +18,10 @@ export async function POST(
 
     const body = await req.json();
     const playerToken = body.playerToken as string | undefined;
+    const rawCount = body.count;
+    const count = typeof rawCount === "number" && Number.isFinite(rawCount) && rawCount >= 1
+      ? Math.floor(rawCount)
+      : 1;
 
     // Validate action
     const action: PlinkoAction = { type: body.action as any };
@@ -48,7 +52,7 @@ export async function POST(
     let newState: PlinkoState;
     try {
       if (action.type === "drop") {
-        newState = dropOneBall(state);
+        newState = dropBalls(state, count);
       } else {
         newState = cashout(state);
       }
