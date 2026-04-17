@@ -305,6 +305,15 @@ export const xpConfig = pgTable("xp_config", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Bot wallet state — single-row table tracking the next available nonce for the
+// payout bot. The UPDATE ... RETURNING pattern guarantees atomic nonce reservation
+// across concurrent lambdas, eliminating "replacement fee too low" races.
+export const botState = pgTable("bot_state", {
+  id:         integer("id").primaryKey().default(1),
+  lastNonce:  integer("last_nonce").notNull(),
+  updatedAt:  timestamp("updated_at").defaultNow().notNull(),
+});
+
 export { relicsGames } from "./schema/relics";
 export type { RelicsGameRow, NewRelicsGame } from "./schema/relics";
 

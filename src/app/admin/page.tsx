@@ -679,6 +679,8 @@ function PayoutsTab({ password }: { password: string }) {
   const [manualForm, setManualForm] = useState({ gameType: "reward", recipientAddress: "", amountCrc: "", reason: "" });
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [manualResult, setManualResult] = useState<any>(null);
+  const [monitorRunning, setMonitorRunning] = useState(false);
+  const [monitorResult, setMonitorResult] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -701,6 +703,27 @@ function PayoutsTab({ password }: { password: string }) {
       await fetchData();
     } catch {} finally { setRetrying(null); }
   };
+
+  const handleRunMonitor = async () => {
+    setMonitorRunning(true);
+    setMonitorResult(null);
+    try {
+      const res = await fetch("/api/cron/payouts-monitor", { cache: "no-store" });
+      const data = await res.json();
+      setMonitorResult(data);
+      await fetchData();
+    } catch (e: any) {
+      setMonitorResult({ ok: false, error: e.message });
+    } finally {
+      setMonitorRunning(false);
+    }
+  };
+
+  const counts = payoutList.reduce<Record<string, number>>((acc, po) => {
+    const key = po.status === "failed" && po.attempts >= 3 ? "max_retries" : po.status;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
 
   const handleManual = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -808,6 +831,59 @@ function PayoutsTab({ password }: { password: string }) {
                 {manualSubmitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Envoyer le payout"}
               </button>
             </form>
+          )}
+        </div>
+      )}
+
+      {/* Stats par statut + cron monitor */}
+      {payoutStatus?.configured && (
+        <div className="rounded-2xl border-2 border-ink/10 bg-white/80 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-ink">Statut des paiements (20 derniers)</h3>
+            <button
+              onClick={handleRunMonitor}
+              disabled={monitorRunning}
+              className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1"
+              title="Lance manuellement le cron monitor (verifie les sending + retry les failed)"
+            >
+              {monitorRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Lancer le monitor
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+            <div className="rounded-lg bg-green-50 p-2 text-center">
+              <div className="text-2xl font-bold text-green-700">{counts.success || 0}</div>
+              <div className="text-green-600">Confirmes</div>
+            </div>
+            <div className="rounded-lg bg-blue-50 p-2 text-center">
+              <div className="text-2xl font-bold text-blue-700">{counts.sending || 0}</div>
+              <div className="text-blue-600">En cours</div>
+            </div>
+            <div className="rounded-lg bg-yellow-50 p-2 text-center">
+              <div className="text-2xl font-bold text-yellow-700">{counts.pending || 0}</div>
+              <div className="text-yellow-600">En attente</div>
+            </div>
+            <div className="rounded-lg bg-red-50 p-2 text-center">
+              <div className="text-2xl font-bold text-red-700">{counts.failed || 0}</div>
+              <div className="text-red-600">En echec</div>
+            </div>
+            <div className="rounded-lg bg-red-100 p-2 text-center">
+              <div className="text-2xl font-bold text-red-800">{counts.max_retries || 0}</div>
+              <div className="text-red-700">Max atteint</div>
+            </div>
+          </div>
+          {monitorResult && (
+            <div className={`text-xs p-2 rounded-lg ${monitorResult.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+              {monitorResult.ok ? (
+                <>
+                  Monitor OK — {monitorResult.sendingChecked} verif. ({monitorResult.confirmed} confirmees, {monitorResult.stillPending} en attente, {monitorResult.confirmedFailed} echec on-chain)
+                  {monitorResult.failedRetried > 0 && <> | {monitorResult.failedRetried} retry ({monitorResult.retrySucceeded} OK, {monitorResult.retryFailed} KO)</>}
+                  {monitorResult.maxAttemptsReached > 0 && <> | {monitorResult.maxAttemptsReached} max-retry atteint</>}
+                </>
+              ) : (
+                <>Erreur : {monitorResult.error}</>
+              )}
+            </div>
           )}
         </div>
       )}
