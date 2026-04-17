@@ -7,7 +7,7 @@ import { checkAllNewPayments } from "@/lib/circles";
 import { createInitialState, generateCrashPoint } from "@/lib/crash-dash";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
-const CRASH_DASH_START_BLOCK = "0x2C00000";
+const CRASH_DASH_START_BLOCK = "0x2B7DE5C";
 
 export async function POST(req: NextRequest) {
   try {
