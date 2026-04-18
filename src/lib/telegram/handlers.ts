@@ -1,7 +1,7 @@
 import { Bot, Context } from "grammy";
 import { db } from "@/lib/db";
 import { supportMessages } from "@/lib/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { ADMIN_CHAT_ID } from "./bot";
 import { decodeStartContext, formatAdminHeader, TelegramStartContext } from "./context";
 
@@ -11,7 +11,6 @@ import { decodeStartContext, formatAdminHeader, TelegramStartContext } from "./c
 // Cold-start proof car on persiste sur le 1er message en DB (context jsonb).
 const pendingStartContext = new Map<number, { ctx: TelegramStartContext; at: number }>();
 
-// Nettoyage des entrees > 10 min.
 function gcPendingContext() {
   const now = Date.now();
   for (const [uid, entry] of pendingStartContext.entries()) {
@@ -35,23 +34,20 @@ export function registerHandlers(b: Bot) {
 
     await ctx.reply(
       "Bienvenue sur le support NF Society\n\n" +
-      "Decris ton probleme ou ta question en un message. " +
+      "Decris ton probleme ou ta question (texte, photo, video, voice...). " +
       "Un admin te repondra ici des que possible.\n\n" +
-      "Welcome to NF Society support — describe your issue and an admin will reply here."
+      "Welcome to NF Society support — describe your issue (text, photo, video, voice...) and an admin will reply here."
     );
   });
 
-  // Message texte d'un user en prive => forward au groupe admin.
-  b.on("message:text", async (ctx) => {
+  // Catch-all pour tous types de messages (texte, photo, video, voice, document, sticker...).
+  b.on("message", async (ctx) => {
     try {
-      // Groupe admin : on traite comme reponse si c'est un reply, sinon on ignore.
       if (ctx.chat.id === ADMIN_CHAT_ID) {
         await handleAdminReply(ctx);
         return;
       }
-      // Doit etre un chat prive avec un user.
       if (ctx.chat.type !== "private") return;
-
       await handleUserMessage(ctx);
     } catch (err) {
       console.error("[telegram] message handler error:", err);
@@ -59,17 +55,48 @@ export function registerHandlers(b: Bot) {
   });
 }
 
+// Determine un libelle lisible du type de message pour les logs / previews.
+function describeMessageContent(msg: any): string {
+  if (msg.text) return msg.text;
+  if (msg.caption) return msg.caption;
+  if (msg.photo) return "[photo]";
+  if (msg.video) return "[video]";
+  if (msg.voice) return "[voice]";
+  if (msg.audio) return "[audio]";
+  if (msg.video_note) return "[video_note]";
+  if (msg.sticker) return "[sticker]";
+  if (msg.animation) return "[gif]";
+  if (msg.document) return "[document]";
+  if (msg.location) return "[location]";
+  if (msg.contact) return "[contact]";
+  return "[media]";
+}
+
+function hasMedia(msg: any): boolean {
+  return !!(
+    msg.photo ||
+    msg.video ||
+    msg.voice ||
+    msg.audio ||
+    msg.video_note ||
+    msg.sticker ||
+    msg.animation ||
+    msg.document ||
+    msg.location ||
+    msg.contact
+  );
+}
+
 async function handleUserMessage(ctx: Context) {
   const from = ctx.from;
   const msg = ctx.message;
-  if (!from || !msg?.text) return;
+  if (!from || !msg) return;
 
   // Recupere contexte du /start si c'est le premier vrai message.
   const pending = pendingStartContext.get(from.id);
   const startCtx = pending?.ctx;
   if (pending) pendingStartContext.delete(from.id);
 
-  // Header admin : nom, handle, wallet (si fourni), page d'origine.
   const header = formatAdminHeader({
     firstName: from.first_name,
     username: from.username,
@@ -78,27 +105,63 @@ async function handleUserMessage(ctx: Context) {
     page: startCtx?.page,
   });
 
-  // Forward vers le groupe admin avec le user id encode dans le header
-  // (pour le retrouver lors d'une reply admin).
-  // On utilise un footer invisible <code>uid:123</code> en derniere ligne.
-  const adminText =
-    `${header}\n` +
-    `<i>uid:${from.id}</i>\n\n` +
-    escapeHtml(msg.text);
+  const contentLabel = describeMessageContent(msg as any);
 
-  const sent = await ctx.api.sendMessage(ADMIN_CHAT_ID, adminText, {
-    parse_mode: "HTML",
-  });
+  // Cas 1 : message texte pur — un seul message au groupe admin avec header + texte.
+  if (msg.text && !hasMedia(msg as any)) {
+    const adminText =
+      `${header}\n` +
+      `<i>uid:${from.id}</i>\n\n` +
+      escapeHtml(msg.text);
 
-  // Log en DB
+    const sent = await ctx.api.sendMessage(ADMIN_CHAT_ID, adminText, {
+      parse_mode: "HTML",
+    });
+
+    await insertIn(from, msg, startCtx, sent.message_id, msg.text);
+  } else {
+    // Cas 2 : message avec media (photo, video, voice, sticker, document, etc.).
+    // On envoie d'abord un header texte (pour contenir le uid + contexte),
+    // puis on COPIE le message original dans le groupe admin.
+    const headerText =
+      `${header}\n` +
+      `<i>uid:${from.id}</i>\n` +
+      `<i>${escapeHtml(contentLabel)}</i>`;
+
+    const headerMsg = await ctx.api.sendMessage(ADMIN_CHAT_ID, headerText, {
+      parse_mode: "HTML",
+    });
+
+    // copyMessage gere tous les types : photo/video/voice/sticker/document/etc.
+    // Pas de bandeau "forwarded from" — le bot semble l'envoyer lui-meme.
+    const copied = await ctx.api.copyMessage(ADMIN_CHAT_ID, ctx.chat!.id, msg.message_id);
+
+    // Log 2 entrees : header + copie. Comme ca l'admin peut reply a n'importe laquelle.
+    await insertIn(from, msg, startCtx, headerMsg.message_id, contentLabel);
+    await insertIn(from, msg, null, copied.message_id, contentLabel);
+  }
+
+  // Accuse de reception au 1er message de la session (celui qui a un startCtx).
+  if (startCtx) {
+    await ctx.reply("Message envoye au support. On te repond au plus vite.");
+  }
+}
+
+async function insertIn(
+  from: { id: number; username?: string; first_name?: string },
+  msg: { message_id: number },
+  startCtx: TelegramStartContext | null | undefined,
+  adminMessageId: number,
+  textOrLabel: string
+) {
   try {
     await db.insert(supportMessages).values({
       telegramUserId: from.id,
       telegramUsername: from.username ?? null,
       telegramFirstName: from.first_name ?? null,
       direction: "in",
-      text: msg.text,
-      adminMessageId: sent.message_id,
+      text: textOrLabel,
+      adminMessageId,
       userMessageId: msg.message_id,
       context: startCtx ? startCtx : null,
       walletAddress: startCtx?.wallet ?? null,
@@ -106,40 +169,30 @@ async function handleUserMessage(ctx: Context) {
   } catch (err) {
     console.error("[telegram] db insert in error:", err);
   }
-
-  // Accuse de reception cote user (uniquement au 1er message de la session).
-  if (startCtx) {
-    await ctx.reply("Message envoye au support. On te repond au plus vite.");
-  }
 }
 
 async function handleAdminReply(ctx: Context) {
   const msg = ctx.message;
   const from = ctx.from;
-  if (!msg?.text || !from) return;
+  if (!msg || !from) return;
 
   // Admin doit repondre EN REPLY a un message du bot pour qu'on sache a quel user envoyer.
   const replyTo = msg.reply_to_message;
-  if (!replyTo) {
-    // Message libre dans le groupe admin, on ignore (c'est une discussion interne).
-    return;
-  }
+  if (!replyTo) return;
 
-  // Tente de retrouver l'user via le adminMessageId.
-  const originalMsgId = replyTo.message_id;
+  // Retrouve le user cible via le adminMessageId (match soit le header soit la copie media).
   const original = await db
     .select()
     .from(supportMessages)
     .where(
       and(
-        eq(supportMessages.adminMessageId, originalMsgId),
+        eq(supportMessages.adminMessageId, replyTo.message_id),
         eq(supportMessages.direction, "in")
       )
     )
     .limit(1);
 
   let targetUserId: number | null = null;
-
   if (original[0]) {
     targetUserId = Number(original[0].telegramUserId);
   } else {
@@ -150,16 +203,17 @@ async function handleAdminReply(ctx: Context) {
 
   if (!targetUserId) {
     await ctx.reply(
-      "Impossible de retrouver l'user cible. Reponds en reply au message du bot qui contient 'uid:...'."
+      "Impossible de retrouver l'user cible. Reponds en reply au message du bot (header ou media) qui contient 'uid:...'."
     );
     return;
   }
 
-  // Envoie au user
-  let sentMsgId: number | undefined;
+  // Envoie au user — copyMessage gere TOUS les types (texte, photo, video, voice, etc.).
+  // Si c'est un message texte pur, copyMessage fait pareil que sendMessage.
+  let sentMsgId: number | null = null;
   try {
-    const sent = await ctx.api.sendMessage(targetUserId, msg.text);
-    sentMsgId = sent.message_id;
+    const copied = await ctx.api.copyMessage(targetUserId, ctx.chat!.id, msg.message_id);
+    sentMsgId = copied.message_id;
   } catch (err) {
     console.error("[telegram] send to user failed:", err);
     await ctx.reply(
@@ -170,14 +224,15 @@ async function handleAdminReply(ctx: Context) {
 
   // Log en DB
   try {
+    const label = describeMessageContent(msg as any);
     await db.insert(supportMessages).values({
       telegramUserId: targetUserId,
       telegramUsername: null,
       telegramFirstName: null,
       direction: "out",
-      text: msg.text,
+      text: label,
       adminMessageId: msg.message_id,
-      userMessageId: sentMsgId ?? null,
+      userMessageId: sentMsgId,
       context: null,
       walletAddress: null,
     });
