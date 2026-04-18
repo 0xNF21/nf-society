@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, BarChart3, Dice5, Swords, ArrowLeftRight, ShoppingBag, FlaskConical, Lock, Trophy } from "lucide-react";
+import { ArrowRight, BarChart3, Dice5, Swords, ArrowLeftRight, ShoppingBag, FlaskConical, Lock, Trophy, LineChart } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
@@ -45,6 +45,16 @@ export default function LandingPage() {
       title: t.sectionExchange[locale],
       desc: t.sectionExchangeDesc[locale],
       color: "text-sky-500",
+    },
+    {
+      href: "/stats",
+      flag: "public_stats",
+      icon: <LineChart className="h-8 w-8 text-amber-500" />,
+      iconBg: "bg-amber-50 group-hover:bg-amber-100",
+      borderHover: "hover:border-amber-200",
+      title: t.sectionStats[locale],
+      desc: t.sectionStatsDesc[locale],
+      color: "text-amber-500",
     },
   ];
 

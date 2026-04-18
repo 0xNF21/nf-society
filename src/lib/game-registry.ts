@@ -95,6 +95,20 @@ export const GAME_REGISTRY: Record<string, GameClientConfig> = {
     apiRoute: "/api/pfc",
     scanRoute: "/api/pfc-scan",
   },
+  "crc-races": {
+    key: "crc-races",
+    featureFlag: "crc-races",
+    emoji: "🏇",
+    iconColor: "text-orange-500",
+    iconBg: "bg-orange-50",
+    iconBgHover: "group-hover:bg-orange-100",
+    borderHover: "hover:border-orange-200",
+    accentColor: "#EA580C",
+    translationKey: "crcRaces",
+    landingTranslationKey: "landingCrcRaces",
+    apiRoute: "/api/crc-races",
+    scanRoute: "/api/crc-races-scan",
+  },
 };
 
 export const ALL_GAMES = Object.values(GAME_REGISTRY);
@@ -139,6 +153,7 @@ export const CATEGORY_FLAGS: { key: string; label: string }[] = [
   { key: "exchange", label: "Exchange" },
   { key: "lobby", label: "Lobby multijoueur" },
   { key: "leaderboard", label: "Classement" },
+  { key: "public_stats", label: "Stats publiques" },
 ];
 
 /** Game display labels (for stats, lobby, etc.) */
@@ -148,6 +163,7 @@ export const GAME_LABELS: Record<string, string> = {
   relics: "Relics",
   dames: "Dames",
   pfc: "Pierre-Feuille-Ciseaux",
+  "crc-races": "Courses CRC",
 };
 
 /** Game icons for stats display */
@@ -157,4 +173,5 @@ export const GAME_ICONS: Record<string, string> = {
   relics: "⚓",
   dames: "♟️",
   pfc: "✊📄✂️",
+  "crc-races": "🏇",
 };

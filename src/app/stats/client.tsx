@@ -1,0 +1,279 @@
+"use client";
+
+import Link from "next/link";
+import { ArrowLeft, TrendingUp, Users, Coins, Gamepad2 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+import { useLocale } from "@/components/language-provider";
+import { translations } from "@/lib/i18n";
+import type { PlatformStats, PeriodStats, GameStatLine, DailyVolumePoint } from "@/lib/platform-stats";
+
+function formatCrc(n: number | string, decimals = 0): string {
+  const num = typeof n === "string" ? parseFloat(n) : n;
+  if (!isFinite(num)) return "0";
+  if (Math.abs(num) >= 1_000_000) return (num / 1_000_000).toFixed(2) + "M";
+  if (Math.abs(num) >= 1_000) return (num / 1_000).toFixed(1) + "k";
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+function formatPct(n: number | null): string {
+  if (n === null) return "-";
+  return `${n.toFixed(1)}%`;
+}
+
+export default function StatsClient({ stats }: { stats: PlatformStats }) {
+  const { locale } = useLocale();
+  const t = translations.stats;
+
+  const { casinoBank, period24h, period7d, period30d, allTime, games, daily30d } = stats;
+
+  return (
+    <div className="min-h-screen bg-sand dark:bg-black">
+      <main className="mx-auto max-w-4xl px-4 py-10 flex flex-col gap-6">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink/80 dark:text-white/50 dark:hover:text-white/80 transition-colors font-medium w-fit"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          {t.back[locale]}
+        </Link>
+
+        <header className="text-center space-y-2">
+          <h1 className="font-display text-4xl font-bold text-ink dark:text-white">
+            {t.title[locale]}
+          </h1>
+          <p className="text-sm text-ink/60 dark:text-white/60">{t.subtitle[locale]}</p>
+        </header>
+
+        {/* Banque casino — hero */}
+        <div className="rounded-3xl bg-gradient-to-br from-marine to-marine/80 text-white p-8 shadow-lg">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/70 mb-2">
+            <Coins className="h-4 w-4" />
+            {t.casinoBank[locale]}
+          </div>
+          <div className="text-5xl font-black font-display">
+            {formatCrc(casinoBank.totalCrc, 2)} <span className="text-2xl text-white/70">CRC</span>
+          </div>
+          <p className="mt-2 text-xs text-white/60">
+            {t.casinoBankDesc[locale]}
+          </p>
+          <div className="mt-4 flex gap-3 text-xs text-white/70">
+            <span>
+              {t.innerCrc[locale]} : <b>{formatCrc(casinoBank.innerCrc, 2)}</b>
+            </span>
+            <span>
+              xCRC : <b>{formatCrc(casinoBank.wrappedCrc, 2)}</b>
+            </span>
+          </div>
+        </div>
+
+        {/* Profit / volume by period */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <PeriodCard label={t.last24h[locale]} stats={period24h} locale={locale} />
+          <PeriodCard label={t.last7d[locale]} stats={period7d} locale={locale} />
+          <PeriodCard label={t.last30d[locale]} stats={period30d} locale={locale} />
+        </div>
+
+        {/* All time + RTP global */}
+        <div className="rounded-2xl bg-white/70 dark:bg-white/5 backdrop-blur-sm border border-ink/10 dark:border-white/10 shadow-sm p-6">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-ink/40 dark:text-white/40 mb-3">
+            <TrendingUp className="h-4 w-4" />
+            {t.allTime[locale]}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Metric label={t.wagered[locale]} value={formatCrc(allTime.wagered, 0) + " CRC"} />
+            <Metric label={t.paidOut[locale]} value={formatCrc(allTime.paidOut, 0) + " CRC"} />
+            <Metric
+              label={t.profit[locale]}
+              value={formatCrc(allTime.profit, 0) + " CRC"}
+              accent={allTime.profit >= 0 ? "green" : "red"}
+            />
+            <Metric label={t.rounds[locale]} value={formatCrc(allTime.rounds, 0)} />
+          </div>
+        </div>
+
+        {/* Volume chart 30j */}
+        <div className="rounded-2xl bg-white/70 dark:bg-white/5 backdrop-blur-sm border border-ink/10 dark:border-white/10 shadow-sm p-6">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-ink/40 dark:text-white/40 mb-4">
+            <TrendingUp className="h-4 w-4" />
+            {t.volumeChart[locale]}
+          </div>
+          <Volume30dChart points={daily30d} />
+        </div>
+
+        {/* Breakdown par jeu */}
+        <div className="rounded-2xl bg-white/70 dark:bg-white/5 backdrop-blur-sm border border-ink/10 dark:border-white/10 shadow-sm p-6">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-ink/40 dark:text-white/40 mb-4">
+            <Gamepad2 className="h-4 w-4" />
+            {t.byGame[locale]} ({t.last30d[locale]})
+          </div>
+          {games.length === 0 ? (
+            <p className="text-sm text-ink/40 dark:text-white/40 italic">
+              {t.noData[locale]}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-ink/40 dark:text-white/40 uppercase tracking-wider border-b border-ink/10 dark:border-white/10">
+                    <th className="py-2">{t.colGame[locale]}</th>
+                    <th className="py-2 text-right">{t.colVolume[locale]}</th>
+                    <th className="py-2 text-right">{t.colRounds[locale]}</th>
+                    <th className="py-2 text-right">{t.colRtp[locale]}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {games.map((g) => (
+                    <tr key={g.key} className="border-b border-ink/5 dark:border-white/5">
+                      <td className="py-3 flex items-center gap-2">
+                        <span>{g.emoji}</span>
+                        <span className="font-medium text-ink dark:text-white">{g.label}</span>
+                        <span className="text-[10px] uppercase tracking-wider text-ink/30 dark:text-white/30">
+                          {g.category}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right font-mono text-ink dark:text-white">
+                        {formatCrc(g.wagered30d, 0)}
+                      </td>
+                      <td className="py-3 text-right font-mono text-ink/60 dark:text-white/60">
+                        {formatCrc(g.rounds30d, 0)}
+                      </td>
+                      <td className="py-3 text-right font-mono text-ink/60 dark:text-white/60">
+                        {formatPct(g.rtp30d)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <footer className="text-center text-xs text-ink/30 dark:text-white/30 py-8">
+          {t.cached[locale]}
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+function PeriodCard({
+  label,
+  stats,
+  locale,
+}: {
+  label: string;
+  stats: PeriodStats;
+  locale: "fr" | "en";
+}) {
+  const t = translations.stats;
+  return (
+    <div className="rounded-2xl bg-white/70 dark:bg-white/5 backdrop-blur-sm border border-ink/10 dark:border-white/10 shadow-sm p-5">
+      <div className="text-xs font-bold uppercase tracking-widest text-ink/40 dark:text-white/40">
+        {label}
+      </div>
+      <div className="mt-3 space-y-2">
+        <div>
+          <div className="text-[10px] text-ink/40 dark:text-white/40 uppercase">
+            {t.wagered[locale]}
+          </div>
+          <div className="text-xl font-bold font-mono text-ink dark:text-white">
+            {formatCrc(stats.wagered, 0)} <span className="text-xs text-ink/40 dark:text-white/40">CRC</span>
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] text-ink/40 dark:text-white/40 uppercase">
+            {t.profit[locale]}
+          </div>
+          <div
+            className={`text-xl font-bold font-mono ${
+              stats.profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"
+            }`}
+          >
+            {stats.profit >= 0 ? "+" : ""}
+            {formatCrc(stats.profit, 0)} <span className="text-xs opacity-60">CRC</span>
+          </div>
+        </div>
+        <div className="flex justify-between text-xs text-ink/50 dark:text-white/50 pt-1">
+          <span>
+            {stats.rounds} {t.rounds[locale]}
+          </span>
+          <span>
+            {stats.players} {t.players[locale]}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: "green" | "red";
+}) {
+  const color =
+    accent === "green"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : accent === "red"
+      ? "text-red-500"
+      : "text-ink dark:text-white";
+  return (
+    <div>
+      <div className="text-[10px] text-ink/40 dark:text-white/40 uppercase tracking-wider">
+        {label}
+      </div>
+      <div className={`text-xl font-bold font-mono ${color}`}>{value}</div>
+    </div>
+  );
+}
+
+function Volume30dChart({ points }: { points: DailyVolumePoint[] }) {
+  const chartData = points.map((p) => ({
+    date: p.date.slice(5), // MM-DD
+    total: p.totalCrc,
+  }));
+  return (
+    <div className="h-64 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.1} />
+          <XAxis dataKey="date" stroke="currentColor" opacity={0.5} tick={{ fontSize: 10 }} />
+          <YAxis stroke="currentColor" opacity={0.5} tick={{ fontSize: 10 }} />
+          <Tooltip
+            contentStyle={{
+              background: "rgba(255,255,255,0.95)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: 12,
+              fontSize: 12,
+            }}
+            formatter={(value: any) => [`${formatCrc(Number(value ?? 0), 0)} CRC`, "Volume"]}
+          />
+          <Line
+            type="monotone"
+            dataKey="total"
+            stroke="#251B9F"
+            strokeWidth={2}
+            dot={false}
+            name="Volume"
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
