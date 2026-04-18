@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
-import type { PlatformStats, PeriodStats, GameStatLine, DailyVolumePoint } from "@/lib/platform-stats";
+import type { PlatformStats, PeriodStats, GameStatLine, DailyVolumePoint, TopGameMeta } from "@/lib/platform-stats";
 
 function formatCrc(n: number | string, decimals = 0): string {
   const num = typeof n === "string" ? parseFloat(n) : n;
@@ -36,7 +36,7 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
   const { locale } = useLocale();
   const t = translations.stats;
 
-  const { casinoBank, period24h, period7d, period30d, allTime, games, daily30d } = stats;
+  const { casinoBank, period24h, period7d, period30d, allTime, games, daily30d, top5Games } = stats;
 
   return (
     <div className="min-h-screen bg-sand dark:bg-black">
@@ -56,8 +56,8 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
           <p className="text-sm text-ink/60 dark:text-white/60">{t.subtitle[locale]}</p>
         </header>
 
-        {/* Banque casino — hero */}
-        <div className="rounded-3xl bg-gradient-to-br from-marine to-marine/80 text-white p-8 shadow-lg">
+        {/* Banque casino — hero (vert dollar) */}
+        <div className="rounded-3xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-green-800 text-white p-8 shadow-lg ring-1 ring-emerald-400/30">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/70 mb-2">
             <Coins className="h-4 w-4" />
             {t.casinoBank[locale]}
@@ -109,7 +109,7 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
             <TrendingUp className="h-4 w-4" />
             {t.volumeChart[locale]}
           </div>
-          <Volume30dChart points={daily30d} />
+          <Volume30dChart points={daily30d} top5={top5Games} />
         </div>
 
         {/* Breakdown par jeu - all time */}
@@ -243,13 +243,22 @@ function Metric({
   );
 }
 
-function Volume30dChart({ points }: { points: DailyVolumePoint[] }) {
-  const chartData = points.map((p) => ({
-    date: p.date.slice(5), // MM-DD
-    total: p.totalCrc,
-  }));
+function Volume30dChart({ points, top5 }: { points: DailyVolumePoint[]; top5: TopGameMeta[] }) {
+  // Transforme les points en data utilisable par recharts :
+  // { date, total, <key1>: vol, <key2>: vol, ... }
+  const chartData = points.map((p) => {
+    const base: Record<string, any> = {
+      date: p.date.slice(5), // MM-DD
+      total: p.totalCrc,
+    };
+    for (const g of top5) {
+      base[g.key] = p.perGame[g.key] ?? 0;
+    }
+    return base;
+  });
+
   return (
-    <div className="h-64 w-full">
+    <div className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.1} />
@@ -262,16 +271,36 @@ function Volume30dChart({ points }: { points: DailyVolumePoint[] }) {
               borderRadius: 12,
               fontSize: 12,
             }}
-            formatter={(value: any) => [`${formatCrc(Number(value ?? 0), 0)} CRC`, "Volume"]}
+            formatter={(value: any, name: any) => [
+              `${formatCrc(Number(value ?? 0), 0)} CRC`,
+              name,
+            ]}
           />
+          <Legend
+            wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+            iconType="circle"
+          />
+          {/* Ligne totale en gras */}
           <Line
             type="monotone"
             dataKey="total"
-            stroke="#251B9F"
-            strokeWidth={2}
+            stroke="#0f172a"
+            strokeWidth={2.5}
             dot={false}
-            name="Volume"
+            name="Total"
           />
+          {/* Top 5 jeux en lignes colorees fines */}
+          {top5.map((g) => (
+            <Line
+              key={g.key}
+              type="monotone"
+              dataKey={g.key}
+              stroke={g.color}
+              strokeWidth={1.5}
+              dot={false}
+              name={`${g.emoji} ${g.label}`}
+            />
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>

@@ -45,6 +45,8 @@ export type ChancePlayerStats = {
   lastPlayedAt: Date | null;
 };
 
+export type DailyVolume = { day: string; wagered: number };
+
 export type ChanceGameServerConfig = {
   key: string;
   label: string;
@@ -54,6 +56,8 @@ export type ChanceGameServerConfig = {
   getPlayerStats(address: string): Promise<ChancePlayerStats>;
   // Liste des adresses joueurs distinctes sur la periode (pour dedup cross-games).
   getPlayerAddresses(since?: Date): Promise<string[]>;
+  // Volume journalier (wagered) sur la periode donnee.
+  getDailyVolume(since: Date): Promise<DailyVolume[]>;
 };
 
 /**
@@ -141,6 +145,18 @@ function createStandardConfig(opts: {
         .where(whereClause as any)
         .groupBy(addressField);
       return rows.map((r: any) => (r.addr as string).toLowerCase());
+    },
+
+    async getDailyVolume(since: Date): Promise<DailyVolume[]> {
+      const rows = await db
+        .select({
+          day: sql<string>`TO_CHAR(DATE_TRUNC('day', ${dateField}), 'YYYY-MM-DD')`,
+          wagered: sql<number>`COALESCE(SUM(${betField}), 0)`,
+        })
+        .from(table)
+        .where(gte(dateField, since))
+        .groupBy(sql`DATE_TRUNC('day', ${dateField})`);
+      return rows.map((r) => ({ day: r.day, wagered: Number(r.wagered) }));
     },
   };
 }
@@ -260,6 +276,19 @@ const lootboxesConfig: ChanceGameServerConfig = {
       .where(whereClause as any)
       .groupBy(lootboxOpens.playerAddress);
     return rows.map((r) => r.addr.toLowerCase());
+  },
+
+  async getDailyVolume(since: Date): Promise<DailyVolume[]> {
+    const rows = await db
+      .select({
+        day: sql<string>`TO_CHAR(DATE_TRUNC('day', ${lootboxOpens.openedAt}), 'YYYY-MM-DD')`,
+        wagered: sql<number>`COALESCE(SUM(${lootboxes.pricePerOpenCrc}), 0)`,
+      })
+      .from(lootboxOpens)
+      .innerJoin(lootboxes, eq(lootboxOpens.lootboxId, lootboxes.id))
+      .where(gte(lootboxOpens.openedAt, since))
+      .groupBy(sql`DATE_TRUNC('day', ${lootboxOpens.openedAt})`);
+    return rows.map((r) => ({ day: r.day, wagered: Number(r.wagered) }));
   },
 };
 

@@ -39,7 +39,14 @@ export type GameStatLine = {
 export type DailyVolumePoint = {
   date: string;       // ISO yyyy-mm-dd
   totalCrc: number;   // volume total ce jour
-  topGames: { key: string; volume: number }[];  // top 3 jeux ce jour
+  perGame: Record<string, number>;  // volume par jeu ce jour (key -> CRC)
+};
+
+export type TopGameMeta = {
+  key: string;
+  label: string;
+  emoji: string;
+  color: string;  // hex
 };
 
 export type PlatformStats = {
@@ -60,17 +67,18 @@ export type PlatformStats = {
   // Breakdown par jeu (30j)
   games: GameStatLine[];
 
-  // Graph volume 30j
+  // Graph volume 30j — total + top 5 jeux par volume sur la periode
   daily30d: DailyVolumePoint[];
+  top5Games: TopGameMeta[];
 };
 
-const MULTI_GAME_META: Record<string, { label: string; emoji: string }> = {
-  morpion: { label: "Morpion", emoji: "❌⭕" },
-  memory: { label: "Memory", emoji: "🃏" },
-  relics: { label: "Relics", emoji: "⚓" },
-  dames: { label: "Dames", emoji: "♟️" },
-  pfc: { label: "Pierre-Feuille-Ciseaux", emoji: "✊" },
-  "crc-races": { label: "Courses CRC", emoji: "🏇" },
+const MULTI_GAME_META: Record<string, { label: string; emoji: string; color: string }> = {
+  morpion: { label: "Morpion", emoji: "❌⭕", color: "#251B9F" },
+  memory: { label: "Memory", emoji: "🃏", color: "#EC4899" },
+  relics: { label: "Relics", emoji: "⚓", color: "#10B981" },
+  dames: { label: "Dames", emoji: "♟️", color: "#F59E0B" },
+  pfc: { label: "Pierre-Feuille-Ciseaux", emoji: "✊", color: "#DC2626" },
+  "crc-races": { label: "Courses CRC", emoji: "🏇", color: "#EA580C" },
 };
 
 function daysAgo(n: number): Date {
@@ -212,13 +220,14 @@ async function computePeriodStats(since?: Date): Promise<PeriodStats> {
 }
 
 /**
- * Volume journalier 30j, total + top 3 jeux par jour.
+ * Volume journalier 30j avec breakdown complet par jeu (multi + chance).
+ * Retourne les points quotidiens + les 5 jeux les plus actifs sur la periode.
  */
-async function computeDaily30d(): Promise<DailyVolumePoint[]> {
+async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; top5: TopGameMeta[] }> {
   const since = daysAgo(30);
 
-  // Multi : claimedPayments group by day + game
-  const multiDaily = await db
+  // Multi : une seule query groupee day + game
+  const multiDailyPromise = db
     .select({
       day: sql<string>`TO_CHAR(DATE_TRUNC('day', ${claimedPayments.claimedAt}), 'YYYY-MM-DD')`,
       game: claimedPayments.gameType,
@@ -231,30 +240,55 @@ async function computeDaily30d(): Promise<DailyVolumePoint[]> {
       claimedPayments.gameType
     );
 
-  // Chance : pour chaque jeu, query daily aggregate
-  const chanceDailyPerGame = await Promise.all(
-    ALL_CHANCE_SERVER_GAMES.map(async (cfg) => {
-      // Ne pas hardcoder le nom de colonne date - on suppose createdAt ou openedAt
-      // Hack temporaire : on fait une requete SQL via le helper unifie.
-      // Pour simplifier, on passe par getAggregate day-by-day n'est pas scalable.
-      // Compromis : on genere les 30 buckets cote app en iterant par jour.
-      const perDay: Record<string, number> = {};
-      for (let i = 0; i < 30; i++) {
-        const start = new Date();
-        start.setDate(start.getDate() - i);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 1);
-        // Optimisation : on pourrait faire une query SQL groupBy, mais pour v1 ca suffit
-        // car 12 jeux * 30 jours = 360 queries. Amelioration possible ensuite.
-        // Pour eviter, on utilise getAggregate(since) et on soustrait
-      }
-      // Approche alternative : une seule query agregate 30j, pas de breakdown daily.
-      // Pour avoir le daily, il faudrait un colonnage par date sur chaque table.
-      // En v1 on simplifie : le chance apparait dans le total mais pas disagrege par jour.
-      return { key: cfg.key, perDay };
-    })
+  // Chance : 1 query par jeu (en parallele)
+  const chanceDailyPromise = Promise.all(
+    ALL_CHANCE_SERVER_GAMES.map(async (cfg) => ({
+      cfg,
+      rows: await cfg.getDailyVolume(since),
+    }))
   );
+
+  const [multiDaily, chanceDaily] = await Promise.all([multiDailyPromise, chanceDailyPromise]);
+
+  // Build perDay[day][gameKey] = volume
+  const perDay: Record<string, Record<string, number>> = {};
+
+  for (const row of multiDaily) {
+    if (!perDay[row.day]) perDay[row.day] = {};
+    perDay[row.day][row.game] = Number(row.vol);
+  }
+  for (const { cfg, rows } of chanceDaily) {
+    for (const r of rows) {
+      if (!perDay[r.day]) perDay[r.day] = {};
+      perDay[r.day][cfg.key] = r.wagered;
+    }
+  }
+
+  // Totaux par jeu sur la periode pour identifier top 5
+  const totalByGame: Record<string, number> = {};
+  for (const day of Object.values(perDay)) {
+    for (const [k, v] of Object.entries(day)) {
+      totalByGame[k] = (totalByGame[k] ?? 0) + v;
+    }
+  }
+  const top5keys = Object.entries(totalByGame)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([k]) => k);
+
+  const top5: TopGameMeta[] = top5keys.map((key) => {
+    // Multi game ?
+    const multiMeta = MULTI_GAME_META[key];
+    if (multiMeta) {
+      return { key, label: multiMeta.label, emoji: multiMeta.emoji, color: multiMeta.color };
+    }
+    // Chance game
+    const chanceCfg = ALL_CHANCE_SERVER_GAMES.find((c) => c.key === key);
+    if (chanceCfg) {
+      return { key, label: chanceCfg.label, emoji: chanceCfg.emoji, color: chanceCfg.accentColor };
+    }
+    return { key, label: key, emoji: "🎮", color: "#64748B" };
+  });
 
   // Construit les 30 derniers jours en partant du plus ancien
   const days: string[] = [];
@@ -264,25 +298,13 @@ async function computeDaily30d(): Promise<DailyVolumePoint[]> {
     days.push(d.toISOString().slice(0, 10));
   }
 
-  // Agrege multi par jour
-  const multiByDay: Record<string, Record<string, number>> = {};
-  for (const row of multiDaily) {
-    const day = row.day;
-    if (!multiByDay[day]) multiByDay[day] = {};
-    multiByDay[day][row.game] = Number(row.vol);
-  }
-
   const points: DailyVolumePoint[] = days.map((day) => {
-    const perGame = multiByDay[day] ?? {};
-    const total = Object.values(perGame).reduce((a, b) => a + b, 0);
-    const topGames = Object.entries(perGame)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([key, vol]) => ({ key, volume: vol }));
-    return { date: day, totalCrc: total, topGames };
+    const dayMap = perDay[day] ?? {};
+    const total = Object.values(dayMap).reduce((a, b) => a + b, 0);
+    return { date: day, totalCrc: total, perGame: dayMap };
   });
 
-  return points;
+  return { points, top5 };
 }
 
 /**
@@ -363,7 +385,7 @@ async function getCasinoBank(): Promise<PlatformStats["casinoBank"]> {
  * Entry point: agrege tout en parallele.
  */
 export async function computePlatformStats(): Promise<PlatformStats> {
-  const [casinoBank, period24h, period7d, period30d, allTime, games, daily30d] = await Promise.all([
+  const [casinoBank, period24h, period7d, period30d, allTime, games, dailyData] = await Promise.all([
     getCasinoBank(),
     computePeriodStats(daysAgo(1)),
     computePeriodStats(daysAgo(7)),
@@ -380,6 +402,7 @@ export async function computePlatformStats(): Promise<PlatformStats> {
     period30d,
     allTime,
     games,
-    daily30d,
+    daily30d: dailyData.points,
+    top5Games: dailyData.top5,
   };
 }
