@@ -3,7 +3,7 @@ import { players } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { computeLevel, getLevelName, xpToNextLevel, LEVELS } from "@/lib/xp";
 import { getPlayerBadges } from "@/lib/badges";
-import { getPlayerStats } from "@/lib/multiplayer";
+import { getPlayerStats, getPlayerGamesBreakdown } from "@/lib/multiplayer";
 import PlayerProfileClient from "./client";
 
 const CIRCLES_RPC_URL = process.env.NEXT_PUBLIC_CIRCLES_RPC_URL || "https://rpc.aboutcircles.com/";
@@ -78,7 +78,10 @@ export default async function PlayerPage({
   const name = profile?.name || `${address.slice(0, 6)}…${address.slice(-4)}`;
   const avatar = profile?.imageUrl || null;
   const badgesList = await getPlayerBadges(address);
-  const stats = await getPlayerStats(address);
+  const [stats, gamesBreakdown] = await Promise.all([
+    getPlayerStats(address),
+    getPlayerGamesBreakdown(address),
+  ]);
 
   return (
     <PlayerProfileClient
@@ -94,6 +97,7 @@ export default async function PlayerPage({
       levels={[...LEVELS]}
       badges={badgesList.map(b => ({ ...b, earnedAt: b.earnedAt?.toISOString() ?? null }))}
       stats={stats}
+      gamesBreakdown={gamesBreakdown}
     />
   );
 }

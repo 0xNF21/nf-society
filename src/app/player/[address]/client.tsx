@@ -55,6 +55,22 @@ interface StatsData {
   history: HistoryEntry[];
 }
 
+interface FullGameStat {
+  key: string;
+  label: string;
+  emoji: string;
+  type: "multi" | "chance";
+  played: number;
+  wagered: number;
+  won: number;
+  net: number;
+  winRate?: number;
+  wins?: number;
+  losses?: number;
+  draws?: number;
+  lastPlayedAt: string | null;
+}
+
 interface Props {
   address: string;
   name: string;
@@ -68,6 +84,7 @@ interface Props {
   levels: LevelDef[];
   badges: BadgeData[];
   stats: StatsData;
+  gamesBreakdown: FullGameStat[];
 }
 
 const CATEGORY_ORDER = ["event", "game", "activity", "secret"];
@@ -111,7 +128,7 @@ const RESULT_COLORS: Record<string, string> = {
 };
 
 export default function PlayerProfileClient({
-  address, name, avatar, xp, level, levelName, toNext, progressPct, streak, levels, badges, stats,
+  address, name, avatar, xp, level, levelName, toNext, progressPct, streak, levels, badges, stats, gamesBreakdown,
 }: Props) {
   const { locale } = useLocale();
   const t = translations.playerProfile;
@@ -264,21 +281,32 @@ export default function PlayerProfileClient({
                 </div>
               </div>
 
-              {/* Par jeu */}
-              {stats.byGame.length > 0 && (
+              {/* Par jeu — dynamique (multi + chance), tri activite recente */}
+              {gamesBreakdown.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{t.byGame[locale]}</p>
-                  {stats.byGame.map(g => (
-                    <div key={g.game} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{GAME_ICONS[g.game]}</span>
-                        <span className="text-sm font-semibold text-ink dark:text-white">{GAME_LABELS[g.game]}</span>
+                  {gamesBreakdown.map(g => (
+                    <div key={g.key} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm">{g.emoji}</span>
+                        <span className="text-sm font-semibold text-ink dark:text-white truncate">{g.label}</span>
+                        <span className="text-[9px] uppercase tracking-wider text-ink/30 dark:text-white/30 font-bold">
+                          {g.type}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs">
+                      <div className="flex items-center gap-3 text-xs shrink-0">
                         <span className="text-ink/50">{g.played} {locale === "fr" ? "parties" : "games"}</span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{g.wins}W</span>
-                        <span className="font-bold text-red-500 dark:text-red-400">{g.losses}L</span>
-                        <span className="font-bold text-marine dark:text-blue-400">{g.winRate}%</span>
+                        {g.type === "multi" && g.winRate !== undefined ? (
+                          <>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{g.wins}W</span>
+                            <span className="font-bold text-red-500 dark:text-red-400">{g.losses}L</span>
+                            <span className="font-bold text-marine dark:text-blue-400">{g.winRate}%</span>
+                          </>
+                        ) : (
+                          <span className={`font-bold font-mono ${g.net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                            {g.net >= 0 ? "+" : ""}{g.net} CRC
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}

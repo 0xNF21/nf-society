@@ -9,6 +9,7 @@ import { eq, and, or, desc } from "drizzle-orm";
 import { generateGameCode } from "@/lib/utils";
 import { checkAllNewPayments } from "@/lib/circles";
 import { getServerGameConfig, ALL_SERVER_GAMES } from "@/lib/game-registry-server";
+import { ALL_CHANCE_SERVER_GAMES, getAllChancePlayerStats } from "@/lib/chance-registry-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
@@ -268,6 +269,136 @@ function getResult(winnerAddr: string | null, me: string, gameResult?: string | 
 
 function getOpponent(p1: string | null, p2: string | null, me: string): string | null {
   return p1?.toLowerCase() === me ? p2 : p1;
+}
+
+// ─── FULL BREAKDOWN (multi + chance) ───
+// Donne une ligne par jeu (multi ou chance) ou le joueur a au moins 1 partie.
+// Iteration dynamique sur les 2 registres — un nouveau jeu apparait auto.
+
+export type FullGameStat = {
+  key: string;
+  label: string;
+  emoji: string;
+  type: "multi" | "chance";
+  played: number;
+  wagered: number;
+  won: number;
+  net: number;
+  winRate?: number;
+  wins?: number;
+  losses?: number;
+  draws?: number;
+  lastPlayedAt: string | null; // ISO string
+};
+
+const MULTI_META: Record<string, { label: string; emoji: string }> = {
+  morpion: { label: "Morpion", emoji: "❌⭕" },
+  memory: { label: "Memory", emoji: "🃏" },
+  relics: { label: "Relics", emoji: "⚓" },
+  dames: { label: "Dames", emoji: "♟️" },
+  pfc: { label: "Pierre-Feuille-Ciseaux", emoji: "✊" },
+  "crc-races": { label: "Courses CRC", emoji: "🏇" },
+};
+
+async function getMultiGameBreakdown(address: string): Promise<FullGameStat[]> {
+  const addr = address.toLowerCase();
+  const queries = ALL_SERVER_GAMES.map(async (config) => {
+    const rows = await db.select()
+      .from(config.table)
+      .where(
+        and(
+          eq(config.table.status, "finished"),
+          or(
+            eq(config.table.player1Address, addr),
+            eq(config.table.player2Address, addr)
+          )
+        )
+      );
+
+    let played = 0, wins = 0, losses = 0, draws = 0;
+    let wagered = 0, won = 0;
+    let lastDate: Date | null = null;
+
+    for (const g of rows as any[]) {
+      played++;
+      wagered += g.betCrc;
+      const winnerAddr = (g.winnerAddress as string | null)?.toLowerCase();
+      const isDraw = g.result === "draw" || !winnerAddr;
+      const isWin = !isDraw && winnerAddr === addr;
+      const commissionPct = g.commissionPct ?? 5;
+      if (isWin) {
+        wins++;
+        won += Math.floor(g.betCrc * 2 * (1 - commissionPct / 100));
+      } else if (isDraw) {
+        draws++;
+        won += g.betCrc; // supposition : remboursement
+      } else {
+        losses++;
+      }
+      const d = g.updatedAt as Date | null;
+      if (d && (!lastDate || d > lastDate)) lastDate = d;
+    }
+
+    if (played === 0) return null;
+
+    const meta = MULTI_META[config.key] ?? { label: config.key, emoji: "🎮" };
+    const stat: FullGameStat = {
+      key: config.key,
+      label: meta.label,
+      emoji: meta.emoji,
+      type: "multi",
+      played,
+      wagered,
+      won,
+      net: won - wagered,
+      winRate: Math.round((wins / played) * 100),
+      wins,
+      losses,
+      draws,
+      lastPlayedAt: lastDate ? lastDate.toISOString() : null,
+    };
+    return stat;
+  });
+
+  const results = await Promise.all(queries);
+  return results.filter((x): x is FullGameStat => x !== null);
+}
+
+async function getChanceGameBreakdown(address: string): Promise<FullGameStat[]> {
+  const byKey = await getAllChancePlayerStats(address);
+  const lines: FullGameStat[] = [];
+  for (const cfg of ALL_CHANCE_SERVER_GAMES) {
+    const s = byKey[cfg.key];
+    if (!s || s.played === 0) continue;
+    lines.push({
+      key: cfg.key,
+      label: cfg.label,
+      emoji: cfg.emoji,
+      type: "chance",
+      played: s.played,
+      wagered: s.wagered,
+      won: s.won,
+      net: s.net,
+      lastPlayedAt: s.lastPlayedAt ? s.lastPlayedAt.toISOString() : null,
+    });
+  }
+  return lines;
+}
+
+export async function getPlayerGamesBreakdown(address: string): Promise<FullGameStat[]> {
+  const [multi, chance] = await Promise.all([
+    getMultiGameBreakdown(address),
+    getChanceGameBreakdown(address),
+  ]);
+  const all = [...multi, ...chance];
+  // Tri par activite recente (lastPlayedAt desc, null a la fin)
+  all.sort((a, b) => {
+    if (!a.lastPlayedAt && !b.lastPlayedAt) return 0;
+    if (!a.lastPlayedAt) return 1;
+    if (!b.lastPlayedAt) return -1;
+    return new Date(b.lastPlayedAt).getTime() - new Date(a.lastPlayedAt).getTime();
+  });
+  return all;
 }
 
 export async function getPlayerStats(address: string): Promise<PlayerStats> {
