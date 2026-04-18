@@ -52,6 +52,8 @@ export type ChanceGameServerConfig = {
   accentColor: string;
   getAggregate(since?: Date): Promise<ChanceAggregate>;
   getPlayerStats(address: string): Promise<ChancePlayerStats>;
+  // Liste des adresses joueurs distinctes sur la periode (pour dedup cross-games).
+  getPlayerAddresses(since?: Date): Promise<string[]>;
 };
 
 /**
@@ -129,6 +131,16 @@ function createStandardConfig(opts: {
         net: won - wagered,
         lastPlayedAt: row?.lastAt ? new Date(row.lastAt as any) : null,
       };
+    },
+
+    async getPlayerAddresses(since?: Date): Promise<string[]> {
+      const whereClause = since ? gte(dateField, since) : undefined;
+      const rows = await db
+        .select({ addr: addressField })
+        .from(table)
+        .where(whereClause as any)
+        .groupBy(addressField);
+      return rows.map((r: any) => (r.addr as string).toLowerCase());
     },
   };
 }
@@ -239,6 +251,16 @@ const lootboxesConfig: ChanceGameServerConfig = {
       lastPlayedAt: row?.lastAt ? new Date(row.lastAt as any) : null,
     };
   },
+
+  async getPlayerAddresses(since?: Date): Promise<string[]> {
+    const whereClause = since ? gte(lootboxOpens.openedAt, since) : undefined;
+    const rows = await db
+      .select({ addr: lootboxOpens.playerAddress })
+      .from(lootboxOpens)
+      .where(whereClause as any)
+      .groupBy(lootboxOpens.playerAddress);
+    return rows.map((r) => r.addr.toLowerCase());
+  },
 };
 
 export const CHANCE_SERVER_REGISTRY: Record<string, ChanceGameServerConfig> = {
@@ -260,21 +282,33 @@ export const ALL_CHANCE_SERVER_GAMES: ChanceGameServerConfig[] = Object.values(
 
 /**
  * Aggregate sur tous les jeux chance, en parallele.
+ * `players` est deduplique cross-jeux via set d'adresses.
  */
-export async function aggregateAllChance(since?: Date): Promise<ChanceAggregate & { byGame: Record<string, ChanceAggregate> }> {
-  const pairs = await Promise.all(
-    ALL_CHANCE_SERVER_GAMES.map(async (cfg) => [cfg.key, await cfg.getAggregate(since)] as const)
-  );
+export async function aggregateAllChance(since?: Date): Promise<
+  ChanceAggregate & { byGame: Record<string, ChanceAggregate>; uniqueAddresses: Set<string> }
+> {
+  const [aggPairs, addressLists] = await Promise.all([
+    Promise.all(
+      ALL_CHANCE_SERVER_GAMES.map(async (cfg) => [cfg.key, await cfg.getAggregate(since)] as const)
+    ),
+    Promise.all(ALL_CHANCE_SERVER_GAMES.map((cfg) => cfg.getPlayerAddresses(since))),
+  ]);
+
   const byGame: Record<string, ChanceAggregate> = {};
-  let wagered = 0, paidOut = 0, rounds = 0, players = 0;
-  for (const [key, agg] of pairs) {
+  let wagered = 0, paidOut = 0, rounds = 0;
+  for (const [key, agg] of aggPairs) {
     byGame[key] = agg;
     wagered += agg.wagered;
     paidOut += agg.paidOut;
     rounds += agg.rounds;
-    players += agg.players; // note: pas deduplique cross-jeux ici (approximation)
   }
-  return { wagered, paidOut, rounds, players, byGame };
+
+  const uniqueAddresses = new Set<string>();
+  for (const list of addressLists) {
+    for (const addr of list) uniqueAddresses.add(addr);
+  }
+
+  return { wagered, paidOut, rounds, players: uniqueAddresses.size, byGame, uniqueAddresses };
 }
 
 export async function getAllChancePlayerStats(

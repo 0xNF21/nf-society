@@ -82,28 +82,41 @@ function daysAgo(n: number): Date {
 /**
  * Agrege les paiements multi (via claimedPayments).
  * claimedPayments.amountCrc = mise de CHAQUE joueur (pas le pot). gameType = key du jeu multi.
- * Pour chaque jeu multi on fait 1 ligne par paiement confirme.
+ * Une partie multi = 2 paiements (un par joueur). Donc :
+ *   - wagered = SUM(amountCrc)           (total effectivement misé par les joueurs)
+ *   - rounds  = COUNT(DISTINCT gameId)   (parties reelles)
+ *   - players = COUNT(DISTINCT address)  (joueurs uniques par jeu, dedup cross-jeux fait ailleurs)
  */
 async function multiAggregate(since?: Date): Promise<{
   total: PeriodStats;
   byGame: Record<string, PeriodStats>;
+  uniqueAddresses: Set<string>;
 }> {
   const multiKeys = ALL_SERVER_GAMES.map((g) => g.key);
   const whereClause = since
     ? and(gte(claimedPayments.claimedAt, since), inArray(claimedPayments.gameType, multiKeys))
     : inArray(claimedPayments.gameType, multiKeys);
 
-  // Wagered par jeu
+  // Wagered par jeu + COUNT DISTINCT gameId pour avoir les vrais parties
   const wageredRows = await db
     .select({
       gameType: claimedPayments.gameType,
       wagered: sql<number>`COALESCE(SUM(${claimedPayments.amountCrc}), 0)`,
       players: sql<number>`COUNT(DISTINCT ${claimedPayments.playerAddress})`,
-      rounds: sql<number>`COUNT(*)`,
+      rounds: sql<number>`COUNT(DISTINCT ${claimedPayments.gameId})`,
     })
     .from(claimedPayments)
     .where(whereClause)
     .groupBy(claimedPayments.gameType);
+
+  // Collect toutes les adresses distinctes (pour dedup cross-jeux plus haut)
+  const addressRows = await db
+    .select({ address: claimedPayments.playerAddress })
+    .from(claimedPayments)
+    .where(whereClause)
+    .groupBy(claimedPayments.playerAddress);
+
+  const uniqueAddresses = new Set<string>(addressRows.map((r) => r.address.toLowerCase()));
 
   // Payouts par jeu (depuis payouts table)
   const paidWhere = since
@@ -147,13 +160,14 @@ async function multiAggregate(since?: Date): Promise<{
       wagered: acc.wagered + g.wagered,
       paidOut: acc.paidOut + g.paidOut,
       rounds: acc.rounds + g.rounds,
-      players: acc.players + g.players,
+      players: 0, // remplace apres par uniqueAddresses.size
       profit: acc.profit + g.profit,
     }),
     { wagered: 0, paidOut: 0, rounds: 0, players: 0, profit: 0 }
   );
+  total.players = uniqueAddresses.size;
 
-  return { total, byGame };
+  return { total, byGame, uniqueAddresses };
 }
 
 async function chanceAggregate(since?: Date) {
@@ -175,7 +189,7 @@ async function chanceAggregate(since?: Date) {
       profit: v.wagered - v.paidOut,
     };
   }
-  return { total, byGame };
+  return { total, byGame, uniqueAddresses: data.uniqueAddresses };
 }
 
 async function computePeriodStats(since?: Date): Promise<PeriodStats> {
@@ -183,11 +197,16 @@ async function computePeriodStats(since?: Date): Promise<PeriodStats> {
     multiAggregate(since),
     chanceAggregate(since),
   ]);
+  // Dedup des joueurs uniques cross-jeux (multi + chance)
+  const allPlayers = new Set<string>();
+  for (const a of multi.uniqueAddresses) allPlayers.add(a);
+  for (const a of chance.uniqueAddresses) allPlayers.add(a);
+
   return {
     wagered: multi.total.wagered + chance.total.wagered,
     paidOut: multi.total.paidOut + chance.total.paidOut,
     rounds: multi.total.rounds + chance.total.rounds,
-    players: multi.total.players + chance.total.players, // approximatif (pas dedup cross-games)
+    players: allPlayers.size,
     profit: multi.total.profit + chance.total.profit,
   };
 }
