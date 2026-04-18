@@ -1,21 +1,26 @@
 import { Bot } from "grammy";
 
-// Instance grammy singleton reutilisable.
-// Les handlers sont enregistres au moment du webhook (registerHandlers).
+// Instance grammy singleton lazy. On n'instancie qu'a la premiere utilisation
+// (runtime), sinon le build Vercel echoue pendant la collecte de page data car
+// les env vars ne sont pas toujours disponibles a ce moment-la.
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
-const adminChatRaw = process.env.TELEGRAM_ADMIN_CHAT_ID;
+let _bot: Bot | null = null;
+let _adminChatId: number | null = null;
 
-if (!token) {
-  throw new Error("TELEGRAM_BOT_TOKEN missing in env");
+export function getBot(): Bot {
+  if (_bot) return _bot;
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) throw new Error("TELEGRAM_BOT_TOKEN missing in env");
+  _bot = new Bot(token);
+  return _bot;
 }
-if (!adminChatRaw) {
-  throw new Error("TELEGRAM_ADMIN_CHAT_ID missing in env");
-}
 
-export const bot = new Bot(token);
-export const ADMIN_CHAT_ID = Number(adminChatRaw);
-
-if (Number.isNaN(ADMIN_CHAT_ID)) {
-  throw new Error("TELEGRAM_ADMIN_CHAT_ID must be a number");
+export function getAdminChatId(): number {
+  if (_adminChatId !== null) return _adminChatId;
+  const raw = process.env.TELEGRAM_ADMIN_CHAT_ID;
+  if (!raw) throw new Error("TELEGRAM_ADMIN_CHAT_ID missing in env");
+  const n = Number(raw);
+  if (Number.isNaN(n)) throw new Error("TELEGRAM_ADMIN_CHAT_ID must be a number");
+  _adminChatId = n;
+  return _adminChatId;
 }

@@ -2,7 +2,7 @@ import { Bot, Context, InlineKeyboard } from "grammy";
 import { db } from "@/lib/db";
 import { supportMessages } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { ADMIN_CHAT_ID } from "./bot";
+import { getAdminChatId } from "./bot";
 import { decodeStartContext, formatAdminHeader, TelegramStartContext, SupportType } from "./context";
 
 // Cache en memoire court pour le contexte `start` fourni par l'user au 1er message.
@@ -43,6 +43,8 @@ function gcPendingContext() {
 }
 
 export function registerHandlers(b: Bot) {
+  const ADMIN_CHAT_ID = getAdminChatId();
+
   // /start [payload] — l'user arrive via le deep link du bouton Support.
   b.command("start", async (ctx) => {
     const payload = ctx.match?.trim();
@@ -222,6 +224,8 @@ async function handleUserMessage(ctx: Context) {
   const from = ctx.from;
   const msg = ctx.message;
   if (!from || !msg) return;
+
+  const ADMIN_CHAT_ID = getAdminChatId();
 
   // Recupere contexte du /start si c'est le premier vrai message.
   const pending = pendingStartContext.get(from.id);
