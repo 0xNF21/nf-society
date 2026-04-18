@@ -30,10 +30,10 @@ export type GameStatLine = {
   label: string;
   emoji: string;
   category: "multi" | "chance";
-  wagered30d: number;
-  paidOut30d: number;
-  rounds30d: number;
-  rtp30d: number | null;  // % (paidOut / wagered) * 100. null si 0 misés
+  wagered: number;
+  paidOut: number;
+  rounds: number;
+  rtp: number | null;  // % (paidOut / wagered) * 100. null si 0 misés
 };
 
 export type DailyVolumePoint = {
@@ -286,13 +286,14 @@ async function computeDaily30d(): Promise<DailyVolumePoint[]> {
 }
 
 /**
- * Breakdown par jeu sur 30 jours (pour la table).
+ * Breakdown par jeu en ALL-TIME (pour la table).
+ * On utilise toute l'historique (pas de filtre since) pour que le RTP
+ * soit statistiquement pertinent meme sur les jeux peu joues.
  */
 async function computeGamesBreakdown(): Promise<GameStatLine[]> {
-  const since = daysAgo(30);
   const [multi, chance] = await Promise.all([
-    multiAggregate(since),
-    chanceAggregate(since),
+    multiAggregate(),   // undefined = all time
+    chanceAggregate(),
   ]);
 
   const lines: GameStatLine[] = [];
@@ -305,10 +306,10 @@ async function computeGamesBreakdown(): Promise<GameStatLine[]> {
       label: meta.label,
       emoji: meta.emoji,
       category: "multi",
-      wagered30d: stats.wagered,
-      paidOut30d: stats.paidOut,
-      rounds30d: stats.rounds,
-      rtp30d: stats.wagered > 0 ? (stats.paidOut / stats.wagered) * 100 : null,
+      wagered: stats.wagered,
+      paidOut: stats.paidOut,
+      rounds: stats.rounds,
+      rtp: stats.wagered > 0 ? (stats.paidOut / stats.wagered) * 100 : null,
     });
   }
 
@@ -320,14 +321,14 @@ async function computeGamesBreakdown(): Promise<GameStatLine[]> {
       label: cfg.label,
       emoji: cfg.emoji,
       category: "chance",
-      wagered30d: stats.wagered,
-      paidOut30d: stats.paidOut,
-      rounds30d: stats.rounds,
-      rtp30d: stats.wagered > 0 ? (stats.paidOut / stats.wagered) * 100 : null,
+      wagered: stats.wagered,
+      paidOut: stats.paidOut,
+      rounds: stats.rounds,
+      rtp: stats.wagered > 0 ? (stats.paidOut / stats.wagered) * 100 : null,
     });
   }
 
-  lines.sort((a, b) => b.wagered30d - a.wagered30d);
+  lines.sort((a, b) => b.wagered - a.wagered);
   return lines;
 }
 

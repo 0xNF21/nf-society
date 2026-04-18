@@ -112,11 +112,11 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
           <Volume30dChart points={daily30d} />
         </div>
 
-        {/* Breakdown par jeu */}
+        {/* Breakdown par jeu - all time */}
         <div className="rounded-2xl bg-white/70 dark:bg-white/5 backdrop-blur-sm border border-ink/10 dark:border-white/10 shadow-sm p-6">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-ink/40 dark:text-white/40 mb-4">
             <Gamepad2 className="h-4 w-4" />
-            {t.byGame[locale]} ({t.last30d[locale]})
+            {t.byGame[locale]} ({t.allTime[locale]})
           </div>
           {games.length === 0 ? (
             <p className="text-sm text-ink/40 dark:text-white/40 italic">
@@ -144,13 +144,13 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
                         </span>
                       </td>
                       <td className="py-3 text-right font-mono text-ink dark:text-white">
-                        {formatCrc(g.wagered30d, 0)}
+                        {formatCrc(g.wagered, 0)}
                       </td>
                       <td className="py-3 text-right font-mono text-ink/60 dark:text-white/60">
-                        {formatCrc(g.rounds30d, 0)}
+                        {formatCrc(g.rounds, 0)}
                       </td>
                       <td className="py-3 text-right font-mono text-ink/60 dark:text-white/60">
-                        {formatPct(g.rtp30d)}
+                        {formatPct(g.rtp)}
                       </td>
                     </tr>
                   ))}
