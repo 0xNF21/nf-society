@@ -4,7 +4,7 @@
  * Rules:
  * - Player picks heads or tails
  * - Fair coin flip (crypto-secure on server, Math.random on client/demo)
- * - Win pays 1.96x (RTP 98%, house edge 2%)
+ * - Win pays 1.98x (RTP 99%, house edge 1%)
  */
 
 // ── Types ──────────────────────────────────────────────
@@ -21,8 +21,8 @@ export type CoinFlipResult = {
 
 // ── Constants ──────────────────────────────────────────
 
-/** Win multiplier: 1.96x → RTP 98% (50% * 1.96 = 0.98) */
-export const PAYOUT_MULTIPLIER = 1.96;
+/** Win multiplier: 1.98x → RTP 99% (50% * 1.98 = 0.99) */
+export const PAYOUT_MULTIPLIER = 1.98;
 
 // ── Functions ──────────────────────────────────────────
 

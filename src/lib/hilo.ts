@@ -6,9 +6,9 @@
  * - Card values: A=1, 2-10=face value, J=11, Q=12, K=13
  * - Player guesses if next card is higher or lower
  * - Equal card = loss (house edge source)
- * - Dynamic multiplier per round: (13 / winning_outcomes) * 0.97
+ * - Dynamic multiplier per round: (13 / winning_outcomes) * 0.98
  * - Cash out after minimum 1 correct prediction
- * - RTP ~97% (3% house edge)
+ * - RTP ~98% (2% house edge)
  */
 
 // ── Types ──────────────────────────────────────────────
@@ -57,8 +57,8 @@ export type VisibleState = {
 
 // ── Constants ──────────────────────────────────────────
 
-/** House edge factor: 0.97 = 3% edge → RTP ~97% */
-const HOUSE_EDGE_FACTOR = 0.97;
+/** House edge factor: 0.98 = 2% edge → RTP ~98% */
+const HOUSE_EDGE_FACTOR = 0.98;
 
 const RANKS: Rank[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const SUITS: Suit[] = ["hearts", "diamonds", "clubs", "spades"];

@@ -696,7 +696,7 @@ export const translations = {
     lootboxTitle: { fr: "Lootboxes", en: "Lootboxes" },
     lootboxDesc: { fr: "Ouvrez des lootboxes pour gagner des CRC.", en: "Open lootboxes to win CRC." },
     coinFlipTitle: { fr: "Pile ou Face", en: "Coin Flip" },
-    coinFlipDesc: { fr: "Pile ou face, 50/50, RTP 98%.", en: "Heads or tails, 50/50, 98% RTP." },
+    coinFlipDesc: { fr: "Pile ou face, 50/50, RTP 99%.", en: "Heads or tails, 50/50, 99% RTP." },
     hiloTitle: { fr: "Hi-Lo", en: "Hi-Lo" },
     hiloDesc: { fr: "Devinez si la prochaine carte est plus haute ou plus basse.", en: "Guess if the next card is higher or lower." },
     minesTitle: { fr: "Mines", en: "Mines" },
@@ -952,7 +952,7 @@ export const translations = {
   },
   coinFlip: {
     title: { fr: "Pile ou Face", en: "Coin Flip" },
-    subtitle: { fr: "Choisissez pile ou face, misez vos CRC. RTP 98%.", en: "Pick heads or tails, bet your CRC. 98% RTP." },
+    subtitle: { fr: "Choisissez pile ou face, misez vos CRC. RTP 99%.", en: "Pick heads or tails, bet your CRC. 99% RTP." },
     chooseBet: { fr: "Choisir la mise", en: "Choose bet" },
     pickSide: { fr: "Choisir un cote", en: "Pick a side" },
     heads: { fr: "Pile", en: "Heads" },
@@ -966,7 +966,7 @@ export const translations = {
     tables: { fr: "Tables", en: "Tables" },
     noTables: { fr: "Aucune table disponible", en: "No tables available" },
     payout: { fr: "Gain", en: "Payout" },
-    rtp: { fr: "Retour au joueur : 98%", en: "Return to player: 98%" },
+    rtp: { fr: "Retour au joueur : 99%", en: "Return to player: 99%" },
   },
   mines: {
     title: { fr: "Mines", en: "Mines" },
@@ -1079,7 +1079,7 @@ export const translations = {
   },
   hiLo: {
     title: { fr: "Hi-Lo", en: "Hi-Lo" },
-    subtitle: { fr: "Devinez si la prochaine carte est plus haute ou plus basse. RTP ~97%.", en: "Guess if the next card is higher or lower. ~97% RTP." },
+    subtitle: { fr: "Devinez si la prochaine carte est plus haute ou plus basse. RTP ~98%.", en: "Guess if the next card is higher or lower. ~98% RTP." },
     chooseBet: { fr: "Choisir la mise", en: "Choose bet" },
     higher: { fr: "Plus haute", en: "Higher" },
     lower: { fr: "Plus basse", en: "Lower" },
@@ -1104,7 +1104,7 @@ export const translations = {
     roundMultiplier: { fr: "x{value} ce tour", en: "x{value} this round" },
     impossible: { fr: "Impossible", en: "Impossible" },
     payout: { fr: "Gain potentiel", en: "Potential payout" },
-    rtp: { fr: "Retour au joueur : ~97%", en: "Return to player: ~97%" },
+    rtp: { fr: "Retour au joueur : ~98%", en: "Return to player: ~98%" },
   },
   keno: {
     title: { fr: "Keno", en: "Keno" },
