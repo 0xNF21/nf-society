@@ -246,6 +246,18 @@ export const shopSessions = pgTable("shop_sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const privacySettings = pgTable("privacy_settings", {
+  address:             text("address").primaryKey(),
+  hidePnl:             boolean("hide_pnl").notNull().default(false),
+  hideTotalBet:        boolean("hide_total_bet").notNull().default(false),
+  hideXpSpent:         boolean("hide_xp_spent").notNull().default(false),
+  hideGameHistory:     boolean("hide_game_history").notNull().default(false),
+  hideFromLeaderboard: boolean("hide_from_leaderboard").notNull().default(false),
+  hideFromSearch:      boolean("hide_from_search").notNull().default(false),
+  updatedAt:           timestamp("updated_at").defaultNow().notNull(),
+});
+export type PrivacySettings = typeof privacySettings.$inferSelect;
+
 export const shopItems = pgTable("shop_items", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),

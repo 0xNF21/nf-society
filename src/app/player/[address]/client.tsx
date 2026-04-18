@@ -55,6 +55,15 @@ interface StatsData {
   history: HistoryEntry[];
 }
 
+interface PrivacyFlags {
+  hidePnl: boolean;
+  hideTotalBet: boolean;
+  hideXpSpent: boolean;
+  hideGameHistory: boolean;
+  hideFromLeaderboard: boolean;
+  hideFromSearch: boolean;
+}
+
 interface Props {
   address: string;
   name: string;
@@ -68,6 +77,7 @@ interface Props {
   levels: LevelDef[];
   badges: BadgeData[];
   stats: StatsData;
+  privacy?: PrivacyFlags;
 }
 
 const CATEGORY_ORDER = ["event", "game", "activity", "secret"];
@@ -111,10 +121,14 @@ const RESULT_COLORS: Record<string, string> = {
 };
 
 export default function PlayerProfileClient({
-  address, name, avatar, xp, level, levelName, toNext, progressPct, streak, levels, badges, stats,
+  address, name, avatar, xp, level, levelName, toNext, progressPct, streak, levels, badges, stats, privacy,
 }: Props) {
   const { locale } = useLocale();
   const t = translations.playerProfile;
+  const tp = translations.privacy;
+  const hidePnl = privacy?.hidePnl ?? false;
+  const hideTotalBet = privacy?.hideTotalBet ?? false;
+  const hideGameHistory = privacy?.hideGameHistory ?? false;
 
   const supremeBadge = badges.find(b => b.slug === "supreme_founder" && b.earned);
   const otherBadges = badges.filter(b => b.slug !== "supreme_founder");
@@ -254,12 +268,20 @@ export default function PlayerProfileClient({
               {/* CRC misés / gagnés */}
               <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
                 <div className="text-center flex-1">
-                  <p className="text-sm font-black text-ink dark:text-white">{stats.totalBet} CRC</p>
+                  {hideTotalBet ? (
+                    <p className="text-sm font-black text-ink/40">🔒 {tp.private[locale]}</p>
+                  ) : (
+                    <p className="text-sm font-black text-ink dark:text-white">{stats.totalBet} CRC</p>
+                  )}
                   <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.crcBet[locale]}</p>
                 </div>
                 <div className="w-px h-8 bg-ink/10" />
                 <div className="text-center flex-1">
-                  <p className={`text-sm font-black ${stats.totalWon >= stats.totalBet ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>{stats.totalWon} CRC</p>
+                  {hidePnl ? (
+                    <p className="text-sm font-black text-ink/40">🔒 {tp.private[locale]}</p>
+                  ) : (
+                    <p className={`text-sm font-black ${stats.totalWon >= stats.totalBet ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>{stats.totalWon} CRC</p>
+                  )}
                   <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.crcWon[locale]}</p>
                 </div>
               </div>
@@ -286,7 +308,11 @@ export default function PlayerProfileClient({
               )}
 
               {/* Historique récent */}
-              {stats.history.length > 0 && (
+              {hideGameHistory ? (
+                <div className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
+                  <span className="text-xs text-ink/40">🔒 {tp.historyHidden[locale]}</span>
+                </div>
+              ) : stats.history.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{t.recentHistory[locale]}</p>
                   <div className="space-y-1.5 max-h-80 overflow-y-auto">
