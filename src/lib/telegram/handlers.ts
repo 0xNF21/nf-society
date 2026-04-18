@@ -86,6 +86,91 @@ export function registerHandlers(b: Bot) {
     await ctx.answerCallbackQuery();
   });
 
+  // /clear (admin only) — supprime tous les messages du bot dans le groupe admin
+  // et vide la table support_messages. Demande confirmation avant execution.
+  b.command("clear", async (ctx) => {
+    if (ctx.chat.id !== ADMIN_CHAT_ID) return;
+    const keyboard = new InlineKeyboard()
+      .text("\u2705 Oui, tout supprimer", "clear:confirm")
+      .text("\u274C Annuler", "clear:cancel");
+    await ctx.reply(
+      "Supprimer TOUS les messages de support ?\n" +
+      "- Messages du bot dans ce groupe (< 48h)\n" +
+      "- Historique complet en DB (support_messages)",
+      { reply_markup: keyboard }
+    );
+  });
+
+  b.callbackQuery("clear:cancel", async (ctx) => {
+    if (ctx.chat?.id !== ADMIN_CHAT_ID) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    try {
+      await ctx.editMessageText("Annule.");
+    } catch {}
+    await ctx.answerCallbackQuery();
+  });
+
+  b.callbackQuery("clear:confirm", async (ctx) => {
+    if (ctx.chat?.id !== ADMIN_CHAT_ID) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    await ctx.answerCallbackQuery({ text: "Suppression en cours..." });
+
+    // Recupere tous les adminMessageId distincts pour les supprimer du groupe.
+    const rows = await db
+      .select({ id: supportMessages.adminMessageId })
+      .from(supportMessages);
+    const ids = Array.from(new Set(rows.map((r) => r.id).filter((id): id is number => !!id)));
+
+    let deleted = 0;
+    let errors = 0;
+
+    // Batch jusqu'a 100 messages par appel deleteMessages.
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      try {
+        await ctx.api.deleteMessages(ADMIN_CHAT_ID, batch);
+        deleted += batch.length;
+      } catch {
+        // fallback : one-by-one pour ce batch (certains trop vieux seront ignores)
+        for (const id of batch) {
+          try {
+            await ctx.api.deleteMessage(ADMIN_CHAT_ID, id);
+            deleted++;
+          } catch {
+            errors++;
+          }
+        }
+      }
+    }
+
+    // Clear la DB
+    let dbCleared = 0;
+    try {
+      const all = await db.select({ id: supportMessages.id }).from(supportMessages);
+      dbCleared = all.length;
+      await db.delete(supportMessages);
+    } catch (err) {
+      console.error("[telegram] db clear error:", err);
+    }
+
+    // Supprime le message de confirmation lui-meme
+    try {
+      await ctx.deleteMessage();
+    } catch {}
+
+    await ctx.api.sendMessage(
+      ADMIN_CHAT_ID,
+      `\u2705 Nettoyage termine\n` +
+      `- Messages supprimes : ${deleted}\n` +
+      `- Erreurs (trop vieux ou deja supprimes) : ${errors}\n` +
+      `- Lignes DB supprimees : ${dbCleared}`
+    );
+  });
+
   // Catch-all pour tous types de messages (texte, photo, video, voice, document, sticker...).
   b.on("message", async (ctx) => {
     try {

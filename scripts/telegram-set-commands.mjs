@@ -34,25 +34,42 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
+const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
 if (!token) {
   console.error("Missing TELEGRAM_BOT_TOKEN in env");
   process.exit(1);
 }
+if (!adminChatId) {
+  console.error("Missing TELEGRAM_ADMIN_CHAT_ID in env");
+  process.exit(1);
+}
 
-// Default (EN) = langue de fallback.
-const COMMANDS_DEFAULT = [
+// Commandes user (EN par defaut, FR en locale override).
+const COMMANDS_USER_DEFAULT = [
   { command: "start", description: "Start support" },
   { command: "menu", description: "Pick a category" },
 ];
 
-const COMMANDS_FR = [
+const COMMANDS_USER_FR = [
   { command: "start", description: "Demarrer le support" },
   { command: "menu", description: "Choisir une categorie" },
 ];
 
-async function setCommands(commands, languageCode) {
+// Commandes visibles UNIQUEMENT dans le groupe admin (ajoutent /clear).
+const COMMANDS_ADMIN_DEFAULT = [
+  ...COMMANDS_USER_DEFAULT,
+  { command: "clear", description: "Delete all support messages + DB" },
+];
+
+const COMMANDS_ADMIN_FR = [
+  ...COMMANDS_USER_FR,
+  { command: "clear", description: "Supprimer tous les messages + DB" },
+];
+
+async function setCommands(commands, opts = {}) {
   const body = { commands };
-  if (languageCode) body.language_code = languageCode;
+  if (opts.languageCode) body.language_code = opts.languageCode;
+  if (opts.scope) body.scope = opts.scope;
 
   const res = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
     method: "POST",
@@ -61,21 +78,37 @@ async function setCommands(commands, languageCode) {
   });
   const data = await res.json();
   if (!data.ok) {
-    console.error(`setMyCommands failed (lang=${languageCode || "default"}):`, data);
+    console.error(`setMyCommands failed (${JSON.stringify(opts)}):`, data);
     process.exit(1);
   }
-  console.log(`OK setMyCommands (lang=${languageCode || "default"})`);
+  console.log(`OK setMyCommands ${JSON.stringify(opts) || "default"}`);
 }
 
-// Enregistre default (EN) puis FR.
-await setCommands(COMMANDS_DEFAULT);
-await setCommands(COMMANDS_FR, "fr");
+// Scope global : applique a tous les chats sauf scopes plus specifiques.
+await setCommands(COMMANDS_USER_DEFAULT);
+await setCommands(COMMANDS_USER_FR, { languageCode: "fr" });
+
+// Scope groupe admin : ajoute /clear visible uniquement dans ce chat.
+const adminScope = { type: "chat", chat_id: Number(adminChatId) };
+await setCommands(COMMANDS_ADMIN_DEFAULT, { scope: adminScope });
+await setCommands(COMMANDS_ADMIN_FR, { scope: adminScope, languageCode: "fr" });
 
 // Verifie
-console.log("\nVerification :");
-for (const lang of [undefined, "fr", "en"]) {
+console.log("\nVerification global :");
+for (const lang of [undefined, "fr"]) {
   const url = new URL(`https://api.telegram.org/bot${token}/getMyCommands`);
   if (lang) url.searchParams.set("language_code", lang);
   const data = await fetch(url).then((r) => r.json());
+  console.log(`  lang=${lang || "default"} :`, JSON.stringify(data.result));
+}
+console.log("\nVerification admin group :");
+for (const lang of [undefined, "fr"]) {
+  const body = { scope: adminScope };
+  if (lang) body.language_code = lang;
+  const data = await fetch(`https://api.telegram.org/bot${token}/getMyCommands`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then((r) => r.json());
   console.log(`  lang=${lang || "default"} :`, JSON.stringify(data.result));
 }
