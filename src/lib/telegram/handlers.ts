@@ -1,15 +1,39 @@
-import { Bot, Context } from "grammy";
+import { Bot, Context, InlineKeyboard } from "grammy";
 import { db } from "@/lib/db";
 import { supportMessages } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ADMIN_CHAT_ID } from "./bot";
-import { decodeStartContext, formatAdminHeader, TelegramStartContext } from "./context";
+import { decodeStartContext, formatAdminHeader, TelegramStartContext, SupportType } from "./context";
 
 // Cache en memoire court pour le contexte `start` fourni par l'user au 1er message.
 // Telegram n'expose pas le param start apres l'echange initial, donc on le stocke
 // le temps que l'user envoie son premier "vrai" message.
 // Cold-start proof car on persiste sur le 1er message en DB (context jsonb).
 const pendingStartContext = new Map<number, { ctx: TelegramStartContext; at: number }>();
+
+function buildMenuKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text("\uD83D\uDC1B Bug", "type:bug")
+    .text("\uD83D\uDCA1 Suggestion", "type:suggestion")
+    .row()
+    .text("\u2753 Question", "type:question")
+    .text("\uD83D\uDCAC Autre", "type:other");
+}
+
+const TYPE_PROMPTS: Record<SupportType, string> = {
+  bug: "\uD83D\uDC1B Decris ton bug : ce qui s'est passe, ce que tu faisais, et la page si possible. Tu peux aussi envoyer une capture d'ecran.",
+  suggestion: "\uD83D\uDCA1 Partage ton idee ou suggestion :",
+  question: "\u2753 Pose ta question :",
+  other: "\uD83D\uDCAC Explique ce qui t'amene :",
+};
+
+function setPendingType(userId: number, type: SupportType) {
+  const existing = pendingStartContext.get(userId);
+  pendingStartContext.set(userId, {
+    ctx: { ...(existing?.ctx ?? {}), type },
+    at: Date.now(),
+  });
+}
 
 function gcPendingContext() {
   const now = Date.now();
@@ -34,10 +58,32 @@ export function registerHandlers(b: Bot) {
 
     await ctx.reply(
       "Bienvenue sur le support NF Society\n\n" +
-      "Decris ton probleme ou ta question (texte, photo, video, voice...). " +
-      "Un admin te repondra ici des que possible.\n\n" +
-      "Welcome to NF Society support — describe your issue (text, photo, video, voice...) and an admin will reply here."
+      "Que veux-tu signaler ? Choisis une categorie, ou ecris directement ton message.\n\n" +
+      "Welcome to NF Society support — pick a category below or just write your message.",
+      { reply_markup: buildMenuKeyboard() }
     );
+  });
+
+  // /menu : re-affiche les boutons de categorie (pour changer de type plus tard).
+  b.command("menu", async (ctx) => {
+    if (ctx.chat.type !== "private") return;
+    await ctx.reply("Choisis une categorie :", { reply_markup: buildMenuKeyboard() });
+  });
+
+  // Callback sur les boutons inline de type.
+  b.callbackQuery(/^type:(bug|suggestion|question|other)$/, async (ctx) => {
+    const type = ctx.match![1] as SupportType;
+    const userId = ctx.from?.id;
+    if (userId) {
+      setPendingType(userId, type);
+    }
+    try {
+      await ctx.editMessageText(TYPE_PROMPTS[type]);
+    } catch {
+      // si on ne peut pas editer (message trop vieux), on envoie un nouveau reply
+      await ctx.reply(TYPE_PROMPTS[type]);
+    }
+    await ctx.answerCallbackQuery();
   });
 
   // Catch-all pour tous types de messages (texte, photo, video, voice, document, sticker...).
@@ -103,6 +149,7 @@ async function handleUserMessage(ctx: Context) {
     userId: from.id,
     walletAddress: startCtx?.wallet,
     page: startCtx?.page,
+    type: startCtx?.type,
   });
 
   const contentLabel = describeMessageContent(msg as any);
