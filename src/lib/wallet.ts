@@ -40,7 +40,18 @@ export async function getBalance(address: string): Promise<number> {
   return row?.balanceCrc ?? 0;
 }
 
-export type CreditKind = "topup" | "prize" | "cashout-refund";
+export type CreditKind = "topup" | "prize" | "commission" | "cashout-refund";
+
+/**
+ * Pseudo-address used to track the DAO's accumulated commission. This is NOT
+ * a real wallet — nothing ever signs on-chain for it. It's just a row in the
+ * players table that aggregates all commission fees withheld from game wins,
+ * so the invariant `sum(players.balance_crc) == Safe_onchain_balance` holds.
+ *
+ * Overridable via env for prod tuning, defaults to a recognizable sentinel.
+ */
+export const DAO_TREASURY_ADDRESS =
+  (process.env.DAO_TREASURY_ADDRESS || "0x000000000000000000000000000000000000da00").toLowerCase();
 
 export type CreditOpts = {
   kind: CreditKind;
@@ -317,6 +328,60 @@ export async function payGameFromBalance(
     const normalized = colon > 0 && colon < 30 ? msg.slice(colon + 1) : msg;
     return { ok: false, error: normalized || "transaction_failed" };
   }
+}
+
+/**
+ * Credit a player who won a game. Thin wrapper over creditWallet that
+ * encodes a deterministic, unique `txHash` (format `prize:{gameType}:{gameRef}`)
+ * so a retry or double-call lands as `skipped: duplicate_txhash` instead of
+ * double-paying the winner.
+ *
+ * `gameRef` must uniquely identify the round within its gameType. Examples:
+ * - chance round: `${tableId}-${roundId}` (id is serial, so unique globally
+ *   within the game's table)
+ * - multi game: `${slug}` (game slug is unique)
+ */
+export async function creditPrize(
+  winnerAddress: string,
+  amountCrc: number,
+  ref: { gameType: string; gameSlug: string; gameRef: string },
+): Promise<CreditResult> {
+  if (amountCrc <= 0) {
+    // Nothing to credit — treat as no-op success.
+    return { ok: true, balanceAfter: 0, ledgerId: 0 } as any;
+  }
+  return creditWallet(winnerAddress, amountCrc, {
+    kind: "prize",
+    reason: `Prize ${ref.gameType} ${ref.gameSlug}`,
+    txHash: `prize:${ref.gameType}:${ref.gameRef}`,
+    gameType: ref.gameType,
+    gameSlug: ref.gameSlug,
+  });
+}
+
+/**
+ * Credit the DAO treasury for a commission fee on a game. Same idempotency
+ * pattern as creditPrize — unique `txHash` of the form
+ * `commission:{gameType}:{gameRef}` guarantees no double-counting.
+ *
+ * The DAO_TREASURY_ADDRESS is a pseudo-address (see constant above). Nothing
+ * signs on-chain for it; it's purely a DB row that aggregates commission so
+ * the invariant `sum(players.balance_crc) == Safe_onchain_balance` holds.
+ */
+export async function creditCommission(
+  amountCrc: number,
+  ref: { gameType: string; gameSlug: string; gameRef: string },
+): Promise<CreditResult> {
+  if (amountCrc <= 0) {
+    return { ok: true, balanceAfter: 0, ledgerId: 0 } as any;
+  }
+  return creditWallet(DAO_TREASURY_ADDRESS, amountCrc, {
+    kind: "commission",
+    reason: `Commission ${ref.gameType} ${ref.gameSlug}`,
+    txHash: `commission:${ref.gameType}:${ref.gameRef}`,
+    gameType: ref.gameType,
+    gameSlug: ref.gameSlug,
+  });
 }
 
 /**
