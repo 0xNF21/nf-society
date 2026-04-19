@@ -1258,6 +1258,7 @@ export const translations = {
     txSuccess: { fr: "Paiement envoy\u00e9 !", en: "Payment sent!" },
     rejected: { fr: "Paiement refus\u00e9", en: "Payment rejected" },
     connected: { fr: "Connect\u00e9", en: "Connected" },
+    preparing: { fr: "Pr\u00e9paration...", en: "Preparing..." },
   },
   support: {
     buttonTooltip: {

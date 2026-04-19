@@ -323,13 +323,14 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const lastFinishedHandRef = useRef<number | null>(null);
   const [restoring, setRestoring] = useState(true);
 
-  // Restore active hand on mount (after page refresh)
+  // Restore active hand on mount (after page refresh) — re-runs when token becomes available after SSR hydration
+  const tokenValue = tokenRef.current;
   useEffect(() => {
-    if (!tokenRef.current) { setRestoring(false); return; }
+    if (!tokenValue) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/blackjack/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/blackjack/active?tableSlug=${table.slug}&token=${tokenValue}`);
         const data = await res.json();
         if (data.hand && active) {
           setHandId(data.hand.id);
@@ -339,7 +340,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
       if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug]);
+  }, [table.slug, tokenValue]);
 
   const dataValue = encodeGameData({ game: "blackjack", id: table.slug, v: 1, t: tokenRef.current || undefined });
 

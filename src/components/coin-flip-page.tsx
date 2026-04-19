@@ -283,13 +283,14 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
 
   const betOptions = table.betOptions as number[];
 
-  // Restore recent result on mount
+  // Restore recent result on mount — re-runs when token becomes available after SSR hydration
+  const tokenValue = tokenRef.current;
   useEffect(() => {
-    if (!tokenRef.current) { setRestoring(false); return; }
+    if (!tokenValue) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/coin-flip/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/coin-flip/active?tableSlug=${table.slug}&token=${tokenValue}`);
         const data = await res.json();
         if (data.result && active) {
           setResult(data.result);
@@ -299,7 +300,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
       if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug]);
+  }, [table.slug, tokenValue]);
 
   // Fetch player profile when result available
   useEffect(() => {

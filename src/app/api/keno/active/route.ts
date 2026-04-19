@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { kenoRounds, kenoTables } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { getVisibleState } from "@/lib/keno";
 import type { KenoState } from "@/lib/keno";
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         and(
           eq(kenoRounds.tableId, table.id),
           eq(kenoRounds.playerToken, token),
-          eq(kenoRounds.status, "playing"),
+          ne(kenoRounds.status, "finished"),
         )
       )
       .orderBy(desc(kenoRounds.createdAt))

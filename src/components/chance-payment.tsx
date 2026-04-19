@@ -84,12 +84,14 @@ export function ChancePayment({
     return () => { active = false; };
   }, [showQr, paymentLink, isMiniApp]);
 
+  const tokenReady = !!playerToken;
+
   async function handleMiniAppPay() {
+    if (!tokenReady) return;
     setMiniAppPaying(true);
     setMiniAppError(null);
     try {
-      const parts = [gameType, gameId];
-      if (playerToken || ballValue !== undefined) parts.push(playerToken || "");
+      const parts = [gameType, gameId, playerToken!];
       if (ballValue !== undefined && ballValue > 0) parts.push(`bv${ballValue}`);
       const data = parts.join(":");
       await sendPayment(recipientAddress, amountCrc, data);
@@ -132,10 +134,12 @@ export function ChancePayment({
               className="w-full h-12 text-lg font-bold"
               style={{ backgroundColor: accentColor }}
               onClick={handleMiniAppPay}
-              disabled={miniAppPaying}
+              disabled={miniAppPaying || !tokenReady}
             >
               {miniAppPaying ? (
                 <><Loader2 className="h-5 w-5 animate-spin mr-2" />{tm.paying[locale]}</>
+              ) : !tokenReady ? (
+                <><Loader2 className="h-5 w-5 animate-spin mr-2" />{tm.preparing[locale]}</>
               ) : (
                 tm.payBtn[locale].replace("{amount}", String(amountCrc))
               )}
@@ -146,20 +150,31 @@ export function ChancePayment({
       ) : (
         /* -- Standalone mode -- */
         <>
-          <Button
-            className="w-full h-12 text-lg font-bold"
-            style={{ backgroundColor: accentColor }}
-            asChild
-          >
-            <a
-              href={paymentLink}
-              target="_blank"
-              rel="noreferrer"
-              onClick={() => onPaymentInitiated?.()}
+          {tokenReady ? (
+            <Button
+              className="w-full h-12 text-lg font-bold"
+              style={{ backgroundColor: accentColor }}
+              asChild
             >
-              {payLabel}
-            </a>
-          </Button>
+              <a
+                href={paymentLink}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => onPaymentInitiated?.()}
+              >
+                {payLabel}
+              </a>
+            </Button>
+          ) : (
+            <Button
+              className="w-full h-12 text-lg font-bold"
+              style={{ backgroundColor: accentColor }}
+              disabled
+            >
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              {tm.preparing[locale]}
+            </Button>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5">

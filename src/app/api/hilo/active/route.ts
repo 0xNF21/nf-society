@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { hiloRounds, hiloTables } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { getVisibleState } from "@/lib/hilo";
 import type { HiLoState } from "@/lib/hilo";
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         and(
           eq(hiloRounds.tableId, table.id),
           eq(hiloRounds.playerToken, token),
-          eq(hiloRounds.status, "playing"),
+          ne(hiloRounds.status, "finished"),
         )
       )
       .orderBy(desc(hiloRounds.createdAt))

@@ -48,6 +48,7 @@ export function GamePayment({
   const [miniAppSuccess, setMiniAppSuccess] = useState(false);
   const scanRef = useRef<NodeJS.Timeout | null>(null);
 
+  const tokenReady = !!playerToken;
   const paymentLink = generateGamePaymentLink(
     game.recipientAddress,
     game.betCrc,
@@ -103,6 +104,7 @@ export function GamePayment({
 
   // Mini App: pay directly via Circles host wallet
   async function handleMiniAppPay() {
+    if (!tokenReady) return;
     setMiniAppPaying(true);
     setMiniAppError(null);
     try {
@@ -223,10 +225,12 @@ export function GamePayment({
                 className="w-full rounded-xl font-bold"
                 style={{ background: config.accentColor }}
                 onClick={handleMiniAppPay}
-                disabled={miniAppPaying}
+                disabled={miniAppPaying || !tokenReady}
               >
                 {miniAppPaying ? (
                   <><Loader2 className="w-4 h-4 animate-spin mr-2" />{tm.paying[locale]}</>
+                ) : !tokenReady ? (
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />{tm.preparing[locale]}</>
                 ) : (
                   tm.payBtn[locale].replace("{amount}", String(game.betCrc))
                 )}
@@ -250,11 +254,18 @@ export function GamePayment({
           /* ── Standalone mode: QR code + Gnosis link ── */
           <>
             {/* Pay button */}
-            <a href={paymentLink} target="_blank" rel="noreferrer">
-              <Button className="w-full rounded-xl font-bold" style={{ background: config.accentColor }}>
-                {t.payCrc[locale].replace("{bet}", String(game.betCrc))}
+            {tokenReady ? (
+              <a href={paymentLink} target="_blank" rel="noreferrer">
+                <Button className="w-full rounded-xl font-bold" style={{ background: config.accentColor }}>
+                  {t.payCrc[locale].replace("{bet}", String(game.betCrc))}
+                </Button>
+              </a>
+            ) : (
+              <Button className="w-full rounded-xl font-bold" style={{ background: config.accentColor }} disabled>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                {tm.preparing[locale]}
               </Button>
-            </a>
+            )}
 
             {/* Copy buttons */}
             <div className={`grid gap-2 ${isCreator && game.status === "waiting_p1" ? "grid-cols-2" : "grid-cols-1"}`}>

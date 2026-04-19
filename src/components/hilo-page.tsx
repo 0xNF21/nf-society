@@ -440,13 +440,14 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
 
   const betOptions = table.betOptions as number[];
 
-  // Restore active round on mount
+  // Restore active round on mount — re-runs when token becomes available after SSR hydration
+  const tokenValue = tokenRef.current;
   useEffect(() => {
-    if (!tokenRef.current) { setRestoring(false); return; }
+    if (!tokenValue) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/hilo/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/hilo/active?tableSlug=${table.slug}&token=${tokenValue}`);
         const data = await res.json();
         if (data.round && active) {
           setRound(data.round);
@@ -455,7 +456,7 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
       if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug]);
+  }, [table.slug, tokenValue]);
 
   // Fetch player profile
   useEffect(() => {
