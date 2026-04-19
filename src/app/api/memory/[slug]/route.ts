@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { memoryGames } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { executePayout } from "@/lib/payout";
+import { creditPrize, creditCommission } from "@/lib/wallet";
 
 const GRID_CONFIG: Record<string, { cols: number; rows: number; pairs: number }> = {
   easy:   { cols: 4, rows: 3, pairs: 6 },
@@ -205,40 +205,34 @@ export async function POST(
         try {
           if (result === "draw") {
             if (game.player1Address) {
-              await executePayout({
-                gameType: "memory",
-                gameId: `memory-${game.slug}-p1-draw`,
-                recipientAddress: game.player1Address,
-                amountCrc: game.betCrc,
-                reason: `Memory ${game.slug} — draw, refund P1`,
+              await creditPrize(game.player1Address, game.betCrc, {
+                gameType: "memory", gameSlug: game.slug, gameRef: `${game.slug}-p1-draw`,
               });
             }
             if (game.player2Address) {
-              await executePayout({
-                gameType: "memory",
-                gameId: `memory-${game.slug}-p2-draw`,
-                recipientAddress: game.player2Address,
-                amountCrc: game.betCrc,
-                reason: `Memory ${game.slug} — draw, refund P2`,
+              await creditPrize(game.player2Address, game.betCrc, {
+                gameType: "memory", gameSlug: game.slug, gameRef: `${game.slug}-p2-draw`,
               });
             }
             await db.update(memoryGames).set({ payoutStatus: "success", updatedAt: new Date() }).where(eq(memoryGames.id, game.id));
           } else if (winnerAddress) {
-            const payoutResult = await executePayout({
-              gameType: "memory",
-              gameId: `memory-${game.slug}-winner`,
-              recipientAddress: winnerAddress,
-              amountCrc: winAmount,
-              reason: `Memory ${game.slug} — win, ${winAmount} CRC`,
+            const commissionAmount = pot * (game.commissionPct / 100);
+            const creditResult = await creditPrize(winnerAddress, winAmount, {
+              gameType: "memory", gameSlug: game.slug, gameRef: `${game.slug}-winner`,
+            });
+            await creditCommission(commissionAmount, {
+              gameType: "memory", gameSlug: game.slug, gameRef: `${game.slug}-commission`,
             });
             await db.update(memoryGames).set({
-              payoutStatus: payoutResult.success ? "success" : "failed",
-              payoutTxHash: payoutResult.transferTxHash || null,
+              payoutStatus: "success",
+              payoutTxHash: creditResult.ok
+                ? `balance-credit:${creditResult.ledgerId}`
+                : "balance-credit:duplicate",
               updatedAt: new Date(),
             }).where(eq(memoryGames.id, game.id));
           }
         } catch (err) {
-          console.error("[Memory] Payout error:", err);
+          console.error("[Memory] Credit error:", err);
           await db.update(memoryGames).set({ payoutStatus: "failed", updatedAt: new Date() }).where(eq(memoryGames.id, game.id));
         }
 

@@ -4,7 +4,7 @@ import { damesGames } from '@/lib/db/schema/dames'
 import { eq } from 'drizzle-orm'
 import { isValidMove, applyMove } from '@/lib/dames'
 import type { Move, DamesState } from '@/lib/dames'
-import { executePayout } from '@/lib/payout'
+import { creditPrize, creditCommission } from '@/lib/wallet'
 
 export async function POST(
   req: NextRequest,
@@ -45,18 +45,22 @@ export async function POST(
       try {
         const pot = game.betCrc * 2
         const winAmount = pot * (1 - game.commissionPct / 100)
-        const payoutResult = await executePayout({
-          gameType: 'dames', gameId: `dames-${game.slug}-winner`,
-          recipientAddress: player, amountCrc: winAmount,
-          reason: `Dames ${game.slug} — victoire, gain ${winAmount} CRC`,
+        const commissionAmount = pot * (game.commissionPct / 100)
+        const creditResult = await creditPrize(player, winAmount, {
+          gameType: 'dames', gameSlug: game.slug, gameRef: `${game.slug}-winner`,
+        })
+        await creditCommission(commissionAmount, {
+          gameType: 'dames', gameSlug: game.slug, gameRef: `${game.slug}-commission`,
         })
         await db.update(damesGames).set({
-          payoutTxHash: payoutResult.transferTxHash || null,
-          payoutStatus: payoutResult.success ? 'success' : 'failed',
+          payoutTxHash: creditResult.ok
+            ? `balance-credit:${creditResult.ledgerId}`
+            : 'balance-credit:duplicate',
+          payoutStatus: 'success',
           updatedAt: new Date(),
         }).where(eq(damesGames.id, game.id))
       } catch (e) {
-        console.error('[Dames] Payout error:', e)
+        console.error('[Dames] Credit error:', e)
         await db.update(damesGames).set({
           payoutStatus: 'failed',
           updatedAt: new Date(),

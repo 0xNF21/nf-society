@@ -4,7 +4,7 @@ import { pfcGames } from "@/lib/db/schema/pfc";
 import { eq } from "drizzle-orm";
 import { resolveRound, getWinner, isValidMove } from "@/lib/pfc";
 import type { PfcState, Move } from "@/lib/pfc";
-import { executePayout } from "@/lib/payout";
+import { creditPrize, creditCommission } from "@/lib/wallet";
 import { calculateWinAmount } from "@/lib/multiplayer";
 
 export async function GET(
@@ -90,23 +90,30 @@ export async function POST(
           updatedAt: new Date(),
         }).where(eq(pfcGames.id, game.id));
 
-        // Execute payout
+        // Credit winner's balance + DAO commission.
         try {
           if (winnerAddress) {
-            await executePayout({
-              gameType: "pfc",
-              gameId: `pfc-${game.slug}-winner`,
-              recipientAddress: winnerAddress,
-              amountCrc: winAmount,
-              reason: `PFC ${game.slug} — victoire, gain ${winAmount} CRC`,
+            const pot = game.betCrc * 2;
+            const commissionAmount = pot * (game.commissionPct / 100);
+            const creditResult = await creditPrize(winnerAddress, winAmount, {
+              gameType: "pfc", gameSlug: game.slug, gameRef: `${game.slug}-winner`,
+            });
+            await creditCommission(commissionAmount, {
+              gameType: "pfc", gameSlug: game.slug, gameRef: `${game.slug}-commission`,
             });
 
             await db.update(pfcGames).set({
               payoutStatus: "success",
+              payoutTxHash: creditResult.ok
+                ? `balance-credit:${creditResult.ledgerId}`
+                : "balance-credit:duplicate",
             }).where(eq(pfcGames.id, game.id));
           }
         } catch (e) {
-          console.error("[PFC] Payout error:", e);
+          console.error("[PFC] Credit error:", e);
+          await db.update(pfcGames).set({
+            payoutStatus: "failed",
+          }).where(eq(pfcGames.id, game.id));
         }
 
         const [updated] = await db.select().from(pfcGames).where(eq(pfcGames.id, game.id));
