@@ -16,7 +16,10 @@ export async function GET() {
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const noTests = sql`${payouts.gameType} NOT LIKE '%test%' AND ${payouts.gameId} NOT LIKE '%test%'`;
+    // Exclut tests + cashouts (les retraits utilisateurs ne sont pas des
+    // redistributions de gains). Sans ce filtre, totalCommissions est
+    // sous-estime car les cashouts gonflent totalRedistributed.
+    const noTests = sql`${payouts.gameType} NOT LIKE '%test%' AND ${payouts.gameId} NOT LIKE '%test%' AND ${payouts.gameType} != 'cashout'`;
 
     // ─── PAYOUTS ───
     const [totalPayout] = await db.select({

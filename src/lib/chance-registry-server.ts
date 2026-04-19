@@ -28,7 +28,7 @@ import {
   lootboxes,
   lootboxOpens,
 } from "@/lib/db/schema";
-import { and, gte, eq, sql, desc } from "drizzle-orm";
+import { and, gte, eq, sql, desc, notInArray } from "drizzle-orm";
 
 export type ChanceAggregate = {
   wagered: number;     // CRC total mises
@@ -74,6 +74,12 @@ function createStandardConfig(opts: {
   betCol?: string;       // default "betCrc"
   payoutCol?: string;    // default "payoutCrc"
   dateCol?: string;      // default "createdAt"
+  // Statuts a exclure des stats — typiquement ["playing"] pour ne pas
+  // compter les rounds abandonnees (user paye puis ferme la page).
+  // Sans ce filtre, le wagered est gonfle alors que le payout reste a 0,
+  // ce qui ecrase artificiellement le RTP.
+  excludeStatuses?: string[];
+  statusCol?: string;    // default "status"
 }): ChanceGameServerConfig {
   const {
     key, label, emoji, accentColor, table,
@@ -81,12 +87,25 @@ function createStandardConfig(opts: {
     betCol = "betCrc",
     payoutCol = "payoutCrc",
     dateCol = "createdAt",
+    excludeStatuses,
+    statusCol = "status",
   } = opts;
 
   const addressField = table[addressCol];
   const betField = table[betCol];
   const payoutField = table[payoutCol];
   const dateField = table[dateCol];
+  const statusField = excludeStatuses && excludeStatuses.length > 0 ? table[statusCol] : null;
+  const statusFilter = statusField ? notInArray(statusField, excludeStatuses!) : undefined;
+
+  // Combine la condition status (statique) avec les filtres dynamiques (date,
+  // adresse). Retourne undefined si rien a appliquer (drizzle accepte ca).
+  function combine(...conds: (any | undefined)[]) {
+    const valid = conds.filter(Boolean);
+    if (valid.length === 0) return undefined;
+    if (valid.length === 1) return valid[0];
+    return and(...valid);
+  }
 
   return {
     key,
@@ -95,7 +114,7 @@ function createStandardConfig(opts: {
     accentColor,
 
     async getAggregate(since?: Date): Promise<ChanceAggregate> {
-      const whereClause = since ? gte(dateField, since) : undefined;
+      const whereClause = combine(since ? gte(dateField, since) : undefined, statusFilter);
       const [row] = await db
         .select({
           wagered: sql<number>`COALESCE(SUM(${betField}), 0)`,
@@ -116,6 +135,7 @@ function createStandardConfig(opts: {
 
     async getPlayerStats(address: string): Promise<ChancePlayerStats> {
       const addr = address.toLowerCase();
+      const whereClause = combine(sql`LOWER(${addressField}) = ${addr}`, statusFilter);
       const [row] = await db
         .select({
           played: sql<number>`COUNT(*)`,
@@ -124,7 +144,7 @@ function createStandardConfig(opts: {
           lastAt: sql<Date | null>`MAX(${dateField})`,
         })
         .from(table)
-        .where(sql`LOWER(${addressField}) = ${addr}`);
+        .where(whereClause as any);
 
       const wagered = Number(row?.wagered ?? 0);
       const won = Number(row?.won ?? 0);
@@ -138,7 +158,7 @@ function createStandardConfig(opts: {
     },
 
     async getPlayerAddresses(since?: Date): Promise<string[]> {
-      const whereClause = since ? gte(dateField, since) : undefined;
+      const whereClause = combine(since ? gte(dateField, since) : undefined, statusFilter);
       const rows = await db
         .select({ addr: addressField })
         .from(table)
@@ -148,13 +168,14 @@ function createStandardConfig(opts: {
     },
 
     async getDailyVolume(since: Date): Promise<DailyVolume[]> {
+      const whereClause = combine(gte(dateField, since), statusFilter);
       const rows = await db
         .select({
           day: sql<string>`TO_CHAR(DATE_TRUNC('day', ${dateField}), 'YYYY-MM-DD')`,
           wagered: sql<number>`COALESCE(SUM(${betField}), 0)`,
         })
         .from(table)
-        .where(gte(dateField, since))
+        .where(whereClause as any)
         .groupBy(sql`DATE_TRUNC('day', ${dateField})`);
       return rows.map((r) => ({ day: r.day, wagered: Number(r.wagered) }));
     },
@@ -175,39 +196,42 @@ const coinFlipConfig = createStandardConfig({
   table: coinFlipResults,
 });
 
+// excludeStatuses: ["playing"] sur tous les jeux interactifs — sans ce filtre,
+// les rounds abandonnees (user paye puis ferme la page avant cashout/spin)
+// gonflent le wagered alors que payout=0, ce qui ecrase le RTP.
 const hiloConfig = createStandardConfig({
   key: "hilo", label: "Hi-Lo", emoji: "🎴", accentColor: "#7C3AED",
-  table: hiloRounds,
+  table: hiloRounds, excludeStatuses: ["playing"],
 });
 
 const minesConfig = createStandardConfig({
   key: "mines", label: "Mines", emoji: "💣", accentColor: "#DC2626",
-  table: minesRounds,
+  table: minesRounds, excludeStatuses: ["playing"],
 });
 
 const diceConfig = createStandardConfig({
   key: "dice", label: "Dice", emoji: "🎲", accentColor: "#F59E0B",
-  table: diceRounds,
+  table: diceRounds, excludeStatuses: ["playing"],
 });
 
 const crashDashConfig = createStandardConfig({
   key: "crash_dash", label: "Demurrage Dash", emoji: "🚀", accentColor: "#10B981",
-  table: crashDashRounds,
+  table: crashDashRounds, excludeStatuses: ["playing"],
 });
 
 const kenoConfig = createStandardConfig({
   key: "keno", label: "Keno", emoji: "🔢", accentColor: "#8B5CF6",
-  table: kenoRounds,
+  table: kenoRounds, excludeStatuses: ["playing"],
 });
 
 const rouletteConfig = createStandardConfig({
   key: "roulette", label: "Roulette", emoji: "🎡", accentColor: "#B91C1C",
-  table: rouletteRounds,
+  table: rouletteRounds, excludeStatuses: ["playing"],
 });
 
 const plinkoConfig = createStandardConfig({
   key: "plinko", label: "Plinko", emoji: "🎯", accentColor: "#7C3AED",
-  table: plinkoRounds,
+  table: plinkoRounds, excludeStatuses: ["playing"],
 });
 
 /**

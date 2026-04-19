@@ -98,6 +98,11 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
               label={t.profit[locale]}
               value={formatCrc(allTime.profit, 0) + " CRC"}
               accent={allTime.profit >= 0 ? "green" : "red"}
+              sub={
+                allTime.wagered > 0
+                  ? `${allTime.profit >= 0 ? "+" : ""}${((allTime.profit / allTime.wagered) * 100).toFixed(1)}%`
+                  : undefined
+              }
             />
             <Metric label={t.rounds[locale]} value={formatCrc(allTime.rounds, 0)} />
           </div>
@@ -222,10 +227,12 @@ function Metric({
   label,
   value,
   accent,
+  sub,
 }: {
   label: string;
   value: string;
   accent?: "green" | "red";
+  sub?: string;
 }) {
   const color =
     accent === "green"
@@ -239,6 +246,9 @@ function Metric({
         {label}
       </div>
       <div className={`text-xl font-bold font-mono ${color}`}>{value}</div>
+      {sub && (
+        <div className={`text-[11px] font-mono mt-0.5 ${color}`}>{sub}</div>
+      )}
     </div>
   );
 }

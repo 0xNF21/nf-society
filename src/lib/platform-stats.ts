@@ -79,7 +79,12 @@ const MULTI_GAME_META: Record<string, { label: string; emoji: string; color: str
   dames: { label: "Dames", emoji: "♟️", color: "#F59E0B" },
   pfc: { label: "Pierre-Feuille-Ciseaux", emoji: "✊", color: "#DC2626" },
   "crc-races": { label: "Courses CRC", emoji: "🏇", color: "#EA580C" },
+  lottery: { label: "Loterie", emoji: "🎟️", color: "#A855F7" },
 };
+
+// gameTypes valides dans claimedPayments, en plus des jeux multi.
+// Lottery passe par claimedPayments mais n'est pas un jeu multi conceptuel.
+const EXTRA_CLAIMED_GAMES = ["lottery"] as const;
 
 function daysAgo(n: number): Date {
   const d = new Date();
@@ -101,9 +106,10 @@ async function multiAggregate(since?: Date): Promise<{
   uniqueAddresses: Set<string>;
 }> {
   const multiKeys = ALL_SERVER_GAMES.map((g) => g.key);
+  const claimedKeys = [...multiKeys, ...EXTRA_CLAIMED_GAMES];
   const whereClause = since
-    ? and(gte(claimedPayments.claimedAt, since), inArray(claimedPayments.gameType, multiKeys))
-    : inArray(claimedPayments.gameType, multiKeys);
+    ? and(gte(claimedPayments.claimedAt, since), inArray(claimedPayments.gameType, claimedKeys))
+    : inArray(claimedPayments.gameType, claimedKeys);
 
   // Wagered par jeu + COUNT DISTINCT gameId pour avoir les vrais parties
   const wageredRows = await db
@@ -128,8 +134,8 @@ async function multiAggregate(since?: Date): Promise<{
 
   // Payouts par jeu (depuis payouts table)
   const paidWhere = since
-    ? and(gte(payouts.createdAt, since), inArray(payouts.gameType, multiKeys))
-    : inArray(payouts.gameType, multiKeys);
+    ? and(gte(payouts.createdAt, since), inArray(payouts.gameType, claimedKeys))
+    : inArray(payouts.gameType, claimedKeys);
 
   const paidRows = await db
     .select({
@@ -226,7 +232,12 @@ async function computePeriodStats(since?: Date): Promise<PeriodStats> {
 async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; top5: TopGameMeta[] }> {
   const since = daysAgo(30);
 
-  // Multi : une seule query groupee day + game
+  // Multi : une seule query groupee day + game.
+  // Filtre par claimedKeys (multi + lottery) pour exclure les non-jeux
+  // (shop_auth, nf_auth, nf_cashout, daily-*, blackjack-refunded, etc.) et
+  // eviter le double-comptage avec les chance games (ex: "lootbox" ici vs
+  // "lootboxes" via chance-registry — ce dernier reste source de verite).
+  const claimedKeys = [...ALL_SERVER_GAMES.map((g) => g.key), ...EXTRA_CLAIMED_GAMES];
   const multiDailyPromise = db
     .select({
       day: sql<string>`TO_CHAR(DATE_TRUNC('day', ${claimedPayments.claimedAt}), 'YYYY-MM-DD')`,
@@ -234,7 +245,7 @@ async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; top5: To
       vol: sql<number>`COALESCE(SUM(${claimedPayments.amountCrc}), 0)`,
     })
     .from(claimedPayments)
-    .where(gte(claimedPayments.claimedAt, since))
+    .where(and(gte(claimedPayments.claimedAt, since), inArray(claimedPayments.gameType, claimedKeys)))
     .groupBy(
       sql`DATE_TRUNC('day', ${claimedPayments.claimedAt})`,
       claimedPayments.gameType
@@ -323,15 +334,19 @@ async function computeGamesBreakdown(): Promise<GameStatLine[]> {
   for (const [key, stats] of Object.entries(multi.byGame)) {
     if (stats.rounds === 0) continue;
     const meta = MULTI_GAME_META[key] ?? { label: key, emoji: "🎮" };
+    // Lottery passe par claimedPayments comme les multi mais reste un jeu de hasard.
+    const isExtra = (EXTRA_CLAIMED_GAMES as readonly string[]).includes(key);
     lines.push({
       key,
       label: meta.label,
       emoji: meta.emoji,
-      category: "multi",
+      category: isExtra ? "chance" : "multi",
       wagered: stats.wagered,
       paidOut: stats.paidOut,
       rounds: stats.rounds,
-      rtp: stats.wagered > 0 ? (stats.paidOut / stats.wagered) * 100 : null,
+      // Pas de RTP pour la lottery : les jackpots peuvent depasser les ventes
+      // (cumul entre tirages, sponsoring), donc le ratio n'est pas representatif.
+      rtp: isExtra ? null : (stats.wagered > 0 ? (stats.paidOut / stats.wagered) * 100 : null),
     });
   }
 
