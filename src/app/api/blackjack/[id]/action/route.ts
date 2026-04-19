@@ -1,13 +1,16 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { blackjackHands } from "@/lib/db/schema";
+import { blackjackHands, blackjackTables, claimedPayments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculateTotalBet } from "@/lib/blackjack";
 import type { BlackjackState, Action } from "@/lib/blackjack";
 import { executePayout } from "@/lib/payout";
+import { checkAllNewPayments } from "@/lib/circles";
 
 const VALID_ACTIONS: Action[] = ["hit", "stand", "double", "split", "insurance"];
+const PAID_ACTIONS: Action[] = ["double", "split"];
+const BLACKJACK_START_BLOCK = "0x2B7DE5C";
 
 export async function POST(
   req: NextRequest,
@@ -21,6 +24,7 @@ export async function POST(
     const body = await req.json();
     const action = body.action as Action;
     const playerToken = body.playerToken as string | undefined;
+    const paymentTxHash = (body.paymentTxHash as string | undefined)?.toLowerCase();
     if (!action || !VALID_ACTIONS.includes(action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
@@ -43,6 +47,41 @@ export async function POST(
     }
     if (hand.status !== "playing") {
       return NextResponse.json({ error: "Hand not in playing state" }, { status: 400 });
+    }
+
+    // For paid actions (double/split), verify + claim the extra payment
+    // atomically BEFORE applying the action. Prevents orphan claims if the
+    // client misses the check-payment response (race condition).
+    if (PAID_ACTIONS.includes(action)) {
+      if (!paymentTxHash) {
+        return NextResponse.json({ error: "Payment tx hash required for this action" }, { status: 400 });
+      }
+      const [table] = await db.select({ recipientAddress: blackjackTables.recipientAddress })
+        .from(blackjackTables).where(eq(blackjackTables.id, hand.tableId)).limit(1);
+      if (!table) {
+        return NextResponse.json({ error: "Table not found" }, { status: 404 });
+      }
+      const payments = await checkAllNewPayments(hand.betCrc, table.recipientAddress, BLACKJACK_START_BLOCK);
+      const tx = payments.find(p => p.transactionHash.toLowerCase() === paymentTxHash);
+      if (!tx) {
+        return NextResponse.json({ error: "Payment tx not found on-chain" }, { status: 400 });
+      }
+      if (tx.sender.toLowerCase() !== hand.playerAddress.toLowerCase()) {
+        return NextResponse.json({ error: "Payment tx sender mismatch" }, { status: 400 });
+      }
+      if (hand.playerToken && tx.gameData?.t && tx.gameData.t !== hand.playerToken) {
+        return NextResponse.json({ error: "Payment tx token mismatch" }, { status: 400 });
+      }
+      const claimed = await db.insert(claimedPayments).values({
+        txHash: paymentTxHash,
+        gameType: "blackjack",
+        gameId: hand.tableId,
+        playerAddress: hand.playerAddress,
+        amountCrc: hand.betCrc,
+      }).onConflictDoNothing().returning({ txHash: claimedPayments.txHash });
+      if (claimed.length === 0) {
+        return NextResponse.json({ error: "Payment tx already consumed" }, { status: 409 });
+      }
     }
 
     const state = hand.gameState as unknown as BlackjackState;

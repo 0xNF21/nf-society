@@ -343,25 +343,37 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
 
   const dataValue = encodeGameData({ game: "blackjack", id: table.slug, v: 1, t: tokenRef.current || undefined });
 
+  // Ref to read latest hand without re-creating the polling effect.
+  // Without this, `hand` updates every 2s (from the main polling) would
+  // restart this effect and set `active=false` on in-flight requests.
+  const handForPaymentRef = useRef<HandResponse | null>(null);
+  useEffect(() => { handForPaymentRef.current = hand; }, [hand]);
+
   // Poll for double/split extra payment via check-payment endpoint
   useEffect(() => {
-    if (!watchingActionPayment || !pendingPaidAction || !handId || !hand) return;
+    if (!watchingActionPayment || !pendingPaidAction || !handId) return;
     let active = true;
 
     const checkPayment = async () => {
+      const currentHand = handForPaymentRef.current;
+      if (!currentHand) return;
       try {
-        const res = await fetch(`/api/blackjack/${handId}/check-payment?amount=${hand.baseBet}&player=${hand.playerAddress}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/blackjack/${handId}/check-payment?amount=${currentHand.baseBet}&player=${currentHand.playerAddress}&token=${tokenRef.current}`);
         const data = await res.json();
-        if (data.found && active) {
+        if (data.found && data.txHash && active) {
           setWatchingActionPayment(false);
           setActionPaymentConfirmed(true);
-          // Perform the action
+          // Perform the action — action endpoint verifies + claims the tx atomically
           setActionLoading(true);
           try {
             const actionRes = await fetch(`/api/blackjack/${handId}/action`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: pendingPaidAction, playerToken: tokenRef.current }),
+              body: JSON.stringify({
+                action: pendingPaidAction,
+                playerToken: tokenRef.current,
+                paymentTxHash: data.txHash,
+              }),
             });
             const actionData = await actionRes.json();
             if (actionRes.ok) setHand(actionData);
@@ -376,7 +388,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     checkPayment();
     const interval = setInterval(checkPayment, 5000);
     return () => { active = false; clearInterval(interval); };
-  }, [watchingActionPayment, pendingPaidAction, handId, hand]);
+  }, [watchingActionPayment, pendingPaidAction, handId]);
 
   const scanForHand = useCallback(async () => {
     setScanning(true);

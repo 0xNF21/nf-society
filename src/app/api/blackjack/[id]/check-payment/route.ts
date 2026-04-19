@@ -61,7 +61,8 @@ export async function GET(
     const payments = await checkAllNewPayments(amount, table.recipientAddress, BLACKJACK_START_BLOCK);
 
     // Find a NEW payment from this player that's not in any known set
-    // If token is available, also verify the payment's gameData.t matches
+    // NOTE: we do NOT claim here — the action endpoint claims atomically
+    // to prevent orphan claims if the client misses the response.
     let found = false;
     let foundTxHash = "";
     for (const p of payments) {
@@ -73,18 +74,7 @@ export async function GET(
       break;
     }
 
-    // Claim the found tx to prevent reuse on subsequent checks
-    if (found && foundTxHash) {
-      await db.insert(claimedPayments).values({
-        txHash: foundTxHash,
-        gameType: "blackjack",
-        gameId: hand.tableId,
-        playerAddress: player,
-        amountCrc: amount,
-      }).onConflictDoNothing();
-    }
-
-    return NextResponse.json({ found });
+    return NextResponse.json({ found, txHash: found ? foundTxHash : undefined });
   } catch (error: any) {
     return NextResponse.json({ found: false, error: error.message });
   }
