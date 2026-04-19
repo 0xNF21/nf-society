@@ -71,7 +71,11 @@ export function MiniAppProvider({ children }: { children: React.ReactNode }) {
   const sendPayment = useCallback(
     async (to: string, amountCrc: number, data?: string): Promise<string[]> => {
       if (!miniApp) throw new Error("Not in Mini App mode");
-      const amountWei = (BigInt(amountCrc) * WEI_PER_CRC).toString();
+      // Support fractional CRC (e.g. 2.5) by going through a 2-decimal-cent
+      // intermediary. Rounds to 0.01 CRC precision — sufficient for topups
+      // and game payouts, avoids JS float precision loss on large amounts.
+      const cents = BigInt(Math.round(amountCrc * 100));
+      const amountWei = (cents * (WEI_PER_CRC / 100n)).toString();
       return sendCrcTransfer(to, amountWei, data);
     },
     [miniApp]

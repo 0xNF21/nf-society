@@ -8,6 +8,7 @@ import { useDemo } from "@/components/demo-provider";
 import { useMiniApp } from "@/components/miniapp-provider";
 import { translations } from "@/lib/i18n";
 import { getLevelName, xpToNextLevel } from "@/lib/xp";
+import { WalletBalanceCard } from "@/components/wallet-balance-card";
 
 type SavedProfile = {
   address: string;
@@ -241,6 +242,9 @@ export default function ProfileModal() {
                     )}
                   </div>
                 )}
+
+                {/* Solde CRC (wallet) — hidden in demo (Phase 3a commit 4) */}
+                {!isDemo && <WalletBalanceCard address={saved.address} />}
 
                 {/* Actions */}
                 <div className="flex gap-2">
