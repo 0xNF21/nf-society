@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { webhookCallback } from "grammy";
-import { bot } from "@/lib/telegram/bot";
+import { getBot } from "@/lib/telegram/bot";
 import { registerHandlers } from "@/lib/telegram/handlers";
 
-// Enregistre les handlers une seule fois par process (Vercel lambda).
 let initialized = false;
 function initBot() {
-  if (initialized) return;
+  const bot = getBot();
+  if (initialized) return bot;
   registerHandlers(bot);
   initialized = true;
+  return bot;
 }
 
 export const dynamic = "force-dynamic";
@@ -16,10 +17,7 @@ export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
-    initBot();
-
-    // grammy webhookCallback retourne un handler compatible std/http qui
-    // s'occupe du parse du body et de la reponse.
+    const bot = initBot();
     const handler = webhookCallback(bot, "std/http");
     return handler(req);
   } catch (err) {

@@ -2,7 +2,7 @@ import { Bot, Context } from "grammy";
 import { db } from "@/lib/db";
 import { supportMessages } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { ADMIN_CHAT_ID } from "./bot";
+import { getAdminChatId } from "./bot";
 import { decodeStartContext, formatAdminHeader, TelegramStartContext } from "./context";
 
 // Cache en memoire court pour le contexte `start` fourni par l'user au 1er message.
@@ -45,7 +45,7 @@ export function registerHandlers(b: Bot) {
   b.on("message:text", async (ctx) => {
     try {
       // Groupe admin : on traite comme reponse si c'est un reply, sinon on ignore.
-      if (ctx.chat.id === ADMIN_CHAT_ID) {
+      if (ctx.chat.id === getAdminChatId()) {
         await handleAdminReply(ctx);
         return;
       }
@@ -86,7 +86,7 @@ async function handleUserMessage(ctx: Context) {
     `<i>uid:${from.id}</i>\n\n` +
     escapeHtml(msg.text);
 
-  const sent = await ctx.api.sendMessage(ADMIN_CHAT_ID, adminText, {
+  const sent = await ctx.api.sendMessage(getAdminChatId(), adminText, {
     parse_mode: "HTML",
   });
 
