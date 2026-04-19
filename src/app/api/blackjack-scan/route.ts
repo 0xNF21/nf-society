@@ -122,28 +122,22 @@ export async function POST(req: NextRequest) {
           amountCrc: betCrc,
         }).onConflictDoNothing();
 
-        // If already finished (natural blackjack or dealer blackjack), credit the win to balance.
+        // Natural blackjack / dealer blackjack → instant payout on-chain.
+        // Scan routes fire only for on-chain tx, so the prize matches the
+        // payment method (on-chain).
         if (state.status === "finished" && state.totalPayout > 0) {
-          const { creditPrize } = await import("@/lib/wallet");
-          try {
-            const creditResult = await creditPrize(
-              playerAddress,
-              state.totalPayout,
-              { gameType: "blackjack", gameSlug: String(table.id), gameRef: `hand-${inserted[0].id}` },
-            );
-            await db.update(blackjackHands).set({
-              payoutStatus: "success",
-              payoutTxHash: creditResult.ok
-                ? `balance-credit:${creditResult.ledgerId}`
-                : "balance-credit:duplicate",
-            }).where(eq(blackjackHands.id, inserted[0].id));
-          } catch (err: any) {
-            console.error("[BlackjackScan] Credit error:", err.message);
-            await db.update(blackjackHands).set({
-              payoutStatus: "failed",
-              errorMessage: err.message?.substring(0, 500),
-            }).where(eq(blackjackHands.id, inserted[0].id));
-          }
+          const { executePayout } = await import("@/lib/payout");
+          await executePayout({
+            gameType: "blackjack",
+            gameId: `blackjack-${table.id}-${txHash}`,
+            recipientAddress: playerAddress,
+            amountCrc: state.totalPayout,
+            reason: `Blackjack ${table.title} — ${state.playerHands[0]?.outcome} ${state.totalPayout} CRC`,
+          });
+
+          await db.update(blackjackHands).set({
+            payoutStatus: "success",
+          }).where(eq(blackjackHands.id, inserted[0].id));
         }
 
         // XP

@@ -5,7 +5,7 @@ import { rouletteRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { resolveRoll, getVisibleState, calculatePayout, isValidAction } from "@/lib/roulette";
 import type { RouletteState, RouletteAction } from "@/lib/roulette";
-import { creditPrize } from "@/lib/wallet";
+import { payPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -73,26 +73,28 @@ export async function POST(
 
     await db.update(rouletteRounds).set(updateData).where(eq(rouletteRounds.id, roundId));
 
-    // Credit the win to the player's balance (Phase 3c — no on-chain payout).
+    // Pay the win. Asymmetric: balance-paid round -> balance credit, on-chain round -> on-chain payout.
     if (newState.status === "won") {
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const creditResult = await creditPrize(
-            round.playerAddress,
-            payoutAmount,
-            { gameType: "roulette", gameSlug: String(round.tableId), gameRef: `round-${round.id}` },
-          );
+          const prize = await payPrize(round.playerAddress, payoutAmount, {
+            gameType: "roulette",
+            gameSlug: String(round.tableId),
+            gameRef: `round-${round.id}`,
+            sourceTxHash: round.transactionHash,
+            reason: `Roulette — #${newState.result} — ${payoutAmount} CRC`,
+          });
 
           await db.update(rouletteRounds).set({
-            payoutStatus: "success",
-            payoutTxHash: creditResult.ok
-              ? `balance-credit:${creditResult.ledgerId}`
-              : "balance-credit:duplicate",
-            errorMessage: null,
+            payoutStatus: prize.ok ? "success" : "failed",
+            payoutTxHash: prize.method === "balance"
+              ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+              : (prize.transferTxHash || null),
+            errorMessage: prize.error || null,
           }).where(eq(rouletteRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Roulette] Credit error:", err.message);
+          console.error("[Roulette] Prize error:", err.message);
           await db.update(rouletteRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),

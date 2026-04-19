@@ -4,7 +4,7 @@ import { pfcGames } from "@/lib/db/schema/pfc";
 import { eq } from "drizzle-orm";
 import { resolveRound, getWinner, isValidMove } from "@/lib/pfc";
 import type { PfcState, Move } from "@/lib/pfc";
-import { creditPrize, creditCommission } from "@/lib/wallet";
+import { payPrize, payCommission } from "@/lib/wallet";
 import { calculateWinAmount } from "@/lib/multiplayer";
 
 export async function GET(
@@ -90,27 +90,31 @@ export async function POST(
           updatedAt: new Date(),
         }).where(eq(pfcGames.id, game.id));
 
-        // Credit winner's balance + DAO commission.
+        // Pay winner asymmetrically.
         try {
           if (winnerAddress) {
             const pot = game.betCrc * 2;
             const commissionAmount = pot * (game.commissionPct / 100);
-            const creditResult = await creditPrize(winnerAddress, winAmount, {
+            const winnerTxHash = winnerAddress === game.player1Address ? game.player1TxHash : game.player2TxHash;
+            const prize = await payPrize(winnerAddress, winAmount, {
               gameType: "pfc", gameSlug: game.slug, gameRef: `${game.slug}-winner`,
+              sourceTxHash: winnerTxHash,
+              reason: `PFC ${game.slug} — victoire, gain ${winAmount} CRC`,
             });
-            await creditCommission(commissionAmount, {
+            await payCommission(commissionAmount, {
               gameType: "pfc", gameSlug: game.slug, gameRef: `${game.slug}-commission`,
+              sourceTxHash: winnerTxHash,
             });
 
             await db.update(pfcGames).set({
-              payoutStatus: "success",
-              payoutTxHash: creditResult.ok
-                ? `balance-credit:${creditResult.ledgerId}`
-                : "balance-credit:duplicate",
+              payoutStatus: prize.ok ? "success" : "failed",
+              payoutTxHash: prize.method === "balance"
+                ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+                : (prize.transferTxHash || null),
             }).where(eq(pfcGames.id, game.id));
           }
         } catch (e) {
-          console.error("[PFC] Credit error:", e);
+          console.error("[PFC] Prize error:", e);
           await db.update(pfcGames).set({
             payoutStatus: "failed",
           }).where(eq(pfcGames.id, game.id));

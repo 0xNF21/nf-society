@@ -5,7 +5,7 @@ import { kenoRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { resolveDraw, getVisibleState, calculatePayout, isValidAction } from "@/lib/keno";
 import type { KenoState, KenoAction } from "@/lib/keno";
-import { creditPrize } from "@/lib/wallet";
+import { payPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -85,21 +85,23 @@ export async function POST(
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const creditResult = await creditPrize(
-            round.playerAddress,
-            payoutAmount,
-            { gameType: "keno", gameSlug: String(round.tableId), gameRef: `round-${round.id}` },
-          );
+          const prize = await payPrize(round.playerAddress, payoutAmount, {
+            gameType: "keno",
+            gameSlug: String(round.tableId),
+            gameRef: `round-${round.id}`,
+            sourceTxHash: round.transactionHash,
+            reason: `Keno — ${newState.hits.length}/${newState.pickCount} hits x${(newState.multiplier || 0).toFixed(2)} — ${payoutAmount} CRC`,
+          });
 
           await db.update(kenoRounds).set({
-            payoutStatus: "success",
-            payoutTxHash: creditResult.ok
-              ? `balance-credit:${creditResult.ledgerId}`
-              : "balance-credit:duplicate",
-            errorMessage: null,
+            payoutStatus: prize.ok ? "success" : "failed",
+            payoutTxHash: prize.method === "balance"
+              ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+              : (prize.transferTxHash || null),
+            errorMessage: prize.error || null,
           }).where(eq(kenoRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Keno] Credit error:", err.message);
+          console.error("[Keno] Prize error:", err.message);
           await db.update(kenoRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),

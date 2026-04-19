@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { lootboxes, lootboxOpens, claimedPayments, shopCoupons } from "@/lib/db/schema";
 import { eq, and, inArray, gt } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
-import { creditPrize, creditWallet } from "@/lib/wallet";
+import { executePayout } from "@/lib/payout";
 import { getRandomReward } from "@/lib/lootbox";
 import { getLootboxXpAction } from "@/lib/xp";
 
@@ -111,26 +111,22 @@ export async function POST(req: NextRequest) {
           amountCrc: priceCrc,
         }).onConflictDoNothing();
 
-        try {
-          const creditResult = await creditPrize(
-            playerAddress,
-            rewardCrc,
-            { gameType: "lootbox", gameSlug: String(lootboxId), gameRef: `open-${txHash}` },
-          );
-          await db.update(lootboxOpens).set({
-            payoutStatus: "success",
-            payoutTxHash: creditResult.ok
-              ? `balance-credit:${creditResult.ledgerId}`
-              : "balance-credit:duplicate",
-            errorMessage: null,
-          }).where(eq(lootboxOpens.transactionHash, txHash));
-        } catch (err: any) {
-          console.error("[LootboxScan] Credit error:", err.message);
-          await db.update(lootboxOpens).set({
-            payoutStatus: "failed",
-            errorMessage: err.message?.substring(0, 500),
-          }).where(eq(lootboxOpens.transactionHash, txHash));
-        }
+        // Lootbox opens are on-chain (scan fired on on-chain tx). Reward
+        // paid on-chain to match.
+        const gameId = `lootbox-${lootboxId}-${txHash}`;
+        const payoutResult = await executePayout({
+          gameType: "lootbox",
+          gameId,
+          recipientAddress: playerAddress,
+          amountCrc: rewardCrc,
+          reason: `Lootbox ${lootbox.title} — reward ${rewardCrc} CRC`,
+        });
+
+        await db.update(lootboxOpens).set({
+          payoutStatus: payoutResult.success ? "success" : "failed",
+          payoutTxHash: payoutResult.transferTxHash || null,
+          errorMessage: payoutResult.error || null,
+        }).where(eq(lootboxOpens.transactionHash, txHash));
 
         // ─── Coupon refund check ───
         try {
@@ -153,18 +149,14 @@ export async function POST(req: NextRequest) {
               .set({ used: true, usedAt: new Date(), txHashUsed: txHash })
               .where(eq(shopCoupons.id, coupon.id));
 
-            // Refund the lootbox price to the player's balance (coupon-triggered).
-            try {
-              await creditWallet(playerAddress, priceCrc, {
-                kind: "cashout-refund",
-                reason: `Lootbox remboursee (coupon) — ${lootbox.title}`,
-                txHash: `shop-refund:${txHash}`,
-                gameType: "shop_refund",
-                gameSlug: String(lootboxId),
-              });
-            } catch (refundErr: any) {
-              console.error("[LootboxScan] Coupon refund credit error:", refundErr.message);
-            }
+            // Lootbox opened on-chain → refund also on-chain (coupon-triggered).
+            await executePayout({
+              gameType: "shop_refund",
+              gameId: `refund-${txHash}`,
+              recipientAddress: playerAddress,
+              amountCrc: priceCrc,
+              reason: `Lootbox Remboursée — Boutique XP`,
+            });
           }
         } catch (couponErr) {
           console.error("[LootboxScan] Coupon refund error:", couponErr);

@@ -5,7 +5,7 @@ import { blackjackHands } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculateTotalBet } from "@/lib/blackjack";
 import type { BlackjackState, Action } from "@/lib/blackjack";
-import { creditPrize } from "@/lib/wallet";
+import { payPrize } from "@/lib/wallet";
 
 const VALID_ACTIONS: Action[] = ["hit", "stand", "double", "split", "insurance"];
 
@@ -79,21 +79,23 @@ export async function POST(
     // Process payout if finished
     if (newState.status === "finished" && newState.totalPayout > 0) {
       try {
-        const creditResult = await creditPrize(
-          hand.playerAddress,
-          newState.totalPayout,
-          { gameType: "blackjack", gameSlug: String(hand.tableId), gameRef: `hand-${hand.id}` },
-        );
+        const prize = await payPrize(hand.playerAddress, newState.totalPayout, {
+          gameType: "blackjack",
+          gameSlug: String(hand.tableId),
+          gameRef: `hand-${hand.id}`,
+          sourceTxHash: hand.transactionHash,
+          reason: `Blackjack — ${updateData.outcome} — ${newState.totalPayout} CRC`,
+        });
 
         await db.update(blackjackHands).set({
-          payoutStatus: "success",
-          payoutTxHash: creditResult.ok
-            ? `balance-credit:${creditResult.ledgerId}`
-            : "balance-credit:duplicate",
-          errorMessage: null,
+          payoutStatus: prize.ok ? "success" : "failed",
+          payoutTxHash: prize.method === "balance"
+            ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+            : (prize.transferTxHash || null),
+          errorMessage: prize.error || null,
         }).where(eq(blackjackHands.id, handId));
       } catch (err: any) {
-        console.error("[Blackjack] Credit error:", err.message);
+        console.error("[Blackjack] Prize error:", err.message);
         await db.update(blackjackHands).set({
           payoutStatus: "failed",
           errorMessage: err.message?.substring(0, 500),

@@ -5,7 +5,7 @@ import { minesRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculatePayout, isValidAction } from "@/lib/mines";
 import type { MinesState, MinesAction } from "@/lib/mines";
-import { creditPrize } from "@/lib/wallet";
+import { payPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -86,21 +86,23 @@ export async function POST(
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const creditResult = await creditPrize(
-            round.playerAddress,
-            payoutAmount,
-            { gameType: "mines", gameSlug: String(round.tableId), gameRef: `round-${round.id}` },
-          );
+          const prize = await payPrize(round.playerAddress, payoutAmount, {
+            gameType: "mines",
+            gameSlug: String(round.tableId),
+            gameRef: `round-${round.id}`,
+            sourceTxHash: round.transactionHash,
+            reason: `Mines — cashout x${newState.currentMultiplier.toFixed(2)} — ${payoutAmount} CRC`,
+          });
 
           await db.update(minesRounds).set({
-            payoutStatus: "success",
-            payoutTxHash: creditResult.ok
-              ? `balance-credit:${creditResult.ledgerId}`
-              : "balance-credit:duplicate",
-            errorMessage: null,
+            payoutStatus: prize.ok ? "success" : "failed",
+            payoutTxHash: prize.method === "balance"
+              ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+              : (prize.transferTxHash || null),
+            errorMessage: prize.error || null,
           }).where(eq(minesRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Mines] Credit error:", err.message);
+          console.error("[Mines] Prize error:", err.message);
           await db.update(minesRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),

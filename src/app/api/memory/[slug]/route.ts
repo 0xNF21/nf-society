@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { memoryGames } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { creditPrize, creditCommission } from "@/lib/wallet";
+import { payPrize, payCommission } from "@/lib/wallet";
 
 const GRID_CONFIG: Record<string, { cols: number; rows: number; pairs: number }> = {
   easy:   { cols: 4, rows: 3, pairs: 6 },
@@ -205,34 +205,42 @@ export async function POST(
         try {
           if (result === "draw") {
             if (game.player1Address) {
-              await creditPrize(game.player1Address, game.betCrc, {
+              await payPrize(game.player1Address, game.betCrc, {
                 gameType: "memory", gameSlug: game.slug, gameRef: `${game.slug}-p1-draw`,
+                sourceTxHash: game.player1TxHash,
+                reason: `Memory ${game.slug} — draw, refund P1`,
               });
             }
             if (game.player2Address) {
-              await creditPrize(game.player2Address, game.betCrc, {
+              await payPrize(game.player2Address, game.betCrc, {
                 gameType: "memory", gameSlug: game.slug, gameRef: `${game.slug}-p2-draw`,
+                sourceTxHash: game.player2TxHash,
+                reason: `Memory ${game.slug} — draw, refund P2`,
               });
             }
             await db.update(memoryGames).set({ payoutStatus: "success", updatedAt: new Date() }).where(eq(memoryGames.id, game.id));
           } else if (winnerAddress) {
+            const winnerTxHash = winnerAddress === game.player1Address ? game.player1TxHash : game.player2TxHash;
             const commissionAmount = pot * (game.commissionPct / 100);
-            const creditResult = await creditPrize(winnerAddress, winAmount, {
+            const prize = await payPrize(winnerAddress, winAmount, {
               gameType: "memory", gameSlug: game.slug, gameRef: `${game.slug}-winner`,
+              sourceTxHash: winnerTxHash,
+              reason: `Memory ${game.slug} — win, ${winAmount} CRC`,
             });
-            await creditCommission(commissionAmount, {
+            await payCommission(commissionAmount, {
               gameType: "memory", gameSlug: game.slug, gameRef: `${game.slug}-commission`,
+              sourceTxHash: winnerTxHash,
             });
             await db.update(memoryGames).set({
-              payoutStatus: "success",
-              payoutTxHash: creditResult.ok
-                ? `balance-credit:${creditResult.ledgerId}`
-                : "balance-credit:duplicate",
+              payoutStatus: prize.ok ? "success" : "failed",
+              payoutTxHash: prize.method === "balance"
+                ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+                : (prize.transferTxHash || null),
               updatedAt: new Date(),
             }).where(eq(memoryGames.id, game.id));
           }
         } catch (err) {
-          console.error("[Memory] Credit error:", err);
+          console.error("[Memory] Prize error:", err);
           await db.update(memoryGames).set({ payoutStatus: "failed", updatedAt: new Date() }).where(eq(memoryGames.id, game.id));
         }
 

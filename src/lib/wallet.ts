@@ -14,6 +14,7 @@ import { db } from "./db";
 import { players, walletLedger } from "./db/schema";
 import { eq, sql } from "drizzle-orm";
 import { checkAllWalletTopups } from "./circles";
+import { executePayout } from "./payout";
 import {
   CHANCE_BALANCE_SUPPORTED,
   MULTI_BALANCE_SUPPORTED,
@@ -21,6 +22,15 @@ import {
   createChanceRound,
   type CreateChanceRoundOpts,
 } from "./wallet-game-dispatch";
+
+/**
+ * Does the given source tx hash identify a balance-paid round?
+ * Balance-paid rounds carry a synthetic tx hash of the form `balance:{ledgerId}`.
+ * Real on-chain tx hashes are 0x-prefixed 32-byte hex strings.
+ */
+export function isBalancePaid(sourceTxHash: string | null | undefined): boolean {
+  return typeof sourceTxHash === "string" && sourceTxHash.startsWith("balance:");
+}
 
 const SAFE_ADDRESS = process.env.SAFE_ADDRESS || "";
 const WEI_PER_CRC = 1_000_000_000_000_000_000n;
@@ -382,6 +392,106 @@ export async function creditCommission(
     gameType: ref.gameType,
     gameSlug: ref.gameSlug,
   });
+}
+
+export type PayPrizeResult = {
+  method: "balance" | "onchain";
+  ok: boolean;
+  /** wallet_ledger.id when method === "balance" */
+  ledgerId?: number;
+  /** on-chain tx hash when method === "onchain" */
+  transferTxHash?: string;
+  error?: string;
+};
+
+/**
+ * Asymmetric prize payout — the source payment method determines where the
+ * prize lands:
+ *
+ * - If the round was balance-paid (sourceTxHash starts with "balance:"),
+ *   the win is credited to the winner's NF Society balance via creditPrize.
+ *   DAO commission, if any, is credited via creditCommission.
+ *
+ * - Otherwise (real on-chain tx hash), the win is paid on-chain via the
+ *   Safe + Roles Modifier, same as before Phase 3c. Commission stays
+ *   implicit in the Safe.
+ *
+ * This mirrors user expectations: you pay on-chain, you get paid on-chain;
+ * you pay from balance, you get paid on balance.
+ */
+export async function payPrize(
+  recipientAddress: string,
+  amountCrc: number,
+  opts: {
+    gameType: string;
+    gameSlug: string;
+    gameRef: string;
+    sourceTxHash: string | null | undefined;
+    /** Optional human-readable reason used only by the on-chain path. */
+    reason?: string;
+  },
+): Promise<PayPrizeResult> {
+  if (amountCrc <= 0) {
+    return { method: isBalancePaid(opts.sourceTxHash) ? "balance" : "onchain", ok: true };
+  }
+
+  if (isBalancePaid(opts.sourceTxHash)) {
+    const result = await creditPrize(recipientAddress, amountCrc, {
+      gameType: opts.gameType,
+      gameSlug: opts.gameSlug,
+      gameRef: opts.gameRef,
+    });
+    return {
+      method: "balance",
+      ok: true,
+      ledgerId: result.ok ? result.ledgerId : undefined,
+    };
+  }
+
+  const result = await executePayout({
+    gameType: opts.gameType,
+    gameId: `${opts.gameType}-${opts.gameRef}`,
+    recipientAddress,
+    amountCrc,
+    reason: opts.reason || `${opts.gameType} ${opts.gameSlug} prize`,
+  });
+  return {
+    method: "onchain",
+    ok: result.success,
+    transferTxHash: result.transferTxHash,
+    error: result.error,
+  };
+}
+
+/**
+ * Commission payout — asymmetric too. If the game was balance-paid, the
+ * commission is credited to the DAO treasury (creditCommission). If the game
+ * was on-chain, the commission stays implicit in the Safe — no on-chain tx,
+ * no DAO ledger entry. This matches the pre-Phase-3c behavior for on-chain
+ * games (Safe keeps the fee).
+ */
+export async function payCommission(
+  amountCrc: number,
+  opts: {
+    gameType: string;
+    gameSlug: string;
+    gameRef: string;
+    sourceTxHash: string | null | undefined;
+  },
+): Promise<{ method: "balance" | "onchain-implicit"; ok: boolean; ledgerId?: number }> {
+  if (amountCrc <= 0) {
+    return { method: isBalancePaid(opts.sourceTxHash) ? "balance" : "onchain-implicit", ok: true };
+  }
+  if (!isBalancePaid(opts.sourceTxHash)) {
+    // On-chain game: commission stays in Safe, nothing to record.
+    return { method: "onchain-implicit", ok: true };
+  }
+  const result = await creditCommission(amountCrc, opts);
+  return {
+    method: "balance",
+    ok: true,
+    ledgerId: result.ok ? result.ledgerId : undefined,
+  };
 }
 
 /**
