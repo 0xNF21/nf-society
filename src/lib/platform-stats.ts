@@ -12,7 +12,7 @@
 import { ethers } from "ethers";
 import { db } from "@/lib/db";
 import { claimedPayments, payouts } from "@/lib/db/schema";
-import { sql, gte, and, inArray } from "drizzle-orm";
+import { sql, gte, lt, and, inArray } from "drizzle-orm";
 import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 import { aggregateAllChance, ALL_CHANCE_SERVER_GAMES, ChanceAggregate } from "@/lib/chance-registry-server";
 import { getSafeCrcBalance } from "@/lib/payout";
@@ -100,16 +100,17 @@ function daysAgo(n: number): Date {
  *   - rounds  = COUNT(DISTINCT gameId)   (parties reelles)
  *   - players = COUNT(DISTINCT address)  (joueurs uniques par jeu, dedup cross-jeux fait ailleurs)
  */
-async function multiAggregate(since?: Date): Promise<{
+export async function multiAggregate(since?: Date, until?: Date): Promise<{
   total: PeriodStats;
   byGame: Record<string, PeriodStats>;
   uniqueAddresses: Set<string>;
 }> {
   const multiKeys = ALL_SERVER_GAMES.map((g) => g.key);
   const claimedKeys = [...multiKeys, ...EXTRA_CLAIMED_GAMES];
-  const whereClause = since
-    ? and(gte(claimedPayments.claimedAt, since), inArray(claimedPayments.gameType, claimedKeys))
-    : inArray(claimedPayments.gameType, claimedKeys);
+  const whereParts: any[] = [inArray(claimedPayments.gameType, claimedKeys)];
+  if (since) whereParts.push(gte(claimedPayments.claimedAt, since));
+  if (until) whereParts.push(lt(claimedPayments.claimedAt, until));
+  const whereClause = whereParts.length === 1 ? whereParts[0] : and(...whereParts);
 
   // Wagered par jeu + COUNT DISTINCT gameId pour avoir les vrais parties
   const wageredRows = await db
@@ -133,9 +134,10 @@ async function multiAggregate(since?: Date): Promise<{
   const uniqueAddresses = new Set<string>(addressRows.map((r) => r.address.toLowerCase()));
 
   // Payouts par jeu (depuis payouts table)
-  const paidWhere = since
-    ? and(gte(payouts.createdAt, since), inArray(payouts.gameType, claimedKeys))
-    : inArray(payouts.gameType, claimedKeys);
+  const paidParts: any[] = [inArray(payouts.gameType, claimedKeys)];
+  if (since) paidParts.push(gte(payouts.createdAt, since));
+  if (until) paidParts.push(lt(payouts.createdAt, until));
+  const paidWhere = paidParts.length === 1 ? paidParts[0] : and(...paidParts);
 
   const paidRows = await db
     .select({

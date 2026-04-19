@@ -2,12 +2,25 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { payouts, lootboxOpens, lootboxes, dailySessions } from "@/lib/db/schema";
 import { sql, eq, gte, and, lt } from "drizzle-orm";
-import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
+import { aggregateAllChance, ALL_CHANCE_SERVER_GAMES } from "@/lib/chance-registry-server";
+import { multiAggregate } from "@/lib/platform-stats";
 import { getSafeCrcBalance } from "@/lib/payout";
 
 export const dynamic = "force-dynamic";
 
 function round(n: number) { return Math.round(n * 10) / 10; }
+
+/**
+ * Dashboard tresorerie plateforme. Utilise les MEMES helpers que /api/stats/platform
+ * (multiAggregate + aggregateAllChance) pour garantir la coherence des chiffres.
+ *
+ *   totalBets        = mises multi+lottery (claimedPayments) + chance (bet_crc)
+ *   totalRedistributed = payouts multi+lottery (table payouts) + chance (payout_crc)
+ *   totalCommissions = totalBets - totalRedistributed
+ *                    = commissions multi (5% du pot) + marge maison chance
+ *
+ * Daily sessions : non comptees dans les totaux (pas dans /stats) mais section dediee.
+ */
 
 export async function GET() {
   try {
@@ -15,207 +28,124 @@ export async function GET() {
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Exclut tests + cashouts (les retraits utilisateurs ne sont pas des
-    // redistributions de gains). Sans ce filtre, totalCommissions est
-    // sous-estime car les cashouts gonflent totalRedistributed.
+    // Exclut tests + cashouts pour les stats secondaires (weekly chart, section daily/lootbox)
     const noTests = sql`${payouts.gameType} NOT LIKE '%test%' AND ${payouts.gameId} NOT LIKE '%test%' AND ${payouts.gameType} != 'cashout'`;
 
-    // ─── PAYOUTS ───
-    const [totalPayout] = await db.select({
-      total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
-      count: sql<number>`COUNT(*)`,
-    }).from(payouts).where(and(eq(payouts.status, "success"), noTests));
+    const [
+      multiAll, multiMonth, multiWeek, multiToday, multiLM,
+      chanceAll, chanceMonth, chanceWeek, chanceToday, chanceLMIncl,
+      payoutsByGame, weeklyByDay, firstPayoutRow,
+      dailySess, dailySessToday, dailySessWeek, dailySessMonth, dailySessLM,
+      safeBalRaw,
+    ] = await Promise.all([
+      multiAggregate(),
+      multiAggregate(thisMonth),
+      multiAggregate(thisWeek),
+      multiAggregate(today),
+      multiAggregate(lastMonth, thisMonth),
+      aggregateAllChance(),
+      aggregateAllChance(thisMonth),
+      aggregateAllChance(thisWeek),
+      aggregateAllChance(today),
+      aggregateAllChance(lastMonth),
+      db.select({
+        gameType: payouts.gameType,
+        total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
+        count: sql<number>`COUNT(*)`,
+      }).from(payouts).where(and(eq(payouts.status, "success"), noTests)).groupBy(payouts.gameType),
+      db.select({
+        day: sql<string>`TO_CHAR(${payouts.createdAt}, 'YYYY-MM-DD')`,
+        total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
+      }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisWeek), noTests))
+        .groupBy(sql`TO_CHAR(${payouts.createdAt}, 'YYYY-MM-DD')`)
+        .orderBy(sql`TO_CHAR(${payouts.createdAt}, 'YYYY-MM-DD')`),
+      db.select({ min: sql<string>`MIN(${payouts.createdAt})` }).from(payouts),
+      db.select({ count: sql<number>`COUNT(*)` }).from(dailySessions).where(sql`${dailySessions.address} IS NOT NULL`),
+      db.select({ count: sql<number>`COUNT(*)` }).from(dailySessions).where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, today))),
+      db.select({ count: sql<number>`COUNT(*)` }).from(dailySessions).where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, thisWeek))),
+      db.select({ count: sql<number>`COUNT(*)` }).from(dailySessions).where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, thisMonth))),
+      db.select({ count: sql<number>`COUNT(*)` }).from(dailySessions).where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, lastMonth), lt(dailySessions.createdAt, thisMonth))),
+      getSafeCrcBalance().catch(() => null),
+    ]);
 
-    const [monthlyPayout] = await db.select({
-      total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
-    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisMonth), noTests));
+    // ─── TOTAUX (aligne sur /stats allTime : multi+lottery + chance) ───
+    const totalBets = multiAll.total.wagered + chanceAll.wagered;
+    const totalRedistributed = multiAll.total.paidOut + chanceAll.paidOut;
+    const totalGamesPlayed = multiAll.total.rounds + chanceAll.rounds;
+    const totalCommissions = totalBets - totalRedistributed;
 
-    const [lastMonthPayout] = await db.select({
-      total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
-    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, lastMonth), lt(payouts.createdAt, thisMonth), noTests));
+    // Periodes (lastMonth = fenetre [lastMonth, thisMonth[)
+    const monthlyBets = multiMonth.total.wagered + chanceMonth.wagered;
+    const weeklyBets = multiWeek.total.wagered + chanceWeek.wagered;
+    const dailyBets = multiToday.total.wagered + chanceToday.wagered;
+    const lastMonthBets = multiLM.total.wagered + (chanceLMIncl.wagered - chanceMonth.wagered);
 
-    const payoutsByGame = await db.select({
-      gameType: payouts.gameType,
-      total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
-      count: sql<number>`COUNT(*)`,
-    }).from(payouts).where(and(eq(payouts.status, "success"), noTests)).groupBy(payouts.gameType);
+    const monthlyPaid = multiMonth.total.paidOut + chanceMonth.paidOut;
+    const weeklyPaid = multiWeek.total.paidOut + chanceWeek.paidOut;
+    const dailyPaid = multiToday.total.paidOut + chanceToday.paidOut;
+    const lastMonthPaid = multiLM.total.paidOut + (chanceLMIncl.paidOut - chanceMonth.paidOut);
 
-    // Weekly payouts by day (for chart)
-    const weeklyByDay = await db.select({
-      day: sql<string>`TO_CHAR(${payouts.createdAt}, 'YYYY-MM-DD')`,
-      total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
-    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisWeek), noTests))
-      .groupBy(sql`TO_CHAR(${payouts.createdAt}, 'YYYY-MM-DD')`)
-      .orderBy(sql`TO_CHAR(${payouts.createdAt}, 'YYYY-MM-DD')`);
-
-    // ─── GAME BETS (per game for recap) ───
-    let totalBets = 0;
-    let totalGamesPlayed = 0;
-    let monthlyBets = 0;
-    let lastMonthBets = 0;
-    const gameRecaps: Array<{ key: string; played: number; totalBet: number; totalPaid: number; margin: number }> = [];
-
-    for (const config of ALL_SERVER_GAMES) {
-      try {
-        const [allTime] = await db.select({
-          total: sql<number>`COALESCE(SUM(${config.table.betCrc} * 2), 0)`,
-          count: sql<number>`COUNT(*)`,
-        }).from(config.table).where(eq(config.table.status, "finished"));
-
-        const bet = Number(allTime.total);
-        const count = Number(allTime.count);
-        totalBets += bet;
-        totalGamesPlayed += count;
-
-        // Find payouts for this game
-        const gamePayout = payoutsByGame.find(p => p.gameType === config.key);
-        const paid = gamePayout ? Number(gamePayout.total) : 0;
-
-        gameRecaps.push({
-          key: config.key,
-          played: count,
-          totalBet: round(bet),
-          totalPaid: round(paid),
-          margin: round(bet - paid),
-        });
-
-        const [monthly] = await db.select({
-          total: sql<number>`COALESCE(SUM(${config.table.betCrc} * 2), 0)`,
-        }).from(config.table).where(and(eq(config.table.status, "finished"), gte(config.table.updatedAt, thisMonth)));
-        monthlyBets += Number(monthly.total);
-
-        const [lastM] = await db.select({
-          total: sql<number>`COALESCE(SUM(${config.table.betCrc} * 2), 0)`,
-        }).from(config.table).where(and(eq(config.table.status, "finished"), gte(config.table.updatedAt, lastMonth), lt(config.table.updatedAt, thisMonth)));
-        lastMonthBets += Number(lastM.total);
-      } catch {}
-    }
-
-    // ─── LOOTBOX ───
+    // ─── LOOTBOX (section dediee — deja compte dans chanceAll.byGame.lootboxes) ───
     let lootboxReceived = 0;
-    let lootboxMonthly = 0;
     let lootboxOpensCount = 0;
     let lootboxRewardTotal = 0;
-
     try {
-      const opensList = await db.select({
-        lootboxId: lootboxOpens.lootboxId,
-        rewardCrc: lootboxOpens.rewardCrc,
-      }).from(lootboxOpens);
-
+      const opensList = await db.select({ lootboxId: lootboxOpens.lootboxId, rewardCrc: lootboxOpens.rewardCrc }).from(lootboxOpens);
       const prices = await db.select({ id: lootboxes.id, price: lootboxes.pricePerOpenCrc }).from(lootboxes);
       const priceMap = new Map(prices.map(l => [l.id, l.price]));
-
       lootboxOpensCount = opensList.length;
       for (const o of opensList) {
         lootboxReceived += priceMap.get(o.lootboxId) || 0;
         lootboxRewardTotal += Number(o.rewardCrc);
       }
-      totalBets += lootboxReceived;
-
-      const monthlyOpens = await db.select({ lootboxId: lootboxOpens.lootboxId })
-        .from(lootboxOpens).where(gte(lootboxOpens.openedAt, thisMonth));
-      for (const o of monthlyOpens) lootboxMonthly += priceMap.get(o.lootboxId) || 0;
-      monthlyBets += lootboxMonthly;
-
-      const lastMOpens = await db.select({ lootboxId: lootboxOpens.lootboxId })
-        .from(lootboxOpens).where(and(gte(lootboxOpens.openedAt, lastMonth), lt(lootboxOpens.openedAt, thisMonth)));
-      for (const o of lastMOpens) lastMonthBets += priceMap.get(o.lootboxId) || 0;
     } catch {}
-
     const lootboxPaid = payoutsByGame.find(p => p.gameType === "lootbox");
     const lootboxPaidTotal = lootboxPaid ? Number(lootboxPaid.total) : 0;
 
-    // ─── DAILY ───
-    let dailyReceived = 0;
-    let dailyMonthly = 0;
-
-    try {
-      const [dTotal] = await db.select({ count: sql<number>`COUNT(*)` })
-        .from(dailySessions).where(sql`${dailySessions.address} IS NOT NULL`);
-      dailyReceived = Number(dTotal.count);
-      totalBets += dailyReceived;
-
-      const [dMonthly] = await db.select({ count: sql<number>`COUNT(*)` })
-        .from(dailySessions).where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, thisMonth)));
-      dailyMonthly = Number(dMonthly.count);
-      monthlyBets += dailyMonthly;
-
-      const [dLastM] = await db.select({ count: sql<number>`COUNT(*)` })
-        .from(dailySessions).where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, lastMonth), lt(dailySessions.createdAt, thisMonth)));
-      lastMonthBets += Number(dLastM.count);
-    } catch {}
-
+    // ─── DAILY (section dediee — exclue des totaux pour matcher /stats) ───
+    const dailyReceived = Number(dailySess[0].count);
     const dailyPaidTypes = payoutsByGame.filter(p => p.gameType.startsWith("daily-"));
     const dailyPaidTotal = dailyPaidTypes.reduce((s, p) => s + Number(p.total), 0);
 
-    // ─── SAFE BALANCE ───
-    let safeBalance: number | null = null;
-    try {
-      const bal = await getSafeCrcBalance();
-      const wei = BigInt("1000000000000000000");
-      safeBalance = Number((bal.erc1155 + bal.erc20) / wei);
-    } catch {}
+    // ─── RECAP PAR JEU ───
+    const gameRecaps: Array<{ key: string; played: number; totalBet: number; totalPaid: number; margin: number }> = [];
 
-    // ─── CALCULATIONS ───
-    const totalRedistributed = Number(totalPayout.total);
-    const totalCommissions = totalBets - totalRedistributed;
-    const monthlyCommissions = monthlyBets - Number(monthlyPayout.total);
-    const lastMonthCommissions = lastMonthBets - Number(lastMonthPayout.total);
-
-    // Daily stats (today)
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const [dailyPayout] = await db.select({
-      total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
-    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, today), noTests));
-
-    // Weekly payouts total
-    const [weeklyPayout] = await db.select({
-      total: sql<number>`COALESCE(SUM(${payouts.amountCrc}), 0)`,
-    }).from(payouts).where(and(eq(payouts.status, "success"), gte(payouts.createdAt, thisWeek), noTests));
-
-    // Daily/weekly bets (games + lootbox + daily)
-    let dailyBets = 0;
-    let weeklyBets = 0;
-    for (const config of ALL_SERVER_GAMES) {
-      try {
-        const [dB] = await db.select({ total: sql<number>`COALESCE(SUM(${config.table.betCrc} * 2), 0)` })
-          .from(config.table).where(and(eq(config.table.status, "finished"), gte(config.table.updatedAt, today)));
-        dailyBets += Number(dB.total);
-        const [wB] = await db.select({ total: sql<number>`COALESCE(SUM(${config.table.betCrc} * 2), 0)` })
-          .from(config.table).where(and(eq(config.table.status, "finished"), gte(config.table.updatedAt, thisWeek)));
-        weeklyBets += Number(wB.total);
-      } catch {}
+    for (const [key, stats] of Object.entries(multiAll.byGame)) {
+      if (stats.rounds === 0) continue;
+      gameRecaps.push({
+        key,
+        played: stats.rounds,
+        totalBet: round(stats.wagered),
+        totalPaid: round(stats.paidOut),
+        margin: round(stats.wagered - stats.paidOut),
+      });
     }
+    for (const cfg of ALL_CHANCE_SERVER_GAMES) {
+      const stats = chanceAll.byGame[cfg.key];
+      if (!stats || stats.rounds === 0) continue;
+      gameRecaps.push({
+        key: cfg.key,
+        played: stats.rounds,
+        totalBet: round(stats.wagered),
+        totalPaid: round(stats.paidOut),
+        margin: round(stats.wagered - stats.paidOut),
+      });
+    }
+    gameRecaps.sort((a, b) => b.totalBet - a.totalBet);
 
-    // Add lootbox + daily to period volumes
-    try {
-      const prices = await db.select({ id: lootboxes.id, price: lootboxes.pricePerOpenCrc }).from(lootboxes);
-      const priceMap = new Map(prices.map(l => [l.id, l.price]));
-
-      const dailyLootbox = await db.select({ lootboxId: lootboxOpens.lootboxId }).from(lootboxOpens).where(gte(lootboxOpens.openedAt, today));
-      for (const o of dailyLootbox) dailyBets += priceMap.get(o.lootboxId) || 0;
-
-      const weeklyLootbox = await db.select({ lootboxId: lootboxOpens.lootboxId }).from(lootboxOpens).where(gte(lootboxOpens.openedAt, thisWeek));
-      for (const o of weeklyLootbox) weeklyBets += priceMap.get(o.lootboxId) || 0;
-    } catch {}
-
-    try {
-      const [dDaily] = await db.select({ count: sql<number>`COUNT(*)` }).from(dailySessions)
-        .where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, today)));
-      dailyBets += Number(dDaily.count);
-
-      const [wDaily] = await db.select({ count: sql<number>`COUNT(*)` }).from(dailySessions)
-        .where(and(sql`${dailySessions.address} IS NOT NULL`, gte(dailySessions.createdAt, thisWeek)));
-      weeklyBets += Number(wDaily.count);
-    } catch {}
-
-    // Days since first payout
-    const firstPayout = await db.select({ min: sql<string>`MIN(${payouts.createdAt})` }).from(payouts);
-    const firstDate = firstPayout[0]?.min ? new Date(firstPayout[0].min) : now;
+    // Revenu moyen par jour
+    const firstDate = firstPayoutRow[0]?.min ? new Date(firstPayoutRow[0].min) : now;
     const daysSinceStart = Math.max(1, Math.ceil((now.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)));
     const avgRevenuePerDay = totalCommissions / daysSinceStart;
+
+    // Safe balance
+    const wei = BigInt("1000000000000000000");
+    const safeBalance = safeBalRaw ? Number((safeBalRaw.erc1155 + safeBalRaw.erc20) / wei) : null;
+
+    // dailySessMonth, dailySessLM used only if the UI needs them later — kept for future.
+    void dailySessMonth; void dailySessLM; void dailySessToday; void dailySessWeek;
 
     return NextResponse.json({
       safeBalance: safeBalance !== null ? round(safeBalance) : null,
@@ -225,10 +155,10 @@ export async function GET() {
       totalGamesPlayed,
       avgRevenuePerDay: round(avgRevenuePerDay),
       periods: {
-        today: { volume: round(dailyBets), commission: round(dailyBets - Number(dailyPayout.total)) },
-        week: { volume: round(weeklyBets), commission: round(weeklyBets - Number(weeklyPayout.total)) },
-        month: { volume: round(monthlyBets), commission: round(monthlyCommissions) },
-        lastMonth: { volume: round(lastMonthBets), commission: round(lastMonthCommissions) },
+        today: { volume: round(dailyBets), commission: round(dailyBets - dailyPaid) },
+        week: { volume: round(weeklyBets), commission: round(weeklyBets - weeklyPaid) },
+        month: { volume: round(monthlyBets), commission: round(monthlyBets - monthlyPaid) },
+        lastMonth: { volume: round(lastMonthBets), commission: round(lastMonthBets - lastMonthPaid) },
       },
       lootbox: {
         opens: lootboxOpensCount,
