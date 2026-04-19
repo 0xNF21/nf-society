@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { determineSpinResult, isSafeBalanceSafe } from "@/lib/daily";
-import { executePayout } from "@/lib/payout";
+import { creditPrize } from "@/lib/wallet";
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,18 +56,16 @@ export async function POST(req: NextRequest) {
       spinPlayed: true,
     }).where(eq(dailySessions.id, session.id));
 
-    // Payout if CRC won (non-blocking)
+    // Credit the spin reward to the player's balance (non-blocking).
     if (result.crcValue > 0) {
       try {
-        await executePayout({
+        await creditPrize(session.address, result.crcValue, {
           gameType: "daily-spin",
-          gameId: `daily-spin-${token}`,
-          recipientAddress: session.address,
-          amountCrc: result.crcValue,
-          reason: `Daily spin — ${result.label}`,
+          gameSlug: String(session.id),
+          gameRef: `spin-${token}`,
         });
       } catch (err: any) {
-        console.error("[DailySpin] Payout error:", err.message);
+        console.error("[DailySpin] Credit error:", err.message);
       }
     }
 

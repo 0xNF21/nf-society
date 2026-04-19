@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { determineScratchResult, isSafeBalanceSafe } from "@/lib/daily";
-import { executePayout } from "@/lib/payout";
+import { creditPrize } from "@/lib/wallet";
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,18 +56,16 @@ export async function POST(req: NextRequest) {
       scratchPlayed: true,
     }).where(eq(dailySessions.id, session.id));
 
-    // Payout if CRC won (non-blocking)
+    // Credit the scratch reward to the player's balance (non-blocking).
     if (result.crcValue > 0) {
       try {
-        await executePayout({
+        await creditPrize(session.address, result.crcValue, {
           gameType: "daily-scratch",
-          gameId: `daily-scratch-${token}`,
-          recipientAddress: session.address,
-          amountCrc: result.crcValue,
-          reason: `Daily scratch card — ${result.label}`,
+          gameSlug: String(session.id),
+          gameRef: `scratch-${token}`,
         });
       } catch (err: any) {
-        console.error("[DailyScratch] Payout error:", err.message);
+        console.error("[DailyScratch] Credit error:", err.message);
       }
     }
 
