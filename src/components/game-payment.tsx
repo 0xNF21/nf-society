@@ -10,6 +10,8 @@ import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY } from "@/lib/game-registry";
 import { useMiniApp } from "@/components/miniapp-provider";
 import { TicketRecovery } from "@/components/ticket-recovery";
+import { BalancePayButton } from "@/components/balance-pay-button";
+import { useConnectedAddress } from "@/hooks/use-connected-address";
 
 interface GamePaymentProps {
   gameKey: string;
@@ -23,6 +25,8 @@ interface GamePaymentProps {
   isCreator: boolean;
   onScanComplete: () => void;
   scanInterval?: number;
+  /** Optional callback when a balance-pay succeeds. Parent should refresh the game. */
+  onBalancePaid?: (result: any) => void;
 }
 
 export function GamePayment({
@@ -32,9 +36,11 @@ export function GamePayment({
   isCreator,
   onScanComplete,
   scanInterval = 5000,
+  onBalancePaid,
 }: GamePaymentProps) {
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
+  const connectedAddress = useConnectedAddress();
   const config = GAME_REGISTRY[gameKey];
   const t = translations[config.translationKey as keyof typeof translations] as Record<string, Record<string, string>>;
   const tm = translations.miniapp;
@@ -195,6 +201,22 @@ export function GamePayment({
   return (
     <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
       <CardContent className="pt-2 px-4 pb-4 space-y-3">
+        {/* Pay-from-balance — appears above the on-chain flow when the
+            connected address has enough CRC on balance. Renders nothing
+            otherwise, so the existing QR + Mini App UI stays unchanged. */}
+        <BalancePayButton
+          gameKey={gameKey}
+          slug={game.slug}
+          amountCrc={game.betCrc}
+          playerToken={playerToken}
+          address={connectedAddress || undefined}
+          onSuccess={(result) => {
+            onBalancePaid?.(result);
+            // Trigger parent refresh so the game state reflects the new slot.
+            onScanCompleteRef.current();
+          }}
+          accentColor={GAME_REGISTRY[gameKey]?.accentColor || "#251B9F"}
+        />
         {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-3">
           <span className="text-xs font-semibold text-ink/40 uppercase tracking-widest">

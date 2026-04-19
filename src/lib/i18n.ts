@@ -1303,6 +1303,22 @@ export const translations = {
     cancel: { fr: "Annuler", en: "Cancel" },
     error: { fr: "Une erreur est survenue", en: "An error occurred" },
     preparing: { fr: "Pr\u00e9paration...", en: "Preparing..." },
+    // Phase 3b — pay-from-balance in game payment components
+    payWithBalance: { fr: "Payer avec mon solde", en: "Pay with my balance" },
+    available: { fr: "dispo", en: "available" },
+    payFromBalanceBtn: {
+      fr: "Payer %AMOUNT% CRC avec mon solde",
+      en: "Pay %AMOUNT% CRC from my balance",
+    },
+    paying: { fr: "Paiement...", en: "Paying..." },
+    balanceDebited: {
+      fr: "Partie cr\u00e9\u00e9e — %REMAINING% CRC restant",
+      en: "Game started — %REMAINING% CRC left",
+    },
+    orPayDirect: {
+      fr: "ou payer en CRC direct ci-dessous",
+      en: "or pay with CRC directly below",
+    },
   },
   ticketRecovery: {
     button: { fr: "Retrouver ma partie", en: "Recover my game" },

@@ -8,6 +8,8 @@ import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { useMiniApp } from "@/components/miniapp-provider";
 import { TicketRecovery } from "@/components/ticket-recovery";
+import { BalancePayButton } from "@/components/balance-pay-button";
+import { useConnectedAddress } from "@/hooks/use-connected-address";
 
 interface ChancePaymentProps {
   /** Recipient address for the payment */
@@ -38,6 +40,14 @@ interface ChancePaymentProps {
   ballValue?: number;
   /** Optional table slug — used by ticket recovery when gameId is composite (mines, keno, coin-flip) */
   tableSlug?: string;
+  /** Optional extras for pay-from-balance — ballValue (plinko), mineCount (mines), pickCount (keno) */
+  balanceExtras?: { ballValue?: number; mineCount?: number; pickCount?: number };
+  /** Game key used for pay-from-balance (defaults to gameType — use when gameType != internal wallet key). */
+  balanceGameKey?: string;
+  /** Slug for pay-from-balance (defaults to tableSlug or gameId — use when gameId is composite). */
+  balanceSlug?: string;
+  /** Called when a balance-pay succeeds (debit + game row created). Parent should refresh or navigate. */
+  onBalancePaid?: (result: any) => void;
 }
 
 export function ChancePayment({
@@ -55,9 +65,14 @@ export function ChancePayment({
   playerToken,
   ballValue,
   tableSlug,
+  balanceExtras,
+  balanceGameKey,
+  balanceSlug,
+  onBalancePaid,
 }: ChancePaymentProps) {
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
+  const connectedAddress = useConnectedAddress();
   const tm = translations.miniapp;
 
   const [copied, setCopied] = useState(false);
@@ -114,8 +129,27 @@ export function ChancePayment({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  // Resolve pay-from-balance params (fallback to the on-chain ones).
+  const balKey = balanceGameKey || gameType;
+  const balSlug = balanceSlug || tableSlug || gameId;
+  const balExtras = balanceExtras || (ballValue !== undefined ? { ballValue } : undefined);
+
   return (
     <div className="space-y-4">
+      {/* Pay-from-balance — shown above the normal flow when balance >= amount.
+          Component renders nothing when balance is insufficient, keeping the
+          default on-chain UI as the only option. */}
+      <BalancePayButton
+        gameKey={balKey}
+        slug={balSlug}
+        amountCrc={amountCrc}
+        playerToken={playerToken}
+        address={connectedAddress || undefined}
+        extras={balExtras}
+        onSuccess={onBalancePaid}
+        accentColor={accentColor}
+      />
+
       {/* -- Mini App mode -- */}
       {isMiniApp && walletAddress ? (
         <>
