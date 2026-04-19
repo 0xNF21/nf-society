@@ -1,187 +1,140 @@
-# Handoff — Wallet NF Society
+# Handoff — Wallet NF Society (Phase 3 — session 2)
 
-Pour reprendre le travail en local depuis Claude Code. Lis ce fichier, puis continue.
+Pour reprendre en local depuis Claude Code. Lis ce fichier, puis continue.
 
-## Contexte rapide
+## Contexte
 
-**Projet** : NF Society — plateforme DAO sur Gnosis Chain, jeux CRC (multijoueur + chance).
+**Projet** : NF Society — plateforme DAO sur Gnosis Chain, jeux CRC.
+**Objectif global** : solde CRC prépayé → jouer sans tx on-chain par partie → cashout possible.
+**Branche active** : `master` (Phase 3 mergée dans master via `b2dfdfa`).
 
-**Objectif global** : permettre à l'utilisateur de charger une fois un **solde CRC prépayé** puis de jouer sans re-tx on-chain à chaque partie. Cashout possible à tout moment.
+## État actuel — ce qui est livré
 
-**Branche de travail** : `claude/add-wallet-balance-9ajNn`
+### Phase 1 (Babanoue) — ✅
+Restauration partie après refresh en pleine partie (multi-layer defensive fix).
 
-**Plan complet** : `.claude/plans/la-avec-tout-le-clever-octopus.md` — référentiel de toutes les décisions produit déjà validées. À relire si questions architecturales.
+### Phase 2 (NF Auth recovery) — ✅
+Retrouver une partie perdue (localStorage clear, nouveau device) via preuve d'adresse 1 CRC remboursé.
 
-## Ce qui est livré (Phase 1 + Phase 2)
+### Phase 3a (fondations wallet) — ✅
+- `players.balance_crc` + table `wallet_ledger` (schéma + migration locale + Neon)
+- `src/lib/wallet.ts` : getBalance, creditWallet, scanWalletTopups, getLedger
+- Routes : `/api/wallet/balance`, `/api/wallet/topup-scan`, `/api/wallet/ledger`, `/api/wallet/config`, `/api/wallet/commission`
+- UI : `<WalletBalanceCard>` dans ProfileModal + `<TopupModal>` + i18n section `wallet`
+- `generateTopupPaymentLink()` + `checkAllWalletTopups()` dans circles.ts
+- Mode demo : localStorage nf-demo-progress avec balanceCrc, méthodes credit/debit
 
-### Phase 1 — Fix bug Babanoue (commit `09c4a77`)
+### Phase 3b (pay-from-balance) — ✅
+- `payGameFromBalance()` dans wallet.ts + route `POST /api/wallet/pay-game`
+- Dispatcher `src/lib/wallet-game-dispatch.ts` — 14+ jeux supportés :
+  - Multi (6) : morpion, memory, relics, dames, pfc, crc-races (non déployé encore)
+  - Chance action (8) : roulette, hilo, plinko, mines, dice, crash_dash, keno, blackjack
+  - Lottery + daily (claim gratuit, route dédiée)
+- UI : `<BalancePayButton>` + hook `useConnectedAddress` → intégré dans ChancePayment + GamePayment
+- Synthetic txHash format `balance:{ledgerId}` pour les rows de jeu
 
-Fix défensif multi-couches pour "refresh en pleine partie = game perdue" :
+### Phase 3c (credit wins to balance) — ✅
+- Helpers `creditPrize()` + `creditCommission()` + `payPrize()` + `payCommission()` dans wallet.ts
+- DAO treasury pseudo-address `0x000000000000000000000000000000000000da00`
+- **Asymétrique** : pay on-chain → win on-chain ; pay balance → win balance
+- 19 routes migrées (chance action, scan routes, multi action, draw, daily scratch/spin)
 
-1. `src/hooks/use-player-token.ts` : `setVersion` force re-render quand le token se résout après hydration SSR.
-2. `ChancePayment` + `GamePayment` : bouton Payer désactivé tant que `!playerToken` (affiche "Préparation..."). Empêche les tx sans token encodé.
-3. 7 routes `/api/{game}/active` : `eq(status, "playing")` → `ne(status, "finished")`. Capture tous les rounds non-finis.
-4. 9 pages chance (`roulette`, `hilo`, `mines`, `keno`, `crash-dash`, `plinko`, `dice`, `coin-flip`, `blackjack`) : useEffect de restore relance quand token arrive (`tokenValue` en dep).
+## Bugs corrigés pendant Phase 3
 
-**Validé par le user** : smoke test OK sur mobile. Refresh simple → partie restaurée.
+1. Fast Refresh interrompait les spins → dev-time only
+2. `await fetch(NEXT_PUBLIC_APP_URL/api/players/xp)` bloquant quand port dev != env var → `void fetch(...).catch(() => {})` (10 routes fixées)
+3. Mines/Keno balance-pay manquait `mineCount`/`pickCount` → balanceExtras passés dans ChancePayment
+4. Dice tables manquantes en local → `scripts/migrate-dice-local.mjs`
+5. Dérive nonce bot entre dev/prod → auto-resync dans `src/lib/payout.ts`
+6. Schema drift `payouts.amount_crc` integer→real en local → `scripts/fix-payouts-column-local.mjs`
 
-### Phase 2 — Bureau des tickets perdus (commit `0a20655`)
+## ⚠️ Ce qu'il reste à faire
 
-Récupération de la partie via preuve d'adresse quand localStorage est perdu (cache clear, nouvelle nav, autre device).
+### Phase 3d — Cashout (pas fait)
+Retirer du solde vers wallet Circles + preuve d'adresse standalone.
 
-**Schema** : table `nf_auth_tokens` (token, address, tx_hash, expires_at).
+Scope (voir `.claude/plans/la-avec-tout-le-clever-octopus.md`) :
+- Helper `cashout(address, amount, proof)` dans wallet.ts
+- Route `POST /api/auth/verify-cashout { address, amountCrc }` → token one-shot
+- Route `POST /api/wallet/cashout { address, amountCrc, proof }` → débit atomique + `executePayout` + rollback crédit si échec
+- UI ProfileModal : bouton "Retirer" → modal (input montant + flow payment-proof ou miniapp signature)
+- Preuve standalone : 1 CRC payment-proof type "cashout", data `nf_cashout:{token}:{amount}`
 
-**API** :
-- `POST /api/nf-auth` → crée token, renvoie `{ token, paymentLink, qrCode, recipientAddress }`
-- `GET /api/nf-auth?token=` → polling, scan blockchain, extrait sender, refund 1 CRC auto
-- `GET /api/game-ticket?gameKey=&slug=&authToken=` → dispatch multi (player1/2Address) + chance (playerAddress). Retourne `{ status, role, token }`.
+### Phase 3e — Polish/monitoring (pas fait)
+- Endpoint `GET /api/admin/wallet-health` → `{ totalBalances, safeCrcBalance, diff }`
+- Historique ledger dans ProfileModal (5 dernières + voir tout)
+- Verif invariant : `sum(players.balance_crc) ≈ Safe_CRC_balance_onchain`
 
-**UI** : composant `<TicketRecovery>` dans `src/components/ticket-recovery.tsx`. Modal avec QR + polling + auto-reload. Injecté discrètement en bas de `ChancePayment` et `GamePayment`.
+### Ajouts optionnels Phase 3b/3c
+- **coin_flip + lootbox au pay-from-balance** : instant-resolve games nécessitent un refactor mineur de `creditWallet` pour partager la transaction DB avec le débit, permettant un flow atomique débit → résolution → crédit dans une seule transaction.
+- **Scan routes XP fetch blocking** : 10 fichiers restants ont `await fetch(XP)` bloquant (roulette-scan, hilo-scan, etc.). Moins critique que action routes (user ne voit pas la réponse en temps réel) mais même pattern à fix en `void fetch(...).catch()`.
 
-**circles.ts** : `"nf_auth"` ajouté à `gameKeys` (ligne 441).
+## Bugs potentiels (à tester après)
 
-**i18n** : section `ticketRecovery` FR+EN dans `src/lib/i18n.ts`.
+La session 1 (actuelle) a beaucoup touché au code. Points de vigilance pour la prochaine session :
 
-**Build** : TSC vert. Non testé en prod (migration Neon pas encore faite).
+1. **Tester tous les jeux balance-pay** : chaque jeu (roulette, hilo, mines, dice, plinko, crash_dash, keno, blackjack, morpion, memory, relics, dames, pfc, lottery) doit :
+   - Afficher card "Payer avec mon solde" quand balance >= bet
+   - Débit atomique quand on clique
+   - Round/partie créée sans tx on-chain
+   - Action de jeu fonctionne (spin/reveal/etc.)
+   - Win → crédit solde (si balance-pay) ou on-chain (si on-chain-pay)
+2. **Tester topup live** : 1 CRC depuis Gnosis App → polling détecte → solde monte. Fix du 18/04 : `armWatching` déclenché sur QR/Copy/Link click.
+3. **Tester daily claim from balance** : bouton "Réclamer mon daily (gratuit)" sans débit.
+4. **Vérifier invariant sur Neon** : `sum(balance_crc) + DAO_TREASURY` vs Safe on-chain balance (devrait être équivalent).
 
-## Action immédiate — Migration Neon
+## Scripts ops utiles (session 1 a beaucoup grossi ce dossier)
 
-La Phase 2 ne fonctionnera pas en prod tant que la table `nf_auth_tokens` n'existe pas sur Neon.
+Voir `scripts/README.md` pour la liste complète. Highlights :
+- `check-wallet-state.mjs <address>` — state players + ledger
+- `check-bot-nonce.mjs [.env.local|.env.neon]` — dérive nonce bot
+- `compare-crc-columns.mjs` — drift schema local vs Neon
+- `fix-payouts-column-local.mjs` — repair int→real + retrigger orphans
+- `resync-and-retry-nf-auth.mjs` — repair refund NF Auth failed
+- `smoke-pay-game.mjs` — smoke test /api/wallet/pay-game
+- `smoke-wallet.mjs` — smoke test routes wallet
+- `smoke-lottery-daily.mjs` — smoke test lottery + daily balance flows
+- `migrate-wallet.mjs --neon` — migration Phase 3a (déjà appliquée)
+- `migrate-nf-auth.mjs --neon` — migration Phase 2 (déjà appliquée)
+- `migrate-dice-local.mjs` — dice tables en local
 
-```bash
-# Depuis le repo principal, branche claude/add-wallet-balance-9ajNn checkée :
-git pull origin claude/add-wallet-balance-9ajNn
-npx vercel env pull .env.neon --environment=production
-node scripts/migrate-nf-auth.mjs --neon
-rm .env.neon
-```
+## Env vars
 
-Fichiers concernés : `drizzle/0009_add_nf_auth_tokens.sql` + `scripts/migrate-nf-auth.mjs`.
+- `SAFE_ADDRESS` = `0x960A0784640fD6581D221A56df1c60b65b5ebB6f` (Safe relayer)
+- `DAO_TREASURY_ADDRESS` = `0x000000000000000000000000000000000000da00` (pseudo-address, commission tracking)
+- `BOT_PRIVATE_KEY` = même clé sur dev/prod (attention dérive nonce)
+- `NEXT_PUBLIC_APP_URL` = doit matcher le port du dev server (sinon XP fetch fail)
+- `ROLES_MODIFIER_ADDRESS`, `ROLE_KEY`, `ADMIN_PASSWORD` = existants
 
-Migration locale aussi (Postgres local dev) si pas déjà fait :
-```bash
-node scripts/migrate-nf-auth.mjs
-```
+## Où reprendre
 
-## Tests à faire après migration
+**Session 2 — options dans l'ordre suggéré :**
 
-Sur preview Vercel ou local :
+1. **Tester Phase 3 end-to-end** : jouer à chaque famille de jeu (multi, chance action, chance instant, lottery, daily) en balance-pay + on-chain. Identifier les bugs réels (pas les bugs de dev Fast Refresh).
 
-1. **Smoke test Phase 1** (si pas déjà refait)
-   - Payer sur roulette en web standalone → placer bets → F5 → partie revient ✓
-2. **Test Phase 2 — recovery**
-   - Payer sur roulette → partie active
-   - `localStorage.clear(); location.reload()` → écran de paiement
-   - Cliquer **"Retrouver ma partie"** en bas du QR
-   - Payer 1 CRC (remboursé auto)
-   - Polling détecte paiement → dispatch → token injecté → reload
-   - Partie restaurée ✓
+2. **Phase 3d (cashout)** : critique, sinon le solde est one-way (tu peux charger mais pas retirer). ~1-2 jours de taf.
 
-Si scan/polling lent, vérifier `/api/nf-auth?token=X` directement en GET — doit retourner `{status:"confirmed", address:"0x..."}` après paiement.
+3. **Ajouts optionnels** : coin_flip/lootbox balance-pay, fix scan routes XP fetch blocking, phase 3e monitoring.
 
-## Plan Phase 3 — Wallet (solde + ledger + cashout)
+4. **Polish UI** : la card balance pourrait avoir un lien direct vers l'historique ledger, un avatar ou lien cashout quand 3d est fait.
 
-Objectif : charger 1 fois un solde CRC, payer ses mises depuis ce solde sans re-tx, cashout on-chain à volonté. Gains crédités au solde (pas de payout gas par partie).
+## Important — git hygiene
 
-**Invariant critique** : `sum(players.balance_crc) + DAO_commission_pending ≈ Safe_CRC_balance_onchain`.
+Session 1 a eu des galères de branche (VSCode / IDE auto-switch). Pour session 2 :
+- **Travailler sur master** désormais (Phase 3 y est mergée).
+- Si un outil switch sur une autre branche, `git checkout master` puis revenir au taf.
+- NE PAS refaire de cherry-pick inter-branches sans un plan clair.
 
-### Découpage recommandé (5 sous-phases commit-par-commit)
-
-**3a — Fondations (1-2j)**
-- `src/lib/db/schema.ts` : `players.balanceCrc: integer.notNull().default(0)` + nouvelle table `walletLedger` (id, address, kind, amountCrc signed, balanceAfter, reason, txHash unique, gameType, gameSlug, createdAt). Index sur address, unique sur txHash.
-- `drizzle/0010_add_wallet.sql` + `scripts/migrate-wallet.mjs`
-- `src/lib/wallet.ts` : `getBalance(address)`, `creditWallet(address, amount, opts)` avec upsert players, `scanWalletTopups()` via `checkAllNewPayments` filtré `gameData.game === "wallet" && id === "topup"`.
-- `src/lib/circles.ts` : `generateTopupPaymentLink(amount)` avec `data="wallet:topup"`. Ajouter `"wallet"` à gameKeys.
-- Routes :
-  - `GET /api/wallet/balance?address=`
-  - `POST /api/wallet/topup-scan { address }` → scan + crédit idempotent
-  - `GET /api/wallet/ledger?address=&limit=`
-- UI : section "Mon solde CRC" dans `src/components/profile-modal.tsx` avec bouton "Charger" → modal QR topup + polling. i18n section `wallet`.
-
-**3b — Paiement par solde (1-2j)**
-- `src/lib/wallet.ts` : `debitForGame(address, gameKey, slug, amount, playerToken)` atomique via `UPDATE players SET balance_crc = balance_crc - X WHERE balance_crc >= X RETURNING` + INSERT ledger + UPDATE table du jeu (set player1/2Address, player1/2Token, player1/2TxHash='balance:<ledgerId>'). Le tout dans `db.transaction()`.
-- Route `POST /api/wallet/pay-game { gameKey, slug, address, playerToken, amount, ballValue? }` — dispatch multi/chance via les mêmes registries que `/api/game-ticket`.
-- UI `ChancePayment` + `GamePayment` : toggle en haut du formulaire de paiement. Si `balanceCrc >= betCrc` → option "Payer avec solde (X CRC)" présélectionnée + bouton unique "Payer avec mon solde". Sinon QR/Mini App comme avant. Ne jamais appeler ça en `isDemo`.
-- Mode demo : `src/components/demo-provider.tsx` → méthodes `debitBalance/creditBalance/topupBalance`, localStorage `nf-demo-balance` (défaut 100).
-
-**3c — Crédit des gains (1j)**
-- Rechercher tous les appels à `executePayout` dans `src/app/api/*/` (~15-20 callsites).
-- Pour chaque **gain joueur** : remplacer par `creditWallet(winner, amount, { reason: "prize:<game>:<slug>" })`.
-- Pour la **commission DAO** : créditer `players (address = DAO_TREASURY_ADDRESS)` via `creditWallet`. Address fixe à définir dans une env var.
-- `scanGamePayments` (`src/lib/multiplayer.ts`) : **inchangé**. La garde `if (!game.player1Address)` ignore déjà les parties attribuées par `/pay-game`.
-- Vérifier que le flow on-chain (paiement direct QR) continue de marcher pour les users sans solde — les 2 flows doivent coexister.
-
-**3d — Cashout (1j)**
-- Helper `cashout(address, amount, proof)` dans wallet.ts. `proof` = `{ type:'miniapp-sig', signature }` OU `{ type:'payment-proof', authToken }`.
-- Route `POST /api/auth/verify-cashout { address, amountCrc }` → crée un token one-shot lié à (address, amount), renvoie lien de paiement proof (nouvelle session payment-proof type `cashout`, data=`nf_cashout:{token}:{amount}`).
-- Route `POST /api/wallet/cashout { address, amountCrc, proof }` → re-valide la preuve (même si une session nf-auth est valide, cashout **re-demande** toujours une signature ou un payment-proof dédié), débite atomiquement, appelle `executePayout({ gameType:"wallet", gameId: "cashout-<ledgerId>", ... })`. Si payout on-chain échoue → `creditWallet(reason:"cashout-refund", ledgerId)` pour rollback.
-- UI ProfileModal : bouton "Retirer" → modal avec input montant + flow signature Mini App OU payment-proof web.
-
-**3e — Polish (0.5j)**
-- Mode demo complet (solde démarre à 100, UI cohérente en demo).
-- History ledger dans ProfileModal (5 dernières entrées + bouton "voir tout").
-- Monitoring invariant : endpoint admin `GET /api/admin/wallet-health` → `{ totalBalances, safeCrcBalance, diff }`.
-- Build + push.
-
-### Points d'attention
-
-- **Concurrence** : `UPDATE players SET balance_crc = balance_crc - X WHERE address = ? AND balance_crc >= X RETURNING *` sérialise naturellement sur la row. 0 rows updated → `insufficient_balance`. INSERT ledger dans la **même transaction**.
-- **Topup sans `data`** : tx ignorée par le scan. Pour recovery manuel admin, prévoir un endpoint `POST /api/admin/credit-topup { txHash, address, amount }` (avec admin token).
-- **Gagnants sans row `players`** : `creditWallet` doit upsert à la volée.
-- **Cashout échoué on-chain** : re-crédit automatique via ledger (pattern de compensation).
-- **Safe balance** : quand tous les users cashout en même temps, le Safe doit couvrir. Invariant à monitorer.
-- **Mini App signature** : vérifier si `miniapp-bridge.ts` expose déjà une primitive `signMessage`. Sinon à ajouter (postMessage `{ type: "sign_message", message }` + response handler). Cf. `src/lib/miniapp-bridge.ts`.
-- **DAO_TREASURY_ADDRESS** : définir dans `.env.local` + `.env.neon`. Typiquement une multisig NF distinct du Safe (pour séparer bankroll jeux et trésorerie DAO). À discuter avec le user.
-
-### Fichiers à créer
+## Derniers commits master
 
 ```
-drizzle/0010_add_wallet.sql
-scripts/migrate-wallet.mjs
-src/lib/wallet.ts
-src/app/api/wallet/balance/route.ts
-src/app/api/wallet/topup-scan/route.ts
-src/app/api/wallet/pay-game/route.ts
-src/app/api/wallet/cashout/route.ts
-src/app/api/wallet/ledger/route.ts
-src/app/api/auth/verify-cashout/route.ts
-src/app/api/admin/wallet-health/route.ts
+b2dfdfa Merge Phase 3: wallet (balance + pay-from-balance + credit-wins)
+09d5bf3 Fix blackjack split/double race condition and orphan claims
+6cb603a fix(build): force-dynamic on chance game lobbies + stats
 ```
 
-### Fichiers à modifier
-
-```
-src/lib/db/schema.ts               # balanceCrc + walletLedger
-src/lib/circles.ts                 # generateTopupPaymentLink + "wallet" dans gameKeys
-src/lib/i18n.ts                    # section wallet
-src/components/profile-modal.tsx   # section solde + modals topup/cashout
-src/components/chance-payment.tsx  # toggle solde vs CRC direct
-src/components/game-payment.tsx    # toggle solde vs CRC direct
-src/components/demo-provider.tsx   # méthodes debit/credit/topup
-```
-
-Puis ~15-20 fichiers sous `src/app/api/*/` pour remplacer `executePayout(winner, ...)` par `creditWallet(...)`.
-
-## Références utiles
-
-- Pattern payment-proof : `src/app/api/shop/auth/route.ts` (shop) et `src/app/api/nf-auth/route.ts` (ce qu'on a fait en Phase 2)
-- Pattern scan : `src/lib/multiplayer.ts` (`scanGamePayments`)
-- Payout Safe : `src/lib/payout.ts` (`executePayout`)
-- Mini App bridge : `src/lib/miniapp-bridge.ts`
-- Game data encoding : `src/lib/game-data.ts`
-- Tables DB : `src/lib/db/schema.ts` + `src/lib/db/schema/*.ts`
-
-## Ordre conseillé
-
-1. Migration Neon Phase 2 → tester le flow recovery end-to-end (20 min)
-2. Si tout roule → démarrer Phase 3a (fondations wallet), commit, push, test isolé
-3. Phase 3b (pay-game) après validation 3a
-4. Phase 3c (crédit gains) — **attention, toucher aux payouts = affecte toutes les parties en cours**. Bien tester
-5. Phase 3d (cashout) — feature critique côté UX
-6. Phase 3e (polish + monitoring)
-
-Check `npx tsc --noEmit` après chaque sous-phase. Push à chaque commit pour que preview Vercel se mette à jour.
+Branche `claude/add-wallet-balance-9ajNn` existe toujours pour historique (preview Vercel dispo), mais master = source de vérité maintenant.
 
 ---
 
-Fin du handoff. Si questions architecturales : relire `.claude/plans/la-avec-tout-le-clever-octopus.md`.
+**Fin du handoff v2.** Bonne session 2.
