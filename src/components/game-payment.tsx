@@ -9,6 +9,7 @@ import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY } from "@/lib/game-registry";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { TicketRecovery } from "@/components/ticket-recovery";
 
 interface GamePaymentProps {
   gameKey: string;
@@ -182,6 +183,9 @@ export function GamePayment({
             <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
             {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
           </button>
+
+          {/* Ticket recovery for the creator who lost their token */}
+          <TicketRecovery gameKey={gameKey} slug={game.slug} />
         </CardContent>
       </Card>
     );
@@ -307,6 +311,9 @@ export function GamePayment({
           <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
           {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
         </button>
+
+        {/* Ticket recovery (bureau des tickets perdus) */}
+        <TicketRecovery gameKey={gameKey} slug={game.slug} />
       </CardContent>
     </Card>
   );

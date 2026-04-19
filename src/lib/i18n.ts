@@ -1260,6 +1260,32 @@ export const translations = {
     connected: { fr: "Connect\u00e9", en: "Connected" },
     preparing: { fr: "Pr\u00e9paration...", en: "Preparing..." },
   },
+  ticketRecovery: {
+    button: { fr: "Retrouver ma partie", en: "Recover my game" },
+    title: { fr: "Retrouver votre partie", en: "Recover your game" },
+    description: {
+      fr: "Payez 1 CRC pour prouver votre adresse. Montant rembours\u00e9 imm\u00e9diatement.",
+      en: "Pay 1 CRC to prove your address. Amount refunded immediately.",
+    },
+    payBtn: { fr: "Payer 1 CRC", en: "Pay 1 CRC" },
+    waiting: { fr: "En attente du paiement...", en: "Waiting for payment..." },
+    confirmed: { fr: "Adresse v\u00e9rifi\u00e9e", en: "Address verified" },
+    searching: { fr: "Recherche de votre partie...", en: "Searching for your game..." },
+    found: { fr: "Partie retrouv\u00e9e !", en: "Game recovered!" },
+    noTicket: {
+      fr: "Aucune partie en cours trouv\u00e9e pour cette adresse.",
+      en: "No active game found for this address.",
+    },
+    expired: { fr: "Le lien a expir\u00e9. R\u00e9essayez.", en: "Link expired. Please retry." },
+    error: { fr: "Une erreur est survenue", en: "An error occurred" },
+    cancel: { fr: "Annuler", en: "Cancel" },
+    close: { fr: "Fermer", en: "Close" },
+    retry: { fr: "R\u00e9essayer", en: "Retry" },
+    scanQr: {
+      fr: "Scannez avec Gnosis App pour payer",
+      en: "Scan with Gnosis App to pay",
+    },
+  },
   support: {
     buttonTooltip: {
       fr: "Besoin d'aide ?",

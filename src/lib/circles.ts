@@ -438,7 +438,7 @@ async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { g
         // Search for known game key patterns in the hex data
         // Each game key (morpion, memory, relics, dames) followed by ":" (3a in hex)
         // Auto-generated from registry + non-game payment types
-        const gameKeys = [...ALL_GAMES.map(g => g.key), "blackjack", "lootbox", "lottery", "coin_flip", "hilo", "mines", "dice", "crash_dash", "keno", "roulette", "plinko", "daily", "shop_auth"];
+        const gameKeys = [...ALL_GAMES.map(g => g.key), "blackjack", "lootbox", "lottery", "coin_flip", "hilo", "mines", "dice", "crash_dash", "keno", "roulette", "plinko", "daily", "shop_auth", "nf_auth"];
         let found = false;
 
         for (const gk of gameKeys) {

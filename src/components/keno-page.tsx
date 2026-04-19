@@ -779,6 +779,7 @@ function RealKenoGame({ table }: { table: KenoTable }) {
             amountCrc={selectedBet}
             gameType="keno"
             gameId={gameId}
+            tableSlug={table.slug}
             accentColor={accentColor}
             payLabel={`🎱 Keno — ${selectedBet} CRC / ${pickCount} ${t.picks[locale]}`}
             onPaymentInitiated={async () => {

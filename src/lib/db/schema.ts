@@ -246,6 +246,15 @@ export const shopSessions = pgTable("shop_sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const nfAuthTokens = pgTable("nf_auth_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  address: text("address"),
+  txHash: text("tx_hash"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
 export const shopItems = pgTable("shop_items", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),

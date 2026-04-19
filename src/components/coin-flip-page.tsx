@@ -468,6 +468,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
               amountCrc={selectedBet}
               gameType="coin_flip"
               gameId={gameId}
+              tableSlug={table.slug}
               accentColor={accentColor}
               payLabel={`${t.heads[locale]} / ${t.tails[locale]} — ${selectedBet} CRC`}
               onPaymentInitiated={async () => {

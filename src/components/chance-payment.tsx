@@ -7,6 +7,7 @@ import { generateGamePaymentLink } from "@/lib/circles";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { TicketRecovery } from "@/components/ticket-recovery";
 
 interface ChancePaymentProps {
   /** Recipient address for the payment */
@@ -35,6 +36,8 @@ interface ChancePaymentProps {
   playerToken?: string;
   /** Optional ball value (CRC per ball) for games like Plinko — encoded as bv{N} */
   ballValue?: number;
+  /** Optional table slug — used by ticket recovery when gameId is composite (mines, keno, coin-flip) */
+  tableSlug?: string;
 }
 
 export function ChancePayment({
@@ -51,6 +54,7 @@ export function ChancePayment({
   qrLabel,
   playerToken,
   ballValue,
+  tableSlug,
 }: ChancePaymentProps) {
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
@@ -252,6 +256,9 @@ export function ChancePayment({
             : (locale === "fr" ? "Scanner les paiements" : "Scan payments")}
         </button>
       )}
+
+      {/* -- Ticket recovery (bureau des tickets perdus) -- */}
+      <TicketRecovery gameKey={gameType} slug={tableSlug || gameId} />
     </div>
   );
 }

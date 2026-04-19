@@ -626,6 +626,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
             amountCrc={selectedBet}
             gameType="mines"
             gameId={gameId}
+            tableSlug={table.slug}
             accentColor={accentColor}
             payLabel={`Mines — ${selectedBet} CRC / ${selectedMines} mines`}
             onPaymentInitiated={async () => {
