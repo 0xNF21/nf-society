@@ -138,7 +138,15 @@ export function ChancePayment({
     <div className="space-y-4">
       {/* Pay-from-balance — shown above the normal flow when balance >= amount.
           Component renders nothing when balance is insufficient, keeping the
-          default on-chain UI as the only option. */}
+          default on-chain UI as the only option.
+
+          onSuccess behavior: if the parent passed onBalancePaid, we defer to
+          it (pages can do smooth state transitions). Otherwise we fall back to
+          a page reload after a short confirmation window — each game page has
+          an /api/{game}/active?token=X query that runs on mount and will pick
+          up the freshly-provisioned round. We don't call onPaymentInitiated
+          here because it usually triggers an on-chain scan that doesn't know
+          about balance-paid rounds. */}
       <BalancePayButton
         gameKey={balKey}
         slug={balSlug}
@@ -146,7 +154,15 @@ export function ChancePayment({
         playerToken={playerToken}
         address={connectedAddress || undefined}
         extras={balExtras}
-        onSuccess={onBalancePaid}
+        onSuccess={(result) => {
+          if (onBalancePaid) {
+            onBalancePaid(result);
+          } else {
+            setTimeout(() => {
+              if (typeof window !== "undefined") window.location.reload();
+            }, 1200);
+          }
+        }}
         accentColor={accentColor}
       />
 
