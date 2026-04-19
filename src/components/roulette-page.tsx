@@ -959,6 +959,7 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
   const handleSpin = useCallback(async () => {
     if (!round || spinning) return;
     setSpinning(true);
+    console.log("[Roulette] Spin starting, round.id=", round.id);
 
     try {
       const res = await fetch(`/api/roulette/${round.id}/action`, {
@@ -967,13 +968,15 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
         body: JSON.stringify({ bets, playerToken: tokenRef.current }),
       });
       const data = await res.json();
+      console.log("[Roulette] Spin response status:", res.status, "data.status:", data?.status, "data.result:", data?.result);
       if (!res.ok) { console.error("[Roulette] Error:", data.error); setSpinning(false); return; }
       // Start wheel animation with result
       setResultNumber(data.result);
-      // After 4.2s (wheel animation done): apply result + re-fetch from /active
-      // to guarantee the UI reflects every DB field (payoutStatus, payoutTxHash,
-      // updated bets, etc.) so the ResultPanel renders immediately without F5.
+      // After 4.2s: apply result + re-fetch from /active. If the UI still
+      // doesn't transition (rare state-propagation issue), the hard reload
+      // at 5s guarantees the final Victory/Defeat screen shows up.
       setTimeout(async () => {
+        console.log("[Roulette] Applying result, setting round with status:", data?.status);
         setRound(data);
         setSpinning(false);
         try {
@@ -982,8 +985,11 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
             { cache: "no-store" },
           );
           const refreshData = await refreshRes.json();
+          console.log("[Roulette] Refresh result:", refreshData?.round?.status);
           if (refreshData?.round) setRound(refreshData.round);
-        } catch {}
+        } catch (e) {
+          console.error("[Roulette] Refresh error:", e);
+        }
       }, 4200);
     } catch (err) {
       console.error("[Roulette] Fetch error:", err);
