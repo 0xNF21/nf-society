@@ -112,14 +112,12 @@ export async function POST(
 
         // XP for any positive outcome
         if (payoutAmount >= newState.totalBet) {
-          try {
-            const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-            await fetch(`${base}/api/players/xp`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ address: round.playerAddress, action: "plinko_win" }),
-            });
-          } catch {}
+          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+          void fetch(`${base}/api/players/xp`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address: round.playerAddress, action: "plinko_win" }),
+          }).catch(() => {});
         }
       } else {
         await db.update(plinkoRounds).set({ payoutStatus: "none" }).where(eq(plinkoRounds.id, roundId));

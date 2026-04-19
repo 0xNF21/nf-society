@@ -120,15 +120,13 @@ export async function POST(
           }).where(eq(crashDashRounds.id, roundId));
         }
 
-        // XP for win
-        try {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: round.playerAddress, action: "crash_dash_win" }),
-          });
-        } catch {}
+        // XP for win — fire and forget (don't block the response).
+        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        void fetch(`${base}/api/players/xp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: round.playerAddress, action: "crash_dash_win" }),
+        }).catch(() => {});
       }
     }
 

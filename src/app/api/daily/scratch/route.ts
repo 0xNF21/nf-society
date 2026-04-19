@@ -74,14 +74,12 @@ export async function POST(req: NextRequest) {
 
     // XP if won (non-blocking)
     if (result.xpValue > 0) {
-      try {
-        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        await fetch(`${base}/api/players/xp`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: session.address, action: "daily_scratch", xpOverride: result.xpValue }),
-        });
-      } catch { /* XP fail silencieux */ }
+      const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      void fetch(`${base}/api/players/xp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: session.address, action: "daily_scratch", xpOverride: result.xpValue }),
+      }).catch(() => {});
     }
 
     return NextResponse.json({ result });

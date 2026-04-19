@@ -101,15 +101,15 @@ export async function POST(
           }).where(eq(rouletteRounds.id, roundId));
         }
 
-        // XP for win
-        try {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: round.playerAddress, action: "roulette_win" }),
-          });
-        } catch {}
+        // XP for win — fire and forget so a slow / unreachable XP endpoint
+        // never blocks the spin response (caused the post-win freeze when
+        // NEXT_PUBLIC_APP_URL pointed at a non-listening port).
+        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        void fetch(`${base}/api/players/xp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: round.playerAddress, action: "roulette_win" }),
+        }).catch(() => {});
       }
     }
 
