@@ -127,20 +127,28 @@ export async function POST(req: NextRequest) {
           amountCrc: betCrc,
         }).onConflictDoNothing();
 
-        // Payout if won
+        // Payout if won — credit the win to the player's balance.
         if (result.outcome === "win" && result.payoutCrc > 0) {
-          const { executePayout } = await import("@/lib/payout");
-          await executePayout({
-            gameType: "coin_flip",
-            gameId: `coin_flip-${table.id}-${txHash}`,
-            recipientAddress: playerAddress,
-            amountCrc: result.payoutCrc,
-            reason: `Coin Flip ${table.title} — win ${result.payoutCrc} CRC`,
-          });
-
-          await db.update(coinFlipResults).set({
-            payoutStatus: "success",
-          }).where(eq(coinFlipResults.id, inserted[0].id));
+          const { creditPrize } = await import("@/lib/wallet");
+          try {
+            const creditResult = await creditPrize(
+              playerAddress,
+              result.payoutCrc,
+              { gameType: "coin_flip", gameSlug: String(table.id), gameRef: `result-${inserted[0].id}` },
+            );
+            await db.update(coinFlipResults).set({
+              payoutStatus: "success",
+              payoutTxHash: creditResult.ok
+                ? `balance-credit:${creditResult.ledgerId}`
+                : "balance-credit:duplicate",
+            }).where(eq(coinFlipResults.id, inserted[0].id));
+          } catch (err: any) {
+            console.error("[CoinFlipScan] Credit error:", err.message);
+            await db.update(coinFlipResults).set({
+              payoutStatus: "failed",
+              errorMessage: err.message?.substring(0, 500),
+            }).where(eq(coinFlipResults.id, inserted[0].id));
+          }
         }
 
         // XP

@@ -5,7 +5,7 @@ import { hiloRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculatePayout, isValidAction } from "@/lib/hilo";
 import type { HiLoState, HiLoAction } from "@/lib/hilo";
-import { executePayout } from "@/lib/payout";
+import { creditPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -77,21 +77,21 @@ export async function POST(
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const payoutResult = await executePayout({
-            gameType: "hilo",
-            gameId: `hilo-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
-            reason: `Hi-Lo — cashout x${newState.currentMultiplier.toFixed(2)} — ${payoutAmount} CRC`,
-          });
+          const creditResult = await creditPrize(
+            round.playerAddress,
+            payoutAmount,
+            { gameType: "hilo", gameSlug: String(round.tableId), gameRef: `round-${round.id}` },
+          );
 
           await db.update(hiloRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: "success",
+            payoutTxHash: creditResult.ok
+              ? `balance-credit:${creditResult.ledgerId}`
+              : "balance-credit:duplicate",
+            errorMessage: null,
           }).where(eq(hiloRounds.id, roundId));
         } catch (err: any) {
-          console.error("[HiLo] Payout error:", err.message);
+          console.error("[HiLo] Credit error:", err.message);
           await db.update(hiloRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),

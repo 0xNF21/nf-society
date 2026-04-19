@@ -5,7 +5,7 @@ import { diceRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { resolveRoll, getVisibleState, calculatePayout, isValidAction } from "@/lib/dice";
 import type { DiceState, DiceAction } from "@/lib/dice";
-import { executePayout } from "@/lib/payout";
+import { creditPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -81,21 +81,21 @@ export async function POST(
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const payoutResult = await executePayout({
-            gameType: "dice",
-            gameId: `dice-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
-            reason: `Dice — x${(newState.multiplier || 0).toFixed(2)} — ${payoutAmount} CRC`,
-          });
+          const creditResult = await creditPrize(
+            round.playerAddress,
+            payoutAmount,
+            { gameType: "dice", gameSlug: String(round.tableId), gameRef: `round-${round.id}` },
+          );
 
           await db.update(diceRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: "success",
+            payoutTxHash: creditResult.ok
+              ? `balance-credit:${creditResult.ledgerId}`
+              : "balance-credit:duplicate",
+            errorMessage: null,
           }).where(eq(diceRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Dice] Payout error:", err.message);
+          console.error("[Dice] Credit error:", err.message);
           await db.update(diceRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),

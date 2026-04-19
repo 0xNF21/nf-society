@@ -5,7 +5,7 @@ import { crashDashRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculatePayout, isValidCashout } from "@/lib/crash-dash";
 import type { CrashDashState, CrashDashAction } from "@/lib/crash-dash";
-import { executePayout } from "@/lib/payout";
+import { creditPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -97,21 +97,21 @@ export async function POST(
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const payoutResult = await executePayout({
-            gameType: "crash_dash",
-            gameId: `crash_dash-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
-            reason: `Demurrage Dash — x${(newState.cashoutMultiplier || 0).toFixed(2)} — ${payoutAmount} CRC`,
-          });
+          const creditResult = await creditPrize(
+            round.playerAddress,
+            payoutAmount,
+            { gameType: "crash_dash", gameSlug: String(round.tableId), gameRef: `round-${round.id}` },
+          );
 
           await db.update(crashDashRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: "success",
+            payoutTxHash: creditResult.ok
+              ? `balance-credit:${creditResult.ledgerId}`
+              : "balance-credit:duplicate",
+            errorMessage: null,
           }).where(eq(crashDashRounds.id, roundId));
         } catch (err: any) {
-          console.error("[CrashDash] Payout error:", err.message);
+          console.error("[CrashDash] Credit error:", err.message);
           await db.update(crashDashRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),

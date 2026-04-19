@@ -5,7 +5,7 @@ import { kenoRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { resolveDraw, getVisibleState, calculatePayout, isValidAction } from "@/lib/keno";
 import type { KenoState, KenoAction } from "@/lib/keno";
-import { executePayout } from "@/lib/payout";
+import { creditPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -85,21 +85,21 @@ export async function POST(
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const payoutResult = await executePayout({
-            gameType: "keno",
-            gameId: `keno-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
-            reason: `Keno — ${newState.hits.length}/${newState.pickCount} hits x${(newState.multiplier || 0).toFixed(2)} — ${payoutAmount} CRC`,
-          });
+          const creditResult = await creditPrize(
+            round.playerAddress,
+            payoutAmount,
+            { gameType: "keno", gameSlug: String(round.tableId), gameRef: `round-${round.id}` },
+          );
 
           await db.update(kenoRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: "success",
+            payoutTxHash: creditResult.ok
+              ? `balance-credit:${creditResult.ledgerId}`
+              : "balance-credit:duplicate",
+            errorMessage: null,
           }).where(eq(kenoRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Keno] Payout error:", err.message);
+          console.error("[Keno] Credit error:", err.message);
           await db.update(kenoRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),

@@ -5,7 +5,7 @@ import { rouletteRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { resolveRoll, getVisibleState, calculatePayout, isValidAction } from "@/lib/roulette";
 import type { RouletteState, RouletteAction } from "@/lib/roulette";
-import { executePayout } from "@/lib/payout";
+import { creditPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -73,26 +73,26 @@ export async function POST(
 
     await db.update(rouletteRounds).set(updateData).where(eq(rouletteRounds.id, roundId));
 
-    // Process payout if won
+    // Credit the win to the player's balance (Phase 3c — no on-chain payout).
     if (newState.status === "won") {
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const payoutResult = await executePayout({
-            gameType: "roulette",
-            gameId: `roulette-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
-            reason: `Roulette — #${newState.result} — ${payoutAmount} CRC`,
-          });
+          const creditResult = await creditPrize(
+            round.playerAddress,
+            payoutAmount,
+            { gameType: "roulette", gameSlug: String(round.tableId), gameRef: `round-${round.id}` },
+          );
 
           await db.update(rouletteRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: "success",
+            payoutTxHash: creditResult.ok
+              ? `balance-credit:${creditResult.ledgerId}`
+              : "balance-credit:duplicate",
+            errorMessage: null,
           }).where(eq(rouletteRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Roulette] Payout error:", err.message);
+          console.error("[Roulette] Credit error:", err.message);
           await db.update(rouletteRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),

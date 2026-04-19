@@ -5,7 +5,7 @@ import { plinkoRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { dropBalls, cashout, getVisibleState, calculatePayout, isValidAction } from "@/lib/plinko";
 import type { PlinkoState, PlinkoAction } from "@/lib/plinko";
-import { executePayout } from "@/lib/payout";
+import { creditPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -87,21 +87,21 @@ export async function POST(
           const reasonSuffix = newState.status === "cashed_out"
             ? `cashout after ${newState.balls.length}/${newState.ballCount} balls`
             : `${newState.balls.length} balls`;
-          const payoutResult = await executePayout({
-            gameType: "plinko",
-            gameId: `plinko-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
-            reason: `Plinko — ${reasonSuffix} — ${payoutAmount} CRC`,
-          });
+          const creditResult = await creditPrize(
+            round.playerAddress,
+            payoutAmount,
+            { gameType: "plinko", gameSlug: String(round.tableId), gameRef: `round-${round.id}` },
+          );
 
           await db.update(plinkoRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: "success",
+            payoutTxHash: creditResult.ok
+              ? `balance-credit:${creditResult.ledgerId}`
+              : "balance-credit:duplicate",
+            errorMessage: null,
           }).where(eq(plinkoRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Plinko] Payout error:", err.message);
+          console.error("[Plinko] Credit error:", err.message);
           await db.update(plinkoRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),

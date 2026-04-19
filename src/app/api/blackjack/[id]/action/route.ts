@@ -5,7 +5,7 @@ import { blackjackHands } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculateTotalBet } from "@/lib/blackjack";
 import type { BlackjackState, Action } from "@/lib/blackjack";
-import { executePayout } from "@/lib/payout";
+import { creditPrize } from "@/lib/wallet";
 
 const VALID_ACTIONS: Action[] = ["hit", "stand", "double", "split", "insurance"];
 
@@ -79,21 +79,21 @@ export async function POST(
     // Process payout if finished
     if (newState.status === "finished" && newState.totalPayout > 0) {
       try {
-        const payoutResult = await executePayout({
-          gameType: "blackjack",
-          gameId: `blackjack-${hand.tableId}-${hand.transactionHash}`,
-          recipientAddress: hand.playerAddress,
-          amountCrc: newState.totalPayout,
-          reason: `Blackjack — ${updateData.outcome} — ${newState.totalPayout} CRC`,
-        });
+        const creditResult = await creditPrize(
+          hand.playerAddress,
+          newState.totalPayout,
+          { gameType: "blackjack", gameSlug: String(hand.tableId), gameRef: `hand-${hand.id}` },
+        );
 
         await db.update(blackjackHands).set({
-          payoutStatus: payoutResult.success ? "success" : "failed",
-          payoutTxHash: payoutResult.transferTxHash || null,
-          errorMessage: payoutResult.error || null,
+          payoutStatus: "success",
+          payoutTxHash: creditResult.ok
+            ? `balance-credit:${creditResult.ledgerId}`
+            : "balance-credit:duplicate",
+          errorMessage: null,
         }).where(eq(blackjackHands.id, handId));
       } catch (err: any) {
-        console.error("[Blackjack] Payout error:", err.message);
+        console.error("[Blackjack] Credit error:", err.message);
         await db.update(blackjackHands).set({
           payoutStatus: "failed",
           errorMessage: err.message?.substring(0, 500),
