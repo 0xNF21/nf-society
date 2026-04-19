@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { players, payouts } from "@/lib/db/schema";
+import { players, payouts, privacySettings } from "@/lib/db/schema";
 import { desc, sql, eq, and, gte } from "drizzle-orm";
 import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
+
+async function getHiddenAddresses(): Promise<Set<string>> {
+  const rows = await db
+    .select({ address: privacySettings.address })
+    .from(privacySettings)
+    .where(eq(privacySettings.hideFromLeaderboard, true));
+  return new Set(rows.map((r) => r.address.toLowerCase()));
+}
 
 export const dynamic = "force-dynamic";
 
@@ -30,17 +38,21 @@ export async function GET(req: NextRequest) {
     const period = req.nextUrl.searchParams.get("period") || "all";
     const game = req.nextUrl.searchParams.get("game") || "all";
 
+    const hidden = await getHiddenAddresses();
+
     // For XP leaderboard, just query players table
     if (type === "xp") {
       const topPlayers = await db.select({
         address: players.address,
         xp: players.xp,
         level: players.level,
-      }).from(players).orderBy(desc(players.xp)).limit(50);
+      }).from(players).orderBy(desc(players.xp)).limit(200);
+
+      const visible = topPlayers.filter((p) => !hidden.has(p.address.toLowerCase())).slice(0, 50);
 
       return NextResponse.json({
         type,
-        entries: topPlayers.map((p, i) => ({
+        entries: visible.map((p, i) => ({
           rank: i + 1,
           address: p.address,
           xp: p.xp,
@@ -97,6 +109,10 @@ export async function GET(req: NextRequest) {
           playerStats.set(p2, stats);
         }
       }
+    }
+
+    for (const addr of Array.from(playerStats.keys())) {
+      if (hidden.has(addr)) playerStats.delete(addr);
     }
 
     // Build entries
