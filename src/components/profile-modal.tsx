@@ -191,11 +191,11 @@ export default function ProfileModal() {
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-ink/10 overflow-hidden"
+            className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-ink/10 overflow-hidden flex flex-col max-h-[90vh]"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-ink/5">
+            <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-ink/5">
               <h2 className="text-base font-bold text-ink">{tp.title[locale]}</h2>
               <button onClick={() => setOpen(false)} className="text-ink/50 hover:text-ink transition-colors">
                 <X className="h-5 w-5" />
@@ -204,7 +204,7 @@ export default function ProfileModal() {
 
             {saved ? (
               /* Profil connecté */
-              <div className="p-5 space-y-4">
+              <div className="p-5 space-y-4 overflow-y-auto">
                 {/* Identité */}
                 <div className="flex items-center gap-3">
                   {saved.imageUrl ? (
@@ -266,7 +266,7 @@ export default function ProfileModal() {
               </div>
             ) : (
               /* Recherche profil */
-              <div className="p-5 space-y-4">
+              <div className="p-5 space-y-4 overflow-y-auto">
                 <p className="text-sm text-ink/50">{tp.searchHint[locale]}</p>
 
                 <div className="relative">

@@ -87,7 +87,7 @@ export function LedgerHistory({ address }: LedgerHistoryProps) {
         {loading && <Loader2 className="h-3 w-3 animate-spin text-ink/30" />}
       </div>
 
-      <ul className="divide-y divide-ink/5">
+      <ul className={`divide-y divide-ink/5 ${expanded ? "max-h-80 overflow-y-auto" : ""}`}>
         {entries.map((e) => (
           <LedgerEntryRow key={e.id} entry={e} locale={locale} />
         ))}
