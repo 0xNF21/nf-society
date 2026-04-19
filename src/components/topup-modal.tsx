@@ -145,8 +145,15 @@ export function TopupModal({ address, onCredited, onClose }: TopupModalProps) {
     }
   }
 
-  function handleStandalonePaid() {
-    // User clicks "J'ai payé" (or equivalent) after opening the Gnosis link.
+  /**
+   * Arm the scan poller. Called on any user action that signals "I'm about
+   * to pay" — clicking the Gnosis link, revealing the QR, or copying the
+   * link. All three lead to a payment that the user makes outside the
+   * browser (mobile app, other device), so we can't rely on an explicit
+   * "I paid" callback. We start polling eagerly and stop on close.
+   */
+  function armWatching() {
+    if (watching) return;
     baselineBalanceRef.current = null;
     pollCountRef.current = 0;
     setWatching(true);
@@ -157,6 +164,7 @@ export function TopupModal({ address, onCredited, onClose }: TopupModalProps) {
     await navigator.clipboard.writeText(paymentLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+    armWatching();
   }
 
   const isSuccess = creditedAmount !== null;
@@ -225,7 +233,7 @@ export function TopupModal({ address, onCredited, onClose }: TopupModalProps) {
               </div>
 
               {/* Demo path — instant credit, no API, no on-chain */}
-              {isDemo && amountValid && !watching && (
+              {isDemo && amountValid && (
                 <Button
                   onClick={() => {
                     const newBalance = creditDemoBalance(amount);
@@ -238,8 +246,9 @@ export function TopupModal({ address, onCredited, onClose }: TopupModalProps) {
                 </Button>
               )}
 
-              {/* Mini App path */}
-              {!isDemo && isMiniApp && amountValid && !watching && (
+              {/* Mini App path — payment options stay visible during watching
+                  so the user can retry if the tx was rejected. */}
+              {!isDemo && isMiniApp && amountValid && (
                 <div className="space-y-2">
                   <Button
                     onClick={handleMiniAppPay}
@@ -256,21 +265,25 @@ export function TopupModal({ address, onCredited, onClose }: TopupModalProps) {
                 </div>
               )}
 
-              {/* Standalone path */}
-              {!isDemo && !isMiniApp && amountValid && !watching && (
+              {/* Standalone path — payment options stay visible during watching
+                  so QR + link remain usable if the user scans from a phone. */}
+              {!isDemo && !isMiniApp && amountValid && (
                 <div className="space-y-2">
                   <a
                     href={paymentLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={handleStandalonePaid}
+                    onClick={armWatching}
                     className="block w-full text-center py-3 rounded-xl bg-marine text-white text-sm font-semibold hover:opacity-90"
                   >
                     {t.openGnosis[locale]}
                   </a>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setShowQr(s => !s)}
+                      onClick={() => {
+                        setShowQr(s => !s);
+                        armWatching();
+                      }}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-ink/15 text-ink/70 text-xs font-semibold hover:border-ink/30"
                     >
                       <QrCode className="h-3.5 w-3.5" />
@@ -297,8 +310,8 @@ export function TopupModal({ address, onCredited, onClose }: TopupModalProps) {
                 </div>
               )}
 
-              {/* Watching state */}
-              {watching && (
+              {/* Watching banner — shown BELOW payment options while polling. */}
+              {watching && !isDemo && (
                 <div className="rounded-xl bg-marine/[0.05] border border-marine/20 p-3 text-center space-y-2">
                   <Loader2 className="h-5 w-5 animate-spin text-marine mx-auto" />
                   <p className="text-sm font-semibold text-marine">{t.watching[locale]}</p>
