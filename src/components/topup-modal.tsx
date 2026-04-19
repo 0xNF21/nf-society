@@ -7,6 +7,7 @@ import { generateTopupPaymentLink } from "@/lib/circles";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { useDemo } from "@/components/demo-provider";
 
 const SAFE_ADDRESS_FALLBACK = "0x960A0784640fD6581D221A56df1c60b65b5ebB6f";
 const POLL_INTERVAL_MS = 5000;
@@ -22,6 +23,7 @@ interface TopupModalProps {
 export function TopupModal({ address, onCredited, onClose }: TopupModalProps) {
   const { locale } = useLocale();
   const { isMiniApp, sendPayment } = useMiniApp();
+  const { isDemo, creditDemoBalance } = useDemo();
   const t = translations.wallet;
 
   const [recipient, setRecipient] = useState(SAFE_ADDRESS_FALLBACK);
@@ -222,8 +224,22 @@ export function TopupModal({ address, onCredited, onClose }: TopupModalProps) {
                 )}
               </div>
 
+              {/* Demo path — instant credit, no API, no on-chain */}
+              {isDemo && amountValid && !watching && (
+                <Button
+                  onClick={() => {
+                    const newBalance = creditDemoBalance(amount);
+                    setCreditedAmount(amount);
+                    onCredited?.(newBalance);
+                  }}
+                  className="w-full bg-marine hover:bg-marine/90 text-white"
+                >
+                  {t.payBtn[locale].replace("%AMOUNT%", amountDisplay)} (demo)
+                </Button>
+              )}
+
               {/* Mini App path */}
-              {isMiniApp && amountValid && !watching && (
+              {!isDemo && isMiniApp && amountValid && !watching && (
                 <div className="space-y-2">
                   <Button
                     onClick={handleMiniAppPay}
@@ -241,7 +257,7 @@ export function TopupModal({ address, onCredited, onClose }: TopupModalProps) {
               )}
 
               {/* Standalone path */}
-              {!isMiniApp && amountValid && !watching && (
+              {!isDemo && !isMiniApp && amountValid && !watching && (
                 <div className="space-y-2">
                   <a
                     href={paymentLink}

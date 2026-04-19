@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Wallet, Plus, Loader2 } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { TopupModal } from "@/components/topup-modal";
 
@@ -13,37 +14,43 @@ interface WalletBalanceCardProps {
 /**
  * Compact card that shows the player's prepaid CRC balance and opens
  * the topup modal. Meant to be rendered inside ProfileModal.
+ *
+ * Demo mode reads balance from the DemoProvider (localStorage-backed),
+ * never hits /api/wallet/*. The topup modal handles the demo crediting
+ * itself via useDemo().creditDemoBalance.
  */
 export function WalletBalanceCard({ address }: WalletBalanceCardProps) {
   const { locale } = useLocale();
+  const { isDemo, demoPlayer } = useDemo();
   const t = translations.wallet;
-  const [balance, setBalance] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [realBalance, setRealBalance] = useState<number | null>(null);
+  const [loading, setLoading] = useState(!isDemo);
   const [topupOpen, setTopupOpen] = useState(false);
 
+  const balance = isDemo ? demoPlayer.balanceCrc : realBalance;
+
   const fetchBalance = useCallback(async () => {
-    if (!address) return;
+    if (isDemo || !address) return;
     try {
       const res = await fetch(`/api/wallet/balance?address=${encodeURIComponent(address)}`, {
         cache: "no-store",
       });
       const data = await res.json();
-      if (typeof data.balanceCrc === "number") setBalance(data.balanceCrc);
+      if (typeof data.balanceCrc === "number") setRealBalance(data.balanceCrc);
     } catch {
       // Silent — leave balance as last known
     } finally {
       setLoading(false);
     }
-  }, [address]);
+  }, [address, isDemo]);
 
   useEffect(() => {
     fetchBalance();
   }, [fetchBalance]);
 
   function handleTopupSuccess(newBalance: number) {
-    setBalance(newBalance);
-    // Keep the modal open so the user sees the confirmation, they close
-    // it manually when they're ready.
+    if (!isDemo) setRealBalance(newBalance);
+    // Demo balance updates via context automatically — no-op here.
   }
 
   return (

@@ -243,8 +243,8 @@ export default function ProfileModal() {
                   </div>
                 )}
 
-                {/* Solde CRC (wallet) — hidden in demo (Phase 3a commit 4) */}
-                {!isDemo && <WalletBalanceCard address={saved.address} />}
+                {/* Solde CRC (wallet) — works in both real and demo mode */}
+                <WalletBalanceCard address={saved.address} />
 
                 {/* Actions */}
                 <div className="flex gap-2">

@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { computeLevel, getLevelName, xpToNextLevel, XP_REWARDS } from "@/lib/xp";
 
+const DEMO_INITIAL_BALANCE = 100; // Starting demo CRC balance
+
 const INITIAL_DEMO = {
   address: "0xdemo0000000000000000000000000000000dead",
   name: "DemoPlayer",
@@ -10,6 +12,7 @@ const INITIAL_DEMO = {
   xpSpent: 0,
   level: 1,
   streak: 0,
+  balanceCrc: DEMO_INITIAL_BALANCE,
   imageUrl: "/logo-color.png",
 };
 
@@ -23,6 +26,10 @@ type DemoContextType = {
   addXp: (action: string) => number; // returns XP gained
   spendXp: (amount: number) => boolean; // returns success
   addStreak: () => void;
+  /** Credit the demo CRC balance (topup, game win). Always succeeds. */
+  creditDemoBalance: (amount: number) => number;
+  /** Debit the demo CRC balance (game bet, cashout). Returns false on insufficient funds. */
+  debitDemoBalance: (amount: number) => boolean;
 };
 
 const DemoContext = createContext<DemoContextType>({
@@ -33,6 +40,8 @@ const DemoContext = createContext<DemoContextType>({
   addXp: () => 0,
   spendXp: () => false,
   addStreak: () => {},
+  creditDemoBalance: () => 0,
+  debitDemoBalance: () => false,
 });
 
 export const DEMO_PLAYER = INITIAL_DEMO;
@@ -59,6 +68,7 @@ function saveDemoProgress(player: typeof INITIAL_DEMO) {
       xpSpent: player.xpSpent,
       level: player.level,
       streak: player.streak,
+      balanceCrc: player.balanceCrc,
     }));
   } catch {}
 }
@@ -131,8 +141,36 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const creditDemoBalance = useCallback((amount: number): number => {
+    if (amount <= 0) return 0;
+    let newBalance = 0;
+    setDemoPlayer(prev => {
+      newBalance = Math.round((prev.balanceCrc + amount) * 100) / 100;
+      const updated = { ...prev, balanceCrc: newBalance };
+      saveDemoProgress(updated);
+      return updated;
+    });
+    return newBalance;
+  }, []);
+
+  const debitDemoBalance = useCallback((amount: number): boolean => {
+    if (amount <= 0) return false;
+    let success = false;
+    setDemoPlayer(prev => {
+      if (prev.balanceCrc < amount) return prev;
+      success = true;
+      const updated = {
+        ...prev,
+        balanceCrc: Math.round((prev.balanceCrc - amount) * 100) / 100,
+      };
+      saveDemoProgress(updated);
+      return updated;
+    });
+    return success;
+  }, []);
+
   return (
-    <DemoContext.Provider value={{ isDemo, demoPlayer, enterDemo, exitDemo, addXp, spendXp, addStreak }}>
+    <DemoContext.Provider value={{ isDemo, demoPlayer, enterDemo, exitDemo, addXp, spendXp, addStreak, creditDemoBalance, debitDemoBalance }}>
       {children}
     </DemoContext.Provider>
   );
