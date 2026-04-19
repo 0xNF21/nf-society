@@ -27,6 +27,7 @@ import {
   crashDashTables, crashDashRounds,
   kenoTables, kenoRounds,
   blackjackTables, blackjackHands,
+  lotteries, participants,
 } from "@/lib/db/schema";
 
 import { createInitialState as rouletteInitState } from "@/lib/roulette";
@@ -51,6 +52,7 @@ export const CHANCE_BALANCE_SUPPORTED = new Set([
   "crash_dash",
   "keno",
   "blackjack",
+  "lottery",
 ]);
 
 /** Multi games that support pay-from-balance today — any game in GAME_SERVER_REGISTRY. */
@@ -145,7 +147,7 @@ export type CreateChanceRoundOpts = {
 
 export type CreateChanceRoundResult =
   | { id: number; tableId: number; gameRow: any }
-  | { error: "table_not_found" | "invalid_bet" | "invalid_param" | "unsupported" };
+  | { error: "table_not_found" | "invalid_bet" | "invalid_param" | "unsupported" | "already_joined" };
 
 /**
  * Insert a chance-game round row mirroring what {game}-scan would have
@@ -323,6 +325,36 @@ export async function createChanceRound(
         status: state.status,
       }).returning({ id: blackjackHands.id });
       return { id: inserted.id, tableId: table.id, gameRow: { ...inserted, gameState: state } };
+    }
+
+    case "lottery": {
+      // Each address may only hold ONE ticket per lottery (unique index on
+      // (lotteryId, address)). We explicitly check first for a friendlier error
+      // message; the unique constraint is the real safeguard against races.
+      const [lottery] = await tx.select().from(lotteries).where(eq(lotteries.slug, tableSlug)).limit(1);
+      if (!lottery) return { error: "table_not_found" };
+      if (lottery.status !== "active") return { error: "invalid_bet" };
+      if (lottery.ticketPriceCrc !== amount) return { error: "invalid_bet" };
+
+      const [existing] = await tx
+        .select({ id: participants.id })
+        .from(participants)
+        .where(and(eq(participants.lotteryId, lottery.id), eq(participants.address, addr)))
+        .limit(1);
+      if (existing) return { error: "already_joined" };
+
+      const [inserted] = await tx.insert(participants).values({
+        lotteryId: lottery.id,
+        address: addr,
+        transactionHash: syntheticTxHash,
+        playerToken,
+        paidAt: new Date(),
+      }).returning({ id: participants.id });
+      return {
+        id: inserted.id,
+        tableId: lottery.id,
+        gameRow: { id: inserted.id, lotteryId: lottery.id, address: addr },
+      };
     }
 
     default:
