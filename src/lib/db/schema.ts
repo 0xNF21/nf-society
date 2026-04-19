@@ -398,3 +398,6 @@ export type { SupportMessageRow, NewSupportMessage } from "./schema/support";
 
 export { crcRacesGames } from "./schema/crc-races";
 export type { CrcRacesGameRow, NewCrcRacesGame, PayoutEntry as CrcRacesPayoutEntry } from "./schema/crc-races";
+
+export { cashoutTokens } from "./schema/cashout";
+export type { CashoutTokenRow, NewCashoutToken } from "./schema/cashout";

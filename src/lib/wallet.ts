@@ -454,6 +454,133 @@ export async function debitForSecondaryBet(params: {
   });
 }
 
+export type CashoutResult =
+  | {
+      ok: true;
+      balanceAfter: number;
+      debitLedgerId: number;
+      payoutTxHash: string | null;
+    }
+  | {
+      ok: false;
+      error:
+        | "invalid_address"
+        | "invalid_amount"
+        | "insufficient_balance"
+        | "payout_failed";
+      /** For payout_failed: the ledger id of the rollback refund. */
+      refundLedgerId?: number;
+      /** Raw error from the on-chain payout pipeline. */
+      payoutError?: string;
+    };
+
+/**
+ * Move CRC from a player's prepaid balance to their wallet on-chain.
+ *
+ * Flow:
+ * 1. Atomic debit of the player's balance_crc. Fails with insufficient_balance
+ *    if they don't have enough — no on-chain call is made.
+ * 2. executePayout() dispatches the ERC-1155 transfer from the Safe. The
+ *    gameId is keyed on `cashoutTokenId` so a retry lands as `already_paid`.
+ * 3. If step 2 reports `success`: done. Return the debit ledger id + tx hash.
+ *    If step 2 fails: credit the balance back atomically (kind="cashout-refund",
+ *    unique tx_hash keyed on cashoutTokenId) so the user never loses the CRC.
+ *
+ * No treasury mirror: cashout moves CRC out of the "system" entirely (user
+ * balance AND Safe on-chain both decrement). The invariant
+ *   sum(balances) + treasury == Safe_onchain
+ * still holds (both sides drop by the same `amountCrc`).
+ *
+ * Caller (the cashout API route) is responsible for verifying the 1 CRC
+ * proof of ownership before calling this. This helper trusts the `address`
+ * parameter.
+ */
+export async function cashout(params: {
+  address: string;
+  amountCrc: number;
+  /** Cashout token row id — used to build idempotent tx hashes. */
+  cashoutTokenId: number;
+}): Promise<CashoutResult> {
+  const addr = normalize(params.address);
+  if (!addr || !/^0x[a-f0-9]{40}$/.test(addr)) {
+    return { ok: false, error: "invalid_address" };
+  }
+  if (!params.amountCrc || params.amountCrc <= 0) {
+    return { ok: false, error: "invalid_amount" };
+  }
+
+  // Step 1 — atomic debit + ledger insert.
+  const debitResult = await db.transaction(async (tx) => {
+    const res = await tx.execute(
+      sql`UPDATE players
+          SET balance_crc = balance_crc - ${params.amountCrc},
+              last_seen = NOW()
+          WHERE address = ${addr} AND balance_crc >= ${params.amountCrc}
+          RETURNING balance_crc`,
+    );
+    const row = (res as any).rows?.[0] ?? (res as any)[0];
+    if (!row || typeof row.balance_crc !== "number") {
+      return { ok: false as const, error: "insufficient_balance" as const };
+    }
+    const balanceAfter = row.balance_crc;
+
+    const [ledger] = await tx
+      .insert(walletLedger)
+      .values({
+        address: addr,
+        kind: "cashout",
+        amountCrc: -params.amountCrc,
+        balanceAfter,
+        reason: `Cashout #${params.cashoutTokenId}`,
+        txHash: `cashout:${params.cashoutTokenId}`,
+        gameType: "cashout",
+        gameSlug: String(params.cashoutTokenId),
+      })
+      .returning({ id: walletLedger.id });
+
+    return { ok: true as const, balanceAfter, ledgerId: ledger.id };
+  });
+
+  if (!debitResult.ok) {
+    return { ok: false, error: debitResult.error };
+  }
+
+  // Step 2 — on-chain payout. gameId is unique per cashout session, so a
+  // retry of the same session reads back `already_paid` and no CRC leaves
+  // the Safe twice.
+  const payoutResult = await executePayout({
+    gameType: "cashout",
+    gameId: `cashout-${params.cashoutTokenId}`,
+    recipientAddress: addr,
+    amountCrc: params.amountCrc,
+    reason: `Cashout #${params.cashoutTokenId} — ${params.amountCrc} CRC`,
+  });
+
+  if (payoutResult.success) {
+    return {
+      ok: true,
+      balanceAfter: debitResult.balanceAfter,
+      debitLedgerId: debitResult.ledgerId,
+      payoutTxHash: payoutResult.transferTxHash || null,
+    };
+  }
+
+  // Step 3 — rollback: the payout failed, so credit the balance back.
+  // Unique txHash prevents a double-refund if this path is retried.
+  const refundResult = await creditWallet(addr, params.amountCrc, {
+    kind: "cashout-refund",
+    reason: `Cashout #${params.cashoutTokenId} refund — payout failed`,
+    txHash: `cashout-refund:${params.cashoutTokenId}`,
+  });
+
+  return {
+    ok: false,
+    error: "payout_failed",
+    refundLedgerId: refundResult.ok ? refundResult.ledgerId : undefined,
+    payoutError: payoutResult.error,
+  };
+}
+
 /**
  * Credit a player who won a game. Thin wrapper over creditWallet that
  * encodes a deterministic, unique `txHash` (format `prize:{gameType}:{gameRef}`)

@@ -1319,6 +1319,51 @@ export const translations = {
       fr: "ou payer en CRC direct ci-dessous",
       en: "or pay with CRC directly below",
     },
+    // Phase 3d — cashout
+    cashoutBtn: { fr: "Retirer", en: "Withdraw" },
+    cashoutTitle: { fr: "Retirer mon solde", en: "Withdraw balance" },
+    cashoutDesc: {
+      fr: "Retirez tout ou partie de votre solde CRC vers votre wallet Circles. Une preuve d'ownership de 1 CRC est demand\u00e9e (rembours\u00e9e) pour s\u00e9curiser le transfert.",
+      en: "Withdraw all or part of your CRC balance to your Circles wallet. A 1 CRC ownership proof is required (refunded) to secure the transfer.",
+    },
+    cashoutAmountLabel: { fr: "Montant \u00e0 retirer", en: "Amount to withdraw" },
+    cashoutMinHint: { fr: "Min. 1 CRC", en: "Min. 1 CRC" },
+    cashoutMax: { fr: "Tout retirer", en: "Max" },
+    cashoutOverBalance: {
+      fr: "Montant sup\u00e9rieur \u00e0 votre solde",
+      en: "Amount exceeds your balance",
+    },
+    cashoutProofExplainer: {
+      fr: "Vous enverrez 1 CRC pour prouver que vous contr\u00f4lez votre wallet. Ce CRC est rembours\u00e9 instantan\u00e9ment avec le montant retir\u00e9.",
+      en: "You'll send 1 CRC to prove ownership of your wallet. This 1 CRC is refunded instantly with the withdrawn amount.",
+    },
+    cashoutStartBtn: { fr: "Retirer %AMOUNT% CRC", en: "Withdraw %AMOUNT% CRC" },
+    cashoutAmountConfirm: { fr: "Montant \u00e0 recevoir", en: "Amount to receive" },
+    cashoutProofInstructions: {
+      fr: "Envoyez 1 CRC depuis votre wallet. D\u00e8s d\u00e9tection, nous enverrons le montant ci-dessus + rembourserons le 1 CRC.",
+      en: "Send 1 CRC from your wallet. Once detected, we will send the amount above + refund the 1 CRC.",
+    },
+    cashoutPayProofBtn: { fr: "Payer 1 CRC de preuve", en: "Pay 1 CRC proof" },
+    cashoutWaitingProof: {
+      fr: "En attente de votre preuve 1 CRC...",
+      en: "Waiting for your 1 CRC proof...",
+    },
+    cashoutProcessing: {
+      fr: "Preuve re\u00e7ue, envoi en cours...",
+      en: "Proof received, processing...",
+    },
+    cashoutSuccess: {
+      fr: "%AMOUNT% CRC envoy\u00e9s \u00e0 votre wallet !",
+      en: "%AMOUNT% CRC sent to your wallet!",
+    },
+    cashoutFailed: {
+      fr: "Le retrait a \u00e9chou\u00e9. Votre solde a \u00e9t\u00e9 rembours\u00e9.",
+      en: "Withdrawal failed. Your balance has been refunded.",
+    },
+    cashoutExpired: {
+      fr: "Session expir\u00e9e. Aucun CRC n'a \u00e9t\u00e9 d\u00e9bit\u00e9.",
+      en: "Session expired. No CRC was debited.",
+    },
   },
   ticketRecovery: {
     button: { fr: "Retrouver ma partie", en: "Recover my game" },
