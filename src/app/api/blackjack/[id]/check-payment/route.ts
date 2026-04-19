@@ -62,6 +62,9 @@ export async function GET(
 
     // Find a NEW payment from this player that's not in any known set
     // If token is available, also verify the payment's gameData.t matches
+    // NOTE: we do NOT claim here — claiming is done atomically in the action
+    // endpoint to prevent orphan claims if the client misses the response
+    // (race condition with the main hand polling re-creating this effect).
     let found = false;
     let foundTxHash = "";
     for (const p of payments) {
@@ -73,18 +76,7 @@ export async function GET(
       break;
     }
 
-    // Claim the found tx to prevent reuse on subsequent checks
-    if (found && foundTxHash) {
-      await db.insert(claimedPayments).values({
-        txHash: foundTxHash,
-        gameType: "blackjack",
-        gameId: hand.tableId,
-        playerAddress: player,
-        amountCrc: amount,
-      }).onConflictDoNothing();
-    }
-
-    return NextResponse.json({ found });
+    return NextResponse.json({ found, txHash: found ? foundTxHash : undefined });
   } catch (error: any) {
     return NextResponse.json({ found: false, error: error.message });
   }
