@@ -1364,6 +1364,26 @@ export const translations = {
       fr: "Session expir\u00e9e. Aucun CRC n'a \u00e9t\u00e9 d\u00e9bit\u00e9.",
       en: "Session expired. No CRC was debited.",
     },
+    // Phase 3e — ledger history
+    historyTitle: { fr: "Activit\u00e9 r\u00e9cente", en: "Recent activity" },
+    historyEmpty: {
+      fr: "Aucune activit\u00e9 pour le moment",
+      en: "No activity yet",
+    },
+    historyDemoHint: {
+      fr: "Historique indisponible en mode d\u00e9mo",
+      en: "History unavailable in demo mode",
+    },
+    historyMore: { fr: "Voir plus", en: "Show more" },
+    historyLess: { fr: "Voir moins", en: "Show less" },
+    historyKind: { fr: "Type", en: "Kind" },
+    historyTxHash: { fr: "Tx hash", en: "Tx hash" },
+    historyKindTopup: { fr: "Rechargement", en: "Top up" },
+    historyKindDebit: { fr: "Mise", en: "Bet" },
+    historyKindPrize: { fr: "Gain", en: "Prize" },
+    historyKindCashout: { fr: "Retrait", en: "Cashout" },
+    historyKindCashoutRefund: { fr: "Retrait rembours\u00e9", en: "Cashout refunded" },
+    historyKindCommission: { fr: "Commission", en: "Commission" },
   },
   ticketRecovery: {
     button: { fr: "Retrouver ma partie", en: "Recover my game" },

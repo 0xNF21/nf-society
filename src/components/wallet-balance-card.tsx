@@ -7,6 +7,7 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { TopupModal } from "@/components/topup-modal";
 import { CashoutModal } from "@/components/cashout-modal";
+import { LedgerHistory } from "@/components/ledger-history";
 
 interface WalletBalanceCardProps {
   address: string;
@@ -95,6 +96,8 @@ export function WalletBalanceCard({ address }: WalletBalanceCardProps) {
           </button>
         </div>
       </div>
+
+      <LedgerHistory address={address} />
 
       {topupOpen && (
         <TopupModal
