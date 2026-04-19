@@ -790,6 +790,8 @@ function RealKenoGame({ table }: { table: KenoTable }) {
             scanning={scanning}
             paymentStatus={watchingPayment ? "watching" : "idle"}
             playerToken={tokenRef.current}
+            balanceSlug={table.slug}
+            balanceExtras={{ pickCount }}
           />
         </div>
       )}

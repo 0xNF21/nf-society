@@ -637,6 +637,8 @@ function RealMinesGame({ table }: { table: MinesTable }) {
             scanning={scanning}
             paymentStatus={watchingPayment ? "watching" : "idle"}
             playerToken={tokenRef.current}
+            balanceSlug={table.slug}
+            balanceExtras={{ mineCount: selectedMines }}
           />
         </div>
       )}
