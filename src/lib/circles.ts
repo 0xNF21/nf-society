@@ -55,6 +55,19 @@ export function generateGamePaymentLink(
   return `https://app.gnosis.io/transfer/${recipientAddress}/crc?data=${encodeURIComponent(data)}&amount=${amountCRC}`;
 }
 
+/**
+ * Payment link for topping up a player's CRC balance.
+ * Format: "wallet:topup" as plain text. Amount is free (any CRC value).
+ * Scanned by checkAllWalletTopups() + creditWallet() in src/lib/wallet.ts.
+ */
+export function generateTopupPaymentLink(
+  recipientAddress: string,
+  amountCRC: number,
+): string {
+  const data = "wallet:topup";
+  return `https://app.gnosis.io/transfer/${recipientAddress}/crc?data=${encodeURIComponent(data)}&amount=${amountCRC}`;
+}
+
 function normalizeAddress(value: string): string | null {
   const trimmed = value.trim().toLowerCase();
   if (!trimmed) return null;
@@ -438,7 +451,7 @@ async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { g
         // Search for known game key patterns in the hex data
         // Each game key (morpion, memory, relics, dames) followed by ":" (3a in hex)
         // Auto-generated from registry + non-game payment types
-        const gameKeys = [...ALL_GAMES.map(g => g.key), "blackjack", "lootbox", "lottery", "coin_flip", "hilo", "mines", "dice", "crash_dash", "keno", "roulette", "plinko", "daily", "shop_auth", "nf_auth"];
+        const gameKeys = [...ALL_GAMES.map(g => g.key), "blackjack", "lootbox", "lottery", "coin_flip", "hilo", "mines", "dice", "crash_dash", "keno", "roulette", "plinko", "daily", "shop_auth", "nf_auth", "wallet"];
         let found = false;
 
         for (const gk of gameKeys) {
@@ -503,20 +516,26 @@ async function fetchTxInputGameData(txHashes: string[]): Promise<Map<string, { g
   return results;
 }
 
-export async function checkAllNewPayments(
-  exactAmountCRC: number,
+/**
+ * Shared pipeline: fetch transfers to recipient, optionally filter by exact
+ * amount, enrich with block timestamps and gameData. Pass `exactAmountCRC=null`
+ * to skip the amount filter (used by wallet topups, which accept any value).
+ */
+async function fetchAndEnrichPayments(
   recipientAddress: string,
+  exactAmountCRC: number | null,
   fromBlock?: string,
 ): Promise<CirclesTransferEvent[]> {
   const normalized = normalizeAddress(recipientAddress);
-  if (!normalized || exactAmountCRC <= 0) return [];
+  if (!normalized) return [];
+  if (exactAmountCRC !== null && exactAmountCRC <= 0) return [];
 
   const [streamEvents, transferEvents] = await Promise.all([
     fetchStreamCompletedFromChain(normalized, fromBlock),
     fetchTransferSingleFromChain(normalized, fromBlock),
   ]);
 
-  const exactWei = BigInt(exactAmountCRC) * WEI_PER_CRC;
+  const exactWei = exactAmountCRC !== null ? BigInt(exactAmountCRC) * WEI_PER_CRC : null;
   const events = deduplicateEvents(streamEvents, transferEvents, exactWei, normalized);
 
   const blockNumbers = events
@@ -552,6 +571,28 @@ export async function checkAllNewPayments(
   return events;
 }
 
+export async function checkAllNewPayments(
+  exactAmountCRC: number,
+  recipientAddress: string,
+  fromBlock?: string,
+): Promise<CirclesTransferEvent[]> {
+  return fetchAndEnrichPayments(recipientAddress, exactAmountCRC, fromBlock);
+}
+
+/**
+ * Scan for wallet topups — any CRC amount with gameData.game === "wallet"
+ * and gameData.id === "topup". Used by src/lib/wallet.ts#scanWalletTopups.
+ */
+export async function checkAllWalletTopups(
+  recipientAddress: string,
+  fromBlock?: string,
+): Promise<CirclesTransferEvent[]> {
+  const events = await fetchAndEnrichPayments(recipientAddress, null, fromBlock);
+  return events.filter(e =>
+    e.gameData?.game === "wallet" && e.gameData?.id === "topup",
+  );
+}
+
 function aggregateTransfersByTx(
   events: CirclesTransferEvent[],
   recipientAddress: string,
@@ -585,16 +626,18 @@ function aggregateTransfersByTx(
 function deduplicateEvents(
   streamEvents: CirclesTransferEvent[],
   transferEvents: CirclesTransferEvent[],
-  exactWei: bigint,
+  exactWei: bigint | null,
   recipientAddress: string,
 ): CirclesTransferEvent[] {
   const seenTxHashes = new Set<string>();
   const results: CirclesTransferEvent[] = [];
 
   for (const event of streamEvents) {
-    try {
-      if (BigInt(event.value) !== exactWei) continue;
-    } catch { continue; }
+    if (exactWei !== null) {
+      try {
+        if (BigInt(event.value) !== exactWei) continue;
+      } catch { continue; }
+    }
     const txKey = event.transactionHash.toLowerCase();
     if (seenTxHashes.has(txKey)) continue;
     seenTxHashes.add(txKey);
@@ -604,9 +647,11 @@ function deduplicateEvents(
   const aggregated = aggregateTransfersByTx(transferEvents, recipientAddress);
   for (const [txKey, event] of aggregated) {
     if (seenTxHashes.has(txKey)) continue;
-    try {
-      if (BigInt(event.value) !== exactWei) continue;
-    } catch { continue; }
+    if (exactWei !== null) {
+      try {
+        if (BigInt(event.value) !== exactWei) continue;
+      } catch { continue; }
+    }
     seenTxHashes.add(txKey);
     results.push(event);
   }
