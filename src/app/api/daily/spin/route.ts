@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { determineSpinResult, isSafeBalanceSafe } from "@/lib/daily";
-import { executePayout } from "@/lib/payout";
+import { payPrize } from "@/lib/wallet";
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,31 +56,29 @@ export async function POST(req: NextRequest) {
       spinPlayed: true,
     }).where(eq(dailySessions.id, session.id));
 
-    // Payout if CRC won (non-blocking)
+    // Pay the spin reward via the same method as the daily claim.
     if (result.crcValue > 0) {
       try {
-        await executePayout({
+        await payPrize(session.address, result.crcValue, {
           gameType: "daily-spin",
-          gameId: `daily-spin-${token}`,
-          recipientAddress: session.address,
-          amountCrc: result.crcValue,
+          gameSlug: String(session.id),
+          gameRef: `spin-${token}`,
+          sourceTxHash: session.txHash,
           reason: `Daily spin — ${result.label}`,
         });
       } catch (err: any) {
-        console.error("[DailySpin] Payout error:", err.message);
+        console.error("[DailySpin] Prize error:", err.message);
       }
     }
 
     // XP if won (non-blocking)
     if (result.xpValue > 0) {
-      try {
-        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        await fetch(`${base}/api/players/xp`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: session.address, action: "daily_spin", xpOverride: result.xpValue }),
-        });
-      } catch { /* XP fail silencieux */ }
+      const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      void fetch(`${base}/api/players/xp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: session.address, action: "daily_spin", xpOverride: result.xpValue }),
+      }).catch(() => {});
     }
 
     return NextResponse.json({ result });

@@ -130,13 +130,35 @@ export const morpionMoves = pgTable("morpion_moves", {
 });
 
 export const players = pgTable("players", {
-  address:   text("address").primaryKey(),
-  xp:        integer("xp").notNull().default(0),
-  xpSpent:   integer("xp_spent").notNull().default(0),
-  level:     integer("level").notNull().default(1),
-  streak:    integer("streak").notNull().default(0),
-  lastSeen:  timestamp("last_seen").defaultNow().notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  address:    text("address").primaryKey(),
+  xp:         integer("xp").notNull().default(0),
+  xpSpent:    integer("xp_spent").notNull().default(0),
+  level:      integer("level").notNull().default(1),
+  streak:     integer("streak").notNull().default(0),
+  balanceCrc: real("balance_crc").notNull().default(0),
+  lastSeen:   timestamp("last_seen").defaultNow().notNull(),
+  createdAt:  timestamp("created_at").defaultNow().notNull(),
+});
+
+/**
+ * Wallet ledger — append-only log of every balance movement.
+ * Invariant (checked by 3e monitoring): for each address,
+ *   balance_crc in players == sum(amount_crc in wallet_ledger WHERE address = X).
+ *
+ * `tx_hash` is UNIQUE and non-null only for on-chain movements (topup, cashout);
+ * internal movements (game debit/credit) leave it null.
+ */
+export const walletLedger = pgTable("wallet_ledger", {
+  id:           serial("id").primaryKey(),
+  address:      text("address").notNull(),
+  kind:         text("kind").notNull(), // 'topup' | 'debit' | 'prize' | 'cashout' | 'cashout-refund'
+  amountCrc:    real("amount_crc").notNull(), // signed: negative = debit
+  balanceAfter: real("balance_after").notNull(),
+  reason:       text("reason"),
+  txHash:       text("tx_hash").unique(),
+  gameType:     text("game_type"),
+  gameSlug:     text("game_slug"),
+  createdAt:    timestamp("created_at").defaultNow().notNull(),
 });
 
 export const badges = pgTable("badges", {
@@ -257,6 +279,15 @@ export const privacySettings = pgTable("privacy_settings", {
   updatedAt:           timestamp("updated_at").defaultNow().notNull(),
 });
 export type PrivacySettings = typeof privacySettings.$inferSelect;
+
+export const nfAuthTokens = pgTable("nf_auth_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  address: text("address"),
+  txHash: text("tx_hash"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
 
 export const shopItems = pgTable("shop_items", {
   id: serial("id").primaryKey(),

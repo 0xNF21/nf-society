@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { plinkoRounds, plinkoTables } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { getVisibleState } from "@/lib/plinko";
 import type { PlinkoState } from "@/lib/plinko";
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         and(
           eq(plinkoRounds.tableId, table.id),
           eq(plinkoRounds.playerToken, token),
-          eq(plinkoRounds.status, "playing"),
+          ne(plinkoRounds.status, "finished"),
         )
       )
       .orderBy(desc(plinkoRounds.createdAt))

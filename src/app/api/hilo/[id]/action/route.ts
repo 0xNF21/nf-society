@@ -5,7 +5,7 @@ import { hiloRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculatePayout, isValidAction } from "@/lib/hilo";
 import type { HiLoState, HiLoAction } from "@/lib/hilo";
-import { executePayout } from "@/lib/payout";
+import { payPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -77,36 +77,36 @@ export async function POST(
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const payoutResult = await executePayout({
+          const prize = await payPrize(round.playerAddress, payoutAmount, {
             gameType: "hilo",
-            gameId: `hilo-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
+            gameSlug: String(round.tableId),
+            gameRef: `round-${round.id}`,
+            sourceTxHash: round.transactionHash,
             reason: `Hi-Lo — cashout x${newState.currentMultiplier.toFixed(2)} — ${payoutAmount} CRC`,
           });
 
           await db.update(hiloRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: prize.ok ? "success" : "failed",
+            payoutTxHash: prize.method === "balance"
+              ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+              : (prize.transferTxHash || null),
+            errorMessage: prize.error || null,
           }).where(eq(hiloRounds.id, roundId));
         } catch (err: any) {
-          console.error("[HiLo] Payout error:", err.message);
+          console.error("[HiLo] Prize error:", err.message);
           await db.update(hiloRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),
           }).where(eq(hiloRounds.id, roundId));
         }
 
-        // XP for win
-        try {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: round.playerAddress, action: "hilo_win" }),
-          });
-        } catch {}
+        // XP for win — fire and forget (don't block the response).
+        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        void fetch(`${base}/api/players/xp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: round.playerAddress, action: "hilo_win" }),
+        }).catch(() => {});
       }
     }
 

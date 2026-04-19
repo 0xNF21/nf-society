@@ -127,7 +127,8 @@ export async function POST(req: NextRequest) {
           amountCrc: betCrc,
         }).onConflictDoNothing();
 
-        // Payout if won
+        // Coin flip is resolved instantly. Scan fires only on on-chain tx,
+        // so the prize is paid on-chain to match the payment method.
         if (result.outcome === "win" && result.payoutCrc > 0) {
           const { executePayout } = await import("@/lib/payout");
           await executePayout({

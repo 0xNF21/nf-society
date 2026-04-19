@@ -905,20 +905,21 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
 
   const betOptions = table.betOptions as number[];
 
-  // Restore active round
+  // Restore active round — re-runs when token becomes available after SSR hydration
+  const tokenValue = tokenRef.current;
   useEffect(() => {
-    if (!tokenRef.current) { setRestoring(false); return; }
+    if (!tokenValue) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/roulette/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/roulette/active?tableSlug=${table.slug}&token=${tokenValue}`);
         const data = await res.json();
         if (data.round && active) setRound(data.round);
       } catch {}
       if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug]);
+  }, [table.slug, tokenValue]);
 
   // Fetch player profile
   useEffect(() => {
@@ -967,14 +968,28 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
       });
       const data = await res.json();
       if (!res.ok) { console.error("[Roulette] Error:", data.error); setSpinning(false); return; }
-      // Start wheel animation with result
+      // Start wheel animation with the result
       setResultNumber(data.result);
-      setTimeout(() => { setRound(data); setSpinning(false); }, 4200);
+      // After 4.2s (wheel done): apply result + refetch from /active to
+      // guarantee the UI reflects every DB field so ResultPanel renders
+      // without F5.
+      setTimeout(async () => {
+        setRound(data);
+        setSpinning(false);
+        try {
+          const refreshRes = await fetch(
+            `/api/roulette/active?tableSlug=${table.slug}&token=${tokenRef.current}`,
+            { cache: "no-store" },
+          );
+          const refreshData = await refreshRes.json();
+          if (refreshData?.round) setRound(refreshData.round);
+        } catch {}
+      }, 4200);
     } catch (err) {
       console.error("[Roulette] Fetch error:", err);
       setSpinning(false);
     }
-  }, [round, spinning, bets]);
+  }, [round, spinning, bets, table.slug]);
 
   const resetGame = useCallback(() => {
     setRound(null); setBets([]); setWatchingPayment(false);

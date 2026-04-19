@@ -323,13 +323,14 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const lastFinishedHandRef = useRef<number | null>(null);
   const [restoring, setRestoring] = useState(true);
 
-  // Restore active hand on mount (after page refresh)
+  // Restore active hand on mount (after page refresh) — re-runs when token becomes available after SSR hydration
+  const tokenValue = tokenRef.current;
   useEffect(() => {
-    if (!tokenRef.current) { setRestoring(false); return; }
+    if (!tokenValue) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/blackjack/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/blackjack/active?tableSlug=${table.slug}&token=${tokenValue}`);
         const data = await res.json();
         if (data.hand && active) {
           setHandId(data.hand.id);
@@ -339,13 +340,15 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
       if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug]);
+  }, [table.slug, tokenValue]);
 
   const dataValue = encodeGameData({ game: "blackjack", id: table.slug, v: 1, t: tokenRef.current || undefined });
 
   // Ref to read latest hand without re-creating the polling effect.
   // Without this, `hand` updates every 2s (from the main polling) would
-  // restart this effect and set `active=false` on in-flight requests.
+  // restart this effect and set `active=false` on in-flight requests,
+  // causing detected payments to be ignored by the client while the server
+  // may already have claimed them (orphan claims, user loses CRC).
   const handForPaymentRef = useRef<HandResponse | null>(null);
   useEffect(() => { handForPaymentRef.current = hand; }, [hand]);
 

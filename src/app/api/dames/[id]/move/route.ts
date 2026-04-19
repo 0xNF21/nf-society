@@ -4,7 +4,7 @@ import { damesGames } from '@/lib/db/schema/dames'
 import { eq } from 'drizzle-orm'
 import { isValidMove, applyMove } from '@/lib/dames'
 import type { Move, DamesState } from '@/lib/dames'
-import { executePayout } from '@/lib/payout'
+import { payPrize, payCommission } from '@/lib/wallet'
 
 export async function POST(
   req: NextRequest,
@@ -45,18 +45,26 @@ export async function POST(
       try {
         const pot = game.betCrc * 2
         const winAmount = pot * (1 - game.commissionPct / 100)
-        const payoutResult = await executePayout({
-          gameType: 'dames', gameId: `dames-${game.slug}-winner`,
-          recipientAddress: player, amountCrc: winAmount,
+        const commissionAmount = pot * (game.commissionPct / 100)
+        const winnerTxHash = player === game.player1Address ? game.player1TxHash : game.player2TxHash
+        const prize = await payPrize(player, winAmount, {
+          gameType: 'dames', gameSlug: game.slug, gameRef: `${game.slug}-winner`,
+          sourceTxHash: winnerTxHash,
           reason: `Dames ${game.slug} — victoire, gain ${winAmount} CRC`,
         })
+        await payCommission(commissionAmount, {
+          gameType: 'dames', gameSlug: game.slug, gameRef: `${game.slug}-commission`,
+          sourceTxHash: winnerTxHash,
+        })
         await db.update(damesGames).set({
-          payoutTxHash: payoutResult.transferTxHash || null,
-          payoutStatus: payoutResult.success ? 'success' : 'failed',
+          payoutTxHash: prize.method === "balance"
+            ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : 'balance-credit:duplicate')
+            : (prize.transferTxHash || null),
+          payoutStatus: prize.ok ? 'success' : 'failed',
           updatedAt: new Date(),
         }).where(eq(damesGames.id, game.id))
       } catch (e) {
-        console.error('[Dames] Payout error:', e)
+        console.error('[Dames] Prize error:', e)
         await db.update(damesGames).set({
           payoutStatus: 'failed',
           updatedAt: new Date(),

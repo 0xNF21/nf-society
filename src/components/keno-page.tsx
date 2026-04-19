@@ -571,13 +571,14 @@ function RealKenoGame({ table }: { table: KenoTable }) {
 
   const betOptions = table.betOptions as number[];
 
-  // Restore active round on mount
+  // Restore active round on mount — re-runs when token becomes available after SSR hydration
+  const tokenValue = tokenRef.current;
   useEffect(() => {
-    if (!tokenRef.current) { setRestoring(false); return; }
+    if (!tokenValue) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/keno/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/keno/active?tableSlug=${table.slug}&token=${tokenValue}`);
         const data = await res.json();
         if (data.round && active) {
           setRound(data.round);
@@ -587,7 +588,7 @@ function RealKenoGame({ table }: { table: KenoTable }) {
       if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug]);
+  }, [table.slug, tokenValue]);
 
   // Fetch player profile when round established
   useEffect(() => {
@@ -778,6 +779,7 @@ function RealKenoGame({ table }: { table: KenoTable }) {
             amountCrc={selectedBet}
             gameType="keno"
             gameId={gameId}
+            tableSlug={table.slug}
             accentColor={accentColor}
             payLabel={`🎱 Keno — ${selectedBet} CRC / ${pickCount} ${t.picks[locale]}`}
             onPaymentInitiated={async () => {
@@ -788,6 +790,8 @@ function RealKenoGame({ table }: { table: KenoTable }) {
             scanning={scanning}
             paymentStatus={watchingPayment ? "watching" : "idle"}
             playerToken={tokenRef.current}
+            balanceSlug={table.slug}
+            balanceExtras={{ pickCount }}
           />
         </div>
       )}

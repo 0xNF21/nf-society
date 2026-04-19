@@ -551,13 +551,14 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
   const betOptions = table.betOptions as number[];
   const quickAuto = [1.5, 2, 5, 10];
 
-  // Restore active round on mount
+  // Restore active round on mount — re-runs when token becomes available after SSR hydration
+  const tokenValue = tokenRef.current;
   useEffect(() => {
-    if (!tokenRef.current) { setRestoring(false); return; }
+    if (!tokenValue) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/crash-dash/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/crash-dash/active?tableSlug=${table.slug}&token=${tokenValue}`);
         const data = await res.json();
         if (data.round && active) {
           setRound(data.round);
@@ -566,7 +567,7 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
       if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug]);
+  }, [table.slug, tokenValue]);
 
   // Fetch player profile
   useEffect(() => {

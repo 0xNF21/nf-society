@@ -95,10 +95,36 @@ async function reserveNonce(): Promise<number> {
   return row.last_nonce;
 }
 
+/**
+ * Pulls the current on-chain pending nonce and bumps bot_state.last_nonce
+ * forward if it's behind. Used as a recovery step when a broadcast fails
+ * with NONCE_EXPIRED (e.g. when another environment sharing the same
+ * BOT_PRIVATE_KEY advanced the chain nonce between our reserves).
+ *
+ * `GREATEST(last_nonce, onchain - 1)` guarantees we never walk backwards,
+ * which preserves the serial invariant for in-flight pending reservations.
+ */
+async function resyncNonceFromChain(wallet: ethers.Wallet): Promise<number> {
+  const onchainPending = await wallet.provider!.getTransactionCount(wallet.address, "pending");
+  const target = onchainPending - 1;
+  await db.execute(
+    sql`UPDATE bot_state SET last_nonce = GREATEST(last_nonce, ${target}), updated_at = NOW() WHERE id = 1`,
+  );
+  return onchainPending;
+}
+
+function isNonceTooLowError(err: any): boolean {
+  const code = err?.code;
+  if (code === "NONCE_EXPIRED") return true;
+  const msg = String(err?.message || err?.info?.error?.message || "").toLowerCase();
+  return /nonce too low|nonce has already been used|already known/.test(msg);
+}
+
 async function execViaRolesMod(
   targetAddress: string,
   calldata: string,
   value: bigint = 0n,
+  { resyncAttempted = false }: { resyncAttempted?: boolean } = {},
 ): Promise<{ hash: string }> {
   const wallet = getBotWallet();
   const rolesModAddress = process.env.ROLES_MODIFIER_ADDRESS;
@@ -112,17 +138,30 @@ async function execViaRolesMod(
   // Fire-and-forget: broadcast the TX with an explicit nonce, return the hash
   // immediately. We do NOT call tx.wait() — the cron job verifies confirmation
   // later, which avoids Vercel lambda timeouts and keeps the bot serial.
-  const tx = await rolesMod.execTransactionWithRole(
-    targetAddress,
-    value,
-    calldata,
-    0,
-    roleKey,
-    true,
-    { nonce },
-  );
-
-  return { hash: tx.hash };
+  try {
+    const tx = await rolesMod.execTransactionWithRole(
+      targetAddress,
+      value,
+      calldata,
+      0,
+      roleKey,
+      true,
+      { nonce },
+    );
+    return { hash: tx.hash };
+  } catch (err: any) {
+    // Auto-heal when bot_state has drifted behind on-chain (typically because
+    // another env — e.g. Vercel prod vs local dev — sharing the same
+    // BOT_PRIVATE_KEY broadcast tx'ing in between). Resync once and retry.
+    if (isNonceTooLowError(err) && !resyncAttempted) {
+      const newPending = await resyncNonceFromChain(wallet);
+      console.warn(
+        `[Payout] Nonce collision (reserved=${nonce}, on-chain pending=${newPending}). Resynced and retrying once.`,
+      );
+      return execViaRolesMod(targetAddress, calldata, value, { resyncAttempted: true });
+    }
+    throw err;
+  }
 }
 
 async function transferErc1155(recipient: string, amountWei: bigint): Promise<string> {

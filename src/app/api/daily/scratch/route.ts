@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { determineScratchResult, isSafeBalanceSafe } from "@/lib/daily";
-import { executePayout } from "@/lib/payout";
+import { payPrize } from "@/lib/wallet";
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,31 +56,30 @@ export async function POST(req: NextRequest) {
       scratchPlayed: true,
     }).where(eq(dailySessions.id, session.id));
 
-    // Payout if CRC won (non-blocking)
+    // Pay the scratch reward via the same method as the daily claim
+    // (balance-claim → balance; on-chain claim → on-chain payout).
     if (result.crcValue > 0) {
       try {
-        await executePayout({
+        await payPrize(session.address, result.crcValue, {
           gameType: "daily-scratch",
-          gameId: `daily-scratch-${token}`,
-          recipientAddress: session.address,
-          amountCrc: result.crcValue,
+          gameSlug: String(session.id),
+          gameRef: `scratch-${token}`,
+          sourceTxHash: session.txHash,
           reason: `Daily scratch card — ${result.label}`,
         });
       } catch (err: any) {
-        console.error("[DailyScratch] Payout error:", err.message);
+        console.error("[DailyScratch] Prize error:", err.message);
       }
     }
 
     // XP if won (non-blocking)
     if (result.xpValue > 0) {
-      try {
-        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        await fetch(`${base}/api/players/xp`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: session.address, action: "daily_scratch", xpOverride: result.xpValue }),
-        });
-      } catch { /* XP fail silencieux */ }
+      const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      void fetch(`${base}/api/players/xp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: session.address, action: "daily_scratch", xpOverride: result.xpValue }),
+      }).catch(() => {});
     }
 
     return NextResponse.json({ result });

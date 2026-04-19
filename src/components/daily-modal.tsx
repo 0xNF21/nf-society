@@ -6,8 +6,9 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import ScratchCard from "@/components/scratch-card";
 import SpinWheel from "@/components/spin-wheel";
-import { X, Copy, Check, Loader2, Sparkles, ChevronDown } from "lucide-react";
+import { X, Copy, Check, Loader2, Sparkles, ChevronDown, Wallet } from "lucide-react";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { useConnectedAddress } from "@/hooks/use-connected-address";
 
 type Phase = "init" | "payment" | "scratch" | "spin" | "complete";
 
@@ -15,8 +16,10 @@ export default function DailyModal() {
   const { locale } = useLocale();
   const { isDemo, addXp, addStreak } = useDemo();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
+  const connectedAddress = useConnectedAddress();
   const t = translations.daily;
   const tm = translations.miniapp;
+  const tw = translations.wallet;
 
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("init");
@@ -32,6 +35,9 @@ export default function DailyModal() {
   const [spinning, setSpinning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showProbs, setShowProbs] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [claimingFromBalance, setClaimingFromBalance] = useState(false);
+  const [balanceClaimError, setBalanceClaimError] = useState<string | null>(null);
 
   // Fermer avec Escape
   useEffect(() => {
@@ -268,6 +274,67 @@ export default function DailyModal() {
     setTimeout(() => setCopied(false), 2000);
   }, [paymentLink]);
 
+  // Fetch wallet balance when entering the payment phase with a known address.
+  useEffect(() => {
+    if (isDemo) return;
+    if (phase !== "payment") return;
+    if (!connectedAddress) return;
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/wallet/balance?address=${encodeURIComponent(connectedAddress)}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (active && typeof data.balanceCrc === "number") setWalletBalance(data.balanceCrc);
+      } catch { /* silent */ }
+    })();
+    return () => { active = false; };
+  }, [phase, connectedAddress, isDemo]);
+
+  // Claim daily from wallet balance — no CRC movement, just confirms the session.
+  const handleBalanceClaim = useCallback(async () => {
+    if (!connectedAddress || claimingFromBalance) return;
+    setClaimingFromBalance(true);
+    setBalanceClaimError(null);
+    try {
+      const res = await fetch("/api/daily/claim-from-balance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: connectedAddress }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setBalanceClaimError(
+          data?.error === "no_balance"
+            ? (locale === "fr" ? "Chargez d'abord votre solde" : "Top up your balance first")
+            : (locale === "fr" ? "Echec — reessayez" : "Failed — try again"),
+        );
+        return;
+      }
+      // Session confirmed — transition like the on-chain poll would.
+      setAddress(connectedAddress);
+      setToken(data.token);
+      try {
+        localStorage.setItem("nf-daily", JSON.stringify({
+          token: data.token,
+          address: connectedAddress,
+          date: new Date().toISOString().slice(0, 10),
+        }));
+      } catch { /* ignore */ }
+
+      // Route to the right phase based on what's already played today.
+      const s = data.session || {};
+      if (s.scratchPlayed && s.spinPlayed) setPhase("complete");
+      else if (s.scratchPlayed) setPhase("spin");
+      else setPhase("scratch");
+    } catch (err: any) {
+      setBalanceClaimError(err?.message || (locale === "fr" ? "Erreur" : "Error"));
+    } finally {
+      setClaimingFromBalance(false);
+    }
+  }, [connectedAddress, claimingFromBalance, locale]);
+
   // Demo mode — simulate payment + generate fake results client-side
   const handleDemo = useCallback(() => {
     const demoToken = "DEMO-" + Math.random().toString(36).slice(2, 8);
@@ -438,6 +505,43 @@ export default function DailyModal() {
               {/* ─── PHASE: PAYMENT ─── */}
               {phase === "payment" && (
                 <div className="text-center py-2">
+                  {/* Claim-from-balance — shown above the on-chain flow when
+                      the connected address has any balance. Daily is already
+                      free on-chain (1 CRC charged, 1 CRC refunded) so the
+                      balance path just confirms the session with no CRC
+                      movement. */}
+                  {connectedAddress && walletBalance !== null && walletBalance > 0 && (
+                    <div className="mb-4 rounded-2xl border border-marine/20 bg-gradient-to-br from-marine/[0.04] to-citrus/[0.04] p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-ink/50">
+                          <Wallet className="h-3.5 w-3.5" />
+                          {tw.payWithBalance[locale]}
+                        </span>
+                        <span className="text-xs text-ink/50 tabular-nums">
+                          {walletBalance.toFixed(2)} CRC {tw.available[locale]}
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleBalanceClaim}
+                        disabled={claimingFromBalance}
+                        className="w-full py-3 rounded-xl bg-marine text-white text-sm font-bold hover:opacity-90 disabled:opacity-50"
+                      >
+                        {claimingFromBalance ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            {tw.paying[locale]}
+                          </span>
+                        ) : (
+                          locale === "fr" ? "Reclamer mon daily (gratuit)" : "Claim my daily (free)"
+                        )}
+                      </button>
+                      {balanceClaimError && <p className="text-xs text-red-500 font-semibold">{balanceClaimError}</p>}
+                      <p className="text-[11px] text-ink/40">
+                        {locale === "fr" ? "Aucun CRC debite (daily est gratuit)." : "No CRC debited (daily is free)."}
+                      </p>
+                    </div>
+                  )}
+
                   {isMiniApp && walletAddress ? (
                     <>
                       <button

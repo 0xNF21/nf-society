@@ -426,13 +426,14 @@ function RealMinesGame({ table }: { table: MinesTable }) {
   const betOptions = table.betOptions as number[];
   const mineOptions = table.mineOptions as number[];
 
-  // Restore active round on mount
+  // Restore active round on mount — re-runs when token becomes available after SSR hydration
+  const tokenValue = tokenRef.current;
   useEffect(() => {
-    if (!tokenRef.current) { setRestoring(false); return; }
+    if (!tokenValue) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/mines/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/mines/active?tableSlug=${table.slug}&token=${tokenValue}`);
         const data = await res.json();
         if (data.round && active) {
           setRound(data.round);
@@ -441,7 +442,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
       if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug]);
+  }, [table.slug, tokenValue]);
 
   // Fetch player profile
   useEffect(() => {
@@ -625,6 +626,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
             amountCrc={selectedBet}
             gameType="mines"
             gameId={gameId}
+            tableSlug={table.slug}
             accentColor={accentColor}
             payLabel={`Mines — ${selectedBet} CRC / ${selectedMines} mines`}
             onPaymentInitiated={async () => {
@@ -635,6 +637,8 @@ function RealMinesGame({ table }: { table: MinesTable }) {
             scanning={scanning}
             paymentStatus={watchingPayment ? "watching" : "idle"}
             playerToken={tokenRef.current}
+            balanceSlug={table.slug}
+            balanceExtras={{ mineCount: selectedMines }}
           />
         </div>
       )}

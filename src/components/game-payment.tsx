@@ -9,6 +9,9 @@ import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY } from "@/lib/game-registry";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { TicketRecovery } from "@/components/ticket-recovery";
+import { BalancePayButton } from "@/components/balance-pay-button";
+import { useConnectedAddress } from "@/hooks/use-connected-address";
 
 interface GamePaymentProps {
   gameKey: string;
@@ -22,6 +25,8 @@ interface GamePaymentProps {
   isCreator: boolean;
   onScanComplete: () => void;
   scanInterval?: number;
+  /** Optional callback when a balance-pay succeeds. Parent should refresh the game. */
+  onBalancePaid?: (result: any) => void;
 }
 
 export function GamePayment({
@@ -31,9 +36,11 @@ export function GamePayment({
   isCreator,
   onScanComplete,
   scanInterval = 5000,
+  onBalancePaid,
 }: GamePaymentProps) {
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
+  const connectedAddress = useConnectedAddress();
   const config = GAME_REGISTRY[gameKey];
   const t = translations[config.translationKey as keyof typeof translations] as Record<string, Record<string, string>>;
   const tm = translations.miniapp;
@@ -48,6 +55,7 @@ export function GamePayment({
   const [miniAppSuccess, setMiniAppSuccess] = useState(false);
   const scanRef = useRef<NodeJS.Timeout | null>(null);
 
+  const tokenReady = !!playerToken;
   const paymentLink = generateGamePaymentLink(
     game.recipientAddress,
     game.betCrc,
@@ -103,6 +111,7 @@ export function GamePayment({
 
   // Mini App: pay directly via Circles host wallet
   async function handleMiniAppPay() {
+    if (!tokenReady) return;
     setMiniAppPaying(true);
     setMiniAppError(null);
     try {
@@ -180,6 +189,9 @@ export function GamePayment({
             <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
             {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
           </button>
+
+          {/* Ticket recovery for the creator who lost their token */}
+          <TicketRecovery gameKey={gameKey} slug={game.slug} />
         </CardContent>
       </Card>
     );
@@ -189,6 +201,22 @@ export function GamePayment({
   return (
     <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
       <CardContent className="pt-2 px-4 pb-4 space-y-3">
+        {/* Pay-from-balance — appears above the on-chain flow when the
+            connected address has enough CRC on balance. Renders nothing
+            otherwise, so the existing QR + Mini App UI stays unchanged. */}
+        <BalancePayButton
+          gameKey={gameKey}
+          slug={game.slug}
+          amountCrc={game.betCrc}
+          playerToken={playerToken}
+          address={connectedAddress || undefined}
+          onSuccess={(result) => {
+            onBalancePaid?.(result);
+            // Trigger parent refresh so the game state reflects the new slot.
+            onScanCompleteRef.current();
+          }}
+          accentColor={GAME_REGISTRY[gameKey]?.accentColor || "#251B9F"}
+        />
         {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-3">
           <span className="text-xs font-semibold text-ink/40 uppercase tracking-widest">
@@ -223,10 +251,12 @@ export function GamePayment({
                 className="w-full rounded-xl font-bold"
                 style={{ background: config.accentColor }}
                 onClick={handleMiniAppPay}
-                disabled={miniAppPaying}
+                disabled={miniAppPaying || !tokenReady}
               >
                 {miniAppPaying ? (
                   <><Loader2 className="w-4 h-4 animate-spin mr-2" />{tm.paying[locale]}</>
+                ) : !tokenReady ? (
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />{tm.preparing[locale]}</>
                 ) : (
                   tm.payBtn[locale].replace("{amount}", String(game.betCrc))
                 )}
@@ -250,11 +280,18 @@ export function GamePayment({
           /* ── Standalone mode: QR code + Gnosis link ── */
           <>
             {/* Pay button */}
-            <a href={paymentLink} target="_blank" rel="noreferrer">
-              <Button className="w-full rounded-xl font-bold" style={{ background: config.accentColor }}>
-                {t.payCrc[locale].replace("{bet}", String(game.betCrc))}
+            {tokenReady ? (
+              <a href={paymentLink} target="_blank" rel="noreferrer">
+                <Button className="w-full rounded-xl font-bold" style={{ background: config.accentColor }}>
+                  {t.payCrc[locale].replace("{bet}", String(game.betCrc))}
+                </Button>
+              </a>
+            ) : (
+              <Button className="w-full rounded-xl font-bold" style={{ background: config.accentColor }} disabled>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                {tm.preparing[locale]}
               </Button>
-            </a>
+            )}
 
             {/* Copy buttons */}
             <div className={`grid gap-2 ${isCreator && game.status === "waiting_p1" ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -296,6 +333,9 @@ export function GamePayment({
           <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
           {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
         </button>
+
+        {/* Ticket recovery (bureau des tickets perdus) */}
+        <TicketRecovery gameKey={gameKey} slug={game.slug} />
       </CardContent>
     </Card>
   );

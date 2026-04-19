@@ -708,20 +708,21 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
     }
   }, [selectedTotal, selectedBallValue]);
 
-  // Restore active round
+  // Restore active round — re-runs when token becomes available after SSR hydration
+  const tokenValue = tokenRef.current;
   useEffect(() => {
-    if (!tokenRef.current) { setRestoring(false); return; }
+    if (!tokenValue) return;
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/plinko/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+        const res = await fetch(`/api/plinko/active?tableSlug=${table.slug}&token=${tokenValue}`);
         const data = await res.json();
         if (data.round && active) setRound(data.round);
       } catch {}
       if (active) setRestoring(false);
     })();
     return () => { active = false; };
-  }, [table.slug]);
+  }, [table.slug, tokenValue]);
 
   // Fetch player profile
   useEffect(() => {

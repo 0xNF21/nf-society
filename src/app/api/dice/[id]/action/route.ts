@@ -5,7 +5,7 @@ import { diceRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { resolveRoll, getVisibleState, calculatePayout, isValidAction } from "@/lib/dice";
 import type { DiceState, DiceAction } from "@/lib/dice";
-import { executePayout } from "@/lib/payout";
+import { payPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -81,21 +81,23 @@ export async function POST(
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const payoutResult = await executePayout({
+          const prize = await payPrize(round.playerAddress, payoutAmount, {
             gameType: "dice",
-            gameId: `dice-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
+            gameSlug: String(round.tableId),
+            gameRef: `round-${round.id}`,
+            sourceTxHash: round.transactionHash,
             reason: `Dice — x${(newState.multiplier || 0).toFixed(2)} — ${payoutAmount} CRC`,
           });
 
           await db.update(diceRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: prize.ok ? "success" : "failed",
+            payoutTxHash: prize.method === "balance"
+              ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+              : (prize.transferTxHash || null),
+            errorMessage: prize.error || null,
           }).where(eq(diceRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Dice] Payout error:", err.message);
+          console.error("[Dice] Prize error:", err.message);
           await db.update(diceRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),
@@ -103,14 +105,12 @@ export async function POST(
         }
 
         // XP for win
-        try {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: round.playerAddress, action: "dice_win" }),
-          });
-        } catch {}
+        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        void fetch(`${base}/api/players/xp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: round.playerAddress, action: "dice_win" }),
+        }).catch(() => {});
       }
     }
 

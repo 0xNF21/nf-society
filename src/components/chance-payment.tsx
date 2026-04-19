@@ -7,6 +7,9 @@ import { generateGamePaymentLink } from "@/lib/circles";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { TicketRecovery } from "@/components/ticket-recovery";
+import { BalancePayButton } from "@/components/balance-pay-button";
+import { useConnectedAddress } from "@/hooks/use-connected-address";
 
 interface ChancePaymentProps {
   /** Recipient address for the payment */
@@ -35,6 +38,16 @@ interface ChancePaymentProps {
   playerToken?: string;
   /** Optional ball value (CRC per ball) for games like Plinko — encoded as bv{N} */
   ballValue?: number;
+  /** Optional table slug — used by ticket recovery when gameId is composite (mines, keno, coin-flip) */
+  tableSlug?: string;
+  /** Optional extras for pay-from-balance — ballValue (plinko), mineCount (mines), pickCount (keno) */
+  balanceExtras?: { ballValue?: number; mineCount?: number; pickCount?: number };
+  /** Game key used for pay-from-balance (defaults to gameType — use when gameType != internal wallet key). */
+  balanceGameKey?: string;
+  /** Slug for pay-from-balance (defaults to tableSlug or gameId — use when gameId is composite). */
+  balanceSlug?: string;
+  /** Called when a balance-pay succeeds (debit + game row created). Parent should refresh or navigate. */
+  onBalancePaid?: (result: any) => void;
 }
 
 export function ChancePayment({
@@ -51,9 +64,15 @@ export function ChancePayment({
   qrLabel,
   playerToken,
   ballValue,
+  tableSlug,
+  balanceExtras,
+  balanceGameKey,
+  balanceSlug,
+  onBalancePaid,
 }: ChancePaymentProps) {
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
+  const connectedAddress = useConnectedAddress();
   const tm = translations.miniapp;
 
   const [copied, setCopied] = useState(false);
@@ -84,12 +103,14 @@ export function ChancePayment({
     return () => { active = false; };
   }, [showQr, paymentLink, isMiniApp]);
 
+  const tokenReady = !!playerToken;
+
   async function handleMiniAppPay() {
+    if (!tokenReady) return;
     setMiniAppPaying(true);
     setMiniAppError(null);
     try {
-      const parts = [gameType, gameId];
-      if (playerToken || ballValue !== undefined) parts.push(playerToken || "");
+      const parts = [gameType, gameId, playerToken!];
       if (ballValue !== undefined && ballValue > 0) parts.push(`bv${ballValue}`);
       const data = parts.join(":");
       await sendPayment(recipientAddress, amountCrc, data);
@@ -108,8 +129,43 @@ export function ChancePayment({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  // Resolve pay-from-balance params (fallback to the on-chain ones).
+  const balKey = balanceGameKey || gameType;
+  const balSlug = balanceSlug || tableSlug || gameId;
+  const balExtras = balanceExtras || (ballValue !== undefined ? { ballValue } : undefined);
+
   return (
     <div className="space-y-4">
+      {/* Pay-from-balance — shown above the normal flow when balance >= amount.
+          Component renders nothing when balance is insufficient, keeping the
+          default on-chain UI as the only option.
+
+          onSuccess behavior: if the parent passed onBalancePaid, we defer to
+          it (pages can do smooth state transitions). Otherwise we fall back to
+          a page reload after a short confirmation window — each game page has
+          an /api/{game}/active?token=X query that runs on mount and will pick
+          up the freshly-provisioned round. We don't call onPaymentInitiated
+          here because it usually triggers an on-chain scan that doesn't know
+          about balance-paid rounds. */}
+      <BalancePayButton
+        gameKey={balKey}
+        slug={balSlug}
+        amountCrc={amountCrc}
+        playerToken={playerToken}
+        address={connectedAddress || undefined}
+        extras={balExtras}
+        onSuccess={(result) => {
+          if (onBalancePaid) {
+            onBalancePaid(result);
+          } else {
+            setTimeout(() => {
+              if (typeof window !== "undefined") window.location.reload();
+            }, 1200);
+          }
+        }}
+        accentColor={accentColor}
+      />
+
       {/* -- Mini App mode -- */}
       {isMiniApp && walletAddress ? (
         <>
@@ -132,10 +188,12 @@ export function ChancePayment({
               className="w-full h-12 text-lg font-bold"
               style={{ backgroundColor: accentColor }}
               onClick={handleMiniAppPay}
-              disabled={miniAppPaying}
+              disabled={miniAppPaying || !tokenReady}
             >
               {miniAppPaying ? (
                 <><Loader2 className="h-5 w-5 animate-spin mr-2" />{tm.paying[locale]}</>
+              ) : !tokenReady ? (
+                <><Loader2 className="h-5 w-5 animate-spin mr-2" />{tm.preparing[locale]}</>
               ) : (
                 tm.payBtn[locale].replace("{amount}", String(amountCrc))
               )}
@@ -146,20 +204,31 @@ export function ChancePayment({
       ) : (
         /* -- Standalone mode -- */
         <>
-          <Button
-            className="w-full h-12 text-lg font-bold"
-            style={{ backgroundColor: accentColor }}
-            asChild
-          >
-            <a
-              href={paymentLink}
-              target="_blank"
-              rel="noreferrer"
-              onClick={() => onPaymentInitiated?.()}
+          {tokenReady ? (
+            <Button
+              className="w-full h-12 text-lg font-bold"
+              style={{ backgroundColor: accentColor }}
+              asChild
             >
-              {payLabel}
-            </a>
-          </Button>
+              <a
+                href={paymentLink}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => onPaymentInitiated?.()}
+              >
+                {payLabel}
+              </a>
+            </Button>
+          ) : (
+            <Button
+              className="w-full h-12 text-lg font-bold"
+              style={{ backgroundColor: accentColor }}
+              disabled
+            >
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              {tm.preparing[locale]}
+            </Button>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5">
@@ -237,6 +306,9 @@ export function ChancePayment({
             : (locale === "fr" ? "Scanner les paiements" : "Scan payments")}
         </button>
       )}
+
+      {/* -- Ticket recovery (bureau des tickets perdus) -- */}
+      <TicketRecovery gameKey={gameType} slug={tableSlug || gameId} />
     </div>
   );
 }

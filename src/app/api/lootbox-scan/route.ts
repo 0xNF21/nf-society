@@ -111,6 +111,8 @@ export async function POST(req: NextRequest) {
           amountCrc: priceCrc,
         }).onConflictDoNothing();
 
+        // Lootbox opens are on-chain (scan fired on on-chain tx). Reward
+        // paid on-chain to match.
         const gameId = `lootbox-${lootboxId}-${txHash}`;
         const payoutResult = await executePayout({
           gameType: "lootbox",
@@ -147,7 +149,7 @@ export async function POST(req: NextRequest) {
               .set({ used: true, usedAt: new Date(), txHashUsed: txHash })
               .where(eq(shopCoupons.id, coupon.id));
 
-            // Refund the player
+            // Lootbox opened on-chain → refund also on-chain (coupon-triggered).
             await executePayout({
               gameType: "shop_refund",
               gameId: `refund-${txHash}`,

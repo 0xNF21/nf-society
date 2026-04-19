@@ -122,7 +122,9 @@ export async function POST(req: NextRequest) {
           amountCrc: betCrc,
         }).onConflictDoNothing();
 
-        // If already finished (natural blackjack or dealer blackjack), process payout
+        // Natural blackjack / dealer blackjack → instant payout on-chain.
+        // Scan routes fire only for on-chain tx, so the prize matches the
+        // payment method (on-chain).
         if (state.status === "finished" && state.totalPayout > 0) {
           const { executePayout } = await import("@/lib/payout");
           await executePayout({

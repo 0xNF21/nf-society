@@ -60,9 +60,11 @@ export async function GET(
     const BLACKJACK_START_BLOCK = "0x2B7DE5C";
     const payments = await checkAllNewPayments(amount, table.recipientAddress, BLACKJACK_START_BLOCK);
 
-    // Find a NEW payment from this player that's not in any known set
+    // Find a NEW payment from this player that's not in any known set.
+    // If token is available, also verify the payment's gameData.t matches.
     // NOTE: we do NOT claim here — the action endpoint claims atomically
-    // to prevent orphan claims if the client misses the response.
+    // to prevent orphan claims if the client misses the response (race
+    // condition with the main hand polling re-creating this effect).
     let found = false;
     let foundTxHash = "";
     for (const p of payments) {

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { rouletteRounds, rouletteTables } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { getVisibleState } from "@/lib/roulette";
 import type { RouletteState } from "@/lib/roulette";
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         and(
           eq(rouletteRounds.tableId, table.id),
           eq(rouletteRounds.playerToken, token),
-          eq(rouletteRounds.status, "playing"),
+          ne(rouletteRounds.status, "finished"),
         )
       )
       .orderBy(desc(rouletteRounds.createdAt))

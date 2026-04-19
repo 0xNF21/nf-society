@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { participants, draws, lotteries } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { getPayoutConfig, executePayout } from "@/lib/payout";
+import { getPayoutConfig } from "@/lib/payout";
+import { payPrize, payCommission } from "@/lib/wallet";
 
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
       selectionIndex: winnerIndex,
     }).returning();
 
-    let payoutResult = null;
+    let payoutResult: { success: boolean; status?: string; error?: string; method?: string; transferTxHash?: string; ledgerId?: number } | null = null;
     const config = getPayoutConfig();
     if (config.configured) {
       try {
@@ -138,18 +139,33 @@ export async function POST(req: NextRequest) {
           const prizeAmount = totalPot - commission;
 
           if (prizeAmount > 0) {
-            payoutResult = await executePayout({
+            // Winner's own participation method determines where the prize goes.
+            const prize = await payPrize(winner.address, prizeAmount, {
               gameType: "lottery",
-              gameId: `lottery-${lotteryId}-draw-${insertedDraw.id}`,
-              recipientAddress: winner.address,
-              amountCrc: prizeAmount,
+              gameSlug: String(lotteryId),
+              gameRef: `draw-${insertedDraw.id}`,
+              sourceTxHash: winner.transactionHash,
               reason: `${lottery.title} — winner draw #${insertedDraw.id}`,
             });
-            console.log(`[Draw] Auto-payout result:`, payoutResult.status);
+            await payCommission(commission, {
+              gameType: "lottery",
+              gameSlug: String(lotteryId),
+              gameRef: `draw-${insertedDraw.id}-commission`,
+              sourceTxHash: winner.transactionHash,
+            });
+            payoutResult = {
+              success: prize.ok,
+              status: prize.ok ? "success" : "failed",
+              method: prize.method,
+              ledgerId: prize.ledgerId,
+              transferTxHash: prize.transferTxHash,
+              error: prize.error,
+            };
+            console.log(`[Draw] Prize paid via ${prize.method} (${prize.ok ? "ok" : prize.error})`);
           }
         }
       } catch (payoutError: any) {
-        console.error("[Draw] Auto-payout failed (draw still valid):", payoutError.message);
+        console.error("[Draw] Auto-pay failed (draw still valid):", payoutError.message);
         payoutResult = { success: false, error: payoutError.message };
       }
     }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { morpionGames, morpionMoves } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
-import { executePayout } from "@/lib/payout";
+import { payPrize, payCommission } from "@/lib/wallet";
 
 const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
@@ -129,39 +129,51 @@ export async function POST(
     const winAmount = pot * (1 - game.commissionPct / 100);
 
     if (winResult === "draw") {
-      // Refund both players
+      // Refund each player via their own payment method.
       if (p1) {
-        await executePayout({
-          gameType: "morpion",
-          gameId: `morpion-${game.slug}-p1-draw`,
-          recipientAddress: p1,
-          amountCrc: game.betCrc,
+        await payPrize(p1, game.betCrc, {
+          gameType: "morpion", gameSlug: game.slug, gameRef: `${game.slug}-p1-draw`,
+          sourceTxHash: game.player1TxHash,
           reason: `Morpion ${game.slug} — nul, remboursement J1`,
         });
       }
       if (p2) {
-        await executePayout({
-          gameType: "morpion",
-          gameId: `morpion-${game.slug}-p2-draw`,
-          recipientAddress: p2,
-          amountCrc: game.betCrc,
+        await payPrize(p2, game.betCrc, {
+          gameType: "morpion", gameSlug: game.slug, gameRef: `${game.slug}-p2-draw`,
+          sourceTxHash: game.player2TxHash,
           reason: `Morpion ${game.slug} — nul, remboursement J2`,
         });
       }
       await db.update(morpionGames).set({ payoutStatus: "success", updatedAt: new Date() }).where(eq(morpionGames.id, game.id));
     } else if (winnerAddress) {
-      const payoutResult = await executePayout({
-        gameType: "morpion",
-        gameId: `morpion-${game.slug}-winner`,
-        recipientAddress: winnerAddress,
-        amountCrc: winAmount,
-        reason: `Morpion ${game.slug} — victoire, gain ${winAmount} CRC`,
-      });
-      await db.update(morpionGames).set({
-        payoutStatus: payoutResult.success ? "success" : "failed",
-        payoutTxHash: payoutResult.transferTxHash || null,
-        updatedAt: new Date(),
-      }).where(eq(morpionGames.id, game.id));
+      // Winner paid-method determines prize method. Commission goes to DAO
+      // only when winner paid from balance; otherwise stays in Safe.
+      const winnerTxHash = winnerAddress === p1 ? game.player1TxHash : game.player2TxHash;
+      const commissionAmount = pot * (game.commissionPct / 100);
+      try {
+        const prize = await payPrize(winnerAddress, winAmount, {
+          gameType: "morpion", gameSlug: game.slug, gameRef: `${game.slug}-winner`,
+          sourceTxHash: winnerTxHash,
+          reason: `Morpion ${game.slug} — victoire, gain ${winAmount} CRC`,
+        });
+        await payCommission(commissionAmount, {
+          gameType: "morpion", gameSlug: game.slug, gameRef: `${game.slug}-commission`,
+          sourceTxHash: winnerTxHash,
+        });
+        await db.update(morpionGames).set({
+          payoutStatus: prize.ok ? "success" : "failed",
+          payoutTxHash: prize.method === "balance"
+            ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+            : (prize.transferTxHash || null),
+          updatedAt: new Date(),
+        }).where(eq(morpionGames.id, game.id));
+      } catch (err: any) {
+        console.error("[Morpion] Prize error:", err.message);
+        await db.update(morpionGames).set({
+          payoutStatus: "failed",
+          updatedAt: new Date(),
+        }).where(eq(morpionGames.id, game.id));
+      }
     }
 
     return NextResponse.json({ status: "finished", result, winnerAddress, board: newBoard });

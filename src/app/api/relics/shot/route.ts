@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { relicsGames } from '@/lib/db/schema/relics'
 import { eq } from 'drizzle-orm'
 import { processShot, isDefeated } from '@/lib/relics'
-import { executePayout } from '@/lib/payout'
+import { payPrize, payCommission } from '@/lib/wallet'
 import type { PlayerGrid } from '@/lib/relics'
 
 export async function POST(req: NextRequest) {
@@ -59,21 +59,27 @@ export async function POST(req: NextRequest) {
 
     await db.update(relicsGames).set(update).where(eq(relicsGames.id, game.id))
 
-    // Payout au vainqueur
+    // Pay winner asymmetrically (balance/on-chain based on their payment).
     if (defeated) {
       try {
         const pot = game.betCrc * 2
         const winAmount = pot * (1 - game.commissionPct / 100)
-        const payoutResult = await executePayout({
-          gameType: "relics",
-          gameId: `relics-${game.slug}-winner`,
-          recipientAddress: player,
-          amountCrc: winAmount,
+        const commissionAmount = pot * (game.commissionPct / 100)
+        const winnerTxHash = player === game.player1Address ? game.player1TxHash : game.player2TxHash
+        const prize = await payPrize(player, winAmount, {
+          gameType: "relics", gameSlug: game.slug, gameRef: `${game.slug}-winner`,
+          sourceTxHash: winnerTxHash,
           reason: `Relics ${game.slug} — victoire, gain ${winAmount} CRC`,
         })
+        await payCommission(commissionAmount, {
+          gameType: "relics", gameSlug: game.slug, gameRef: `${game.slug}-commission`,
+          sourceTxHash: winnerTxHash,
+        })
         await db.update(relicsGames).set({
-          payoutTxHash: payoutResult.transferTxHash || null,
-          payoutStatus: payoutResult.success ? 'success' : 'failed',
+          payoutTxHash: prize.method === "balance"
+            ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : 'balance-credit:duplicate')
+            : (prize.transferTxHash || null),
+          payoutStatus: prize.ok ? 'success' : 'failed',
           updatedAt: new Date(),
         }).where(eq(relicsGames.id, game.id))
       } catch (e) {

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { crashDashRounds, crashDashTables } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import { getVisibleState } from "@/lib/crash-dash";
 import type { CrashDashState } from "@/lib/crash-dash";
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         and(
           eq(crashDashRounds.tableId, table.id),
           eq(crashDashRounds.playerToken, token),
-          eq(crashDashRounds.status, "playing"),
+          ne(crashDashRounds.status, "finished"),
         )
       )
       .orderBy(desc(crashDashRounds.createdAt))

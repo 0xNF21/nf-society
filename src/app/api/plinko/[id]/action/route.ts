@@ -5,7 +5,7 @@ import { plinkoRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { dropBalls, cashout, getVisibleState, calculatePayout, isValidAction } from "@/lib/plinko";
 import type { PlinkoState, PlinkoAction } from "@/lib/plinko";
-import { executePayout } from "@/lib/payout";
+import { payPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -87,21 +87,23 @@ export async function POST(
           const reasonSuffix = newState.status === "cashed_out"
             ? `cashout after ${newState.balls.length}/${newState.ballCount} balls`
             : `${newState.balls.length} balls`;
-          const payoutResult = await executePayout({
+          const prize = await payPrize(round.playerAddress, payoutAmount, {
             gameType: "plinko",
-            gameId: `plinko-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
+            gameSlug: String(round.tableId),
+            gameRef: `round-${round.id}`,
+            sourceTxHash: round.transactionHash,
             reason: `Plinko — ${reasonSuffix} — ${payoutAmount} CRC`,
           });
 
           await db.update(plinkoRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: prize.ok ? "success" : "failed",
+            payoutTxHash: prize.method === "balance"
+              ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+              : (prize.transferTxHash || null),
+            errorMessage: prize.error || null,
           }).where(eq(plinkoRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Plinko] Payout error:", err.message);
+          console.error("[Plinko] Prize error:", err.message);
           await db.update(plinkoRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),
@@ -110,14 +112,12 @@ export async function POST(
 
         // XP for any positive outcome
         if (payoutAmount >= newState.totalBet) {
-          try {
-            const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-            await fetch(`${base}/api/players/xp`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ address: round.playerAddress, action: "plinko_win" }),
-            });
-          } catch {}
+          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+          void fetch(`${base}/api/players/xp`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address: round.playerAddress, action: "plinko_win" }),
+          }).catch(() => {});
         }
       } else {
         await db.update(plinkoRounds).set({ payoutStatus: "none" }).where(eq(plinkoRounds.id, roundId));

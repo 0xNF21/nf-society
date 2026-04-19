@@ -5,7 +5,7 @@ import { rouletteRounds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { resolveRoll, getVisibleState, calculatePayout, isValidAction } from "@/lib/roulette";
 import type { RouletteState, RouletteAction } from "@/lib/roulette";
-import { executePayout } from "@/lib/payout";
+import { payPrize } from "@/lib/wallet";
 
 export async function POST(
   req: NextRequest,
@@ -73,41 +73,43 @@ export async function POST(
 
     await db.update(rouletteRounds).set(updateData).where(eq(rouletteRounds.id, roundId));
 
-    // Process payout if won
+    // Pay the win. Asymmetric: balance-paid round -> balance credit, on-chain round -> on-chain payout.
     if (newState.status === "won") {
       const payoutAmount = calculatePayout(newState);
       if (payoutAmount > 0) {
         try {
-          const payoutResult = await executePayout({
+          const prize = await payPrize(round.playerAddress, payoutAmount, {
             gameType: "roulette",
-            gameId: `roulette-${round.tableId}-${round.transactionHash}`,
-            recipientAddress: round.playerAddress,
-            amountCrc: payoutAmount,
+            gameSlug: String(round.tableId),
+            gameRef: `round-${round.id}`,
+            sourceTxHash: round.transactionHash,
             reason: `Roulette — #${newState.result} — ${payoutAmount} CRC`,
           });
 
           await db.update(rouletteRounds).set({
-            payoutStatus: payoutResult.success ? "success" : "failed",
-            payoutTxHash: payoutResult.transferTxHash || null,
-            errorMessage: payoutResult.error || null,
+            payoutStatus: prize.ok ? "success" : "failed",
+            payoutTxHash: prize.method === "balance"
+              ? (prize.ledgerId ? `balance-credit:${prize.ledgerId}` : "balance-credit:duplicate")
+              : (prize.transferTxHash || null),
+            errorMessage: prize.error || null,
           }).where(eq(rouletteRounds.id, roundId));
         } catch (err: any) {
-          console.error("[Roulette] Payout error:", err.message);
+          console.error("[Roulette] Prize error:", err.message);
           await db.update(rouletteRounds).set({
             payoutStatus: "failed",
             errorMessage: err.message?.substring(0, 500),
           }).where(eq(rouletteRounds.id, roundId));
         }
 
-        // XP for win
-        try {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: round.playerAddress, action: "roulette_win" }),
-          });
-        } catch {}
+        // XP for win — fire and forget so a slow / unreachable XP endpoint
+        // never blocks the spin response (caused the post-win freeze when
+        // NEXT_PUBLIC_APP_URL pointed at a non-listening port).
+        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        void fetch(`${base}/api/players/xp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: round.playerAddress, action: "roulette_win" }),
+        }).catch(() => {});
       }
     }
 
