@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Demurrage Dash — NF Society",
   description: "Faites pousser la plante, recoltez avant le crash. RTP ~99%.",

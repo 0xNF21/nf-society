@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Dice — NF Society",
   description: "Lancez le de, choisissez votre multiplicateur. RTP ~99%.",

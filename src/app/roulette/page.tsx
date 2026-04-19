@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Roulette — NF Society",
   description: "Placez vos mises sur le tapis, lancez la roue. RTP ~99%.",

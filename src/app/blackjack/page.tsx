@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Blackjack — NF Society",
   description: "Joue au blackjack classique avec des CRC sur NF Society",

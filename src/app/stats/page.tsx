@@ -1,7 +1,7 @@
 import { computePlatformStats } from "@/lib/platform-stats";
 import StatsClient from "./client";
 
-export const revalidate = 300; // cache 5 min
+export const dynamic = "force-dynamic";
 
 export default async function StatsPage() {
   const stats = await computePlatformStats();

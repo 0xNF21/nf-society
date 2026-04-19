@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Pile ou Face — NF Society",
   description: "Pile ou face avec CRC sur NF Society. RTP 98%.",
