@@ -970,12 +970,26 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
       if (!res.ok) { console.error("[Roulette] Error:", data.error); setSpinning(false); return; }
       // Start wheel animation with result
       setResultNumber(data.result);
-      setTimeout(() => { setRound(data); setSpinning(false); }, 4200);
+      // After 4.2s (wheel animation done): apply result + re-fetch from /active
+      // to guarantee the UI reflects every DB field (payoutStatus, payoutTxHash,
+      // updated bets, etc.) so the ResultPanel renders immediately without F5.
+      setTimeout(async () => {
+        setRound(data);
+        setSpinning(false);
+        try {
+          const refreshRes = await fetch(
+            `/api/roulette/active?tableSlug=${table.slug}&token=${tokenRef.current}`,
+            { cache: "no-store" },
+          );
+          const refreshData = await refreshRes.json();
+          if (refreshData?.round) setRound(refreshData.round);
+        } catch {}
+      }, 4200);
     } catch (err) {
       console.error("[Roulette] Fetch error:", err);
       setSpinning(false);
     }
-  }, [round, spinning, bets]);
+  }, [round, spinning, bets, table.slug]);
 
   const resetGame = useCallback(() => {
     setRound(null); setBets([]); setWatchingPayment(false);
