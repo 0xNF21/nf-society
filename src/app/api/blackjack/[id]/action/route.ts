@@ -5,7 +5,7 @@ import { blackjackHands, blackjackTables, claimedPayments } from "@/lib/db/schem
 import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculateTotalBet } from "@/lib/blackjack";
 import type { BlackjackState, Action } from "@/lib/blackjack";
-import { payPrize } from "@/lib/wallet";
+import { payPrize, debitForSecondaryBet, isBalancePaid } from "@/lib/wallet";
 import { checkAllNewPayments } from "@/lib/circles";
 
 const VALID_ACTIONS: Action[] = ["hit", "stand", "double", "split", "insurance"];
@@ -50,45 +50,70 @@ export async function POST(
       return NextResponse.json({ error: "Hand not in playing state" }, { status: 400 });
     }
 
-    // For paid actions (double/split), verify + claim the extra payment
-    // atomically BEFORE applying the action. This prevents orphan claims
-    // if the client missed the check-payment response (race condition).
+    // For paid actions (double/split), collect the extra bet BEFORE applying
+    // the action. Two paths, mutually exclusive, picked by how the initial
+    // hand was funded:
+    //
+    // 1. Balance-paid hand (hand.transactionHash starts with "balance:")
+    //    → debit the player's balance for `betCrc` again. Atomic; fails with
+    //      insufficient_balance if they've spent their stack elsewhere since
+    //      starting the hand. No claimedPayments row (not an on-chain tx).
+    //
+    // 2. On-chain hand → verify the extra on-chain paymentTxHash and claim
+    //    it in claimedPayments (prevents double-spending the same tx across
+    //    multiple actions).
     if (PAID_ACTIONS.includes(action)) {
-      if (!paymentTxHash) {
-        return NextResponse.json({ error: "Payment tx hash required for this action" }, { status: 400 });
-      }
+      if (isBalancePaid(hand.transactionHash)) {
+        // Balance-pay hand → debit balance atomically for the extra bet.
+        const debit = await debitForSecondaryBet({
+          address: hand.playerAddress,
+          amount: hand.betCrc,
+          gameType: "blackjack",
+          gameSlug: String(hand.tableId),
+          reason: `Bet blackjack ${action} ${hand.tableId}`,
+        });
+        if (!debit.ok) {
+          const status = debit.error === "insufficient_balance" ? 422 : 400;
+          return NextResponse.json({ error: debit.error }, { status });
+        }
+      } else {
+        // On-chain hand → existing payment verification + claim flow.
+        if (!paymentTxHash) {
+          return NextResponse.json({ error: "Payment tx hash required for this action" }, { status: 400 });
+        }
 
-      // Lookup table for recipient address
-      const [table] = await db.select({ recipientAddress: blackjackTables.recipientAddress })
-        .from(blackjackTables).where(eq(blackjackTables.id, hand.tableId)).limit(1);
-      if (!table) {
-        return NextResponse.json({ error: "Table not found" }, { status: 404 });
-      }
+        // Lookup table for recipient address
+        const [table] = await db.select({ recipientAddress: blackjackTables.recipientAddress })
+          .from(blackjackTables).where(eq(blackjackTables.id, hand.tableId)).limit(1);
+        if (!table) {
+          return NextResponse.json({ error: "Table not found" }, { status: 404 });
+        }
 
-      // Verify tx on-chain: must be from the player, correct amount, with matching token
-      const payments = await checkAllNewPayments(hand.betCrc, table.recipientAddress, BLACKJACK_START_BLOCK);
-      const tx = payments.find(p => p.transactionHash.toLowerCase() === paymentTxHash);
-      if (!tx) {
-        return NextResponse.json({ error: "Payment tx not found on-chain" }, { status: 400 });
-      }
-      if (tx.sender.toLowerCase() !== hand.playerAddress.toLowerCase()) {
-        return NextResponse.json({ error: "Payment tx sender mismatch" }, { status: 400 });
-      }
-      if (hand.playerToken && tx.gameData?.t && tx.gameData.t !== hand.playerToken) {
-        return NextResponse.json({ error: "Payment tx token mismatch" }, { status: 400 });
-      }
+        // Verify tx on-chain: must be from the player, correct amount, with matching token
+        const payments = await checkAllNewPayments(hand.betCrc, table.recipientAddress, BLACKJACK_START_BLOCK);
+        const tx = payments.find(p => p.transactionHash.toLowerCase() === paymentTxHash);
+        if (!tx) {
+          return NextResponse.json({ error: "Payment tx not found on-chain" }, { status: 400 });
+        }
+        if (tx.sender.toLowerCase() !== hand.playerAddress.toLowerCase()) {
+          return NextResponse.json({ error: "Payment tx sender mismatch" }, { status: 400 });
+        }
+        if (hand.playerToken && tx.gameData?.t && tx.gameData.t !== hand.playerToken) {
+          return NextResponse.json({ error: "Payment tx token mismatch" }, { status: 400 });
+        }
 
-      // Atomic claim — onConflictDoNothing returns [] if the tx was already claimed
-      const claimed = await db.insert(claimedPayments).values({
-        txHash: paymentTxHash,
-        gameType: "blackjack",
-        gameId: hand.tableId,
-        playerAddress: hand.playerAddress,
-        amountCrc: hand.betCrc,
-      }).onConflictDoNothing().returning({ txHash: claimedPayments.txHash });
+        // Atomic claim — onConflictDoNothing returns [] if the tx was already claimed
+        const claimed = await db.insert(claimedPayments).values({
+          txHash: paymentTxHash,
+          gameType: "blackjack",
+          gameId: hand.tableId,
+          playerAddress: hand.playerAddress,
+          amountCrc: hand.betCrc,
+        }).onConflictDoNothing().returning({ txHash: claimedPayments.txHash });
 
-      if (claimed.length === 0) {
-        return NextResponse.json({ error: "Payment tx already consumed" }, { status: 409 });
+        if (claimed.length === 0) {
+          return NextResponse.json({ error: "Payment tx already consumed" }, { status: 409 });
+        }
       }
     }
 
@@ -170,6 +195,7 @@ export async function POST(
       betCrc: hand.betCrc,
       payoutStatus: hand.payoutStatus,
       createdAt: hand.createdAt,
+      isBalancePaid: isBalancePaid(hand.transactionHash),
       ...visible,
       outcome: updateData.outcome || null,
       payoutCrc: newState.totalPayout,

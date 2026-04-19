@@ -37,6 +37,8 @@ type HandResponse = VisibleState & {
   payoutCrc: number | null;
   payoutStatus: string;
   createdAt: string;
+  /** True when the hand was funded from the player's prepaid balance (tx hash "balance:..."). */
+  isBalancePaid?: boolean;
 };
 
 // ── Card Component ──────────────────────────────────────
@@ -652,7 +654,17 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
               )}
               {hand.availableActions.includes("double") && !pendingPaidAction && (
                 <button
-                  onClick={() => { setPendingPaidAction("double"); setWatchingActionPayment(false); setActionPaymentConfirmed(false); }}
+                  onClick={() => {
+                    if (hand.isBalancePaid) {
+                      // Balance-paid hand → action endpoint debits the player's
+                      // balance for the extra bet. No payment panel needed.
+                      performAction("double");
+                    } else {
+                      setPendingPaidAction("double");
+                      setWatchingActionPayment(false);
+                      setActionPaymentConfirmed(false);
+                    }
+                  }}
                   disabled={actionLoading}
                   className="py-3 rounded-xl font-bold text-sm bg-amber-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >
@@ -661,7 +673,15 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
               )}
               {hand.availableActions.includes("split") && !pendingPaidAction && (
                 <button
-                  onClick={() => { setPendingPaidAction("split"); setWatchingActionPayment(false); setActionPaymentConfirmed(false); }}
+                  onClick={() => {
+                    if (hand.isBalancePaid) {
+                      performAction("split");
+                    } else {
+                      setPendingPaidAction("split");
+                      setWatchingActionPayment(false);
+                      setActionPaymentConfirmed(false);
+                    }
+                  }}
                   disabled={actionLoading}
                   className="py-3 rounded-xl font-bold text-sm bg-violet-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >

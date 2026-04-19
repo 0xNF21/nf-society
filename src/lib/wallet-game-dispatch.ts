@@ -27,6 +27,8 @@ import {
   crashDashTables, crashDashRounds,
   kenoTables, kenoRounds,
   blackjackTables, blackjackHands,
+  coinFlipTables, coinFlipResults,
+  lootboxes, lootboxOpens,
   lotteries, participants,
 } from "@/lib/db/schema";
 
@@ -38,6 +40,8 @@ import { createInitialState as diceInitState } from "@/lib/dice";
 import { generateCrashPoint, createInitialState as crashInitState } from "@/lib/crash-dash";
 import { createInitialState as kenoInitState } from "@/lib/keno";
 import { createDeck as blackjackCreateDeck, dealInitialHands as blackjackDealInitial } from "@/lib/blackjack";
+import { resolveCoinFlip, isValidChoice as isValidCoinChoice, type CoinSide } from "@/lib/coin-flip";
+import { getRandomReward as getLootboxReward } from "@/lib/lootbox";
 
 // drizzle's tx type — use any to avoid dragging in full schema relations.
 type Tx = any;
@@ -52,8 +56,19 @@ export const CHANCE_BALANCE_SUPPORTED = new Set([
   "crash_dash",
   "keno",
   "blackjack",
+  "coin_flip",
+  "lootbox",
   "lottery",
 ]);
+
+/**
+ * Games resolved server-side at bet time (no separate action call to deal
+ * cards, reveal a tile, etc.). The dispatcher flips the coin / rolls the
+ * lootbox and returns `prizeCrc` alongside the inserted row — payGameFromBalance
+ * credits that prize inside the SAME transaction so the bet debit, the row
+ * insert, the prize credit, and the treasury mirror all commit together.
+ */
+export const INSTANT_RESOLVE_GAMES = new Set(["coin_flip", "lootbox"]);
 
 /** Multi games that support pay-from-balance today — any game in GAME_SERVER_REGISTRY. */
 export const MULTI_BALANCE_SUPPORTED = new Set([
@@ -143,10 +158,19 @@ export type CreateChanceRoundOpts = {
   ballValue?: number;  // plinko
   mineCount?: number;  // mines
   pickCount?: number;  // keno
+  choice?: "heads" | "tails"; // coin_flip
 };
 
 export type CreateChanceRoundResult =
-  | { id: number; tableId: number; gameRow: any }
+  | {
+      id: number;
+      tableId: number;
+      gameRow: any;
+      /** For instant-resolve games (coin_flip, lootbox): amount to credit back
+       *  to the player as their prize. 0 on a loss. Undefined for regular
+       *  chance games where the prize is paid later by the action route. */
+      prizeCrc?: number;
+    }
   | { error: "table_not_found" | "invalid_bet" | "invalid_param" | "unsupported" | "already_joined" };
 
 /**
@@ -290,10 +314,12 @@ export async function createChanceRound(
       const [table] = await tx.select().from(kenoTables).where(eq(kenoTables.slug, tableSlug)).limit(1);
       if (!table) return { error: "table_not_found" };
       const betOptions = (table.betOptions as number[]) || [];
-      const pickOptions = (table.pickOptions as number[]) || [];
       if (!betOptions.includes(amount)) return { error: "invalid_bet" };
+      // Keno tables have no explicit pickOptions column; the rules cap at
+      // MAX_PICKS=10 and the UI enforces 1..10. Mirror that here rather than
+      // reading a non-existent table column.
       const pickCount = opts.pickCount;
-      if (!pickCount || !pickOptions.includes(pickCount)) return { error: "invalid_param" };
+      if (!pickCount || pickCount < 1 || pickCount > 10) return { error: "invalid_param" };
       const state = kenoInitState(amount, pickCount);
       const [inserted] = await tx.insert(kenoRounds).values({
         tableId: table.id,
@@ -325,6 +351,91 @@ export async function createChanceRound(
         status: state.status,
       }).returning({ id: blackjackHands.id });
       return { id: inserted.id, tableId: table.id, gameRow: { ...inserted, gameState: state } };
+    }
+
+    case "coin_flip": {
+      // Instant-resolve: flip the coin server-side and record the result in
+      // the same transaction. prizeCrc is returned so payGameFromBalance
+      // credits the winner atomically with the bet debit + treasury mirror.
+      const [table] = await tx.select().from(coinFlipTables).where(eq(coinFlipTables.slug, tableSlug)).limit(1);
+      if (!table) return { error: "table_not_found" };
+      const betOptions = (table.betOptions as number[]) || [];
+      if (!betOptions.includes(amount)) return { error: "invalid_bet" };
+      const choice = opts.choice;
+      if (!choice || !isValidCoinChoice(choice)) return { error: "invalid_param" };
+
+      const flip = resolveCoinFlip(choice, amount);
+      const payoutStatus = flip.outcome === "win" ? "success" : "none";
+      const [inserted] = await tx.insert(coinFlipResults).values({
+        tableId: table.id,
+        playerAddress: addr,
+        transactionHash: syntheticTxHash,
+        betCrc: amount,
+        playerToken,
+        playerChoice: flip.playerChoice,
+        coinResult: flip.coinResult,
+        outcome: flip.outcome,
+        payoutCrc: flip.payoutCrc > 0 ? flip.payoutCrc : null,
+        payoutStatus,
+      }).returning({ id: coinFlipResults.id, createdAt: coinFlipResults.createdAt });
+
+      return {
+        id: inserted.id,
+        tableId: table.id,
+        gameRow: {
+          id: inserted.id,
+          tableId: table.id,
+          playerAddress: addr,
+          transactionHash: syntheticTxHash,
+          betCrc: amount,
+          playerToken,
+          playerChoice: flip.playerChoice,
+          coinResult: flip.coinResult,
+          outcome: flip.outcome,
+          payoutCrc: flip.payoutCrc > 0 ? flip.payoutCrc : null,
+          payoutStatus,
+          createdAt: inserted.createdAt,
+        },
+        prizeCrc: flip.payoutCrc,
+      };
+    }
+
+    case "lootbox": {
+      // Instant-resolve: open the box, insert the result, and return the
+      // reward as prizeCrc. payGameFromBalance credits it atomically.
+      const [lootbox] = await tx.select().from(lootboxes).where(eq(lootboxes.slug, tableSlug)).limit(1);
+      if (!lootbox) return { error: "table_not_found" };
+      if (lootbox.status !== "active") return { error: "invalid_bet" };
+      if (lootbox.pricePerOpenCrc !== amount) return { error: "invalid_bet" };
+
+      const rewardCrc = getLootboxReward(amount);
+      const payoutStatus = rewardCrc > 0 ? "success" : "none";
+      const openedAt = new Date();
+      const [inserted] = await tx.insert(lootboxOpens).values({
+        lootboxId: lootbox.id,
+        playerAddress: addr,
+        transactionHash: syntheticTxHash,
+        playerToken,
+        rewardCrc,
+        payoutStatus,
+        openedAt,
+      }).returning({ id: lootboxOpens.id });
+
+      return {
+        id: inserted.id,
+        tableId: lootbox.id,
+        gameRow: {
+          id: inserted.id,
+          lootboxId: lootbox.id,
+          playerAddress: addr,
+          transactionHash: syntheticTxHash,
+          playerToken,
+          rewardCrc,
+          payoutStatus,
+          openedAt: openedAt.toISOString(),
+        },
+        prizeCrc: rewardCrc,
+      };
     }
 
     case "lottery": {

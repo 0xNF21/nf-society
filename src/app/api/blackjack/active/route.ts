@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
         payoutCrc: hand.payoutCrc,
         payoutStatus: hand.payoutStatus,
         createdAt: hand.createdAt,
+        isBalancePaid: typeof hand.transactionHash === "string" && hand.transactionHash.startsWith("balance:"),
         ...visible,
       },
     });

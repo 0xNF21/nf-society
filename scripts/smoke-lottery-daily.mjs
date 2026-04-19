@@ -1,7 +1,8 @@
 // Smoke test for lottery (via /api/wallet/pay-game) and daily
 // (via /api/daily/claim-from-balance).
 const ADDR = (process.argv[2] || "0x158a0ec28264d37b6471736f29e8f68f0c927ed5").toLowerCase();
-const BASE = "http://localhost:3000/api";
+const PORT = process.env.PORT || "3000";
+const BASE = `http://localhost:${PORT}/api`;
 
 async function call(label, url, body) {
   const res = await fetch(`${BASE}${url}`, {

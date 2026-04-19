@@ -40,8 +40,8 @@ interface ChancePaymentProps {
   ballValue?: number;
   /** Optional table slug — used by ticket recovery when gameId is composite (mines, keno, coin-flip) */
   tableSlug?: string;
-  /** Optional extras for pay-from-balance — ballValue (plinko), mineCount (mines), pickCount (keno) */
-  balanceExtras?: { ballValue?: number; mineCount?: number; pickCount?: number };
+  /** Optional extras for pay-from-balance — ballValue (plinko), mineCount (mines), pickCount (keno), choice (coin_flip) */
+  balanceExtras?: { ballValue?: number; mineCount?: number; pickCount?: number; choice?: "heads" | "tails" };
   /** Game key used for pay-from-balance (defaults to gameType — use when gameType != internal wallet key). */
   balanceGameKey?: string;
   /** Slug for pay-from-balance (defaults to tableSlug or gameId — use when gameId is composite). */

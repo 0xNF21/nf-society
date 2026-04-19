@@ -5,7 +5,8 @@
 
 const ADDR = (process.argv[2] || "0x158a0ec28264d37b6471736f29e8f68f0c927ed5").toLowerCase();
 const TOKEN = "smoke1234";
-const BASE = "http://localhost:3000/api/wallet";
+const PORT = process.env.PORT || "3000";
+const BASE = `http://localhost:${PORT}/api/wallet`;
 
 async function call(label, body) {
   const res = await fetch(`${BASE}/pay-game`, {

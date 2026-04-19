@@ -869,6 +869,25 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
               qrLabel={t.scanQr[locale]}
               playerToken={tokenRef.current}
+              balanceSlug={lootbox.slug}
+              onBalancePaid={(data) => {
+                // Instant-resolve: dispatcher rolled the reward and credited it.
+                // data.gameRow has the inserted row (rewardCrc, playerAddress, etc.);
+                // play the same animation the scan flow would have triggered.
+                const row = data?.gameRow;
+                if (!row) return;
+                const open: LootboxOpen = {
+                  id: row.id,
+                  playerAddress: row.playerAddress,
+                  transactionHash: row.transactionHash ?? "",
+                  playerToken: row.playerToken ?? null,
+                  rewardCrc: row.rewardCrc,
+                  payoutStatus: row.payoutStatus ?? "success",
+                  openedAt: row.openedAt ?? new Date().toISOString(),
+                };
+                setWatchingPayment(false);
+                runAnimation(open);
+              }}
             />
 
             <p className="text-xs text-ink/25 font-mono break-all text-center">{paymentAddress}</p>

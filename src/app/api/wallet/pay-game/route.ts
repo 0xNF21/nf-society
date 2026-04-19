@@ -35,7 +35,7 @@ import { payGameFromBalance } from "@/lib/wallet";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { gameKey, slug, address, playerToken, amount, ballValue, mineCount, pickCount } = body || {};
+    const { gameKey, slug, address, playerToken, amount, ballValue, mineCount, pickCount, choice } = body || {};
 
     if (!gameKey || !slug || !address || !playerToken || typeof amount !== "number") {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
         ballValue: typeof ballValue === "number" ? ballValue : undefined,
         mineCount: typeof mineCount === "number" ? mineCount : undefined,
         pickCount: typeof pickCount === "number" ? pickCount : undefined,
+        choice: choice === "heads" || choice === "tails" ? choice : undefined,
       },
     });
 

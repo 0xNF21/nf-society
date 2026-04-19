@@ -479,6 +479,30 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
               scanning={scanning}
               paymentStatus={watchingPayment ? "watching" : "idle"}
               playerToken={tokenRef.current}
+              balanceSlug={table.slug}
+              balanceExtras={{ choice: selectedChoice }}
+              onBalancePaid={(data) => {
+                // Instant-resolve: the dispatcher has already flipped the
+                // coin and credited the prize (if any). data.gameRow holds
+                // the full flip result; mirror it into the result state so
+                // the normal "Result" UI takes over without a reload.
+                const row = data?.gameRow;
+                if (!row) return;
+                const flipResult: FlipResultResponse = {
+                  id: row.id,
+                  playerAddress: row.playerAddress,
+                  betCrc: row.betCrc,
+                  playerChoice: row.playerChoice,
+                  coinResult: row.coinResult,
+                  outcome: row.outcome,
+                  payoutCrc: row.payoutCrc ?? null,
+                  payoutStatus: row.payoutStatus ?? "success",
+                  createdAt: row.createdAt ?? new Date().toISOString(),
+                };
+                setWatchingPayment(false);
+                setResult(flipResult);
+                setShowResult(true);
+              }}
             />
           )}
         </div>

@@ -2,7 +2,8 @@
 // Requires npm run dev running on http://localhost:3000.
 
 const ADDR = process.argv[2] || "0x158a0ec28264d37b6471736f29e8f68f0c927ed5";
-const BASE = "http://localhost:3000/api/wallet";
+const PORT = process.env.PORT || "3000";
+const BASE = `http://localhost:${PORT}/api/wallet`;
 
 async function j(label, res) {
   const text = await res.text();

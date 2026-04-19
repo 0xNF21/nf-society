@@ -22,6 +22,10 @@ import {
   createChanceRound,
   type CreateChanceRoundOpts,
 } from "./wallet-game-dispatch";
+import {
+  applyLedgerEntry,
+  DAO_TREASURY_ADDRESS,
+} from "./wallet-ledger";
 
 /**
  * Does the given source tx hash identify a balance-paid round?
@@ -51,17 +55,16 @@ export async function getBalance(address: string): Promise<number> {
 }
 
 export type CreditKind = "topup" | "prize" | "commission" | "cashout-refund";
+// LedgerKindAll is imported from wallet-ledger above and re-used here for
+// the shared applyLedgerEntry primitive.
 
 /**
- * Pseudo-address used to track the DAO's accumulated commission. This is NOT
- * a real wallet — nothing ever signs on-chain for it. It's just a row in the
- * players table that aggregates all commission fees withheld from game wins,
- * so the invariant `sum(players.balance_crc) == Safe_onchain_balance` holds.
- *
- * Overridable via env for prod tuning, defaults to a recognizable sentinel.
+ * Pseudo-address used to track the DAO's accumulated treasury (bets in,
+ * prizes out). Re-exported from wallet-ledger so external callers keep using
+ * `import { DAO_TREASURY_ADDRESS } from "@/lib/wallet"`. The actual constant
+ * lives in wallet-ledger.ts to avoid circular imports with the dispatch layer.
  */
-export const DAO_TREASURY_ADDRESS =
-  (process.env.DAO_TREASURY_ADDRESS || "0x000000000000000000000000000000000000da00").toLowerCase();
+export { DAO_TREASURY_ADDRESS };
 
 export type CreditOpts = {
   kind: CreditKind;
@@ -94,49 +97,14 @@ export async function creditWallet(
   if (!addr) throw new Error("creditWallet: address required");
 
   return db.transaction(async (tx) => {
-    // 1) If txHash provided, short-circuit on duplicate (idempotency).
-    if (opts.txHash) {
-      const [existing] = await tx
-        .select({ id: walletLedger.id })
-        .from(walletLedger)
-        .where(eq(walletLedger.txHash, opts.txHash))
-        .limit(1);
-      if (existing) return { ok: false, skipped: "duplicate_txhash" } as const;
-    }
-
-    // 2) Upsert players row and bump balance_crc.
-    //    INSERT ... ON CONFLICT DO UPDATE returns the new balance.
-    const result = await tx.execute<{ balance_crc: number }>(
-      sql`INSERT INTO players (address, balance_crc)
-          VALUES (${addr}, ${amountCrc})
-          ON CONFLICT (address) DO UPDATE
-            SET balance_crc = players.balance_crc + ${amountCrc},
-                last_seen   = NOW()
-          RETURNING balance_crc`,
-    );
-    const balanceAfter =
-      (result as any).rows?.[0]?.balance_crc ??
-      (result as any)[0]?.balance_crc;
-    if (typeof balanceAfter !== "number") {
-      throw new Error("creditWallet: failed to read balance_after");
-    }
-
-    // 3) Insert ledger row.
-    const [ledger] = await tx
-      .insert(walletLedger)
-      .values({
-        address: addr,
-        kind: opts.kind,
-        amountCrc: amountCrc,
-        balanceAfter,
-        reason: opts.reason || null,
-        txHash: opts.txHash || null,
-        gameType: opts.gameType || null,
-        gameSlug: opts.gameSlug || null,
-      })
-      .returning({ id: walletLedger.id });
-
-    return { ok: true, balanceAfter, ledgerId: ledger.id } as const;
+    const res = await applyLedgerEntry(tx, addr, amountCrc, opts.kind, {
+      reason: opts.reason,
+      txHash: opts.txHash,
+      gameType: opts.gameType,
+      gameSlug: opts.gameSlug,
+    });
+    if ("skipped" in res) return { ok: false, skipped: "duplicate_txhash" } as const;
+    return { ok: true, balanceAfter: res.balanceAfter, ledgerId: res.ledgerId } as const;
   });
 }
 
@@ -214,6 +182,12 @@ export type PayGameFromBalanceResult =
       roundId: number;
       tableId: number;
       gameRow: any;
+      /** For instant-resolve games (coin_flip, lootbox). The prize has been
+       *  credited to the player already; `balanceAfter` is the post-credit
+       *  balance. `prizeLedgerId` is the ledger row id of the credit. 0 on
+       *  a loss. Undefined for regular chance games. */
+      prizeCrc?: number;
+      prizeLedgerId?: number;
     }
   | { ok: false; error: string };
 
@@ -283,6 +257,25 @@ export async function payGameFromBalance(
 
       const syntheticTxHash = `balance:${ledger.id}`;
 
+      // Step 2b: mirror on DAO treasury. The bet leaves the user, so it has
+      // to go somewhere in the DB — the treasury pseudo-address acts as the
+      // "house", matching how an on-chain bet flows into the Safe. This
+      // keeps the invariant sum(players.balance_crc) == Safe_onchain
+      // (modulo topups/cashouts) holdable across balance-pay activity.
+      // txHash is unique via the user ledger id → idempotent on retry.
+      await applyLedgerEntry(
+        tx,
+        DAO_TREASURY_ADDRESS,
+        params.amount,
+        "house-bet",
+        {
+          reason: `House bet ${params.gameKey} ${params.slug}`,
+          txHash: `house-bet:${ledger.id}`,
+          gameType: params.gameKey,
+          gameSlug: params.slug,
+        },
+      );
+
       // Step 3: game-side write.
       if (isMulti) {
         const result = await assignMultiPlayer(
@@ -321,14 +314,60 @@ export async function payGameFromBalance(
       if ("error" in result) {
         throw new Error(`chance:${result.error}`);
       }
+
+      // Instant-resolve games (coin_flip, lootbox) settle at bet time.
+      // The dispatcher has already flipped / rolled server-side and reports
+      // `prizeCrc`. Credit the player + debit the treasury atomically so the
+      // full bet → resolve → credit path is one transaction. On a loss
+      // (prizeCrc === 0) we skip — the bet stays on the treasury side,
+      // matching the on-chain flow where the Safe keeps the loss.
+      let finalBalance = balanceAfter;
+      let prizeLedgerId: number | undefined;
+      if (typeof result.prizeCrc === "number" && result.prizeCrc > 0) {
+        const prizeRef = `${params.gameKey}-${result.id}`;
+        const userCredit = await applyLedgerEntry(
+          tx,
+          addr,
+          result.prizeCrc,
+          "prize",
+          {
+            reason: `Prize ${params.gameKey} ${params.slug}`,
+            txHash: `prize:${params.gameKey}:${prizeRef}`,
+            gameType: params.gameKey,
+            gameSlug: params.slug,
+          },
+        );
+        if ("balanceAfter" in userCredit) {
+          finalBalance = userCredit.balanceAfter;
+          prizeLedgerId = userCredit.ledgerId;
+        }
+        // If the user credit was skipped as duplicate (idempotent retry),
+        // the treasury debit must also be idempotent via its own unique
+        // txHash — applyLedgerEntry handles that check internally.
+        await applyLedgerEntry(
+          tx,
+          DAO_TREASURY_ADDRESS,
+          -result.prizeCrc,
+          "house-payout",
+          {
+            reason: `House payout ${params.gameKey} ${params.slug}`,
+            txHash: `house-payout:${params.gameKey}:${prizeRef}`,
+            gameType: params.gameKey,
+            gameSlug: params.slug,
+          },
+        );
+      }
+
       return {
         ok: true as const,
-        balanceAfter,
+        balanceAfter: finalBalance,
         ledgerId: ledger.id,
         family: "chance" as const,
         roundId: result.id,
         tableId: result.tableId,
         gameRow: result.gameRow,
+        prizeCrc: result.prizeCrc,
+        prizeLedgerId,
       };
     });
   } catch (err: any) {
@@ -338,6 +377,81 @@ export async function payGameFromBalance(
     const normalized = colon > 0 && colon < 30 ? msg.slice(colon + 1) : msg;
     return { ok: false, error: normalized || "transaction_failed" };
   }
+}
+
+export type DebitSecondaryBetResult =
+  | { ok: true; balanceAfter: number; ledgerId: number }
+  | { ok: false; error: "insufficient_balance" | "invalid_address" | "invalid_amount" };
+
+/**
+ * Debit a player's balance for an in-round extra bet (e.g. blackjack double
+ * or split). The game round already exists; this is just a balance move.
+ *
+ * Atomic: the user debit + user ledger row + treasury mirror all commit
+ * together, or not at all. On success returns a ledgerId that callers should
+ * fold into their round's claim / secondary-bet tracking.
+ */
+export async function debitForSecondaryBet(params: {
+  address: string;
+  amount: number;
+  gameType: string;
+  gameSlug: string;
+  /** Free-text audit label — ends up in wallet_ledger.reason. */
+  reason: string;
+}): Promise<DebitSecondaryBetResult> {
+  const addr = normalize(params.address);
+  if (!addr || !/^0x[a-f0-9]{40}$/.test(addr)) {
+    return { ok: false, error: "invalid_address" };
+  }
+  if (!params.amount || params.amount <= 0) {
+    return { ok: false, error: "invalid_amount" };
+  }
+
+  return db.transaction(async (tx) => {
+    const debitRes = await tx.execute(
+      sql`UPDATE players
+          SET balance_crc = balance_crc - ${params.amount},
+              last_seen = NOW()
+          WHERE address = ${addr} AND balance_crc >= ${params.amount}
+          RETURNING balance_crc`,
+    );
+    const row = (debitRes as any).rows?.[0] ?? (debitRes as any)[0];
+    if (!row || typeof row.balance_crc !== "number") {
+      return { ok: false as const, error: "insufficient_balance" };
+    }
+    const balanceAfter = row.balance_crc;
+
+    const [ledger] = await tx
+      .insert(walletLedger)
+      .values({
+        address: addr,
+        kind: "debit",
+        amountCrc: -params.amount,
+        balanceAfter,
+        reason: params.reason,
+        txHash: null,
+        gameType: params.gameType,
+        gameSlug: params.gameSlug,
+      })
+      .returning({ id: walletLedger.id });
+
+    // Mirror to treasury (house-bet). Idempotent via unique txHash keyed on
+    // the user ledger id, so a retry collapses cleanly.
+    await applyLedgerEntry(
+      tx,
+      DAO_TREASURY_ADDRESS,
+      params.amount,
+      "house-bet",
+      {
+        reason: `House bet ${params.gameType} ${params.gameSlug}`,
+        txHash: `house-bet:${ledger.id}`,
+        gameType: params.gameType,
+        gameSlug: params.gameSlug,
+      },
+    );
+
+    return { ok: true as const, balanceAfter, ledgerId: ledger.id };
+  });
 }
 
 /**
@@ -360,12 +474,40 @@ export async function creditPrize(
     // Nothing to credit — treat as no-op success.
     return { ok: true, balanceAfter: 0, ledgerId: 0 } as any;
   }
-  return creditWallet(winnerAddress, amountCrc, {
-    kind: "prize",
-    reason: `Prize ${ref.gameType} ${ref.gameSlug}`,
-    txHash: `prize:${ref.gameType}:${ref.gameRef}`,
-    gameType: ref.gameType,
-    gameSlug: ref.gameSlug,
+  const addr = normalize(winnerAddress);
+  if (!addr) throw new Error("creditPrize: winnerAddress required");
+
+  const userTxHash = `prize:${ref.gameType}:${ref.gameRef}`;
+  const treasuryTxHash = `house-payout:${ref.gameType}:${ref.gameRef}`;
+
+  return db.transaction(async (tx) => {
+    // Credit the winner.
+    const userRes = await applyLedgerEntry(tx, addr, amountCrc, "prize", {
+      reason: `Prize ${ref.gameType} ${ref.gameSlug}`,
+      txHash: userTxHash,
+      gameType: ref.gameType,
+      gameSlug: ref.gameSlug,
+    });
+    if ("skipped" in userRes) return { ok: false, skipped: "duplicate_txhash" } as const;
+
+    // Mirror on DAO treasury: the house pays out. Deterministic txHash keyed
+    // on gameRef means a retry lands as duplicate_txhash and the treasury
+    // is not double-debited. We still succeed from the winner's POV (they
+    // got credited once on the user side).
+    await applyLedgerEntry(
+      tx,
+      DAO_TREASURY_ADDRESS,
+      -amountCrc,
+      "house-payout",
+      {
+        reason: `House payout ${ref.gameType} ${ref.gameSlug}`,
+        txHash: treasuryTxHash,
+        gameType: ref.gameType,
+        gameSlug: ref.gameSlug,
+      },
+    );
+
+    return { ok: true, balanceAfter: userRes.balanceAfter, ledgerId: userRes.ledgerId } as const;
   });
 }
 

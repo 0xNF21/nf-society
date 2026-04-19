@@ -13,11 +13,12 @@ interface BalancePayButtonProps {
   playerToken: string | undefined;
   /** Player address (miniapp walletAddress, saved profile, or demo). Required. */
   address: string | undefined;
-  /** Game-specific extras — ballValue (plinko), mineCount (mines), pickCount (keno). */
+  /** Game-specific extras — ballValue (plinko), mineCount (mines), pickCount (keno), choice (coin_flip). */
   extras?: {
     ballValue?: number;
     mineCount?: number;
     pickCount?: number;
+    choice?: "heads" | "tails";
   };
   /** Called when the debit succeeds and the game row is created. */
   onSuccess?: (result: any) => void;
@@ -103,6 +104,7 @@ export function BalancePayButton({
           ...(extras?.ballValue !== undefined ? { ballValue: extras.ballValue } : {}),
           ...(extras?.mineCount !== undefined ? { mineCount: extras.mineCount } : {}),
           ...(extras?.pickCount !== undefined ? { pickCount: extras.pickCount } : {}),
+          ...(extras?.choice !== undefined ? { choice: extras.choice } : {}),
         }),
       });
       const data = await res.json();
