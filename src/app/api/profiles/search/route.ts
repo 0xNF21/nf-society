@@ -1,7 +1,22 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { privacySettings } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const CIRCLES_RPC_URL = process.env.NEXT_PUBLIC_CIRCLES_RPC_URL || "https://rpc.aboutcircles.com/";
+
+async function getHiddenFromSearch(): Promise<Set<string>> {
+  try {
+    const rows = await db
+      .select({ address: privacySettings.address })
+      .from(privacySettings)
+      .where(eq(privacySettings.hideFromSearch, true));
+    return new Set(rows.map((r) => r.address.toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
 
 async function fetchIpfsProfile(cid: string): Promise<{ previewImageUrl?: string; imageUrl?: string } | null> {
   try {
@@ -63,6 +78,7 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (!q || q.length < 2) return NextResponse.json({ results: [] });
 
-  const results = await searchProfiles(q);
-  return NextResponse.json({ results });
+  const [results, hidden] = await Promise.all([searchProfiles(q), getHiddenFromSearch()]);
+  const visible = results.filter((r) => !hidden.has(r.address.toLowerCase()));
+  return NextResponse.json({ results: visible });
 }
