@@ -364,3 +364,6 @@ export type { PlinkoTableRow, PlinkoRoundRow, NewPlinkoTable, NewPlinkoRound } f
 
 export { supportMessages } from "./schema/support";
 export type { SupportMessageRow, NewSupportMessage } from "./schema/support";
+
+export { crcRacesGames } from "./schema/crc-races";
+export type { CrcRacesGameRow, NewCrcRacesGame, PayoutEntry as CrcRacesPayoutEntry } from "./schema/crc-races";

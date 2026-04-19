@@ -2,10 +2,22 @@
 // Le param `start` est limite a 64 caracteres en URL-safe base64.
 // On garde un format compact : seulement page + wallet (optionnel).
 
+export type SupportType = "bug" | "suggestion" | "question" | "other";
+
 export type TelegramStartContext = {
   page?: string;           // URL relative de la page d'ou vient l'user
   wallet?: string;         // adresse wallet (0x...)
+  type?: SupportType;      // categorie choisie via le menu inline
 };
+
+// Libelle/emoji du type pour le header admin.
+export function supportTypeLabel(type: SupportType | null | undefined): string {
+  if (type === "bug") return "\uD83D\uDC1B <b>BUG</b>";            // 🐛
+  if (type === "suggestion") return "\uD83D\uDCA1 <b>SUGGESTION</b>"; // 💡
+  if (type === "question") return "\u2753 <b>QUESTION</b>";        // ❓
+  if (type === "other") return "\uD83D\uDCAC <b>AUTRE</b>";        // 💬
+  return "";
+}
 
 // base64url (URL-safe) encoding/decoding.
 function toBase64Url(input: string): string {
@@ -63,6 +75,7 @@ export function formatAdminHeader(opts: {
   userId: number;
   walletAddress?: string | null;
   page?: string | null;
+  type?: SupportType | null;
 }): string {
   const parts: string[] = [];
   const displayName = opts.firstName || "Anonyme";
@@ -74,7 +87,9 @@ export function formatAdminHeader(opts: {
   if (opts.page) {
     parts.push(`page: <code>${escapeHtml(opts.page)}</code>`);
   }
-  return parts.join(" | ");
+  const mainLine = parts.join(" | ");
+  const prefix = supportTypeLabel(opts.type);
+  return prefix ? `${prefix}\n${mainLine}` : mainLine;
 }
 
 function shortWallet(addr: string): string {

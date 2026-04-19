@@ -1,5 +1,9 @@
 import { Bot } from "grammy";
 
+// Instance grammy singleton lazy. On n'instancie qu'a la premiere utilisation
+// (runtime), sinon le build Vercel echoue pendant la collecte de page data car
+// les env vars ne sont pas toujours disponibles a ce moment-la.
+
 let _bot: Bot | null = null;
 let _adminChatId: number | null = null;
 

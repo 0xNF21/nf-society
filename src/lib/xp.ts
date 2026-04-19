@@ -24,6 +24,7 @@ export const DEFAULT_XP_REWARDS: Record<string, number> = {
   daily_checkin: 3, daily_scratch: 5, daily_spin: 5, streak_7days: 50,
   dames_win: 20, dames_lose: 5, relics_win: 20, relics_lose: 5,
   pfc_win: 15, pfc_lose: 5,
+  races_1st: 25, races_2nd: 12, races_3rd: 6, races_participated: 3,
 };
 
 // Server-side: use loadXpConfig() and invalidateXpCache() from xp-server.ts

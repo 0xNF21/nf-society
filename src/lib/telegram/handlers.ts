@@ -1,9 +1,9 @@
-import { Bot, Context } from "grammy";
+import { Bot, Context, InlineKeyboard } from "grammy";
 import { db } from "@/lib/db";
 import { supportMessages } from "@/lib/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getAdminChatId } from "./bot";
-import { decodeStartContext, formatAdminHeader, TelegramStartContext } from "./context";
+import { decodeStartContext, formatAdminHeader, TelegramStartContext, SupportType } from "./context";
 
 // Cache en memoire court pour le contexte `start` fourni par l'user au 1er message.
 // Telegram n'expose pas le param start apres l'echange initial, donc on le stocke
@@ -11,7 +11,30 @@ import { decodeStartContext, formatAdminHeader, TelegramStartContext } from "./c
 // Cold-start proof car on persiste sur le 1er message en DB (context jsonb).
 const pendingStartContext = new Map<number, { ctx: TelegramStartContext; at: number }>();
 
-// Nettoyage des entrees > 10 min.
+function buildMenuKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text("\uD83D\uDC1B Bug", "type:bug")
+    .text("\uD83D\uDCA1 Suggestion", "type:suggestion")
+    .row()
+    .text("\u2753 Question", "type:question")
+    .text("\uD83D\uDCAC Autre", "type:other");
+}
+
+const TYPE_PROMPTS: Record<SupportType, string> = {
+  bug: "\uD83D\uDC1B Decris ton bug : ce qui s'est passe, ce que tu faisais, et la page si possible. Tu peux aussi envoyer une capture d'ecran.",
+  suggestion: "\uD83D\uDCA1 Partage ton idee ou suggestion :",
+  question: "\u2753 Pose ta question :",
+  other: "\uD83D\uDCAC Explique ce qui t'amene :",
+};
+
+function setPendingType(userId: number, type: SupportType) {
+  const existing = pendingStartContext.get(userId);
+  pendingStartContext.set(userId, {
+    ctx: { ...(existing?.ctx ?? {}), type },
+    at: Date.now(),
+  });
+}
+
 function gcPendingContext() {
   const now = Date.now();
   for (const [uid, entry] of pendingStartContext.entries()) {
@@ -20,6 +43,8 @@ function gcPendingContext() {
 }
 
 export function registerHandlers(b: Bot) {
+  const ADMIN_CHAT_ID = getAdminChatId();
+
   // /start [payload] — l'user arrive via le deep link du bouton Support.
   b.command("start", async (ctx) => {
     const payload = ctx.match?.trim();
@@ -35,23 +60,127 @@ export function registerHandlers(b: Bot) {
 
     await ctx.reply(
       "Bienvenue sur le support NF Society\n\n" +
-      "Decris ton probleme ou ta question en un message. " +
-      "Un admin te repondra ici des que possible.\n\n" +
-      "Welcome to NF Society support — describe your issue and an admin will reply here."
+      "Que veux-tu signaler ? Choisis une categorie, ou ecris directement ton message.\n\n" +
+      "Welcome to NF Society support — pick a category below or just write your message.",
+      { reply_markup: buildMenuKeyboard() }
     );
   });
 
-  // Message texte d'un user en prive => forward au groupe admin.
-  b.on("message:text", async (ctx) => {
+  // /menu : re-affiche les boutons de categorie (pour changer de type plus tard).
+  b.command("menu", async (ctx) => {
+    if (ctx.chat.type !== "private") return;
+    await ctx.reply("Choisis une categorie :", { reply_markup: buildMenuKeyboard() });
+  });
+
+  // Callback sur les boutons inline de type.
+  b.callbackQuery(/^type:(bug|suggestion|question|other)$/, async (ctx) => {
+    const type = ctx.match![1] as SupportType;
+    const userId = ctx.from?.id;
+    if (userId) {
+      setPendingType(userId, type);
+    }
     try {
-      // Groupe admin : on traite comme reponse si c'est un reply, sinon on ignore.
-      if (ctx.chat.id === getAdminChatId()) {
+      await ctx.editMessageText(TYPE_PROMPTS[type]);
+    } catch {
+      // si on ne peut pas editer (message trop vieux), on envoie un nouveau reply
+      await ctx.reply(TYPE_PROMPTS[type]);
+    }
+    await ctx.answerCallbackQuery();
+  });
+
+  // /clear (admin only) — supprime tous les messages du bot dans le groupe admin
+  // et vide la table support_messages. Demande confirmation avant execution.
+  b.command("clear", async (ctx) => {
+    if (ctx.chat.id !== ADMIN_CHAT_ID) return;
+    const keyboard = new InlineKeyboard()
+      .text("\u2705 Oui, tout supprimer", "clear:confirm")
+      .text("\u274C Annuler", "clear:cancel");
+    await ctx.reply(
+      "Supprimer TOUS les messages de support ?\n" +
+      "- Messages du bot dans ce groupe (< 48h)\n" +
+      "- Historique complet en DB (support_messages)",
+      { reply_markup: keyboard }
+    );
+  });
+
+  b.callbackQuery("clear:cancel", async (ctx) => {
+    if (ctx.chat?.id !== ADMIN_CHAT_ID) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    try {
+      await ctx.editMessageText("Annule.");
+    } catch {}
+    await ctx.answerCallbackQuery();
+  });
+
+  b.callbackQuery("clear:confirm", async (ctx) => {
+    if (ctx.chat?.id !== ADMIN_CHAT_ID) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    await ctx.answerCallbackQuery({ text: "Suppression en cours..." });
+
+    // Recupere tous les adminMessageId distincts pour les supprimer du groupe.
+    const rows = await db
+      .select({ id: supportMessages.adminMessageId })
+      .from(supportMessages);
+    const ids = Array.from(new Set(rows.map((r) => r.id).filter((id): id is number => !!id)));
+
+    let deleted = 0;
+    let errors = 0;
+
+    // Batch jusqu'a 100 messages par appel deleteMessages.
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      try {
+        await ctx.api.deleteMessages(ADMIN_CHAT_ID, batch);
+        deleted += batch.length;
+      } catch {
+        // fallback : one-by-one pour ce batch (certains trop vieux seront ignores)
+        for (const id of batch) {
+          try {
+            await ctx.api.deleteMessage(ADMIN_CHAT_ID, id);
+            deleted++;
+          } catch {
+            errors++;
+          }
+        }
+      }
+    }
+
+    // Clear la DB
+    let dbCleared = 0;
+    try {
+      const all = await db.select({ id: supportMessages.id }).from(supportMessages);
+      dbCleared = all.length;
+      await db.delete(supportMessages);
+    } catch (err) {
+      console.error("[telegram] db clear error:", err);
+    }
+
+    // Supprime le message de confirmation lui-meme
+    try {
+      await ctx.deleteMessage();
+    } catch {}
+
+    await ctx.api.sendMessage(
+      ADMIN_CHAT_ID,
+      `\u2705 Nettoyage termine\n` +
+      `- Messages supprimes : ${deleted}\n` +
+      `- Erreurs (trop vieux ou deja supprimes) : ${errors}\n` +
+      `- Lignes DB supprimees : ${dbCleared}`
+    );
+  });
+
+  // Catch-all pour tous types de messages (texte, photo, video, voice, document, sticker...).
+  b.on("message", async (ctx) => {
+    try {
+      if (ctx.chat.id === ADMIN_CHAT_ID) {
         await handleAdminReply(ctx);
         return;
       }
-      // Doit etre un chat prive avec un user.
       if (ctx.chat.type !== "private") return;
-
       await handleUserMessage(ctx);
     } catch (err) {
       console.error("[telegram] message handler error:", err);
@@ -59,46 +188,116 @@ export function registerHandlers(b: Bot) {
   });
 }
 
+// Determine un libelle lisible du type de message pour les logs / previews.
+function describeMessageContent(msg: any): string {
+  if (msg.text) return msg.text;
+  if (msg.caption) return msg.caption;
+  if (msg.photo) return "[photo]";
+  if (msg.video) return "[video]";
+  if (msg.voice) return "[voice]";
+  if (msg.audio) return "[audio]";
+  if (msg.video_note) return "[video_note]";
+  if (msg.sticker) return "[sticker]";
+  if (msg.animation) return "[gif]";
+  if (msg.document) return "[document]";
+  if (msg.location) return "[location]";
+  if (msg.contact) return "[contact]";
+  return "[media]";
+}
+
+function hasMedia(msg: any): boolean {
+  return !!(
+    msg.photo ||
+    msg.video ||
+    msg.voice ||
+    msg.audio ||
+    msg.video_note ||
+    msg.sticker ||
+    msg.animation ||
+    msg.document ||
+    msg.location ||
+    msg.contact
+  );
+}
+
 async function handleUserMessage(ctx: Context) {
   const from = ctx.from;
   const msg = ctx.message;
-  if (!from || !msg?.text) return;
+  if (!from || !msg) return;
+
+  const ADMIN_CHAT_ID = getAdminChatId();
 
   // Recupere contexte du /start si c'est le premier vrai message.
   const pending = pendingStartContext.get(from.id);
   const startCtx = pending?.ctx;
   if (pending) pendingStartContext.delete(from.id);
 
-  // Header admin : nom, handle, wallet (si fourni), page d'origine.
   const header = formatAdminHeader({
     firstName: from.first_name,
     username: from.username,
     userId: from.id,
     walletAddress: startCtx?.wallet,
     page: startCtx?.page,
+    type: startCtx?.type,
   });
 
-  // Forward vers le groupe admin avec le user id encode dans le header
-  // (pour le retrouver lors d'une reply admin).
-  // On utilise un footer invisible <code>uid:123</code> en derniere ligne.
-  const adminText =
-    `${header}\n` +
-    `<i>uid:${from.id}</i>\n\n` +
-    escapeHtml(msg.text);
+  const contentLabel = describeMessageContent(msg as any);
 
-  const sent = await ctx.api.sendMessage(getAdminChatId(), adminText, {
-    parse_mode: "HTML",
-  });
+  // Cas 1 : message texte pur — un seul message au groupe admin avec header + texte.
+  if (msg.text && !hasMedia(msg as any)) {
+    const adminText =
+      `${header}\n` +
+      `<i>uid:${from.id}</i>\n\n` +
+      escapeHtml(msg.text);
 
-  // Log en DB
+    const sent = await ctx.api.sendMessage(ADMIN_CHAT_ID, adminText, {
+      parse_mode: "HTML",
+    });
+
+    await insertIn(from, msg, startCtx, sent.message_id, msg.text);
+  } else {
+    // Cas 2 : message avec media (photo, video, voice, sticker, document, etc.).
+    // On envoie d'abord un header texte (pour contenir le uid + contexte),
+    // puis on COPIE le message original dans le groupe admin.
+    const headerText =
+      `${header}\n` +
+      `<i>uid:${from.id}</i>\n` +
+      `<i>${escapeHtml(contentLabel)}</i>`;
+
+    const headerMsg = await ctx.api.sendMessage(ADMIN_CHAT_ID, headerText, {
+      parse_mode: "HTML",
+    });
+
+    // copyMessage gere tous les types : photo/video/voice/sticker/document/etc.
+    // Pas de bandeau "forwarded from" — le bot semble l'envoyer lui-meme.
+    const copied = await ctx.api.copyMessage(ADMIN_CHAT_ID, ctx.chat!.id, msg.message_id);
+
+    // Log 2 entrees : header + copie. Comme ca l'admin peut reply a n'importe laquelle.
+    await insertIn(from, msg, startCtx, headerMsg.message_id, contentLabel);
+    await insertIn(from, msg, null, copied.message_id, contentLabel);
+  }
+
+  // Accuse de reception au 1er message de la session (celui qui a un startCtx).
+  if (startCtx) {
+    await ctx.reply("Message envoye au support. On te repond au plus vite.");
+  }
+}
+
+async function insertIn(
+  from: { id: number; username?: string; first_name?: string },
+  msg: { message_id: number },
+  startCtx: TelegramStartContext | null | undefined,
+  adminMessageId: number,
+  textOrLabel: string
+) {
   try {
     await db.insert(supportMessages).values({
       telegramUserId: from.id,
       telegramUsername: from.username ?? null,
       telegramFirstName: from.first_name ?? null,
       direction: "in",
-      text: msg.text,
-      adminMessageId: sent.message_id,
+      text: textOrLabel,
+      adminMessageId,
       userMessageId: msg.message_id,
       context: startCtx ? startCtx : null,
       walletAddress: startCtx?.wallet ?? null,
@@ -106,40 +305,30 @@ async function handleUserMessage(ctx: Context) {
   } catch (err) {
     console.error("[telegram] db insert in error:", err);
   }
-
-  // Accuse de reception cote user (uniquement au 1er message de la session).
-  if (startCtx) {
-    await ctx.reply("Message envoye au support. On te repond au plus vite.");
-  }
 }
 
 async function handleAdminReply(ctx: Context) {
   const msg = ctx.message;
   const from = ctx.from;
-  if (!msg?.text || !from) return;
+  if (!msg || !from) return;
 
   // Admin doit repondre EN REPLY a un message du bot pour qu'on sache a quel user envoyer.
   const replyTo = msg.reply_to_message;
-  if (!replyTo) {
-    // Message libre dans le groupe admin, on ignore (c'est une discussion interne).
-    return;
-  }
+  if (!replyTo) return;
 
-  // Tente de retrouver l'user via le adminMessageId.
-  const originalMsgId = replyTo.message_id;
+  // Retrouve le user cible via le adminMessageId (match soit le header soit la copie media).
   const original = await db
     .select()
     .from(supportMessages)
     .where(
       and(
-        eq(supportMessages.adminMessageId, originalMsgId),
+        eq(supportMessages.adminMessageId, replyTo.message_id),
         eq(supportMessages.direction, "in")
       )
     )
     .limit(1);
 
   let targetUserId: number | null = null;
-
   if (original[0]) {
     targetUserId = Number(original[0].telegramUserId);
   } else {
@@ -150,16 +339,17 @@ async function handleAdminReply(ctx: Context) {
 
   if (!targetUserId) {
     await ctx.reply(
-      "Impossible de retrouver l'user cible. Reponds en reply au message du bot qui contient 'uid:...'."
+      "Impossible de retrouver l'user cible. Reponds en reply au message du bot (header ou media) qui contient 'uid:...'."
     );
     return;
   }
 
-  // Envoie au user
-  let sentMsgId: number | undefined;
+  // Envoie au user — copyMessage gere TOUS les types (texte, photo, video, voice, etc.).
+  // Si c'est un message texte pur, copyMessage fait pareil que sendMessage.
+  let sentMsgId: number | null = null;
   try {
-    const sent = await ctx.api.sendMessage(targetUserId, msg.text);
-    sentMsgId = sent.message_id;
+    const copied = await ctx.api.copyMessage(targetUserId, ctx.chat!.id, msg.message_id);
+    sentMsgId = copied.message_id;
   } catch (err) {
     console.error("[telegram] send to user failed:", err);
     await ctx.reply(
@@ -170,14 +360,15 @@ async function handleAdminReply(ctx: Context) {
 
   // Log en DB
   try {
+    const label = describeMessageContent(msg as any);
     await db.insert(supportMessages).values({
       telegramUserId: targetUserId,
       telegramUsername: null,
       telegramFirstName: null,
       direction: "out",
-      text: msg.text,
+      text: label,
       adminMessageId: msg.message_id,
-      userMessageId: sentMsgId ?? null,
+      userMessageId: sentMsgId,
       context: null,
       walletAddress: null,
     });
