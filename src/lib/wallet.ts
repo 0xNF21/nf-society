@@ -14,6 +14,13 @@ import { db } from "./db";
 import { players, walletLedger } from "./db/schema";
 import { eq, sql } from "drizzle-orm";
 import { checkAllWalletTopups } from "./circles";
+import {
+  CHANCE_BALANCE_SUPPORTED,
+  MULTI_BALANCE_SUPPORTED,
+  assignMultiPlayer,
+  createChanceRound,
+  type CreateChanceRoundOpts,
+} from "./wallet-game-dispatch";
 
 const SAFE_ADDRESS = process.env.SAFE_ADDRESS || "";
 const WEI_PER_CRC = 1_000_000_000_000_000_000n;
@@ -157,6 +164,159 @@ export async function scanWalletTopups(): Promise<{
   }
 
   return { credited, skipped, errors };
+}
+
+export type PayGameFromBalanceParams = {
+  address: string;
+  gameKey: string;
+  slug: string;
+  amount: number;
+  playerToken: string;
+  /** Game-specific extras: ballValue (plinko), mineCount (mines), pickCount (keno). */
+  extras?: CreateChanceRoundOpts;
+};
+
+export type PayGameFromBalanceResult =
+  | {
+      ok: true;
+      balanceAfter: number;
+      ledgerId: number;
+      family: "multi";
+      role: "player1" | "player2";
+      gameRow: any;
+    }
+  | {
+      ok: true;
+      balanceAfter: number;
+      ledgerId: number;
+      family: "chance";
+      roundId: number;
+      tableId: number;
+      gameRow: any;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Debit a player's prepaid balance and attribute them to a multi slot or a
+ * new chance-game round, atomically. If the game-side write fails, the
+ * debit and ledger row roll back together — no orphan CRC.
+ *
+ * Supported gameKeys: everything in MULTI_BALANCE_SUPPORTED and
+ * CHANCE_BALANCE_SUPPORTED (see wallet-game-dispatch.ts). Games not in
+ * either set (today: coin_flip) must continue to use the on-chain flow.
+ */
+export async function payGameFromBalance(
+  params: PayGameFromBalanceParams,
+): Promise<PayGameFromBalanceResult> {
+  const addr = params.address.trim().toLowerCase();
+  if (!addr || !/^0x[a-f0-9]{40}$/.test(addr)) {
+    return { ok: false, error: "invalid_address" };
+  }
+  if (!params.amount || params.amount <= 0) {
+    return { ok: false, error: "invalid_amount" };
+  }
+  if (!params.playerToken) {
+    return { ok: false, error: "missing_player_token" };
+  }
+
+  const isMulti = MULTI_BALANCE_SUPPORTED.has(params.gameKey);
+  const isChance = CHANCE_BALANCE_SUPPORTED.has(params.gameKey);
+  if (!isMulti && !isChance) {
+    return { ok: false, error: "unsupported_game" };
+  }
+
+  try {
+    return await db.transaction(async (tx) => {
+      // Step 1: atomic debit. UPDATE...WHERE balance_crc >= amount RETURNING
+      // is serialized per-row in PG, so two concurrent debits on the same
+      // address cannot over-spend.
+      const debitRes = await tx.execute<{ balance_crc: number }>(
+        sql`UPDATE players
+            SET balance_crc = balance_crc - ${params.amount},
+                last_seen = NOW()
+            WHERE address = ${addr} AND balance_crc >= ${params.amount}
+            RETURNING balance_crc`,
+      );
+      const row = (debitRes as any).rows?.[0] ?? (debitRes as any)[0];
+      if (!row || typeof row.balance_crc !== "number") {
+        // Either the players row doesn't exist (never topped up) or the
+        // balance is below the bet amount. Either way → insufficient.
+        return { ok: false as const, error: "insufficient_balance" };
+      }
+      const balanceAfter = row.balance_crc;
+
+      // Step 2: ledger. reason encodes "bet:{gameKey}:{slug}" for audit.
+      const [ledger] = await tx
+        .insert(walletLedger)
+        .values({
+          address: addr,
+          kind: "debit",
+          amountCrc: -params.amount,
+          balanceAfter,
+          reason: `Bet ${params.gameKey} ${params.slug}`,
+          txHash: null,
+          gameType: params.gameKey,
+          gameSlug: params.slug,
+        })
+        .returning({ id: walletLedger.id });
+
+      const syntheticTxHash = `balance:${ledger.id}`;
+
+      // Step 3: game-side write.
+      if (isMulti) {
+        const result = await assignMultiPlayer(
+          tx,
+          params.gameKey,
+          params.slug,
+          addr,
+          params.playerToken,
+          params.amount,
+          syntheticTxHash,
+        );
+        if ("error" in result) {
+          // Abort the transaction so debit + ledger are rolled back.
+          throw new Error(`multi:${result.error}`);
+        }
+        return {
+          ok: true as const,
+          balanceAfter,
+          ledgerId: ledger.id,
+          family: "multi" as const,
+          role: result.role,
+          gameRow: result.gameRow,
+        };
+      }
+
+      const result = await createChanceRound(
+        tx,
+        params.gameKey,
+        params.slug,
+        addr,
+        params.playerToken,
+        params.amount,
+        syntheticTxHash,
+        params.extras || {},
+      );
+      if ("error" in result) {
+        throw new Error(`chance:${result.error}`);
+      }
+      return {
+        ok: true as const,
+        balanceAfter,
+        ledgerId: ledger.id,
+        family: "chance" as const,
+        roundId: result.id,
+        tableId: result.tableId,
+        gameRow: result.gameRow,
+      };
+    });
+  } catch (err: any) {
+    const msg = String(err?.message || err);
+    // Normalize "multi:wrong_bet" → "wrong_bet" etc.
+    const colon = msg.indexOf(":");
+    const normalized = colon > 0 && colon < 30 ? msg.slice(colon + 1) : msg;
+    return { ok: false, error: normalized || "transaction_failed" };
+  }
 }
 
 /**
