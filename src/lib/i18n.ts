@@ -1,6 +1,144 @@
 export type Locale = "fr" | "en";
 
 export const translations = {
+  landingMarketing: {
+    navPlay: { fr: "Jouer", en: "Play" },
+    navDocs: { fr: "Docs", en: "Docs" },
+    heroTagline: { fr: "La plateforme de jeux du DAO", en: "The DAO gaming platform" },
+    heroTitle: {
+      fr: "Joue, mise, gouverne — en CRC sur Gnosis",
+      en: "Play, bet, govern — in CRC on Gnosis",
+    },
+    heroSubtitle: {
+      fr: "17 jeux on-chain, payouts automatiques, 100% communautaire.",
+      en: "17 on-chain games, automatic payouts, 100% community-owned.",
+    },
+    heroCtaPrimary: { fr: "Essayer sans wallet", en: "Try without a wallet" },
+    heroCtaPrimaryHint: {
+      fr: "Mode demo — aucune inscription",
+      en: "Demo mode — no signup",
+    },
+    heroCtaSecondary: { fr: "J'ai deja un wallet, je joue", en: "I already have a wallet, let's play" },
+    heroCtaSecondaryHint: {
+      fr: "Acces direct aux jeux reels",
+      en: "Direct access to real games",
+    },
+    statsTitle: { fr: "La plateforme en chiffres", en: "Platform at a glance" },
+    statsPlayed: { fr: "Parties jouees", en: "Games played" },
+    statsPlayers: { fr: "Joueurs uniques", en: "Unique players" },
+    statsWagered: { fr: "CRC mises", en: "CRC wagered" },
+    statsPaidOut: { fr: "CRC payes aux joueurs", en: "CRC paid to players" },
+    statsBank: { fr: "Tresorerie on-chain", en: "On-chain treasury" },
+    statsLoading: { fr: "Chargement...", en: "Loading..." },
+    gamesTitle: { fr: "Nos 17 jeux", en: "Our 17 games" },
+    gamesSubtitle: {
+      fr: "Multijoueur skill-based + Chance — tous on-chain sur Gnosis.",
+      en: "Skill-based multiplayer + Chance — all on-chain on Gnosis.",
+    },
+    gamesCategoryMulti: { fr: "Multijoueur", en: "Multiplayer" },
+    gamesCategoryChance: { fr: "Chance", en: "Chance" },
+    gamesViewAll: { fr: "Voir tous les jeux", en: "See all games" },
+    howTitle: { fr: "Comment ca marche", en: "How it works" },
+    howStep1Title: { fr: "1. Installe Circles", en: "1. Install Circles" },
+    howStep1Desc: {
+      fr: "Wallet gratuit + revenu universel quotidien en CRC.",
+      en: "Free wallet + universal daily income in CRC.",
+    },
+    howStep2Title: { fr: "2. Choisis un jeu", en: "2. Pick a game" },
+    howStep2Desc: {
+      fr: "Mise en CRC, joue contre un ami ou la banque.",
+      en: "Bet in CRC, play against a friend or the house.",
+    },
+    howStep3Title: { fr: "3. Gagne", en: "3. Win" },
+    howStep3Desc: {
+      fr: "Payout automatique en 2 secondes via Safe + Roles.",
+      en: "Automatic payout in 2 seconds via Safe + Roles.",
+    },
+    whyTitle: { fr: "Pourquoi NF Society ?", en: "Why NF Society?" },
+    why1: {
+      fr: "DAO communautaire — gouverne par les joueurs",
+      en: "Community DAO — governed by players",
+    },
+    why2: {
+      fr: "Open source — code lisible par tous",
+      en: "Open source — code anyone can audit",
+    },
+    why3: {
+      fr: "House edge configurable par vote du DAO",
+      en: "House edge set by DAO vote",
+    },
+    why4: {
+      fr: "XP + boutique — pas juste du gambling",
+      en: "XP + shop — not just gambling",
+    },
+    why5: {
+      fr: "Payouts instantanes on-chain, verifiables",
+      en: "Instant on-chain payouts, verifiable",
+    },
+    faqTitle: { fr: "Questions frequentes", en: "Frequently asked questions" },
+    faqQ1: { fr: "C'est quoi le CRC ?", en: "What is CRC?" },
+    faqA1: {
+      fr: "Le CRC est la monnaie du protocole Circles sur Gnosis Chain. Chaque humain verifie recoit un revenu universel quotidien en CRC, utilisable pour miser et jouer sur NF Society.",
+      en: "CRC is the currency of the Circles protocol on Gnosis Chain. Every verified human receives a daily universal basic income in CRC, usable to bet and play on NF Society.",
+    },
+    faqQ2: { fr: "J'ai pas de wallet, je peux jouer ?", en: "I don't have a wallet, can I play?" },
+    faqA2: {
+      fr: "Oui — utilise le mode demo, aucune inscription necessaire. Pour miser du vrai CRC, il te faudra un compte Circles (gratuit, quelques minutes).",
+      en: "Yes — use demo mode, no signup needed. To bet real CRC, you'll need a Circles account (free, a few minutes).",
+    },
+    faqQ3: { fr: "Comment je gagne de vrais CRC ?", en: "How do I win real CRC?" },
+    faqA3: {
+      fr: "Gagne une partie multijoueur ou un jeu de chance, et le payout est automatique dans ton wallet en moins de 2 secondes via un contrat Safe + Roles Modifier.",
+      en: "Win a multiplayer game or a chance game, and payout is automatic to your wallet in under 2 seconds via a Safe + Roles Modifier contract.",
+    },
+    faqQ4: { fr: "C'est legal chez moi ?", en: "Is it legal where I live?" },
+    faqA4: {
+      fr: "NF Society est une plateforme communautaire du DAO. Certaines juridictions interdisent les jeux d'argent en ligne — verifie la reglementation locale avant de miser. Le mode demo reste accessible partout.",
+      en: "NF Society is a community DAO platform. Some jurisdictions ban online gambling — check your local laws before betting. Demo mode stays accessible anywhere.",
+    },
+    faqQ5: { fr: "C'est quoi le DAO ?", en: "What is the DAO?" },
+    faqA5: {
+      fr: "Une organisation decentralisee : les joueurs votent sur les parametres (house edge, nouveaux jeux, distribution de la tresorerie). Pas de patron, pas d'actionnaires — juste la communaute.",
+      en: "A decentralized organization: players vote on parameters (house edge, new games, treasury distribution). No boss, no shareholders — just the community.",
+    },
+    faqQ6: { fr: "Comment deposer et retirer mes CRC ?", en: "How do I deposit and withdraw my CRC?" },
+    faqA6: {
+      fr: "Deux options : (1) payer directement depuis ton wallet Circles a chaque partie — les gains arrivent au wallet en fin de partie ; (2) deposer un solde NF Society (topup) pour jouer plus vite sans signer a chaque mise. Quand tu veux recuperer ton solde, un cashout renvoie les CRC sur ton wallet on-chain en quelques secondes.",
+      en: "Two options: (1) pay directly from your Circles wallet on each game — winnings land back in your wallet after each game ends; (2) deposit an NF Society balance (topup) to play faster without signing each bet. Whenever you want your balance back, a cashout sends the CRC to your on-chain wallet in seconds.",
+    },
+    finalCtaTitle: {
+      fr: "Pret a lancer ta premiere partie ?",
+      en: "Ready for your first game?",
+    },
+    finalCtaButton: { fr: "Essayer en mode demo", en: "Try in demo mode" },
+    finalCtaHint: {
+      fr: "Pas d'inscription, pas de wallet requis",
+      en: "No signup, no wallet required",
+    },
+    footerTagline: {
+      fr: "Propulse par Gnosis Chain & Circles",
+      en: "Powered by Gnosis Chain & Circles",
+    },
+    footerDao: { fr: "DAO", en: "DAO" },
+    footerDocs: { fr: "Documentation", en: "Documentation" },
+    footerStats: { fr: "Statistiques", en: "Stats" },
+    footerTerms: { fr: "CGU", en: "Terms" },
+    footerPrivacy: { fr: "Confidentialite", en: "Privacy" },
+    footerCookies: { fr: "Cookies", en: "Cookies" },
+    footerImprint: { fr: "Mentions legales", en: "Imprint" },
+  },
+  legal: {
+    backHome: { fr: "Retour a l'accueil", en: "Back to home" },
+    lastUpdated: { fr: "Derniere mise a jour", en: "Last updated" },
+    draftNotice: {
+      fr: "Ce document est un brouillon a faire valider par un professionnel du droit avant mise en production.",
+      en: "This document is a draft and must be reviewed by a legal professional before production use.",
+    },
+    termsTitle: { fr: "Conditions generales d'utilisation", en: "Terms of Service" },
+    privacyTitle: { fr: "Politique de confidentialite", en: "Privacy Policy" },
+    cookiesTitle: { fr: "Politique des cookies", en: "Cookie Policy" },
+    imprintTitle: { fr: "Mentions legales", en: "Legal Notice" },
+  },
   landing: {
     subtitle: {
       fr: "Plateforme communautaire du DAO NF Society",
