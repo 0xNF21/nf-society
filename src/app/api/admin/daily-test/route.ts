@@ -8,6 +8,9 @@ import { checkAdminAuth } from "@/lib/admin-auth";
 
 // POST — create a test daily session with real scratch/spin/payout (no payment needed)
 export async function POST(req: NextRequest) {
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "Not available in production" }, { status: 404 });
+  }
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
