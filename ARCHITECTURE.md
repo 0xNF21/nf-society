@@ -534,4 +534,398 @@ Seule forme de test : les scripts `smoke-*.mjs` dans `/scripts/` (exécutés à 
 
 ---
 
-*Fin du rapport descriptif. Phase suivante : priorisation + plan de migration par petites PR.*
+*Fin du rapport descriptif initial. Sections §16+ : audit approfondi (branche `audit-cleanup`, 2026-04-20).*
+
+---
+
+# Audit approfondi — sections §16 à §25
+
+> Ajouté sur branche `audit-cleanup` le 2026-04-20. Vérifications par lecture du code réel.
+
+## §16 — Vérification §5 : schéma DB dual — CONFIRMÉ
+
+### §16.1 — Confirmation config Drizzle
+- `drizzle.config.ts:4` : `schema: "./src/lib/db/schema.ts"` → le fichier monolithique, pas le dossier.
+- `src/lib/db/index.ts:3` : `import * as schema from "./schema"` → Node résout vers le **fichier** `schema.ts`, le dossier n'ayant pas d'`index.ts`.
+- **Résultat confirmé** : Drizzle-kit ne voit que 27 tables. Les 24 tables du dossier `schema/*.ts` sont invisibles à la génération de migrations.
+
+### §16.2 — Imports directs du dossier schema/
+**16 imports** confirmés (comme le rapport initial) depuis `@/lib/db/schema/<jeu>` :
+- **dames** (6 fichiers) : `api/dames/{route,[id]/route,[id]/move/route,[id]/test/route}.ts`, `dames/[id]/page.tsx` (type)
+- **relics** (7 fichiers) : `api/relics/{route,join/route,shot/route,[id]/route,[id]/test/route}.ts`, `api/relics-scan/relics-scan/route.ts`, `relics/[id]/page.tsx` (type)
+- **pfc** (3 fichiers) : `api/pfc/[slug]/route.ts`, `api/pfc/[slug]/test/route.ts`, `pfc/[slug]/page.tsx` (type)
+
+⚠️ Les 7 autres jeux chance (blackjack, coin-flip, crash-dash, dice, hilo, keno, mines, plinko, roulette) importent **uniquement** via la ré-export dans `schema.ts` (l'export monolithique), donc leur table est visible à Drizzle-kit — **mais via une ré-export, pas depuis la source schema/**.
+
+### §16.3 — `db.query` vs `db.select`
+Grep exhaustif : **zéro occurrence** de `db.query.<table>` dans `src/`. Tout le code utilise `db.select().from(<table>)`. 
+→ Pas de panne de runtime, juste une **dette architecturale** : si quelqu'un écrit `db.query.blackjackTables` demain, ça plantera silencieusement (champ `undefined`).
+
+### §16.4 — Tables sans migration SQL dans `drizzle/`
+**10 tables** du dossier `schema/*.ts` n'ont **aucune** instruction `CREATE TABLE` dans `drizzle/*.sql` :
+- `blackjackHands`, `blackjackTables`
+- `coinFlipResults`, `coinFlipTables`
+- `plinkoRounds`, `plinkoTables`
+- `rouletteRounds`, `rouletteTables`
+- `crcRacesGames`
+- `supportMessages`
+
+→ Créées via **scripts one-shot ou SQL manuel** (non reproductible depuis une installation fresh).
+
+### §16.5 — Conflits de numérotation CONFIRMÉS
+- `0002_cynical_grey_gargoyle.sql` (auto-généré, 8 tables) + `0002_uniform_dames_relics.sql` (hand-written, 2 tables) → pas de collision sur les noms de table, mais ordre alphabétique.
+- `0009_add_nf_auth_tokens.sql` + `0009_add_privacy_settings.sql` → idem, pas de collision de nom mais ordre fragile.
+
+### §16.6 — Scripts migrations one-shot
+6 scripts `scripts/migrate-*.mjs` recréent des tables via `db.execute(sql`CREATE TABLE…`)` :
+- `migrate-cashout.mjs`, `migrate-dice-local.mjs`, `migrate-hilo.mjs`, `migrate-nf-auth.mjs`, `migrate-support.mjs`, `migrate-wallet.mjs`
+→ Chevauchement avec `drizzle/*.sql` pour hilo, nf-auth, wallet → double source de vérité.
+
+---
+
+## §17 — Vérification §9 : `.env.example` incomplet — CONFIRMÉ + aggravé
+
+### §17.1 — `.env.example` actuel (via `git show HEAD:.env.example`)
+Exactement **2 lignes** :
+```
+NEXT_PUBLIC_DEFAULT_RECIPIENT_ADDRESS=
+NEXT_PUBLIC_CIRCLES_RPC_URL=https://rpc.aboutcircles.com/
+```
+
+### §17.2 — Variables réellement utilisées (18, pas 17)
+Grep exhaustif `process\.env\.` dans `src/` + `scripts/` :
+
+| Variable | Côté | Sensible | Fallback | Dans `.env.example` |
+|----------|------|----------|----------|----------------------|
+| `DATABASE_URL` | Serveur | 🔐 | aucun | ❌ |
+| `NEXT_PUBLIC_CIRCLES_RPC_URL` | Client | N | `"https://rpc.aboutcircles.com/"` | ✅ |
+| `NEXT_PUBLIC_DEFAULT_RECIPIENT_ADDRESS` | Client | N | aucun | ✅ |
+| `NEXT_PUBLIC_APP_URL` | Client | N | `"http://localhost:3000"` | ❌ |
+| `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | Client | N | `""` | ❌ |
+| `BOT_PRIVATE_KEY` | Serveur | 🔐 | aucun (non-null assertion) | ❌ |
+| `SAFE_ADDRESS` | Serveur | N | `""` (silent) | ❌ |
+| `ROLES_MODIFIER_ADDRESS` | Serveur | N | aucun | ❌ |
+| `ROLE_KEY` | Serveur | 🔐 | `"0x000…01"` 🚨 | ❌ |
+| `MAX_PAYOUT_CRC` | Serveur | N | `"1000"` | ❌ |
+| `JACKPOT_THRESHOLD_CRC` | Serveur | N | `"1000"` | ❌ |
+| `DAO_TREASURY_ADDRESS` | Serveur | N | `"0x…da00"` | ❌ |
+| `ADMIN_PASSWORD` | Serveur | 🔐 | **`"admin"`** 🚨🚨 (10 routes) | ❌ |
+| `CRON_SECRET` | Serveur | 🔐 | aucun | ❌ |
+| `TELEGRAM_BOT_TOKEN` | Serveur | 🔐 | aucun | ❌ |
+| `TELEGRAM_ADMIN_CHAT_ID` | Serveur | N | aucun | ❌ |
+| `NODE_ENV` | Auto | N | N/A | N/A |
+| `PORT` | Serveur | N | `"3000"` | ❌ |
+
+→ **16 variables non documentées** dont **5 sensibles** (DATABASE_URL, BOT_PRIVATE_KEY, ROLE_KEY, ADMIN_PASSWORD, CRON_SECRET, TELEGRAM_BOT_TOKEN).
+
+---
+
+## §18 — Vérification §10 : sécurité — AGGRAVÉ 🚨🚨
+
+### §18.1 — 🚨🚨 Fallback `ADMIN_PASSWORD || "admin"` — URGENT
+**10 routes admin** contiennent le pattern :
+```ts
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
+```
+
+Fichiers confirmés :
+- `src/app/api/admin/badges/award/route.ts:5`
+- `src/app/api/admin/badges/route.ts:6`
+- `src/app/api/admin/daily/route.ts:7`
+- `src/app/api/admin/daily-test/route.ts:8`
+- `src/app/api/admin/flags/route.ts:7`
+- `src/app/api/admin/reset/route.ts:6`
+- `src/app/api/admin/shop/route.ts:6`
+- `src/app/api/admin/wallet-health/route.ts:10`
+- `src/app/api/admin/xp/route.ts:7`
+
+→ **Si la variable `ADMIN_PASSWORD` n'est pas définie en prod (ou unset accidentellement), n'importe qui peut envoyer `x-admin-password: admin` et :**
+  - reset la DB (`/api/admin/reset`)
+  - accorder des badges arbitraires, octroyer de l'XP illimitée
+  - modifier les feature flags (désactiver des jeux)
+  - voir l'état du wallet DAO (info leak)
+  - lancer des **vrais payouts CRC** via `/api/admin/daily-test` (voir §18.3)
+
+**C'est la vulnérabilité la plus grave du repo.**
+
+Note : `src/app/api/admin/route.ts` (lignes 6-8), `/api/payout`, `/api/payout/retry`, `/api/draw`, `/api/lotteries`, `/api/lootboxes` comparent directement à `process.env.ADMIN_PASSWORD` sans fallback (sûrs).
+
+### §18.2 — Fallback `ROLE_KEY` confirmé (§5 initial)
+`src/lib/payout.ts:58` :
+```ts
+const key = process.env.ROLE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000001";
+```
+Si `ROLE_KEY` manque, les tx Gnosis Safe seront tentées avec ce rôle bidon → elles reverteront on-chain (pas de perte de fonds), **mais les payouts seront silencieusement cassés**.
+
+**Positif** : `getPayoutConfig()` lignes 30-36 vérifie la présence de la var avant d'appeler `executePayout()`, et retourne `configured: false`. Le fallback sur ligne 58 est donc doublement protégé par ce check. Mais le fallback reste troublant — à supprimer.
+
+### §18.3 — 🚨 Route `/api/admin/daily-test` déclenche de vrais payouts
+Contrairement aux autres routes `*/test/`, cette route :
+- N'est **pas** gatée par `NODE_ENV === "development"`
+- Appelle `executePayout()` avec des vraies CRC (lignes 49 + 74)
+- Est protégée uniquement par `ADMIN_PASSWORD` qui lui-même a fallback `"admin"`
+
+→ **Couplé avec §18.1 = vecteur de vol de fonds** si `ADMIN_PASSWORD` manque en prod.
+
+### §18.4 — Autres test routes (correctement gatées)
+Les 6 autres test routes gatent correctement sur `NODE_ENV !== "development"` :
+- `morpion/[slug]/test`, `memory/[slug]/test`, `pfc/[slug]/test`, `dames/[id]/test`, `relics/[id]/test`, `crc-races/[slug]/test`
+→ OK, elles injectent des faux joueurs avec des tx hashes fake (pas de vrai payout).
+
+### §18.5 — Rate-limiting : 1 route sur 133 (aggravé)
+Le rapport initial disait 2 sur 133. Vérification : **seule `/api/wallet/cashout-init` utilise `src/lib/rate-limit.ts`** (5 req/60s, IP-based). 
+
+Le rate-limit est **en-mémoire, par-instance** → inefficace sur Vercel serverless (instances éphémères) ou multi-instance.
+
+**Top 20 routes critiques à protéger en priorité (écrivent en DB ET déclenchent des tx) :**
+
+| # | Route | DB write | Tx on-chain | Auth | Risque si spammée |
+|---|-------|----------|-------------|------|-------------------|
+| 1 | `/api/daily/scan` | ✓ | ✓ | Aucune | XP farm + spam claims |
+| 2 | `/api/daily/claim` | ✓ | ✗ | Aucune | Multi-claim different addresses |
+| 3 | `/api/daily/claim-from-balance` | ✓ | ✗ | Aucune | idem |
+| 4 | `/api/morpion-scan` | ✓ | ✓ | Aucune | Spam polling DB + on-chain |
+| 5 | `/api/memory-scan` | ✓ | ✓ | Aucune | idem |
+| 6 | `/api/dames-scan` | ✓ | ✓ | Aucune | idem |
+| 7 | `/api/pfc-scan` | ✓ | ✓ | Aucune | idem |
+| 8 | `/api/relics-scan` | ✓ | ✓ | Aucune | idem |
+| 9 | `/api/crc-races-scan` | ✓ | ✓ | Aucune | idem |
+| 10 | `/api/blackjack-scan` | ✓ | ✓ | Aucune | idem |
+| 11 | `/api/coin-flip-scan` | ✓ | ✓ | Aucune | idem |
+| 12 | `/api/crash-dash-scan` | ✓ | ✓ | Aucune | idem |
+| 13 | `/api/dice-scan` | ✓ | ✓ | Aucune | idem |
+| 14 | `/api/hilo-scan` | ✓ | ✓ | Aucune | idem |
+| 15 | `/api/keno-scan` | ✓ | ✓ | Aucune | idem |
+| 16 | `/api/mines-scan` | ✓ | ✓ | Aucune | idem |
+| 17 | `/api/plinko-scan` | ✓ | ✓ | Aucune | idem |
+| 18 | `/api/roulette-scan` | ✓ | ✓ | Aucune | idem |
+| 19 | `/api/wallet/topup-scan` | ✓ | ✗ | Aucune | Spam DB + fetch on-chain |
+| 20 | `/api/shop/buy` | ✓ | ✓ | Aucune | Drain XP |
+
+### §18.6 — Validation d'input — gaps confirmés
+Vérification ciblée :
+- ✅ `/api/payout` : regex address `^0x[a-fA-F0-9]{40}$` ligne 29, typeof checks — **OK**
+- ✅ `/api/wallet/pay-game` : typeof + String() + Number() — **OK**
+- ✅ `/api/wallet/cashout-init` : `isFinite()` + bounds — **OK**
+- ⚠️ `/api/lotteries` POST : `recipientAddress` accepté **sans regex** — MOYEN
+- ⚠️ `/api/lootboxes` POST : idem — MOYEN
+- ⚠️ `/api/wallet/topup-scan` : `String(address)` uniquement, pas de regex — FAIBLE (optionnel)
+- ⚠️ `/api/lotteries` POST : `commissionPercent` pas borné (0-100) — FAIBLE
+
+### §18.7 — Secrets client-side — PASS ✅
+Vérification transitive : aucun fichier avec `"use client"` n'importe directement ni transitivement `payout.ts`, `wallet.ts` (partie serveur), `telegram/bot.ts`, ou `db/index.ts`.
+→ **Pas de fuite de BOT_PRIVATE_KEY / ADMIN_PASSWORD / TELEGRAM_BOT_TOKEN dans le bundle client**.
+
+---
+
+## §19 — Complément §13 : i18n — 205 violations
+
+### §19.1 — Structure
+Le fichier contient `translations = { fr: {...}, en: {...} }` avec ~46 sections top-level (landing, home, lottery, wallet, dashboard, stats, errors, admin, blackjack, morpion, memory, daily, lootbox, mines, keno, plinko, roulette, hiLo, crashDash, coinFlip, dice, pfc, dames, crcRaces, relics, exchange, shop, rematch, payout, profile, playerProfile, leaderboard, support, privacy, ticketRecovery, tickets, miniapp, demo, dao, landingXxx × 6).
+→ **FR et EN alignés** : pas de clé manquante d'un côté (spot check OK sur 15 clés).
+
+### §19.2 — 🚨 205 violations de la règle i18n
+`.claude/rules/` interdit `locale === "fr" ? "…" : "…"`. Grep exhaustif :
+- **205 occurrences** de `locale === "fr" ?` dans `src/`
+- Top offenders :
+  - `app/relics/[id]/page.tsx` : 34
+  - `app/dashboard-dao/page.tsx` : 16
+  - `components/daily-modal.tsx` : 13
+  - `app/morpion/[slug]/page.tsx` : 12
+  - `app/memory/[slug]/page.tsx` : 11
+  - `app/lobby/page.tsx` : 11
+  - `components/chance-payment.tsx` : 10
+  - `components/pnl-card.tsx` : 9
+  - `app/player/[address]/client.tsx` : 8
+  - `components/balance-pay-button.tsx` : 7
+
+### §19.3 — Strings FR/EN hardcodés en JSX
+Exemples détectés (extrait non exhaustif) :
+- `balance-pay-button.tsx:181` : `"Solde insuffisant"` (hors i18n)
+- `balance-pay-button.tsx:183` : `"Mise invalide"` (hors i18n)
+- `blackjack-page.tsx:600` : `"Dealer"` (hors i18n)
+- `blackjack-page.tsx:720` : `"Mise supplementaire"` (hors i18n)
+- `chance-payment.tsx:281` : `"Scannez pour payer"` (hors i18n)
+- `lootbox-page.tsx:708` : long paragraphe FR hardcodé
+- `admin/page.tsx:1313` : `"RTP doit être entre 97% et 100%"` (hors i18n)
+- `game-rules-modal.tsx:33` : `"Règles du jeu"` (hors i18n)
+
+---
+
+## §20 — Complément §3 et §6 : duplication casino & paiement
+
+### §20.1 — Duplication casino (8 jeux chance)
+Matrice des patterns communs (✓ = présent dans le jeu) :
+
+| Pattern | Plinko | Roulette | Mines | Dice | HiLo | Keno | Crash | BJ |
+|---------|--------|----------|-------|------|------|------|-------|-----|
+| `usePlayerToken` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `useDemo` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `useLocale` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `useTheme` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `<ChancePayment>` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `<BalancePayButton>` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `<PnlCard>` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Split Demo/Real | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `darkSafeColor` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| POST /profiles après paiement | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Polling scan | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ |
+| GET /active (restore) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Animation spécifique | concurrent balls | spin 4s | reveal | roll | flip | draw 350ms | RAF | hands |
+
+→ **65-75% de code dupliqué estimé** entre les 8 fichiers (~6 584 lignes au total).
+
+**Abstractions extractibles** :
+- `useCasinoGame({ gameName, tableSlug, accentColor })` → `{ locale, tokenRef, round, restoring, scanning, playerProfile, scanForRound, setWatchingPayment }`
+- `<CasinoGameShell>` → wrapper demo/real + header + sections
+- `<GameResultPanel>` → PnlCard + Play Again button unifié
+- Extraction de `darkSafeColor` + profile fetch en provider/hook
+
+### §20.2 — Duplication paiement (4 composants, 1116 lignes)
+
+| Feature | `game-payment` | `chance-payment` | `crc-races-payment` | `balance-pay-button` |
+|---------|----------------|-------------------|----------------------|------------------------|
+| Détection Mini App | ✓ | ✓ | ✓ | ✗ |
+| QR generation | ✓ | ✓ | ✓ | ✗ |
+| Payment link gen | ✓ | ✓ | ✓ | ✗ |
+| Polling auto | ✓ | ✗ | ✓ | ✗ |
+| Bouton copy-link | ✓ | ✓ | ✓ | ✗ |
+| Bouton scan manuel | ✓ | ✓ | ✓ | ✗ |
+| sendPayment (Mini App) | ✓ | ✓ | ✓ | ✗ |
+| Mode creator/joiner | ✓ (waiting_p2) | ✗ | ✓ (iAmIn) | ✗ |
+| Balance vs on-chain | ✗ | délégué | ✗ | dédié |
+
+→ **50-60% dupliqué**. 
+
+**Abstraction unifiée** proposée :
+```ts
+usePaymentFlow({ recipientAddress, amountCrc, gameKey, gameId, playerToken, scanFunction, scanInterval })
+  → { isMiniApp, paymentLink, qrCode, qrState, miniAppPaying, miniAppError, handleMiniAppPay, copyPaymentLink, scanning }
+
+<UnifiedPaymentFlow mode="multiplay|chance" ... />
+```
+→ Remplace `game-payment`, `chance-payment`, `crc-races-payment`.
+→ `balance-pay-button` reste séparé (concept différent : débit solde).
+→ Économie estimée : ~600-700 lignes.
+
+---
+
+## §21 — Complément §4 : route orpheline `relics-scan/relics-scan`
+
+Dossier confirmé doublement imbriqué :
+```
+src/app/api/relics-scan/
+  route.ts                       # route active (utilisée via game-registry.ts:67)
+  relics-scan/
+    route.ts                     # ORPHANE — aucune référence dans le code
+```
+Le fichier imbriqué lit sur `gameId` query param et appelle directement `db.select().from(relicsGames)` avec logique legacy (pré-`scanGamePayments`). 
+→ **Zero référence en code** (grep `api/relics-scan/relics-scan` : 0 hits). À supprimer.
+
+---
+
+## §22 — Complément §12 : pages landing
+
+| Page | Liens entrants actifs | Statut |
+|------|------------------------|--------|
+| `/hub` | bottom-nav.tsx (label "Jouer"), home page | ✅ **Hub principal actif** |
+| `/chance` | linké depuis `/hub` (carte Dice5) | ✅ **Sous-hub chance actif** |
+| `/multijoueur` | linké depuis `/hub` (carte Swords) | ⚠️ **Couche intermédiaire redondante** (le hub pourrait linker direct vers `/morpion`, `/memory`, etc.) |
+| `/lobby` | linké depuis `/multijoueur` uniquement (pas dans bottom-nav) | ⚠️ **Sous-page de multijoueur** |
+
+→ `/multijoueur` est réellement un layer intermédiaire entre `/hub` et chaque jeu. Pas forcément à supprimer, mais pourrait être fusionné avec `/hub`.
+→ `/lobby` a une vraie valeur (liste des parties ouvertes + polling `/api/lobby`) mais n'est joignable que via `/multijoueur` — candidat à être accessible plus directement.
+
+---
+
+## §23 — Complément §12 : scripts one-shot (34 fichiers, pas 35)
+
+Comptage réel : **34 fichiers** dans `scripts/`. Un `scripts/README.md` existe (mentionné dans HANDOFF.md).
+
+Classification (détail dans §24) :
+- **15 à garder actifs** (diagnostics, smoke tests, seed, core migrations)
+- **19 à archiver** (migrations déjà appliquées, repairs one-shot)
+
+Sous-catégorisation proposée :
+```
+scripts/
+├── README.md                          (à mettre à jour)
+├── diagnostics/                       (11 scripts)
+├── migrations/                        (core migration : init-bot-nonce)
+├── smoke/                             (6 scripts)
+├── seed/                              (seed-badges, seed-shop, telegram-*)
+└── archive/                           (migrations passées + repairs appliqués)
+```
+
+---
+
+## §24 — Complément §11 : code legacy
+
+Grep sur strings `demurrage`, `trust or untrust`, `stg roulette`, `mini roulette`, `demurrage dash`, `mini app agent` dans `src/` + `drizzle/` + `scripts/` :
+
+**Zero match.** Le codebase est propre de références à des features abandonnées.
+→ Pas de code mort identifiable par ce vecteur. Les dossiers suspectés (`/hub`, `/lobby`, `/multijoueur`) sont actuellement tous utilisés (cf §22).
+
+---
+
+## §25 — Complément : hooks & memory leaks
+
+Lecture des 4 fichiers `src/hooks/*.ts` :
+
+| Hook | Role | useEffect + intervalle ? | Cleanup ? | fetch ? | AbortController ? | Verdict |
+|------|------|--------------------------|-----------|---------|--------------------|---------|
+| `use-connected-address.ts` | Adresse wallet (Mini App + localStorage) | storage listener | ✓ | ✗ | N/A | ✅ SAFE |
+| `use-game-polling.ts` | Polling état de partie toutes les 2s | ✓ | ✓ (clear + active flag) | ✓ | ❌ | ⚠️ **fetch pending peut résoudre après unmount** |
+| `use-payment-watcher.ts` | Polling blockchain paiement 5s | ✓ | ✓ (clear + cancelled flag) | ✓ | ⚠️ flag only | ✅ SAFE (flag suffit) |
+| `use-player-token.ts` | Token localStorage + URL | ✓ | ✓ (one-shot) | ✗ | N/A | ✅ SAFE |
+
+→ Risque faible sur `use-game-polling` (le `try/catch` couvre `setGame` après unmount). À assainir avec `AbortController` à terme, non urgent.
+
+---
+
+## §26 — Build / Lint / TypeScript
+
+### §26.1 — `npm run lint`
+Exit code 0. **0 erreur**, seulement des warnings (~80) :
+- `@next/next/no-img-element` (balises `<img>` au lieu de `<Image />`) : ~40 occurrences
+- `react-hooks/exhaustive-deps` : ~40 occurrences (deps manquantes ou tokenRef récurrent)
+
+Cluster récurrent : `tokenRef` manquant dans useCallback de presque tous les jeux casino (blackjack, coin-flip, crash-dash, dice, hilo, keno, mines, plinko, roulette, lootbox). Le pattern : ref utilisée dans useCallback sans être listée en deps — techniquement OK si on accepte que la ref n'invalide jamais le callback, mais ESLint hurle.
+
+### §26.2 — `npx tsc --noEmit`
+Exit code 0. **2 erreurs dans `.next/types`** (cache Next.js périmé, faux positifs) :
+```
+.next/types/app/api/debug-hilo-rounds/route.ts(2,24): error TS2307
+.next/types/app/api/debug-hilo-rounds/route.ts(5,29): error TS2307
+```
+→ Route `debug-hilo-rounds` supprimée mais cache Next.js pas nettoyé. `rm -rf .next && npx tsc --noEmit` devrait passer. Non bloquant.
+
+### §26.3 — `npm run build`
+⚠️ **Non exécuté** (nécessite DATABASE_URL valide + build prod complet). Recommandé de l'ajouter en CI.
+
+---
+
+## §27 — Résumé des findings nouveaux (par ordre de gravité)
+
+| # | Finding | Gravité | Section |
+|---|---------|---------|---------|
+| 1 | Fallback `ADMIN_PASSWORD \|\| "admin"` sur 10 routes admin | 🚨🚨 Critique | §18.1 |
+| 2 | `/api/admin/daily-test` non-gaté `NODE_ENV` + appelle `executePayout()` réel | 🚨 Haute | §18.3 |
+| 3 | 10 tables DB sans migration SQL dans `drizzle/` (createur manuel/scripts) | 🚨 Haute | §16.4 |
+| 4 | 16 vars d'env critiques manquent dans `.env.example` (dont 5 sensibles) | 🚨 Haute | §17.2 |
+| 5 | 19 routes `*-scan` + 3 `daily/*` sans rate-limit avec écriture DB + tx | 🚨 Haute | §18.5 |
+| 6 | Fallback `ROLE_KEY \|\| "0x000…01"` | ⚠️ Moyenne (double-checké par config) | §18.2 |
+| 7 | 205 violations i18n (`locale === "fr"` hardcodé) | ⚠️ Moyenne | §19.2-3 |
+| 8 | Route orpheline `api/relics-scan/relics-scan/route.ts` | ⚠️ Moyenne | §21 |
+| 9 | `recipientAddress` non regex-validé dans POST lotteries/lootboxes | ⚠️ Moyenne | §18.6 |
+| 10 | 65-75% de code dupliqué sur les 8 jeux casino | ⚠️ Moyenne (dette technique) | §20.1 |
+| 11 | 50-60% de code dupliqué sur les 4 composants paiement | ⚠️ Moyenne (dette technique) | §20.2 |
+| 12 | Conflits de numérotation migrations 0002 + 0009 | ⚠️ Faible | §16.5 |
+| 13 | `use-game-polling` pas d'AbortController | 🟢 Faible | §25 |
+| 14 | Warnings lint (~80) : `<img>`, deps manquantes | 🟢 Faible | §26.1 |
+
+**Note finale** : rapport initial globalement juste. Aucun finding critique manqué, aucun finding infirmé. Les 3 aggravations majeures par rapport au rapport initial sont :
+1. Le fallback `"admin"` qui transforme le point §10-3 "ADMIN_PASSWORD un seul mot de passe partagé" en **vulnérabilité exploitable**.
+2. Le couplage §18.1 + §18.3 qui permet, si `ADMIN_PASSWORD` manque en prod, de trigger de vrais payouts CRC avec un header HTTP trivial.
+3. Les **10 tables DB** sans migration `drizzle/` (vs. dette "à la main" mentionnée en §5 initial) — un refresh/reset complet de la DB est impossible sans scripts manuels.
+
