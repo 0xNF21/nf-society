@@ -1141,68 +1141,6 @@ function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
                 </div>
               </div>
 
-              {/* Lootbox recap */}
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">Lootboxes</p>
-                <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3 space-y-1">
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Ouvertures" : "Opens"}</span><span className="text-xs font-bold">{data.lootbox.opens}</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Recu" : "Received"}</span><span className="text-xs font-bold">{data.lootbox.received} CRC</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Redistribué" : "Paid"}</span><span className="text-xs font-bold">{data.lootbox.paid} CRC</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">RTP</span><span className="text-xs font-bold">{data.lootbox.rtp}%</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Marge" : "Margin"}</span><span className={`text-xs font-bold ${data.lootbox.margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.lootbox.margin} CRC</span></div>
-                </div>
-              </div>
-
-              {/* Daily recap */}
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">Daily</p>
-                <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3 space-y-1">
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">Sessions</span><span className="text-xs font-bold">{data.daily.sessions}</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Recu" : "Received"}</span><span className="text-xs font-bold">{data.daily.received} CRC</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Redistribué" : "Paid"}</span><span className="text-xs font-bold">{data.daily.paid} CRC</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">RTP</span><span className="text-xs font-bold">{data.daily.rtp}%</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-ink/50">{locale === "fr" ? "Marge" : "Margin"}</span><span className={`text-xs font-bold ${data.daily.margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.daily.margin} CRC</span></div>
-                </div>
-              </div>
-
-              {/* Game recaps */}
-              {data.gameRecaps.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Recap par jeu" : "By game"}</p>
-                  {data.gameRecaps.filter(g => g.played > 0).sort((a, b) => b.totalBet - a.totalBet).map(g => (
-                    <div key={g.key} className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-bold text-ink dark:text-white">{GAME_TYPE_LABELS[g.key] || g.key}</p>
-                        <p className="text-[10px] text-ink/30">{g.played} {locale === "fr" ? "parties" : "games"}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-ink/50">{g.totalBet} → {g.totalPaid} CRC</p>
-                        <p className={`text-xs font-bold ${g.margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>{g.margin >= 0 ? "+" : ""}{g.margin} CRC</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Weekly chart */}
-              {data.weeklyChart.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Redistribué cette semaine" : "Redistributed this week"}</p>
-                  <div className="flex items-end gap-1 h-20">
-                    {data.weeklyChart.map(d => {
-                      const max = Math.max(...data.weeklyChart.map(x => x.paid), 1);
-                      const pct = (d.paid / max) * 100;
-                      return (
-                        <div key={d.day} className="flex-1 flex flex-col items-center gap-0.5">
-                          <span className="text-[8px] text-ink/30">{d.paid}</span>
-                          <div className="w-full bg-blue-400 rounded-t-sm" style={{ height: `${Math.max(pct, 4)}%` }} />
-                          <span className="text-[7px] text-ink/20">{d.day.slice(5)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
