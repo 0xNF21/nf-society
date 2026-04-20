@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 const nextConfig = {
   reactStrictMode: true,
   async headers() {
@@ -20,4 +22,15 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry : only wrap when SENTRY_DSN is set (keeps local dev clean)
+export default process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      silent: !process.env.CI,
+      widenClientFileUpload: true,
+      tunnelRoute: "/monitoring",
+      disableLogger: true,
+      automaticVercelMonitors: false,
+    })
+  : nextConfig;
