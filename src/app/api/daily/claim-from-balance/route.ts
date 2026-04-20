@@ -105,15 +105,16 @@ export async function POST(req: NextRequest) {
         .where(eq(dailySessions.id, sessionId));
     }
 
-    // Award XP — non-blocking
-    try {
+    // Award XP — fire-and-forget. The previous try/await/catch still
+    // blocked on the fetch; void+.catch is the real non-blocking pattern.
+    {
       const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      await fetch(`${base}/api/players/xp`, {
+      void fetch(`${base}/api/players/xp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: addr, action: "daily_checkin" }),
-      });
-    } catch { /* XP failure silent */ }
+      }).catch(() => {});
+    }
 
     return NextResponse.json({
       ok: true,

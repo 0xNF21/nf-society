@@ -162,23 +162,26 @@ export async function POST(req: NextRequest) {
           console.error("[LootboxScan] Coupon refund error:", couponErr);
         }
 
-        // XP non-bloquant — ne doit jamais bloquer le payout
-        try {
+        // XP — fire-and-forget. Never block the scan response on XP (was
+        // "non-bloquant" via try/catch but still awaited, which blocks the
+        // scan while the XP route is being called). void + .catch is the
+        // real non-blocking pattern.
+        {
           const base = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}`;
-          await fetch(`${base}/api/players/xp`, {
+          void fetch(`${base}/api/players/xp`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ address: playerAddress, action: "lootbox_open" }),
-          });
+          }).catch(() => {});
           const bonusAction = getLootboxXpAction(rewardCrc, priceCrc);
           if (bonusAction) {
-            await fetch(`${base}/api/players/xp`, {
+            void fetch(`${base}/api/players/xp`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ address: playerAddress, action: bonusAction }),
-            });
+            }).catch(() => {});
           }
-        } catch { /* XP fail silencieux */ }
+        }
       } catch (err: any) {
         console.error("[LootboxScan] Error processing payment:", err.message);
         await db.update(lootboxOpens).set({

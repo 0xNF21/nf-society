@@ -147,17 +147,18 @@ export async function POST(req: NextRequest) {
         // XP
         try {
           const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
+          // Fire-and-forget — never block the scan response on XP.
+          void fetch(`${base}/api/players/xp`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ address: playerAddress, action: "coin_flip_play" }),
-          });
+          }).catch(() => {});
           if (result.outcome === "win") {
-            await fetch(`${base}/api/players/xp`, {
+            void fetch(`${base}/api/players/xp`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ address: playerAddress, action: "coin_flip_win" }),
-            });
+            }).catch(() => {});
           }
         } catch {}
 

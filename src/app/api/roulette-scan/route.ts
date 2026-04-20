@@ -114,15 +114,17 @@ export async function POST(req: NextRequest) {
           amountCrc: betCrc,
         }).onConflictDoNothing();
 
-        // XP
-        try {
+        // XP — fire-and-forget. A slow or unreachable XP endpoint must
+        // never block the scan response (caused scan hangs when
+        // NEXT_PUBLIC_APP_URL pointed at a non-listening port).
+        {
           const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
+          void fetch(`${base}/api/players/xp`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ address: playerAddress, action: "roulette_play" }),
-          });
-        } catch {}
+          }).catch(() => {});
+        }
 
       } catch (err: any) {
         console.error("[RouletteScan] Error:", err.message);

@@ -140,15 +140,15 @@ export async function POST(req: NextRequest) {
           }).where(eq(blackjackHands.id, inserted[0].id));
         }
 
-        // XP
-        try {
+        // XP — fire-and-forget. Never block the scan response on XP.
+        {
           const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
+          void fetch(`${base}/api/players/xp`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ address: playerAddress, action: "blackjack_play" }),
-          });
-        } catch {}
+          }).catch(() => {});
+        }
 
       } catch (err: any) {
         console.error("[BlackjackScan] Error:", err.message);

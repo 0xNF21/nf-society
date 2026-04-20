@@ -116,15 +116,15 @@ export async function POST(req: NextRequest) {
           amountCrc: betCrc,
         }).onConflictDoNothing();
 
-        // XP
-        try {
+        // XP — fire-and-forget. Never block the scan response on XP.
+        {
           const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          await fetch(`${base}/api/players/xp`, {
+          void fetch(`${base}/api/players/xp`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ address: playerAddress, action: "hilo_play" }),
-          });
-        } catch {}
+          }).catch(() => {});
+        }
 
       } catch (err: any) {
         console.error("[HiLoScan] Error:", err.message);
