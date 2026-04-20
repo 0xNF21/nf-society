@@ -4,16 +4,14 @@ import { dailySessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { generateDailyToken, determineScratchResult, determineSpinResult } from "@/lib/daily";
 import { executePayout } from "@/lib/payout";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
-
-function checkAuth(req: NextRequest) {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
-}
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 // POST — create a test daily session with real scratch/spin/payout (no payment needed)
 export async function POST(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "Not available in production" }, { status: 404 });
+  }
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { address } = await req.json();

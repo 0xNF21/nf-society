@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     // security boundary (see rate-limit.ts docstring); the 1 CRC proof
     // + balance debit are the real gates for value movement.
     const ip = clientIp(req.headers);
-    const rl = checkRateLimit(`cashout-init:${ip}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    const rl = await checkRateLimit(`cashout-init:${ip}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
     if (!rl.ok) {
       return NextResponse.json(
         { error: "rate_limited", retryAfterSec: rl.retryAfterSec, limit: rl.limit },

@@ -2,23 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { shopItems } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
-
-function checkAuth(req: NextRequest) {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
-}
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 // GET — list all shop items
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const items = await db.select().from(shopItems);
   return NextResponse.json({ items });
 }
 
 // PATCH — update a shop item
 export async function PATCH(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await req.json();
     const { slug, ...updates } = body;
@@ -50,7 +45,7 @@ export async function PATCH(req: NextRequest) {
 
 // POST — create a new shop item
 export async function POST(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { slug, name, description, icon, category, xpCost, levelRequired, stock, active } = await req.json();
     if (!slug || !name || !description || !icon || !category || typeof xpCost !== "number") {

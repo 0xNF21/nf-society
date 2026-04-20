@@ -54,8 +54,14 @@ function getBotWallet() {
   return new ethers.Wallet(process.env.BOT_PRIVATE_KEY!, provider);
 }
 
+// ROLE_KEY is the bytes32 identifier of the role (in the Zodiac Roles Modifier)
+// that the bot uses to authorize payouts from the Safe. Accepts either a hex
+// string (e.g. "0x0000...0001") or a decimal role ID (e.g. "1"), padded to
+// bytes32. No fallback: a missing env var must fail loudly so we don't silently
+// reuse a stale role key after a future rotation.
 function getRoleKey(): string {
-  const key = process.env.ROLE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000001";
+  const key = process.env.ROLE_KEY;
+  if (!key) throw new Error("ROLE_KEY is not configured");
   if (key.startsWith("0x")) {
     return key.padEnd(66, "0").slice(0, 66);
   }

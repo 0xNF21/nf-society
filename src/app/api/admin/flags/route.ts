@@ -3,18 +3,13 @@ import { db } from "@/lib/db";
 import { featureFlags } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { ALL_GAMES, ALL_CHANCE_GAMES, CATEGORY_FLAGS } from "@/lib/game-registry";
+import { checkAdminAuth } from "@/lib/admin-auth";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
 const VALID_STATUSES = ["enabled", "coming_soon", "hidden"];
-
-function checkAuth(req: NextRequest) {
-  const auth = req.headers.get("x-admin-password");
-  return auth === ADMIN_PASSWORD;
-}
 
 // GET — list all flags, auto-create missing ones from game registry
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) {
+  if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const flags = await db.select().from(featureFlags);
@@ -55,7 +50,7 @@ export async function GET(req: NextRequest) {
 
 // PATCH — change a flag's status
 export async function PATCH(req: NextRequest) {
-  if (!checkAuth(req)) {
+  if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

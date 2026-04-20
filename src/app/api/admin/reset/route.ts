@@ -2,12 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { payouts, claimedPayments, lootboxOpens, dailySessions, jackpotPool, morpionGames, memoryGames, relicsGames, damesGames, pfcGames, playerBadges, players, shopPurchases, shopCoupons } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
-
-function checkAuth(req: NextRequest) {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
-}
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 const RESET_TARGETS: Record<string, { label: string; tables: string[]; where?: string }> = {
   // Payouts
@@ -38,7 +33,7 @@ const RESET_TARGETS: Record<string, { label: string; tables: string[]; where?: s
 };
 
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   return NextResponse.json({
     targets: Object.entries(RESET_TARGETS).map(([key, val]) => ({
       key,
@@ -49,7 +44,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { target, confirm } = await req.json();
