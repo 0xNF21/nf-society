@@ -7,11 +7,11 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 
 type LedgerEntry = {
-  id: number;
+  id: number | string;
   address: string;
   kind: string;
   amountCrc: number;
-  balanceAfter: number;
+  balanceAfter: number | null;
   reason: string | null;
   txHash: string | null;
   gameType: string | null;
@@ -51,7 +51,7 @@ export function LedgerHistory({ address }: LedgerHistoryProps) {
     try {
       const limit = expanded ? 20 : 5;
       const res = await fetch(
-        `/api/wallet/ledger?address=${encodeURIComponent(address)}&limit=${limit}`,
+        `/api/wallet/activity?address=${encodeURIComponent(address)}&limit=${limit}`,
         { cache: "no-store" },
       );
       const data = await res.json();
@@ -180,11 +180,14 @@ function iconFor(kind: string) {
     case "cashout":
       return ArrowUpCircle;
     case "prize":
+    case "game-prize":
       return Trophy;
     case "commission":
     case "house-bet":
     case "house-payout":
       return Gift;
+    case "game-bet":
+    case "daily-ticket":
     case "debit":
     default:
       return Coins;
@@ -203,6 +206,9 @@ function labelFor(entry: LedgerEntry, locale: "fr" | "en"): string {
     cashout: t.historyKindCashout,
     "cashout-refund": t.historyKindCashoutRefund,
     commission: t.historyKindCommission,
+    "game-bet": t.historyKindGameBet,
+    "game-prize": t.historyKindGamePrize,
+    "daily-ticket": t.historyKindDailyTicket,
   };
   const label = kindLabels[entry.kind];
   if (label) return label[locale];

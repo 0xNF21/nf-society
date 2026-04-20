@@ -1394,6 +1394,9 @@ export const translations = {
     historyKindCashout: { fr: "Retrait", en: "Cashout" },
     historyKindCashoutRefund: { fr: "Retrait rembours\u00e9", en: "Cashout refunded" },
     historyKindCommission: { fr: "Commission", en: "Commission" },
+    historyKindGameBet: { fr: "Mise", en: "Bet" },
+    historyKindGamePrize: { fr: "Gain", en: "Prize" },
+    historyKindDailyTicket: { fr: "Ticket Daily", en: "Daily ticket" },
   },
   ticketRecovery: {
     button: { fr: "Retrouver ma partie", en: "Recover my game" },
