@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { lootboxes, lootboxOpens, claimedPayments, shopCoupons } from "@/lib/db/schema";
 import { eq, and, inArray, gt } from "drizzle-orm";
@@ -11,6 +12,9 @@ import { getLootboxXpAction } from "@/lib/xp";
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "lootbox-scan", 10, 60000);
+  if (limited) return limited;
+
   try {
     const lootboxIdParam = req.nextUrl.searchParams.get("lootboxId");
     if (!lootboxIdParam) {

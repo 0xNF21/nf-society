@@ -1,8 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { scanGamePayments } from "@/lib/multiplayer";
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "relics-scan", 10, 60000);
+  if (limited) return limited;
+
   try {
     const gameSlug =
       req.nextUrl.searchParams.get("gameSlug") ||

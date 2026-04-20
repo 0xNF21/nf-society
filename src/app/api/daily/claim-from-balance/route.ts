@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { dailySessions, players } from "@/lib/db/schema";
 import { eq, and, isNull, desc, isNotNull } from "drizzle-orm";
@@ -25,6 +26,9 @@ import { generateDailyToken, todayString } from "@/lib/daily";
  * No CRC movement (balance unchanged, no ledger row).
  */
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "daily-claim", 5, 60000);
+  if (limited) return limited;
+
   try {
     const body = await req.json().catch(() => ({}));
     const addressRaw = body?.address ? String(body.address) : "";

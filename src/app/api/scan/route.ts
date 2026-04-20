@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { participants, lotteries, claimedPayments } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -9,6 +10,9 @@ const LOTTERY_START_TIMESTAMP = 1739404800;
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "scan", 10, 60000);
+  if (limited) return limited;
+
   try {
     const lotteryIdParam = req.nextUrl.searchParams.get("lotteryId");
     const lotteryId = lotteryIdParam ? parseInt(lotteryIdParam, 10) : null;

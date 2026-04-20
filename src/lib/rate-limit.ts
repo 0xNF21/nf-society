@@ -15,6 +15,7 @@
  * spoofed by anyone upstream of our proxy). Pair rate limits with real auth
  * or transaction proofs for anything that moves value.
  */
+import { NextRequest, NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
@@ -121,4 +122,29 @@ export function clientIp(headers: Headers): string {
   const xri = headers.get("x-real-ip");
   if (xri) return xri;
   return "unknown";
+}
+
+/**
+ * One-liner helper for API routes: check the rate limit and return a
+ * ready-made 429 response if blocked, or null if the caller can proceed.
+ *
+ * Usage inside a POST handler:
+ *   const limited = await enforceRateLimit(req, "plinko-scan");
+ *   if (limited) return limited;
+ *
+ * Default: 10 hits / 60s per IP. Bucket key is `<scope>:<ip>`.
+ */
+export async function enforceRateLimit(
+  req: NextRequest,
+  scope: string,
+  max = 10,
+  windowMs = 60_000,
+): Promise<NextResponse | null> {
+  const ip = clientIp(req.headers);
+  const rl = await checkRateLimit(`${scope}:${ip}`, max, windowMs);
+  if (rl.ok) return null;
+  return NextResponse.json(
+    { error: "rate_limited", retryAfterSec: rl.retryAfterSec, limit: rl.limit },
+    { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+  );
 }

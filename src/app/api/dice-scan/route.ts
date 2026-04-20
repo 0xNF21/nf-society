@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { diceTables, diceRounds, claimedPayments } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -10,6 +11,9 @@ const WEI_PER_CRC = BigInt("1000000000000000000");
 const DICE_START_BLOCK = "0x2B7DE5C";
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "dice-scan", 10, 60000);
+  if (limited) return limited;
+
   try {
     const tableSlug = req.nextUrl.searchParams.get("tableSlug");
     if (!tableSlug) return NextResponse.json({ error: "tableSlug required" }, { status: 400 });

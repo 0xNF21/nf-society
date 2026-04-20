@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { scanWalletTopups, getBalance } from "@/lib/wallet";
 
 /**
@@ -13,6 +14,9 @@ import { scanWalletTopups, getBalance } from "@/lib/wallet";
  * caller's post-scan balance. If omitted, we just return the scan result.
  */
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "wallet-topup-scan", 10, 60000);
+  if (limited) return limited;
+
   try {
     const body = await req.json().catch(() => ({}));
     const address = body?.address ? String(body.address) : undefined;

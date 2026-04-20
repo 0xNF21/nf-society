@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -12,6 +13,9 @@ import { generateDailyToken, todayString } from "@/lib/daily";
  * One claim per address per day — enforced server-side.
  */
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "daily-claim", 5, 60000);
+  if (limited) return limited;
+
   try {
     const { address } = await req.json();
 

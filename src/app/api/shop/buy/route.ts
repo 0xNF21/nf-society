@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { shopItems, shopPurchases, shopCoupons, players } from "@/lib/db/schema";
 import { eq, and, sql, gt } from "drizzle-orm";
@@ -6,6 +7,9 @@ import { getAvailableXp, computeLevel } from "@/lib/xp";
 import { executePayout } from "@/lib/payout";
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "shop-buy", 10, 60000);
+  if (limited) return limited;
+
   try {
     const { address, item_slug } = await req.json();
 

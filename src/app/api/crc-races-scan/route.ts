@@ -1,8 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { scanCrcRacePayments } from "@/lib/crc-races-server";
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "crc-races-scan", 10, 60000);
+  if (limited) return limited;
+
   try {
     const slug = req.nextUrl.searchParams.get("gameSlug");
     if (!slug) return NextResponse.json({ error: "gameSlug is required" }, { status: 400 });
