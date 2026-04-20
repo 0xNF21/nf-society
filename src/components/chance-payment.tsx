@@ -85,6 +85,17 @@ export function ChancePayment({
 
   const paymentLink = generateGamePaymentLink(recipientAddress, amountCrc, gameType, gameId, playerToken, ballValue);
 
+  // Hydration guard — the Pay button's DOM structure differs between
+  // "token ready" (renders an <a>) and "token not ready" (renders a
+  // disabled <button>). playerToken comes from localStorage via
+  // usePlayerToken, so the server always sees null and the client sees
+  // the saved value immediately. Without this flag, React flags a
+  // hydration mismatch and re-renders the whole subtree on the first
+  // paint. Gating on `mounted` keeps SSR and initial client render
+  // identical, then swaps once the effect fires.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   // Generate QR code (standalone only)
   useEffect(() => {
     if (isMiniApp) return;
@@ -103,7 +114,7 @@ export function ChancePayment({
     return () => { active = false; };
   }, [showQr, paymentLink, isMiniApp]);
 
-  const tokenReady = !!playerToken;
+  const tokenReady = mounted && !!playerToken;
 
   async function handleMiniAppPay() {
     if (!tokenReady) return;
