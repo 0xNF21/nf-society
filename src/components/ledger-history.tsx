@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, ChevronDown, ArrowDownCircle, ArrowUpCircle, Trophy, Gift, Coins } from "lucide-react";
+import { Loader2, ChevronDown, ArrowDownCircle, ArrowUpCircle, Trophy, Gift, Coins, ExternalLink } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -17,7 +17,12 @@ type LedgerEntry = {
   gameType: string | null;
   gameSlug: string | null;
   createdAt: string;
+  /** Real 0x on-chain tx hash when available (topup, cashout payout). Null
+   *  for synthetic internal hashes (balance debits, prizes, house mirrors). */
+  onchainTxHash: string | null;
 };
+
+const GNOSISSCAN_TX = "https://gnosisscan.io/tx/";
 
 interface LedgerHistoryProps {
   address: string;
@@ -120,20 +125,49 @@ function LedgerEntryRow({ entry, locale }: { entry: LedgerEntry; locale: "fr" | 
   const label = labelFor(entry, locale);
   const dateLabel = formatDate(entry.createdAt, locale);
 
-  return (
-    <li
-      className="flex items-center gap-2 px-3 py-2"
-      title={`${t.historyKind[locale]}: ${entry.kind}${entry.txHash ? `\n${t.historyTxHash[locale]}: ${entry.txHash}` : ""}`}
-    >
+  const onchainHash = entry.onchainTxHash;
+  const href = onchainHash ? `${GNOSISSCAN_TX}${onchainHash}` : null;
+
+  const content = (
+    <>
       <Icon className={`h-4 w-4 shrink-0 ${iconColor}`} />
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-ink/80 truncate">{label}</p>
+        <p className="text-xs font-semibold text-ink/80 truncate flex items-center gap-1">
+          {label}
+          {onchainHash && <ExternalLink className="h-3 w-3 text-ink/30 shrink-0" />}
+        </p>
         <p className="text-[11px] text-ink/40">{dateLabel}</p>
       </div>
       <span className={`text-sm font-black tabular-nums shrink-0 ${amountColor}`}>
         {prefix}
         {entry.amountCrc.toFixed(2).replace(/\.00$/, "")} CRC
       </span>
+    </>
+  );
+
+  const tooltip = `${t.historyKind[locale]}: ${entry.kind}${
+    onchainHash ? `\n${t.historyTxHash[locale]}: ${onchainHash}` : ""
+  }`;
+
+  if (href) {
+    return (
+      <li>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={tooltip}
+          className="flex items-center gap-2 px-3 py-2 hover:bg-marine/5 transition-colors"
+        >
+          {content}
+        </a>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center gap-2 px-3 py-2" title={tooltip}>
+      {content}
     </li>
   );
 }

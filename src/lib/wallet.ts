@@ -769,10 +769,43 @@ export async function payCommission(
 export async function getLedger(address: string, limit = 20) {
   const addr = normalize(address);
   if (!addr) return [];
-  return db
+  const rows = await db
     .select()
     .from(walletLedger)
     .where(eq(walletLedger.address, addr))
     .orderBy(sql`${walletLedger.createdAt} DESC`)
     .limit(Math.min(Math.max(limit, 1), 100));
+
+  // Enrich cashout rows with the real on-chain payout tx hash. The ledger
+  // row's own tx_hash is the synthetic `cashout:{tokenId}` used for idempotency;
+  // the user actually wants to see the 0x... hash to verify on gnosisscan.
+  const cashoutTokenIds: number[] = [];
+  for (const r of rows) {
+    if (r.kind === "cashout" && typeof r.txHash === "string" && r.txHash.startsWith("cashout:")) {
+      const id = Number(r.txHash.slice("cashout:".length));
+      if (!isNaN(id)) cashoutTokenIds.push(id);
+    }
+  }
+
+  if (cashoutTokenIds.length === 0) {
+    return rows.map((r) => ({ ...r, onchainTxHash: null as string | null }));
+  }
+
+  const { cashoutTokens } = await import("./db/schema/cashout");
+  const { inArray } = await import("drizzle-orm");
+  const sessions = await db
+    .select({ id: cashoutTokens.id, payoutTxHash: cashoutTokens.payoutTxHash })
+    .from(cashoutTokens)
+    .where(inArray(cashoutTokens.id, cashoutTokenIds));
+  const bySessionId = new Map(sessions.map((s) => [s.id, s.payoutTxHash] as const));
+
+  return rows.map((r) => {
+    if (r.kind === "cashout" && typeof r.txHash === "string" && r.txHash.startsWith("cashout:")) {
+      const id = Number(r.txHash.slice("cashout:".length));
+      return { ...r, onchainTxHash: bySessionId.get(id) || null };
+    }
+    // For rows whose own txHash is already a 0x on-chain hash (topups), surface it too.
+    const raw = typeof r.txHash === "string" && r.txHash.startsWith("0x") ? r.txHash : null;
+    return { ...r, onchainTxHash: raw };
+  });
 }
