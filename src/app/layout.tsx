@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Space_Grotesk, Sora } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { LanguageProvider } from "@/components/language-provider";
 import { DemoProvider } from "@/components/demo-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -78,6 +79,7 @@ export default function RootLayout({
             </LanguageProvider>
           </DemoProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
