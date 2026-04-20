@@ -1,7 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, TrendingUp, Users, Coins, Gamepad2 } from "lucide-react";
+import { ArrowLeft, TrendingUp, Users, Coins, Gamepad2, History, ExternalLink } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -15,6 +16,30 @@ import {
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import type { PlatformStats, PeriodStats, GameStatLine, DailyVolumePoint, TopGameMeta } from "@/lib/platform-stats";
+import type { RecentGameRow } from "@/lib/recent-games";
+
+const GNOSISSCAN_TX = "https://gnosisscan.io/tx/";
+
+function shortenAddress(addr: string | null | undefined): string {
+  if (!addr) return "-";
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function formatRelativeDate(iso: string, locale: "fr" | "en"): string {
+  const d = new Date(iso);
+  const diffMs = Date.now() - d.getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return locale === "fr" ? "a l'instant" : "just now";
+  if (mins < 60) return locale === "fr" ? `il y a ${mins} min` : `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return locale === "fr" ? `il y a ${hours} h` : `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return locale === "fr" ? `il y a ${days} j` : `${days} d ago`;
+  return d.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
+    day: "2-digit",
+    month: "short",
+  });
+}
 
 function formatCrc(n: number | string, decimals = 0): string {
   const num = typeof n === "string" ? parseFloat(n) : n;
@@ -36,7 +61,7 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
   const { locale } = useLocale();
   const t = translations.stats;
 
-  const { casinoBank, period24h, period7d, period30d, allTime, games, daily30d, top5Games } = stats;
+  const { casinoBank, period24h, period7d, period30d, allTime, games, daily30d, top5Games, recentGames } = stats;
 
   return (
     <div className="min-h-screen bg-sand dark:bg-black">
@@ -164,6 +189,9 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
             </div>
           )}
         </div>
+
+        {/* Historique recent */}
+        <RecentHistorySection rows={recentGames} locale={locale} />
 
         <footer className="text-center text-xs text-ink/30 dark:text-white/30 py-8">
           {t.cached[locale]}
@@ -314,5 +342,157 @@ function Volume30dChart({ points, top5 }: { points: DailyVolumePoint[]; top5: To
         </LineChart>
       </ResponsiveContainer>
     </div>
+  );
+}
+
+function RecentHistorySection({
+  rows,
+  locale,
+}: {
+  rows: RecentGameRow[];
+  locale: "fr" | "en";
+}) {
+  const t = translations.stats;
+  const [filter, setFilter] = useState<"all" | "multi" | "chance" | string>("all");
+
+  // Jeux uniques presents dans l'historique (pour le filtre par jeu).
+  const gameOptions = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; emoji: string }>();
+    for (const r of rows) {
+      if (!map.has(r.key)) map.set(r.key, { key: r.key, label: r.label, emoji: r.emoji });
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [rows]);
+
+  const filtered = useMemo(() => {
+    if (filter === "all") return rows;
+    if (filter === "multi" || filter === "chance") {
+      return rows.filter((r) => r.category === filter);
+    }
+    return rows.filter((r) => r.key === filter);
+  }, [rows, filter]);
+
+  const filterBtn = (value: string, label: string) => (
+    <button
+      key={value}
+      onClick={() => setFilter(value)}
+      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+        filter === value
+          ? "bg-marine text-white dark:bg-white dark:text-marine"
+          : "bg-ink/5 text-ink/60 hover:bg-ink/10 dark:bg-white/10 dark:text-white/60 dark:hover:bg-white/20"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="rounded-2xl bg-white/70 dark:bg-white/5 backdrop-blur-sm border border-ink/10 dark:border-white/10 shadow-sm p-6">
+      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-ink/40 dark:text-white/40 mb-1">
+        <History className="h-4 w-4" />
+        {t.recentHistory[locale]}
+      </div>
+      <p className="text-xs text-ink/50 dark:text-white/50 mb-4">
+        {t.recentHistoryDesc[locale]}
+      </p>
+
+      {/* Filtres */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {filterBtn("all", t.filterAll[locale])}
+        {filterBtn("multi", t.filterMulti[locale])}
+        {filterBtn("chance", t.filterChance[locale])}
+        <span className="mx-1 text-ink/20 dark:text-white/20">|</span>
+        {gameOptions.map((g) =>
+          filterBtn(g.key, `${g.emoji} ${g.label}`)
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-ink/40 dark:text-white/40 italic">{t.noHistory[locale]}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-ink/40 dark:text-white/40 uppercase tracking-wider border-b border-ink/10 dark:border-white/10">
+                <th className="py-2">{t.colGame[locale]}</th>
+                <th className="py-2">{t.colPlayer[locale]}</th>
+                <th className="py-2 text-right">{t.colBet[locale]}</th>
+                <th className="py-2 text-right">{t.colResult[locale]}</th>
+                <th className="py-2 text-right">{t.colDate[locale]}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r, i) => (
+                <RecentHistoryRow key={`${r.key}-${r.createdAt}-${i}`} row={r} locale={locale} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecentHistoryRow({ row, locale }: { row: RecentGameRow; locale: "fr" | "en" }) {
+  const t = translations.stats;
+  const bet = row.betCrc;
+  const payout = row.payoutCrc;
+  const net = payout - bet;
+
+  const resultColor =
+    row.outcome === "win"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : row.outcome === "loss"
+      ? "text-red-500"
+      : "text-ink/60 dark:text-white/60";
+  const resultLabel =
+    row.outcome === "win" ? t.resultWin[locale] : row.outcome === "loss" ? t.resultLoss[locale] : t.resultDraw[locale];
+
+  return (
+    <tr className="border-b border-ink/5 dark:border-white/5">
+      <td className="py-3">
+        <div className="flex items-center gap-2">
+          <span>{row.emoji}</span>
+          <span className="font-medium text-ink dark:text-white">{row.label}</span>
+          <span className="text-[10px] uppercase tracking-wider text-ink/30 dark:text-white/30">
+            {row.category}
+          </span>
+        </div>
+      </td>
+      <td className="py-3 font-mono text-xs text-ink/70 dark:text-white/70">
+        {shortenAddress(row.playerAddress)}
+        {row.opponentAddress && (
+          <span className="text-ink/40 dark:text-white/40">
+            {" "}{t.vsOpponent[locale]} {shortenAddress(row.opponentAddress)}
+          </span>
+        )}
+      </td>
+      <td className="py-3 text-right font-mono text-ink dark:text-white">
+        {formatCrc(bet, 0)}
+      </td>
+      <td className={`py-3 text-right font-mono ${resultColor}`}>
+        <div className="flex items-center justify-end gap-1">
+          <span className="text-[11px] uppercase opacity-70">{resultLabel}</span>
+          <span>
+            {net >= 0 ? "+" : ""}
+            {formatCrc(net, 0)}
+          </span>
+          {row.txHash && (
+            <a
+              href={`${GNOSISSCAN_TX}${row.txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-1 text-ink/40 hover:text-ink/80 dark:text-white/40 dark:hover:text-white/80"
+              title="Voir on-chain"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      </td>
+      <td className="py-3 text-right text-xs text-ink/50 dark:text-white/50">
+        {formatRelativeDate(row.createdAt, locale)}
+      </td>
+    </tr>
   );
 }

@@ -16,6 +16,7 @@ import { sql, gte, lt, and, inArray } from "drizzle-orm";
 import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 import { aggregateAllChance, ALL_CHANCE_SERVER_GAMES, ChanceAggregate } from "@/lib/chance-registry-server";
 import { getSafeCrcBalance } from "@/lib/payout";
+import { getRecentGames, RecentGameRow } from "@/lib/recent-games";
 
 export type PeriodStats = {
   wagered: number;
@@ -70,6 +71,9 @@ export type PlatformStats = {
   // Graph volume 30j — total + top 5 jeux par volume sur la periode
   daily30d: DailyVolumePoint[];
   top5Games: TopGameMeta[];
+
+  // Historique des 100 dernieres parties (multi + chance confondus)
+  recentGames: RecentGameRow[];
 };
 
 const MULTI_GAME_META: Record<string, { label: string; emoji: string; color: string }> = {
@@ -402,7 +406,7 @@ async function getCasinoBank(): Promise<PlatformStats["casinoBank"]> {
  * Entry point: agrege tout en parallele.
  */
 export async function computePlatformStats(): Promise<PlatformStats> {
-  const [casinoBank, period24h, period7d, period30d, allTime, games, dailyData] = await Promise.all([
+  const [casinoBank, period24h, period7d, period30d, allTime, games, dailyData, recentGames] = await Promise.all([
     getCasinoBank(),
     computePeriodStats(daysAgo(1)),
     computePeriodStats(daysAgo(7)),
@@ -410,6 +414,7 @@ export async function computePlatformStats(): Promise<PlatformStats> {
     computePeriodStats(),
     computeGamesBreakdown(),
     computeDaily30d(),
+    getRecentGames(100),
   ]);
 
   return {
@@ -421,5 +426,6 @@ export async function computePlatformStats(): Promise<PlatformStats> {
     games,
     daily30d: dailyData.points,
     top5Games: dailyData.top5,
+    recentGames,
   };
 }
