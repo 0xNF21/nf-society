@@ -3,23 +3,18 @@ import { db } from "@/lib/db";
 import { xpConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { invalidateXpCache } from "@/lib/xp-server";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
-
-function checkAuth(req: NextRequest) {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
-}
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 // GET — list all XP config
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const configs = await db.select().from(xpConfig);
   return NextResponse.json({ configs });
 }
 
 // PATCH — update a single config value
 export async function PATCH(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { key, value, label } = await req.json();
     if (!key || typeof value !== "number" || value < 0) {
@@ -41,7 +36,7 @@ export async function PATCH(req: NextRequest) {
 
 // POST — create a new XP config entry
 export async function POST(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { key, value, category, label } = await req.json();
     if (!key || typeof value !== "number" || !category || !label) {
@@ -68,7 +63,7 @@ export async function POST(req: NextRequest) {
 
 // DELETE — remove a config entry
 export async function DELETE(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { key } = await req.json();
     if (!key) return NextResponse.json({ error: "key required" }, { status: 400 });

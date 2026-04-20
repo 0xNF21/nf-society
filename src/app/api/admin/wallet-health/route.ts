@@ -6,12 +6,7 @@ import { players } from "@/lib/db/schema";
 import { sql, eq } from "drizzle-orm";
 import { getSafeCrcBalance } from "@/lib/payout";
 import { DAO_TREASURY_ADDRESS } from "@/lib/wallet";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
-
-function isAdmin(req: NextRequest): boolean {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
-}
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 /**
  * GET /api/admin/wallet-health
@@ -28,7 +23,7 @@ function isAdmin(req: NextRequest): boolean {
  * Auth: `x-admin-password` header must match ADMIN_PASSWORD env.
  */
 export async function GET(req: NextRequest) {
-  if (!isAdmin(req)) {
+  if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

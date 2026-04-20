@@ -3,16 +3,11 @@ import { db } from "@/lib/db";
 import { dailyRewardsConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { invalidateDailyCache } from "@/lib/daily";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
-
-function checkAuth(req: NextRequest) {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
-}
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 // GET — get scratch and spin reward tables
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const rows = await db.select().from(dailyRewardsConfig);
   const result: Record<string, unknown> = {};
   for (const row of rows) {
@@ -23,7 +18,7 @@ export async function GET(req: NextRequest) {
 
 // PATCH — update a reward table (scratch or spin)
 export async function PATCH(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { key, rewards } = await req.json();
     if (!key || !Array.isArray(rewards)) {

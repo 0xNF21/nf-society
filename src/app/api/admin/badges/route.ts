@@ -2,23 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { badges, playerBadges } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
-
-function checkAuth(req: NextRequest) {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
-}
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 // GET — list all badges
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const allBadges = await db.select().from(badges);
   return NextResponse.json({ badges: allBadges });
 }
 
 // POST — create a new badge
 export async function POST(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { slug, name, description, icon, category, secret, condition } = await req.json();
     if (!slug || !name || !description || !icon || !category) {
@@ -44,7 +39,7 @@ export async function POST(req: NextRequest) {
 
 // PATCH — update a badge
 export async function PATCH(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await req.json();
     const { slug, ...updates } = body;
@@ -73,7 +68,7 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE — delete a badge and its awards
 export async function DELETE(req: NextRequest) {
-  if (!checkAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { slug } = await req.json();
     if (!slug) return NextResponse.json({ error: "slug required" }, { status: 400 });
