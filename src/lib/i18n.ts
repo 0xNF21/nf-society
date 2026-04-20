@@ -1364,6 +1364,16 @@ export const translations = {
       fr: "Session expir\u00e9e. Aucun CRC n'a \u00e9t\u00e9 d\u00e9bit\u00e9.",
       en: "Session expired. No CRC was debited.",
     },
+    pendingCashoutTitle: {
+      fr: "Retrait de %AMOUNT% CRC en attente",
+      en: "%AMOUNT% CRC withdrawal pending",
+    },
+    pendingCashoutHint: {
+      fr: "Envoyez la preuve de 1 CRC pour finaliser",
+      en: "Send the 1 CRC proof to finalize",
+    },
+    pendingCashoutResume: { fr: "Reprendre", en: "Resume" },
+    pendingCashoutIgnore: { fr: "Ignorer", en: "Ignore" },
     // Phase 3e — ledger history
     historyTitle: { fr: "Activit\u00e9 r\u00e9cente", en: "Recent activity" },
     historyEmpty: {
@@ -1489,6 +1499,26 @@ export const translations = {
     cached: {
       fr: "Donnees mises a jour toutes les 5 minutes",
       en: "Data refreshed every 5 minutes",
+    },
+    recentHistory: { fr: "Historique recent", en: "Recent history" },
+    recentHistoryDesc: {
+      fr: "Les 100 dernieres parties (multi + chance)",
+      en: "Last 100 games (multi + chance)",
+    },
+    filterAll: { fr: "Tous", en: "All" },
+    filterMulti: { fr: "Multi", en: "Multi" },
+    filterChance: { fr: "Chance", en: "Chance" },
+    colPlayer: { fr: "Joueur", en: "Player" },
+    colBet: { fr: "Mise", en: "Bet" },
+    colResult: { fr: "Resultat", en: "Result" },
+    colDate: { fr: "Date", en: "Date" },
+    resultWin: { fr: "Victoire", en: "Win" },
+    resultLoss: { fr: "Defaite", en: "Loss" },
+    resultDraw: { fr: "Nul", en: "Draw" },
+    vsOpponent: { fr: "vs", en: "vs" },
+    noHistory: {
+      fr: "Aucune partie jouee pour le moment.",
+      en: "No games played yet.",
     },
   },
 } as const;

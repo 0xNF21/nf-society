@@ -7,6 +7,7 @@ import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { useMiniApp } from "@/components/miniapp-provider";
 import { useDemo } from "@/components/demo-provider";
+import { generateGamePaymentLink } from "@/lib/circles";
 
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLLS = 75; // ~5 min window
@@ -17,7 +18,23 @@ interface CashoutModalProps {
   /** Called when the cashout completes (payoutTxHash available) or after demo cashout. */
   onCashedOut?: (newBalance: number) => void;
   onClose: () => void;
+  /** Resume an existing session by token — skips the amount-input screen and
+   *  jumps straight to polling + payment UI. Used when the user closed the
+   *  modal mid-flight and wants to pick back up from the indicator banner. */
+  resumedToken?: string;
 }
+
+/** localStorage key for per-address pending cashout session metadata. */
+export function cashoutPendingKey(address: string): string {
+  return `nfs_cashout_pending_${address.toLowerCase()}`;
+}
+
+export type PendingCashoutStored = {
+  token: string;
+  amountCrc: number;
+  expiresAt: string;
+  createdAt: string;
+};
 
 type Session = {
   id?: number;
@@ -39,7 +56,13 @@ type Status = {
   error?: string | null;
 };
 
-export function CashoutModal({ address, currentBalance, onCashedOut, onClose }: CashoutModalProps) {
+export function CashoutModal({
+  address,
+  currentBalance,
+  onCashedOut,
+  onClose,
+  resumedToken,
+}: CashoutModalProps) {
   const { locale } = useLocale();
   const { isMiniApp, sendPayment } = useMiniApp();
   const { isDemo, debitDemoBalance } = useDemo();
@@ -56,6 +79,32 @@ export function CashoutModal({ address, currentBalance, onCashedOut, onClose }: 
   const [copied, setCopied] = useState(false);
 
   const pollCountRef = useRef(0);
+
+  // Persist / clear localStorage marker for in-flight cashouts so the
+  // indicator banner in WalletBalanceCard knows whether to render.
+  const saveLocalPending = useCallback((s: Session) => {
+    if (typeof window === "undefined") return;
+    const payload: PendingCashoutStored = {
+      token: s.token,
+      amountCrc: s.amountCrc,
+      expiresAt: s.expiresAt,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem(cashoutPendingKey(address), JSON.stringify(payload));
+    } catch {
+      /* storage quota / privacy mode — silent */
+    }
+  }, [address]);
+
+  const clearLocalPending = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(cashoutPendingKey(address));
+    } catch {
+      /* silent */
+    }
+  }, [address]);
 
   // Amount validation — min 1, capped at balance.
   const amount = parseFloat(amountStr);
@@ -90,13 +139,75 @@ export function CashoutModal({ address, currentBalance, onCashedOut, onClose }: 
   useEffect(() => {
     if (!session || !status) return;
     if (status.status === "completed" || status.status === "failed" || status.status === "expired") {
+      // Terminal state — stop polling and clear the pending marker so the
+      // banner in WalletBalanceCard doesn't keep prompting to "Reprendre"
+      // a session that has nothing to resume.
+      clearLocalPending();
       return;
     }
     pollCountRef.current += 1;
     if (pollCountRef.current > MAX_POLLS) return;
     const timer = setTimeout(pollStatus, POLL_INTERVAL_MS);
     return () => clearTimeout(timer);
-  }, [status, session, pollStatus]);
+  }, [status, session, pollStatus, clearLocalPending]);
+
+  // Resume path — when a resumedToken is passed, hydrate the session from
+  // status + regenerate the Gnosis payment link client-side (it's a pure
+  // function of Safe address + token), so the user lands straight on the
+  // payment/waiting screen without going through the amount-input flow.
+  useEffect(() => {
+    if (!resumedToken || session) return;
+    let active = true;
+    (async () => {
+      try {
+        const [statusRes, cfgRes] = await Promise.all([
+          fetch(`/api/wallet/cashout-status?token=${encodeURIComponent(resumedToken)}`, { cache: "no-store" }),
+          fetch("/api/wallet/config", { cache: "no-store" }),
+        ]);
+        const statusData = await statusRes.json();
+        const cfgData = await cfgRes.json();
+
+        if (!active) return;
+
+        // If the session is already terminal, drop straight into the
+        // success / failure / expired screen. Also purge the stale marker.
+        if (["completed", "failed", "expired", "not_found"].includes(statusData?.status)) {
+          setStatus(statusData);
+          clearLocalPending();
+          return;
+        }
+
+        const safeAddress = cfgData?.safeAddress;
+        if (!safeAddress) {
+          setError(t.error[locale]);
+          return;
+        }
+
+        const paymentLink = generateGamePaymentLink(safeAddress, 1, "nf_cashout", resumedToken);
+        let qrCode = "";
+        try {
+          const { toDataURL } = await import("qrcode");
+          qrCode = await toDataURL(paymentLink, { width: 300, margin: 2 });
+        } catch { /* best-effort */ }
+
+        const s: Session = {
+          token: resumedToken,
+          amountCrc: Number(statusData.amountCrc) || 0,
+          paymentLink,
+          qrCode,
+          recipientAddress: safeAddress,
+          expiresAt: statusData.expiresAt || new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        };
+        setSession(s);
+        setStatus(statusData);
+        pollCountRef.current = 0;
+        setTimeout(() => pollStatus(), 1500);
+      } catch {
+        if (active) setError(t.error[locale]);
+      }
+    })();
+    return () => { active = false; };
+  }, [resumedToken, session, locale, t, pollStatus, clearLocalPending]);
 
   async function handleStart() {
     if (!amountValid || loading) return;
@@ -128,6 +239,9 @@ export function CashoutModal({ address, currentBalance, onCashedOut, onClose }: 
       setSession(data);
       setStatus({ status: "pending" });
       pollCountRef.current = 0;
+      // Persist so WalletBalanceCard can show a "pending cashout" banner if
+      // the user closes the modal before the flow completes.
+      saveLocalPending(data);
       // Immediate poll so the user sees activity if they paid fast.
       setTimeout(() => pollStatus(), 1500);
     } catch (err: any) {

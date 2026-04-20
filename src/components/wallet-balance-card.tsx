@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Wallet, Plus, Loader2, ArrowDownCircle } from "lucide-react";
+import { Wallet, Plus, Loader2, ArrowDownCircle, Clock, X as XIcon } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { TopupModal } from "@/components/topup-modal";
-import { CashoutModal } from "@/components/cashout-modal";
+import { CashoutModal, cashoutPendingKey, type PendingCashoutStored } from "@/components/cashout-modal";
 import { LedgerHistory } from "@/components/ledger-history";
 
 interface WalletBalanceCardProps {
@@ -29,8 +29,40 @@ export function WalletBalanceCard({ address }: WalletBalanceCardProps) {
   const [loading, setLoading] = useState(!isDemo);
   const [topupOpen, setTopupOpen] = useState(false);
   const [cashoutOpen, setCashoutOpen] = useState(false);
+  const [resumedToken, setResumedToken] = useState<string | undefined>(undefined);
+  const [pendingCashout, setPendingCashout] = useState<PendingCashoutStored | null>(null);
 
   const balance = isDemo ? demoPlayer.balanceCrc : realBalance;
+
+  // Surface a pending cashout if one was started earlier and the user left
+  // without finishing. Demo mode has no persisted sessions — skip.
+  const refreshPending = useCallback(() => {
+    if (isDemo || !address) {
+      setPendingCashout(null);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(cashoutPendingKey(address));
+      if (!raw) {
+        setPendingCashout(null);
+        return;
+      }
+      const parsed = JSON.parse(raw) as PendingCashoutStored;
+      // Expired marker — drop silently.
+      if (!parsed?.expiresAt || Date.now() > new Date(parsed.expiresAt).getTime()) {
+        localStorage.removeItem(cashoutPendingKey(address));
+        setPendingCashout(null);
+        return;
+      }
+      setPendingCashout(parsed);
+    } catch {
+      setPendingCashout(null);
+    }
+  }, [address, isDemo]);
+
+  useEffect(() => {
+    refreshPending();
+  }, [refreshPending]);
 
   const fetchBalance = useCallback(async () => {
     if (isDemo || !address) return;
@@ -58,6 +90,29 @@ export function WalletBalanceCard({ address }: WalletBalanceCardProps) {
 
   function handleCashoutSuccess(newBalance: number) {
     if (!isDemo) setRealBalance(newBalance);
+  }
+
+  function handleCashoutClose() {
+    setCashoutOpen(false);
+    setResumedToken(undefined);
+    // Modal may have cleared the localStorage marker (terminal state) or
+    // left it in place (user closed mid-flow). Either way, re-read so the
+    // banner reflects the latest truth.
+    refreshPending();
+  }
+
+  function handleResumeCashout() {
+    if (!pendingCashout) return;
+    setResumedToken(pendingCashout.token);
+    setCashoutOpen(true);
+  }
+
+  function handleIgnorePending() {
+    if (!address) return;
+    try {
+      localStorage.removeItem(cashoutPendingKey(address));
+    } catch { /* silent */ }
+    setPendingCashout(null);
   }
 
   return (
@@ -97,6 +152,34 @@ export function WalletBalanceCard({ address }: WalletBalanceCardProps) {
         </div>
       </div>
 
+      {pendingCashout && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-center gap-2">
+          <Clock className="h-4 w-4 shrink-0 text-amber-600" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-amber-900">
+              {t.pendingCashoutTitle[locale].replace("%AMOUNT%", pendingCashout.amountCrc.toFixed(2).replace(/\.00$/, ""))}
+            </p>
+            <p className="text-[11px] text-amber-700/80">
+              {t.pendingCashoutHint[locale]}
+            </p>
+          </div>
+          <button
+            onClick={handleResumeCashout}
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-colors"
+          >
+            {t.pendingCashoutResume[locale]}
+          </button>
+          <button
+            onClick={handleIgnorePending}
+            title={t.pendingCashoutIgnore[locale]}
+            aria-label={t.pendingCashoutIgnore[locale]}
+            className="shrink-0 text-amber-700/60 hover:text-amber-900 p-1"
+          >
+            <XIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       <LedgerHistory address={address} />
 
       {topupOpen && (
@@ -111,8 +194,9 @@ export function WalletBalanceCard({ address }: WalletBalanceCardProps) {
         <CashoutModal
           address={address}
           currentBalance={balance}
-          onClose={() => setCashoutOpen(false)}
+          onClose={handleCashoutClose}
           onCashedOut={handleCashoutSuccess}
+          resumedToken={resumedToken}
         />
       )}
     </>
