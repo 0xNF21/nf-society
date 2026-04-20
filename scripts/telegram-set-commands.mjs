@@ -55,15 +55,17 @@ const COMMANDS_USER_FR = [
   { command: "menu", description: "Choisir une categorie" },
 ];
 
-// Commandes visibles UNIQUEMENT dans le groupe admin (ajoutent /clear).
+// Commandes visibles UNIQUEMENT dans le groupe admin (ajoutent /clear, /topics).
 const COMMANDS_ADMIN_DEFAULT = [
   ...COMMANDS_USER_DEFAULT,
   { command: "clear", description: "Delete all support messages + DB" },
+  { command: "topics", description: "Show topic thread IDs for env setup" },
 ];
 
 const COMMANDS_ADMIN_FR = [
   ...COMMANDS_USER_FR,
   { command: "clear", description: "Supprimer tous les messages + DB" },
+  { command: "topics", description: "Afficher les IDs des topics (env)" },
 ];
 
 async function setCommands(commands, opts = {}) {

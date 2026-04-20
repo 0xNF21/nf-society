@@ -2,7 +2,7 @@ import { Bot, Context, InlineKeyboard } from "grammy";
 import { db } from "@/lib/db";
 import { supportMessages } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getAdminChatId } from "./bot";
+import { getAdminChatId, getTopicThreadId, listConfiguredTopics } from "./bot";
 import { decodeStartContext, formatAdminHeader, TelegramStartContext, SupportType } from "./context";
 
 // Cache en memoire court pour le contexte `start` fourni par l'user au 1er message.
@@ -86,6 +86,38 @@ export function registerHandlers(b: Bot) {
       await ctx.reply(TYPE_PROMPTS[type]);
     }
     await ctx.answerCallbackQuery();
+  });
+
+  // /topics (admin only) — aide a recuperer les thread_id des topics pour
+  // configurer les env vars. Si la commande est tapee DANS un topic, affiche
+  // l'id de ce topic. Sinon, liste la config actuelle (env vars).
+  b.command("topics", async (ctx) => {
+    if (ctx.chat.id !== ADMIN_CHAT_ID) return;
+    const currentThreadId = (ctx.message as any)?.message_thread_id as number | undefined;
+    const lines: string[] = [];
+    if (currentThreadId !== undefined) {
+      lines.push(`\uD83D\uDCCD Topic courant: <code>${currentThreadId}</code>`);
+      lines.push("");
+    }
+    lines.push("<b>Configuration actuelle :</b>");
+    for (const { type, threadId } of listConfiguredTopics()) {
+      const envKey = {
+        bug: "TELEGRAM_TOPIC_BUG",
+        suggestion: "TELEGRAM_TOPIC_SUGGESTION",
+        question: "TELEGRAM_TOPIC_QUESTION",
+        other: "TELEGRAM_TOPIC_OTHER",
+      }[type];
+      lines.push(
+        threadId !== undefined
+          ? `- ${envKey} = <code>${threadId}</code>`
+          : `- ${envKey} = <i>(non configure)</i>`
+      );
+    }
+    lines.push("");
+    lines.push(
+      "Pour recuperer l'id d'un topic, tape /topics <b>dans</b> ce topic."
+    );
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   });
 
   // /clear (admin only) — supprime tous les messages du bot dans le groupe admin
@@ -243,6 +275,10 @@ async function handleUserMessage(ctx: Context) {
 
   const contentLabel = describeMessageContent(msg as any);
 
+  // Route vers le topic correspondant au type (bug/suggestion/question/other).
+  // undefined si le groupe n'est pas un forum ou si le type est absent → General topic.
+  const threadId = getTopicThreadId(startCtx?.type);
+
   // Cas 1 : message texte pur — un seul message au groupe admin avec header + texte.
   if (msg.text && !hasMedia(msg as any)) {
     const adminText =
@@ -252,6 +288,7 @@ async function handleUserMessage(ctx: Context) {
 
     const sent = await ctx.api.sendMessage(ADMIN_CHAT_ID, adminText, {
       parse_mode: "HTML",
+      ...(threadId !== undefined ? { message_thread_id: threadId } : {}),
     });
 
     await insertIn(from, msg, startCtx, sent.message_id, msg.text);
@@ -266,11 +303,14 @@ async function handleUserMessage(ctx: Context) {
 
     const headerMsg = await ctx.api.sendMessage(ADMIN_CHAT_ID, headerText, {
       parse_mode: "HTML",
+      ...(threadId !== undefined ? { message_thread_id: threadId } : {}),
     });
 
     // copyMessage gere tous les types : photo/video/voice/sticker/document/etc.
     // Pas de bandeau "forwarded from" — le bot semble l'envoyer lui-meme.
-    const copied = await ctx.api.copyMessage(ADMIN_CHAT_ID, ctx.chat!.id, msg.message_id);
+    const copied = await ctx.api.copyMessage(ADMIN_CHAT_ID, ctx.chat!.id, msg.message_id, {
+      ...(threadId !== undefined ? { message_thread_id: threadId } : {}),
+    });
 
     // Log 2 entrees : header + copie. Comme ca l'admin peut reply a n'importe laquelle.
     await insertIn(from, msg, startCtx, headerMsg.message_id, contentLabel);

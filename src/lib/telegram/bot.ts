@@ -1,4 +1,5 @@
 import { Bot } from "grammy";
+import type { SupportType } from "./context";
 
 // Instance grammy singleton lazy. On n'instancie qu'a la premiere utilisation
 // (runtime), sinon le build Vercel echoue pendant la collecte de page data car
@@ -23,4 +24,31 @@ export function getAdminChatId(): number {
   if (Number.isNaN(n)) throw new Error("TELEGRAM_ADMIN_CHAT_ID must be a number");
   _adminChatId = n;
   return _adminChatId;
+}
+
+// Retourne le message_thread_id du topic correspondant au type de ticket.
+// Si l'env var n'est pas configuree, retourne undefined (message ira dans General).
+// L'env var doit contenir un nombre (l'id du topic dans le supergroupe forum).
+export function getTopicThreadId(type: SupportType | null | undefined): number | undefined {
+  if (!type) type = "other";
+  const envKey = {
+    bug: "TELEGRAM_TOPIC_BUG",
+    suggestion: "TELEGRAM_TOPIC_SUGGESTION",
+    question: "TELEGRAM_TOPIC_QUESTION",
+    other: "TELEGRAM_TOPIC_OTHER",
+  }[type];
+  const raw = process.env[envKey];
+  if (!raw) return undefined;
+  const n = Number(raw);
+  if (Number.isNaN(n)) return undefined;
+  return n;
+}
+
+// Map inverse : message_thread_id -> type. Sert a la commande /topics pour
+// afficher un mapping lisible.
+export function listConfiguredTopics(): Array<{ type: SupportType; threadId: number | undefined }> {
+  return (["bug", "suggestion", "question", "other"] as SupportType[]).map((type) => ({
+    type,
+    threadId: getTopicThreadId(type),
+  }));
 }
