@@ -47,6 +47,12 @@ export type ChancePlayerStats = {
 
 export type DailyVolume = { day: string; wagered: number };
 
+export type ChancePlayerRound = {
+  betCrc: number;
+  payoutCrc: number;
+  createdAt: Date;
+};
+
 export type ChanceGameServerConfig = {
   key: string;
   label: string;
@@ -58,6 +64,8 @@ export type ChanceGameServerConfig = {
   getPlayerAddresses(since?: Date): Promise<string[]>;
   // Volume journalier (wagered) sur la periode donnee.
   getDailyVolume(since: Date): Promise<DailyVolume[]>;
+  // Rounds individuels d'un joueur (ordonne desc par date, exclusion des statuts abandonnes).
+  getPlayerRounds(address: string): Promise<ChancePlayerRound[]>;
 };
 
 /**
@@ -178,6 +186,25 @@ function createStandardConfig(opts: {
         .where(whereClause as any)
         .groupBy(sql`DATE_TRUNC('day', ${dateField})`);
       return rows.map((r) => ({ day: r.day, wagered: Number(r.wagered) }));
+    },
+
+    async getPlayerRounds(address: string): Promise<ChancePlayerRound[]> {
+      const addr = address.toLowerCase();
+      const whereClause = combine(sql`LOWER(${addressField}) = ${addr}`, statusFilter);
+      const rows = await db
+        .select({
+          betCrc: betField,
+          payoutCrc: payoutField,
+          createdAt: dateField,
+        })
+        .from(table)
+        .where(whereClause as any)
+        .orderBy(desc(dateField));
+      return rows.map((r: any) => ({
+        betCrc: Number(r.betCrc ?? 0),
+        payoutCrc: Number(r.payoutCrc ?? 0),
+        createdAt: r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt),
+      }));
     },
   };
 }
@@ -313,6 +340,25 @@ const lootboxesConfig: ChanceGameServerConfig = {
       .where(gte(lootboxOpens.openedAt, since))
       .groupBy(sql`DATE_TRUNC('day', ${lootboxOpens.openedAt})`);
     return rows.map((r) => ({ day: r.day, wagered: Number(r.wagered) }));
+  },
+
+  async getPlayerRounds(address: string): Promise<ChancePlayerRound[]> {
+    const addr = address.toLowerCase();
+    const rows = await db
+      .select({
+        betCrc: lootboxes.pricePerOpenCrc,
+        payoutCrc: lootboxOpens.rewardCrc,
+        createdAt: lootboxOpens.openedAt,
+      })
+      .from(lootboxOpens)
+      .innerJoin(lootboxes, eq(lootboxOpens.lootboxId, lootboxes.id))
+      .where(sql`LOWER(${lootboxOpens.playerAddress}) = ${addr}`)
+      .orderBy(desc(lootboxOpens.openedAt));
+    return rows.map((r: any) => ({
+      betCrc: Number(r.betCrc ?? 0),
+      payoutCrc: Number(r.payoutCrc ?? 0),
+      createdAt: r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt),
+    }));
   },
 };
 

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { payouts, lootboxOpens, lootboxes, dailySessions } from "@/lib/db/schema";
+import { payouts, dailySessions } from "@/lib/db/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 import { GAME_LABELS } from "@/lib/game-registry";
+import { ALL_CHANCE_SERVER_GAMES } from "@/lib/chance-registry-server";
 
 export const dynamic = "force-dynamic";
 
@@ -69,28 +70,24 @@ export async function GET(
       } catch {}
     }
 
-    // 3. Lootbox opens (CRC out)
-    try {
-      const opens = await db.select({
-        rewardCrc: lootboxOpens.rewardCrc,
-        openedAt: lootboxOpens.openedAt,
-        lootboxId: lootboxOpens.lootboxId,
-      }).from(lootboxOpens).where(eq(lootboxOpens.playerAddress, addr)).orderBy(desc(lootboxOpens.openedAt));
-
-      const prices = await db.select({ id: lootboxes.id, price: lootboxes.pricePerOpenCrc, title: lootboxes.title }).from(lootboxes);
-      const lootboxMap = new Map(prices.map(l => [l.id, l]));
-
-      for (const o of opens) {
-        const lb = lootboxMap.get(o.lootboxId);
-        transactions.push({
-          type: "out",
-          amount: lb?.price || 10,
-          label: `${lb?.title || "Lootbox"} — ouverture`,
-          category: "lootbox",
-          date: o.openedAt.toISOString(),
-        });
-      }
-    } catch {}
+    // 3. Chance game bets (CRC out) — blackjack, hilo, mines, dice, coin_flip,
+    //    roulette, keno, plinko, crash_dash, lootboxes.
+    //    Rounds abandonnees (status="playing") sont exclues via le registre.
+    for (const cfg of ALL_CHANCE_SERVER_GAMES) {
+      try {
+        const rounds = await cfg.getPlayerRounds(addr);
+        for (const r of rounds) {
+          if (r.betCrc <= 0) continue;
+          transactions.push({
+            type: "out",
+            amount: r.betCrc,
+            label: `${cfg.label} — mise`,
+            category: cfg.key,
+            date: r.createdAt.toISOString(),
+          });
+        }
+      } catch {}
+    }
 
     // 4. Daily sessions (CRC out — 1 CRC each)
     try {

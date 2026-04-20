@@ -404,8 +404,8 @@ export async function getPlayerGamesBreakdown(address: string): Promise<FullGame
 export async function getPlayerStats(address: string): Promise<PlayerStats> {
   const addr = address.toLowerCase();
 
-  // Query all game tables in parallel
-  const queries = ALL_SERVER_GAMES.map(async (config) => {
+  // Query all multiplayer tables in parallel
+  const multiQueries = ALL_SERVER_GAMES.map(async (config) => {
     const rows = await db.select()
       .from(config.table)
       .where(
@@ -425,25 +425,57 @@ export async function getPlayerStats(address: string): Promise<PlayerStats> {
       opponent: getOpponent(g.player1Address as string | null, g.player2Address as string | null, addr),
       result: getResult(g.winnerAddress as string | null, addr, g.result as string | null),
       betCrc: g.betCrc as number,
+      payoutCrc: (() => {
+        const commissionPct = (g.commissionPct as number | undefined) ?? 5;
+        const winnerAddr = (g.winnerAddress as string | null)?.toLowerCase();
+        const isDraw = (g.result as string | null) === "draw" || !winnerAddr;
+        if (isDraw) return (g.betCrc as number); // remboursement
+        return winnerAddr === addr
+          ? Math.floor((g.betCrc as number) * 2 * (1 - commissionPct / 100))
+          : 0;
+      })(),
       date: (g.updatedAt as Date).toISOString(),
     }));
   });
 
-  const results = await Promise.all(queries);
-  const history: HistoryEntry[] = results.flat()
+  const multiResults = await Promise.all(multiQueries);
+  const multiHistory = multiResults.flat();
+
+  // Query chance games en parallele (rounds individuels).
+  const chanceResults = await Promise.all(
+    ALL_CHANCE_SERVER_GAMES.map(async (cfg) => {
+      const rounds = await cfg.getPlayerRounds(addr);
+      return rounds.map(r => ({
+        game: cfg.key,
+        slug: "",
+        opponent: null,
+        result: r.payoutCrc > r.betCrc ? "win" as const
+          : r.payoutCrc < r.betCrc ? "loss" as const
+          : "draw" as const,
+        betCrc: r.betCrc,
+        payoutCrc: r.payoutCrc,
+        date: r.createdAt.toISOString(),
+      }));
+    })
+  );
+  const chanceHistory = chanceResults.flat();
+
+  const allHistory = [...multiHistory, ...chanceHistory]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const totalGames = history.length;
-  const wins = history.filter(h => h.result === "win").length;
-  const losses = history.filter(h => h.result === "loss").length;
-  const draws = history.filter(h => h.result === "draw").length;
+  const totalGames = allHistory.length;
+  const wins = allHistory.filter(h => h.result === "win").length;
+  const losses = allHistory.filter(h => h.result === "loss").length;
+  const draws = allHistory.filter(h => h.result === "draw").length;
   const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
-  const totalBet = history.reduce((s, h) => s + h.betCrc, 0);
-  const totalWon = history.reduce((s, h) => s + (h.result === "win" ? h.betCrc * 2 : 0), 0);
+  const totalBet = Math.round(allHistory.reduce((s, h) => s + h.betCrc, 0) * 100) / 100;
+  const totalWon = Math.round(allHistory.reduce((s, h) => s + h.payoutCrc, 0) * 100) / 100;
 
+  // byGame : multi uniquement (affichage W/L/D en tete). Les chance games
+  // sont couverts par gamesBreakdown (net CRC) dans la page profil.
   const byGame: GameStat[] = ALL_SERVER_GAMES
     .map(config => {
-      const games = history.filter(h => h.game === config.key);
+      const games = multiHistory.filter(h => h.game === config.key);
       const w = games.filter(h => h.result === "win").length;
       return {
         game: config.key,
@@ -456,6 +488,15 @@ export async function getPlayerStats(address: string): Promise<PlayerStats> {
     })
     .filter(g => g.played > 0);
 
+  // Historique : multi uniquement (les chance games n'ont pas de slug/opponent
+  // a afficher). Si besoin de les inclure plus tard, prevoir un affichage dedie.
+  const history: HistoryEntry[] = multiHistory
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 15)
+    .map(({ game, slug, opponent, result, betCrc, date }) => ({
+      game, slug, opponent, result, betCrc, date,
+    }));
+
   return {
     totalGames,
     wins,
@@ -465,6 +506,6 @@ export async function getPlayerStats(address: string): Promise<PlayerStats> {
     totalBet,
     totalWon,
     byGame,
-    history: history.slice(0, 15),
+    history,
   };
 }
