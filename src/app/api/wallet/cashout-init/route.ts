@@ -3,12 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cashoutTokens } from "@/lib/db/schema";
 import { generateGamePaymentLink } from "@/lib/circles";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import QRCode from "qrcode";
 
 const SAFE_ADDRESS = process.env.SAFE_ADDRESS || "";
 const SESSION_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 const MIN_CASHOUT_CRC = 1;
 const MAX_PAYOUT_CRC = parseInt(process.env.MAX_PAYOUT_CRC || "1000", 10);
+/** Rate limit — max 5 new cashout sessions per IP per 60 seconds. */
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 function generateToken(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -38,6 +42,18 @@ export async function POST(req: NextRequest) {
   try {
     if (!SAFE_ADDRESS) {
       return NextResponse.json({ error: "safe_address_missing" }, { status: 500 });
+    }
+
+    // Rate limit by IP — prevents accidental spam or casual abuse. Not a
+    // security boundary (see rate-limit.ts docstring); the 1 CRC proof
+    // + balance debit are the real gates for value movement.
+    const ip = clientIp(req.headers);
+    const rl = checkRateLimit(`cashout-init:${ip}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "rate_limited", retryAfterSec: rl.retryAfterSec, limit: rl.limit },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
     }
 
     const body = await req.json().catch(() => ({}));

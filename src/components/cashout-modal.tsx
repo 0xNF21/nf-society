@@ -395,6 +395,10 @@ function mapInitError(code: string, data: any, locale: "fr" | "en"): string {
       return t.invalidAmount[locale];
     case "safe_address_missing":
       return locale === "fr" ? "Configuration serveur manquante" : "Server configuration missing";
+    case "rate_limited":
+      return locale === "fr"
+        ? `Trop de tentatives. R\u00e9essayez dans ${data?.retryAfterSec || 60}s.`
+        : `Too many attempts. Try again in ${data?.retryAfterSec || 60}s.`;
     default:
       return t.error[locale];
   }
