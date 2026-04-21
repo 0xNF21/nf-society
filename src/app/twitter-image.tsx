@@ -6,7 +6,18 @@ export const alt = "NF Society — La plateforme de jeux du DAO";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+const SITE = "https://nf-society.vercel.app";
+
 export default async function TwitterImage() {
+  const [nfLogo, gnosisLogo, circlesLogo] = await Promise.all([
+    fetch(`${SITE}/nf-society-logo.png`).then((r) => r.arrayBuffer()),
+    fetch(`${SITE}/gnosis-logo.png`).then((r) => r.arrayBuffer()),
+    fetch(`${SITE}/logo-color.png`).then((r) => r.arrayBuffer()),
+  ]);
+  const nfSrc = `data:image/png;base64,${Buffer.from(nfLogo).toString("base64")}`;
+  const gnosisSrc = `data:image/png;base64,${Buffer.from(gnosisLogo).toString("base64")}`;
+  const circlesSrc = `data:image/png;base64,${Buffer.from(circlesLogo).toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -30,22 +41,8 @@ export default async function TwitterImage() {
             padding: "64px 64px 0 64px",
           }}
         >
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 18,
-              backgroundColor: "#FF491B",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 40,
-              fontWeight: 900,
-              color: "white",
-            }}
-          >
-            N
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={nfSrc} alt="NF Society" width={72} height={72} style={{ borderRadius: 18 }} />
           <div
             style={{
               fontSize: 36,
@@ -109,18 +106,12 @@ export default async function TwitterImage() {
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-end",
             justifyContent: "space-between",
-            padding: "0 64px 64px 64px",
+            padding: "0 64px 56px 64px",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              gap: 14,
-              fontSize: 44,
-            }}
-          >
+          <div style={{ display: "flex", gap: 14, fontSize: 44 }}>
             <span>❌⭕</span>
             <span>♟️</span>
             <span>🎲</span>
@@ -132,24 +123,46 @@ export default async function TwitterImage() {
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "12px 22px",
-              borderRadius: 999,
-              backgroundColor: "rgba(255, 255, 255, 0.15)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
-              fontSize: 22,
-              fontWeight: 600,
-              color: "white",
+              flexDirection: "column",
+              gap: 14,
+              alignItems: "flex-end",
             }}
           >
-            Powered by Gnosis · Circles
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                fontSize: 20,
+                fontWeight: 500,
+                color: "rgba(255, 255, 255, 0.75)",
+              }}
+            >
+              <span>Built on</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={gnosisSrc} alt="Gnosis" width={28} height={28} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={circlesSrc} alt="Circles" width={72} height={22} style={{ objectFit: "contain" }} />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                fontSize: 20,
+                fontWeight: 600,
+                color: "white",
+              }}
+            >
+              <span style={{ color: "rgba(255,255,255,0.75)", fontWeight: 500 }}>Made by</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={nfSrc} alt="NF Society" width={28} height={28} style={{ borderRadius: 6 }} />
+              <span>NF Society</span>
+            </div>
           </div>
         </div>
       </div>
     ),
-    {
-      ...size,
-    },
+    { ...size },
   );
 }
