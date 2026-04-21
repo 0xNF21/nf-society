@@ -22,11 +22,16 @@ export * from "./crash-dash";
 export * from "./crc-races";
 // Preserve the pre-PR#9 alias so existing consumers don't break.
 export type { PayoutEntry as CrcRacesPayoutEntry } from "./crc-races";
+export * from "./daily";
 export * from "./dames";
 export * from "./dice";
 export * from "./hilo";
 export * from "./keno";
+export * from "./lootbox";
+export * from "./lottery";
+export * from "./memory";
 export * from "./mines";
+export * from "./morpion";
 export * from "./pfc";
 export * from "./plinko";
 export * from "./relics";
