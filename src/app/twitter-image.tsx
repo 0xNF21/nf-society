@@ -37,21 +37,32 @@ export default async function TwitterImage() {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 20,
-            padding: "64px 64px 0 64px",
+            justifyContent: "space-between",
+            padding: "48px 48px 0 48px",
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={nfSrc} alt="NF Society" width={72} height={72} style={{ borderRadius: 18 }} />
-          <div
-            style={{
-              fontSize: 36,
-              fontWeight: 700,
-              color: "white",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            NF Society
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={nfSrc} alt="NF Society" width={72} height={72} style={{ borderRadius: 18 }} />
+            <div
+              style={{
+                fontSize: 36,
+                fontWeight: 700,
+                color: "white",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              NF Society
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 14, fontSize: 44 }}>
+            <span>❌⭕</span>
+            <span>♟️</span>
+            <span>🎲</span>
+            <span>🎡</span>
+            <span>🟣</span>
+            <span>💣</span>
+            <span>🎟️</span>
           </div>
         </div>
 
@@ -107,19 +118,10 @@ export default async function TwitterImage() {
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
+            justifyContent: "flex-end",
             padding: "0 48px 32px 48px",
           }}
         >
-          <div style={{ display: "flex", gap: 16, fontSize: 52 }}>
-            <span>❌⭕</span>
-            <span>♟️</span>
-            <span>🎲</span>
-            <span>🎡</span>
-            <span>🟣</span>
-            <span>💣</span>
-            <span>🎟️</span>
-          </div>
           <div
             style={{
               display: "flex",
@@ -140,10 +142,10 @@ export default async function TwitterImage() {
             >
               <span style={{ fontSize: 20, fontWeight: 600, color: "#251B9F" }}>Built on</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={gnosisSrc} alt="Gnosis" width={48} height={48} />
-              <div style={{ width: 1, height: 28, backgroundColor: "rgba(0,0,0,0.1)" }} />
+              <img src={gnosisSrc} alt="Gnosis" width={60} height={60} />
+              <div style={{ width: 1, height: 32, backgroundColor: "rgba(0,0,0,0.1)" }} />
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={circlesSrc} alt="Circles" width={170} height={50} style={{ objectFit: "contain" }} />
+              <img src={circlesSrc} alt="Circles" width={180} height={54} style={{ objectFit: "contain" }} />
             </div>
             <div
               style={{
