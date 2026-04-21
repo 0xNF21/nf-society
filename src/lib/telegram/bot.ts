@@ -52,3 +52,20 @@ export function listConfiguredTopics(): Array<{ type: SupportType; threadId: num
     threadId: getTopicThreadId(type),
   }));
 }
+
+// Chat + topic du forum public ou on annonce les parties multijoueur publiques.
+// Different du groupe admin support (TELEGRAM_ADMIN_CHAT_ID) : ici c'est le
+// groupe communautaire NF Society, avec un topic dedie "Lobby".
+export function getLobbyChatId(): number | null {
+  const raw = process.env.TELEGRAM_LOBBY_CHAT_ID;
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isNaN(n) ? null : n;
+}
+
+export function getLobbyThreadId(): number | undefined {
+  const raw = process.env.TELEGRAM_LOBBY_TOPIC_ID;
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isNaN(n) ? undefined : n;
+}
