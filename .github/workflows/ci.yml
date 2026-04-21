@@ -1,0 +1,45 @@
+name: CI
+
+# Runs on every PR against master, and on every push to master.
+# Fails the check if lint, typecheck, or the production build breaks,
+# so broken code cannot reach Vercel's auto-deploy.
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - name: next build
+        run: npm run build
+        env:
+          # Fake values so Next.js can resolve env references at build
+          # time without connecting to anything. Real values live in
+          # Vercel's Environment Variables.
+          DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
+          NEXT_PUBLIC_CIRCLES_RPC_URL: https://rpc.aboutcircles.com/
+          NEXT_PUBLIC_DEFAULT_RECIPIENT_ADDRESS: "0x0000000000000000000000000000000000000000"
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ""
