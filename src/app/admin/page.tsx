@@ -119,7 +119,7 @@ export default function AdminPage() {
       <div className="flex-1 flex flex-col items-center px-4 py-8">
         <div className="w-full max-w-3xl flex flex-col gap-6">
           <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
+            <Link href="/home" className="flex items-center gap-2 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
               <ArrowLeft className="h-4 w-4" /> Retour
             </Link>
           </div>

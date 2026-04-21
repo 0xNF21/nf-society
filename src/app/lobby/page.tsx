@@ -64,7 +64,7 @@ export default function LobbyPage() {
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="mb-6 space-y-2">
-          <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
+          <Link href="/hub" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" /> {t.home[locale]}
           </Link>
           <div className="flex items-center justify-between">

@@ -20,7 +20,7 @@ export default function BehindTheScenesPage() {
           >
             <div className="flex flex-wrap items-center gap-4">
               <Link
-                href="/"
+                href="/home"
                 className="inline-flex items-center gap-2 font-semibold text-ink transition hover:text-ink/70"
               >
                 <ArrowLeft className="h-4 w-4" />

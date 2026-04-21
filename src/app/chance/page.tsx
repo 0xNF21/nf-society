@@ -155,7 +155,7 @@ export default function ChancePage() {
   return (
     <main className="min-h-screen bg-sand text-ink">
       <div className="max-w-2xl mx-auto px-4 pt-16 pb-8">
-        <Link href="/" className="inline-flex items-center gap-2 text-ink/60 hover:text-ink mb-6">
+        <Link href="/hub" className="inline-flex items-center gap-2 text-ink/60 hover:text-ink mb-6">
           <ArrowLeft className="w-4 h-4" />
           <span>{locale === "fr" ? "Accueil" : "Home"}</span>
         </Link>

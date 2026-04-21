@@ -89,7 +89,7 @@ export default function CrcRacesLobbyPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-start px-4 py-12">
       <div className="w-full max-w-md">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink mb-8 transition-colors">
+        <Link href="/multijoueur" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
         </Link>
 

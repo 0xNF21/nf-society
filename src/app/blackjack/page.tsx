@@ -20,7 +20,7 @@ export default async function BlackjackLobbyPage() {
   return (
     <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto">
       <Link
-        href="/"
+        href="/chance"
         className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6"
       >
         ← Accueil

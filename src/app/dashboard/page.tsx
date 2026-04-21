@@ -249,7 +249,7 @@ export default function DashboardPage() {
       <main className="px-4 py-10 md:py-16">
         <div className="mx-auto max-w-md">
           <div className="text-center mb-8 relative">
-            <Link href="/" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6">
+            <Link href="/hub" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6">
               <ArrowLeft className="h-4 w-4" />
               {d.backToHome[locale]}
             </Link>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <Link href="/" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
+            <Link href="/hub" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
               <ArrowLeft className="h-4 w-4" />
               {d.backToHome[locale]}
             </Link>
