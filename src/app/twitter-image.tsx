@@ -140,10 +140,10 @@ export default async function TwitterImage() {
             >
               <span style={{ fontSize: 20, fontWeight: 600, color: "#251B9F" }}>Built on</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={gnosisSrc} alt="Gnosis" width={60} height={60} />
-              <div style={{ width: 1, height: 32, backgroundColor: "rgba(0,0,0,0.1)" }} />
+              <img src={gnosisSrc} alt="Gnosis" width={48} height={48} />
+              <div style={{ width: 1, height: 28, backgroundColor: "rgba(0,0,0,0.1)" }} />
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={circlesSrc} alt="Circles" width={180} height={54} style={{ objectFit: "contain" }} />
+              <img src={circlesSrc} alt="Circles" width={170} height={50} style={{ objectFit: "contain" }} />
             </div>
             <div
               style={{
