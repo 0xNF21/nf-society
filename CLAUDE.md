@@ -31,22 +31,78 @@ npm run db:check     # Validate migrations + snapshots consistency
 ```
 src/
   app/           # Pages + API routes (Next.js App Router)
-    api/         # Routes API (POST/GET, DB operations)
-    morpion/     # Jeu morpion (tic-tac-toe avec paris CRC)
-    memory/      # Jeu memory (matching cards avec paris CRC)
+    api/         # 130+ routes API (POST/GET, DB operations)
+    # 17 jeux, chacun avec son lobby + sa page de jeu :
+    # Multijoueur : morpion, memory, dames, pfc, relics, crc-races
+    # Chance/casino : blackjack, coin-flip, crash-dash, dice, hilo, keno,
+    #                 mines, plinko, roulette, loterie/loteries,
+    #                 lootbox/lootboxes
+    daily/       # Daily scratch + spin + jackpot
     shop/        # Boutique XP
-    chance/      # Loteries, lootboxes, daily
-  components/    # React components
+    exchange/    # Echange CRC (on-chain direct, pas d'API)
+    chance/      # Hub des jeux chance
+    multijoueur/ # Hub des jeux multi
+    admin/       # Dashboard admin (1873 l. — en dette)
+    dashboard/   # Dashboard joueur
+    dashboard-dao/ # Dashboard DAO / treasury
+  components/    # Composants React (44 top-level + shadcn/ui)
     ui/          # shadcn/ui primitives (ne pas modifier)
-    demo-provider.tsx  # Mode demo global (React Context)
-    demo-banner.tsx    # Bandeau demo
-  lib/           # Utilitaires
-    db/          # Schema Drizzle + connexion PostgreSQL
-    circles.ts   # SDK Circles, generation liens paiement
-    i18n.ts      # Traductions FR/EN
-    xp.ts        # Systeme XP, levels, rewards
-    payout.ts    # Paiements automatiques
+    demo-provider.tsx    # Mode demo global (React Context)
+    miniapp-provider.tsx # Contexte Mini App Circles (isMiniApp, sendPayment)
+    game-payment.tsx     # Paiement multijoueur (QR + Mini App)
+    chance-payment.tsx   # Paiement chance (QR + Mini App)
+    balance-pay-button.tsx # Bouton "Payer depuis mon solde" (balance system)
+  lib/
+    db/schema/        # Drizzle schema (51 tables, un fichier par domaine)
+    circles.ts        # SDK Circles, generation liens paiement, detection tx
+    payout.ts         # Payout via Gnosis Safe + Zodiac Roles Modifier
+    wallet.ts         # Balance system : top-up, debit, credit, cashout
+    wallet-ledger.ts  # Helpers append-only pour wallet_ledger
+    wallet-game-dispatch.ts # Routing balance-pay par jeu
+    rate-limit.ts     # Rate limiter Upstash + fallback in-memory
+    admin-auth.ts     # Helper d'auth admin partage (checkAdminAuth)
+    validation.ts     # Regex Ethereum address + autres validateurs
+    i18n.ts           # Traductions FR/EN
+    miniapp-bridge.ts # SDK postMessage pour Mini App Circles
+    xp.ts             # Systeme XP, levels, rewards
+    badges.ts         # Systeme de badges
+    telegram/         # Bot Telegram (grammy) — support messages
 ```
+
+## Les 2 modes de paiement
+
+Chaque jeu peut etre paye de deux facons :
+
+### Mode 1 — Paiement direct on-chain (original)
+- 1 transaction Gnosis par partie depuis le wallet Circles du joueur
+- Le serveur poll la blockchain pour detecter la tx
+- Plus lent + frais de gas, mais 100% on-chain auditable
+
+### Mode 2 — Balance system (Phase 3, recommande)
+- Le joueur depose ses CRC en une fois dans la Safe NF Society (top-up)
+- `players.balance_crc` est credite, `wallet_ledger` enregistre la tx
+- Chaque partie suivante debite le solde DB (`POST /api/wallet/pay-game`), **zero tx on-chain**
+- Cashout a tout moment via `POST /api/wallet/cashout-init` → Safe renvoie les CRC
+
+**Important** — ce n'est **pas un wallet custodial** au sens Coinbase : on ne gere pas les cles du joueur. Le solde est une simple ecriture comptable off-chain adossee 1:1 aux CRC detenus dans la Safe. L'invariant `sum(players.balance_crc) ≈ Safe_onchain_balance` est check par `/api/admin/wallet-health`.
+
+## Les 2 modes d'interface (standalone vs Mini App)
+
+Le projet detecte automatiquement (via `useMiniApp()`) s'il tourne :
+
+### Mode A — Standalone (navigateur classique)
+- L'utilisateur ouvre `nf-society.vercel.app` directement
+- Paiement : affichage d'un QR code + lien Gnosis App (deep link)
+- Cross-device : scan sur desktop, signature sur mobile
+- Gere dans `game-payment.tsx` / `chance-payment.tsx` via `qrcode` lib
+
+### Mode B — Mini App Circles (iframe)
+- Le projet tourne en iframe a l'interieur de l'app Circles/Gnosis
+- Paiement : bouton natif → `sendPayment(recipient, amount, data)` via `postMessage` bridge
+- Signature 1-tap, pas de QR
+- SDK : `src/lib/miniapp-bridge.ts` + `useMiniApp()` hook
+
+**Regle** : ne jamais generer le QR code en mode Mini App. Toujours utiliser `<GamePayment>` / `<ChancePayment>` qui gerent les deux cas automatiquement.
 
 ## Conventions
 
