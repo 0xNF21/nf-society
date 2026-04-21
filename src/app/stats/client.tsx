@@ -14,7 +14,7 @@ import {
   Legend,
 } from "recharts";
 import { useLocale } from "@/components/language-provider";
-import { translations } from "@/lib/i18n";
+import { translations, localeBcp47 } from "@/lib/i18n";
 import type { PlatformStats, PeriodStats, GameStatLine, DailyVolumePoint, TopGameMeta } from "@/lib/platform-stats";
 import type { RecentGameRow } from "@/lib/recent-games";
 
@@ -29,13 +29,14 @@ function formatRelativeDate(iso: string, locale: "fr" | "en"): string {
   const d = new Date(iso);
   const diffMs = Date.now() - d.getTime();
   const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return locale === "fr" ? "a l'instant" : "just now";
-  if (mins < 60) return locale === "fr" ? `il y a ${mins} min` : `${mins} min ago`;
+  const tl = translations.lobby;
+  if (mins < 1) return tl.justNow2[locale];
+  if (mins < 60) return tl.minAgoSpaced[locale].replace("{n}", String(mins));
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return locale === "fr" ? `il y a ${hours} h` : `${hours} h ago`;
+  if (hours < 24) return tl.hourAgoSpaced[locale].replace("{n}", String(hours));
   const days = Math.floor(hours / 24);
-  if (days < 7) return locale === "fr" ? `il y a ${days} j` : `${days} d ago`;
-  return d.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
+  if (days < 7) return tl.dayAgoSpaced[locale].replace("{n}", String(days));
+  return d.toLocaleDateString(localeBcp47(locale), {
     day: "2-digit",
     month: "short",
   });

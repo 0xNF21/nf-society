@@ -74,6 +74,7 @@ export function ChancePayment({
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const connectedAddress = useConnectedAddress();
   const tm = translations.miniapp;
+  const t = translations.chancePayment;
 
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
@@ -244,9 +245,7 @@ export function ChancePayment({
           <div className="grid grid-cols-2 gap-3">
             <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5">
               {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-              {copied
-                ? (locale === "fr" ? "Copie !" : "Copied!")
-                : (locale === "fr" ? "Copier le lien" : "Copy link")}
+              {copied ? t.copied[locale] : t.copyLink[locale]}
             </Button>
             <Button
               variant="outline"
@@ -259,9 +258,7 @@ export function ChancePayment({
               }}
             >
               <QrCode className="h-4 w-4" />
-              {showQr
-                ? (locale === "fr" ? "Masquer QR" : "Hide QR")
-                : (locale === "fr" ? "QR Code" : "QR Code")}
+              {showQr ? t.hideQr[locale] : t.qrCode[locale]}
             </Button>
           </div>
 
@@ -278,7 +275,7 @@ export function ChancePayment({
               {qrState === "error" && (
                 <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">QR Error</div>
               )}
-              <span>{qrLabel || (locale === "fr" ? "Scannez pour payer" : "Scan to pay")}</span>
+              <span>{qrLabel || t.scanToPay[locale]}</span>
             </div>
           )}
         </>
@@ -288,19 +285,19 @@ export function ChancePayment({
       {paymentStatus === "watching" && (
         <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium bg-white/60 dark:bg-white/5 border border-ink/10 text-ink/60">
           <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          {locale === "fr" ? "En attente du paiement..." : "Waiting for payment..."}
+          {t.waitingPayment[locale]}
         </div>
       )}
       {paymentStatus === "confirmed" && (
         <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium bg-green-50 border border-green-200 text-green-700">
           <CheckCircle className="h-4 w-4 shrink-0 text-green-600" />
-          {locale === "fr" ? "Paiement detecte !" : "Payment detected!"}
+          {t.paymentDetected[locale]}
         </div>
       )}
       {paymentStatus === "error" && (
         <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium bg-red-50 border border-red-200 text-red-600">
           <span className="h-4 w-4 shrink-0">&#9888;&#65039;</span>
-          {locale === "fr" ? "Erreur de detection" : "Detection error"}
+          {t.detectionError[locale]}
         </div>
       )}
 
@@ -312,9 +309,7 @@ export function ChancePayment({
           className="w-full text-xs text-ink/40 hover:text-ink/60 flex items-center justify-center gap-1.5 transition-colors"
         >
           <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
-          {scanning
-            ? (locale === "fr" ? "Scan en cours..." : "Scanning...")
-            : (locale === "fr" ? "Scanner les paiements" : "Scan payments")}
+          {scanning ? t.scanning[locale] : t.scanPayments[locale]}
         </button>
       )}
 

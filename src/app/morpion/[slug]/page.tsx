@@ -205,7 +205,7 @@ function DemoMorpionGame({ slug }: { slug: string }) {
             {status === "finished" && result === "O" && (
               <div className="py-3 px-4">
                 <p className="text-2xl text-center">🤖</p>
-                <p className="font-bold text-ink text-sm">{locale === "fr" ? "Le bot a gagné !" : "Bot wins!"}</p>
+                <p className="font-bold text-ink text-sm">{t.botWins[locale]}</p>
                 {xpGained > 0 && <p className="text-xs text-emerald-600 font-bold">+{xpGained} XP</p>}
               </div>
             )}
@@ -245,7 +245,7 @@ function DemoMorpionGame({ slug }: { slug: string }) {
             <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest mb-1.5">J1</p>
             <div className="flex items-center gap-2">
               <span className="text-lg font-black text-emerald-600">X</span>
-              <span className="text-xs font-semibold text-ink/70">{demoPlayer.name} <span className="text-ink/50">({locale === "fr" ? "vous" : "you"})</span></span>
+              <span className="text-xs font-semibold text-ink/70">{demoPlayer.name} <span className="text-ink/50">({t.youShort[locale]})</span></span>
             </div>
           </div>
           <div className="bg-white/60 backdrop-blur-sm border border-ink/10 rounded-xl p-3">
@@ -260,7 +260,7 @@ function DemoMorpionGame({ slug }: { slug: string }) {
         {status === "finished" && (
           <Link href="/morpion">
             <Button className="w-full rounded-xl font-bold mt-4" style={{ background: "#251B9F" }}>
-              {locale === "fr" ? "Rejouer" : "Play again"}
+              {t.playAgain[locale]}
             </Button>
           </Link>
         )}
@@ -379,7 +379,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
 
   if (!game) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <p className="text-ink/50">{locale === "fr" ? "Partie introuvable" : "Game not found"}</p>
+      <p className="text-ink/50">{t.gameNotFound[locale]}</p>
       <Link href="/morpion"><Button variant="outline" className="rounded-xl">← {t.back[locale]}</Button></Link>
     </div>
   );
@@ -445,7 +445,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
                     <Trophy className="w-5 h-5 text-citrus" />
                     <span className="font-bold text-ink">{t.gameOver[locale]}</span>
                   </div>
-                  <p className="text-xs text-ink/50">{locale === "fr" ? "Gagnant" : "Winner"} : {game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"} — {winAmount} CRC</p>
+                  <p className="text-xs text-ink/50">{t.winnerLabel[locale]} : {game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"} — {winAmount} CRC</p>
                 </div>
               );
 
@@ -455,7 +455,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
                     <Trophy className="w-5 h-5 text-citrus" />
                     <span className="font-bold text-ink">{t.youWon[locale]}</span>
                   </div>
-                  <p className="text-xs text-ink/50">{winAmount} CRC {locale === "fr" ? "en route" : "on the way"}</p>
+                  <p className="text-xs text-ink/50">{winAmount} CRC {t.onTheWay[locale]}</p>
                 </div>
               );
 
@@ -464,7 +464,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
                   <p className="text-2xl text-center">😢</p>
                   <p className="font-bold text-ink text-sm">{t.youLost[locale]}</p>
                   <div className="text-xs text-ink/50 space-y-0.5">
-                    <p>{locale === "fr" ? "Gagnant" : "Winner"} : <span className="font-semibold text-ink/60">{game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"}</span></p>
+                    <p>{t.winnerLabel[locale]} : <span className="font-semibold text-ink/60">{game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"}</span></p>
                     <p>{t.betWon[locale]} <span className="font-bold text-ink/60">{winAmount} CRC</span></p>
                   </div>
                 </div>
@@ -535,7 +535,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
             <CardContent className="p-5 text-center">
               <p className="text-sm text-ink/60 dark:text-white/60">
-                {locale === "fr" ? "Mode spectateur — vous regardez cette partie" : "Spectator mode — you are watching this game"}
+                {t.spectatorMode[locale]}
               </p>
             </CardContent>
           </Card>
@@ -581,7 +581,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
             return (
               <div key={label} className="bg-white/60 backdrop-blur-sm border border-ink/10 rounded-xl p-3">
                 <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest mb-1.5">{label}</p>
-                <PlayerBadge addr={addr} profile={profile} symbol={symbol} isMe={isMe} waitingLabel={t.waiting[locale]} youLabel={locale === "fr" ? "vous" : "you"} />
+                <PlayerBadge addr={addr} profile={profile} symbol={symbol} isMe={isMe} waitingLabel={t.waiting[locale]} youLabel={t.youShort[locale]} />
               </div>
             );
           })}
@@ -594,18 +594,18 @@ function RealMorpionGame({ slug }: { slug: string }) {
             {(game.status === "waiting_p1" || game.status === "waiting_p2") && (
               <button onClick={activateTestMode} disabled={testLoading}
                 className="w-full py-1.5 rounded-lg bg-ink/5 text-xs text-ink/40 hover:text-ink/60 hover:bg-ink/10 transition-all">
-                {testLoading ? "..." : locale === "fr" ? "Injecter 2 faux joueurs" : "Inject 2 test players"}
+                {testLoading ? "..." : t.injectTestPlayers[locale]}
               </button>
             )}
             {game.status === "active" && !addressConfirmed && (
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => { setMyAddress("0xTEST000000000000000000000000000000000001"); setAddressConfirmed(true); }}
                   className="py-1.5 rounded-lg bg-marine/10 text-xs text-marine font-bold hover:bg-marine/20 transition-all">
-                  {locale === "fr" ? "Jouer en J1 (X)" : "Play as P1 (X)"}
+                  {t.playAsP1[locale]}
                 </button>
                 <button onClick={() => { setMyAddress("0xTEST000000000000000000000000000000000002"); setAddressConfirmed(true); }}
                   className="py-1.5 rounded-lg bg-citrus/10 text-xs text-citrus font-bold hover:bg-citrus/20 transition-all">
-                  {locale === "fr" ? "Jouer en J2 (O)" : "Play as P2 (O)"}
+                  {t.playAsP2[locale]}
                 </button>
               </div>
             )}
