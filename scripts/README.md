@@ -1,50 +1,74 @@
-# Scripts — Ops & Diagnostics
+# `scripts/` — utilities, diagnostics, tests
 
-Scripts Node (`.mjs`) pour migrations, diagnostics et réparations. Tous lisent leur config depuis `.env.local` par défaut, `.env.neon` pour la prod (à puller via `npx vercel env pull .env.neon --environment=production`).
+Tous les scripts ad-hoc du projet, rangés par usage. Ne pas confondre avec
+`drizzle/` (migrations SQL versionnées, gérées par drizzle-kit depuis PR #11).
 
-## Migrations
+## Arborescence
+
+```
+scripts/
+├── diagnostics/        # "quel est l'état de X ?" — à lancer pour debug
+├── smoke/              # tests d'intégration manuels (appellent les API)
+├── seed/               # population initiale de la DB (badges, shop items)
+├── ops/                # opérations récurrentes légitimes
+└── archive/            # scripts historiques, obsolètes — ne pas relancer
+```
+
+## diagnostics/
+
+Lecture-seule sur la DB et la blockchain. Utile quand quelque chose ne
+marche pas en prod ou en dev. Tous sans side effect.
+
+| Script | À quoi ça sert |
+|--------|----------------|
+| `check-bot-nonce.mjs [.env.local\|.env.neon]` | Compare `bot_state.last_nonce` vs le nonce on-chain. Détecte les dérives. |
+| `check-nf-auth.mjs` | État de la table `nf_auth_tokens` (schéma, indexes, row count). |
+| `check-payouts-schema.mjs` | Type de `payouts.amount_crc` + les 5 derniers payouts. |
+| `check-treasury-state.mjs` | Audit du row DAO treasury (balance + ledger). |
+| `check-tx.mjs <hash>` | Fetch une tx Gnosis par son hash (block, status, gas). |
+| `check-wallet-drift.mjs` | Compare `sum(ledger)` vs `players.balance_crc` par adresse. |
+| `check-wallet-invariant.mjs` | Total balances joueurs + treasury vs solde on-chain de la Safe. |
+| `check-wallet-state.mjs <address>` | Snapshot complet d'un joueur (balance, XP, ledger récent). |
+| `compare-crc-columns.mjs` | Diff des colonnes `*_crc` entre local et Neon. |
+| `debug-wallet-scan.mjs` | Trigger `/api/wallet/topup-scan` + inspect tx récentes. |
+| `list-failed-payouts.mjs` | Liste des `payouts` en status `failed` sur Neon. |
+
+## smoke/
+
+Tests d'intégration manuels. Chacun attend que `npm run dev` tourne et
+appelle les vraies API. Pas de mock.
+
+| Script | Scope |
+|--------|-------|
+| `smoke-wallet.mjs` | Routes wallet Phase 3a (balance, topup-scan, pay-game). |
+| `smoke-pay-game.mjs` | POST /api/wallet/pay-game avec edge cases. |
+| `smoke-lottery-daily.mjs` | Flow balance-pay sur lottery et daily. |
+| `smoke-cashout.mjs` | Routes cashout-init + cashout-status. |
+| `smoke-credit-prize.ts` | Flow creditPrize + miroir treasury. |
+| `test-auto-resync.mjs` | Fait dériver le nonce bot, vérifie l'auto-resync + rediffuse la tx. |
+
+## seed/
+
+Population initiale de la DB. À lancer **une fois** sur une base fresh.
+
+| Script | Résultat |
+|--------|----------|
+| `seed-badges.js` | Insère toutes les définitions de badges (achievement, activity, event, secret). |
+| `seed-shop.ts` | Insère les items de la boutique XP (refunds, boosts, protection, CRC, cosmétiques). |
+
+## ops/
+
+Opérations récurrentes sans obsolescence.
 
 | Script | Usage |
-|---|---|
-| `init-bot-nonce.mjs` | Bootstrap `bot_state` avec le nonce on-chain courant. À run **1 fois par env** (local + Neon). |
-| `migrate-nf-auth.mjs` | Crée la table `nf_auth_tokens` (Phase 2 recovery). `node scripts/migrate-nf-auth.mjs --neon` pour prod. |
-| `migrate-hilo.mjs`, `migrate-support.mjs` | Migrations jeux spécifiques. |
+|--------|-------|
+| `init-bot-nonce.mjs` | Bootstrap de `bot_state` depuis le nonce on-chain. Idempotent. À lancer une fois par environnement DB (local + Neon). |
 
-## Diagnostics
+## archive/
 
-| Script | Ce qu'il affiche |
-|---|---|
-| `check-bot-nonce.mjs [envFile]` | Compare `bot_state.last_nonce` (local/Neon) vs on-chain `latest`/`pending`. Detecte la dérive. |
-| `check-nf-auth.mjs [envFile]` | Colonnes + indexes + row count de `nf_auth_tokens`. |
-| `check-payouts-schema.mjs [envFile]` | Type de `payouts.amount_crc` + 5 derniers payouts. |
-| `compare-crc-columns.mjs` | Diff de tous les `*_crc` entre local et Neon. Utile pour repérer les migrations oubliées. |
-| `check-tx.mjs <txHash>` | Receipt Gnosis d'une tx (block, status, gas). |
+Scripts historiques conservés pour référence. **Ne pas relancer**.
 
-## Réparations (one-shots)
-
-| Script | Scénario |
-|---|---|
-| `resync-and-retry-nf-auth.mjs [envFile]` | Dérive de nonce : resync `bot_state` depuis on-chain, reset attempts sur les `nf_auth_refund` failed, retry via `/api/payout/retry`. |
-| `fix-payouts-column-local.mjs` | Schema drift `payouts.amount_crc` integer→real en local + retrigger les roulette rounds orphelins (failed sans ligne payouts). |
-| `repair-failed-payouts.mjs` | Reset + retry de payouts par ID (hardcoded 63, 64 — à adapter). |
-| `list-failed-payouts.mjs` | Liste les payouts `failed` sur Neon. |
-
-## Tests d'intégration
-
-| Script | Ce qu'il teste |
-|---|---|
-| `test-auto-resync.mjs <recipient>` | Drift artificiel du nonce, insert payout test, trigger retry → vérifie que le fix auto-resync de `src/lib/payout.ts` kick in. Coûte 1 CRC (envoyé à l'adresse recipient). |
-
-## Drifts connus entre `.env.local` et Neon
-
-À traiter au cas par cas :
-
-- **Vercel prod et dev local partagent `BOT_PRIVATE_KEY`** → les deux `bot_state.last_nonce` divergent. Le fix auto-resync (dans `payout.ts`) gère ça, mais `check-bot-nonce.mjs` permet de visualiser la dérive.
-- **Les colonnes `*_crc` peuvent ne pas avoir le même type** (ex. `integer` local vs `real` Neon) si une migration a été appliquée uniquement sur Neon. `compare-crc-columns.mjs` liste toutes les divergences.
-- **Certaines tables n'existent qu'en prod** (ex. `dice_rounds` manquait en local à un moment). Le dev peut se contenter de créer les tables à la demande via les routes `/api/{game}` ou via des scripts dédiés.
-
-## Convention
-
-- Les scripts utilisent un parser `.env` inline (pas de dep `dotenv` pour éviter l'install).
-- SSL activé automatiquement dès que l'URL ne contient pas `localhost`.
-- Les scripts qui hit le dev server attendent `npm run dev` sur `http://localhost:3000` et `ADMIN_PASSWORD` dans `.env.local`.
+- `archive/migrations/` — 6 scripts de migration manuelle (cashout, dice, hilo, nf-auth, support, wallet). Tous appliqués. Depuis PR #11, les migrations passent par drizzle-kit (`npm run db:generate` + `db:migrate`).
+- `archive/repairs/` — 3 scripts de réparation one-shot : `fix-payouts-column-local` (int→real), `repair-failed-payouts` (reset payout #63/#64), `resync-and-retry-nf-auth`.
+- `archive/telegram-setup/` — 2 setups one-shot : `telegram-set-webhook`, `telegram-set-commands`. Relancer seulement si tu changes le webhook URL ou renommes les commandes.
+- `archive/one-shot/` — `award-supreme.js` (badge fondateur, déjà awarded) et `enable-stats-flag.mjs` (feature flag `public_stats`, déjà enabled).
