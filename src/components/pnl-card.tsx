@@ -2,6 +2,7 @@
 
 import { useRef, useCallback, useState, useEffect } from "react";
 import { Download, Check, Link2, Loader2 } from "lucide-react";
+import { translations } from "@/lib/i18n";
 
 /* ─── CONFIG ───────────────────────────────────────────── */
 
@@ -346,9 +347,9 @@ function CardContent({ props }: { props: PnlCardProps }) {
             </div>
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>
               {isPositive && props.betCrc ? (
-                <>{locale === "fr" ? "Gain brut" : "Gross"} <span style={{ color: "rgba(255,255,255,0.35)" }}>+{Math.round(gross * 1000) / 1000} CRC</span>{commAmt > 0 && <> · Commission <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{Math.round(commAmt * 1000) / 1000} CRC</span></>}</>
+                <>{translations.pnlCard.grossLabel[locale]} <span style={{ color: "rgba(255,255,255,0.35)" }}>+{Math.round(gross * 1000) / 1000} CRC</span>{commAmt > 0 && <> · Commission <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{Math.round(commAmt * 1000) / 1000} CRC</span></>}</>
               ) : props.betCrc ? (
-                <>{locale === "fr" ? "Mise perdue" : "Bet lost"} · <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{props.betCrc} CRC</span></>
+                <>{translations.pnlCard.betLost[locale]} · <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{props.betCrc} CRC</span></>
               ) : null}
             </div>
           </div>
@@ -371,7 +372,7 @@ function CardContent({ props }: { props: PnlCardProps }) {
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "white", marginBottom: 1 }}>
-              {props.playerName || (locale === "fr" ? "Joueur" : "Player")}
+              {props.playerName || translations.pnlCard.playerDefault[locale]}
             </div>
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>
               {props.opponentName ? `vs ${props.opponentName}` : ""}
@@ -385,7 +386,7 @@ function CardContent({ props }: { props: PnlCardProps }) {
         {/* Footer */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)" }}>{locale === "fr" ? "Mise" : "Bet"}</span>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)" }}>{translations.pnlCard.betLabel[locale]}</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>{props.betCrc ?? 0} CRC</span>
           </div>
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>{props.date || new Date().toLocaleDateString()}</span>
@@ -419,17 +420,15 @@ function buildTweetText(props: PnlCardProps): string {
   const netRaw = props.gainCrc ?? (props.rewardCrc !== undefined && props.betCrc !== undefined ? props.rewardCrc - props.betCrc : 0);
   const net = Math.round(netRaw * 1000) / 1000;
   const sign = net >= 0 ? "+" : "";
+  const amount = `${sign}${net}`;
   if (props.result === "win") {
-    return locale === "fr"
-      ? `${sign}${net} CRC sur ${gameName} ! \uD83C\uDFC6\n\nJoue sur NF Society \uD83D\uDC49 https://nf-society.vercel.app`
-      : `${sign}${net} CRC on ${gameName}! \uD83C\uDFC6\n\nPlay on NF Society \uD83D\uDC49 https://nf-society.vercel.app`;
+    return translations.pnlCard.tweetWin[locale].replace("{amount}", amount).replace("{gameName}", gameName);
   }
   if (props.result === "reward") {
-    return locale === "fr"
-      ? `${sign}${net} CRC ${props.tier ? `(${props.tier})` : ""} sur ${gameName} ! \uD83C\uDFB0\n\nhttps://nf-society.vercel.app`
-      : `${sign}${net} CRC ${props.tier ? `(${props.tier})` : ""} on ${gameName}! \uD83C\uDFB0\n\nhttps://nf-society.vercel.app`;
+    const tier = props.tier ? ` (${props.tier})` : "";
+    return translations.pnlCard.tweetReward[locale].replace("{amount}", amount).replace("{tier}", tier).replace("{gameName}", gameName);
   }
-  return `${sign}${net} CRC — ${gameName}\n\nhttps://nf-society.vercel.app`;
+  return `${amount} CRC — ${gameName}\n\nhttps://nf-society.vercel.app`;
 }
 
 /* ─── EXPORTED COMPONENT ───────────────────────────────── */
@@ -479,13 +478,13 @@ export function PnlCard(props: PnlCardProps) {
       {/* Action buttons */}
       <div className="flex gap-2 w-full max-w-[400px]">
         <button onClick={handleCopy} className="flex-1 py-2.5 rounded-[10px] border border-white/[0.07] bg-white/[0.03] text-white/50 text-[11px] font-semibold hover:bg-white/[0.07] hover:text-white transition-all">
-          {copied ? "\u2713 " + (locale === "fr" ? "Copie" : "Copied") : "\uD83D\uDCCB " + (locale === "fr" ? "Copier" : "Copy")}
+          {copied ? "\u2713 " + translations.pnlCard.copied[locale] : "\uD83D\uDCCB " + translations.pnlCard.copy[locale]}
         </button>
         <button onClick={handleTwitter} className="flex-1 py-2.5 rounded-[10px] border border-indigo-500/30 bg-[rgba(37,27,159,0.25)] text-indigo-400 text-[11px] font-semibold hover:bg-[rgba(37,27,159,0.4)] hover:text-white transition-all">
-          {"\uD835\uDD4F"} {locale === "fr" ? "Partager" : "Share"}
+          {"\uD835\uDD4F"} {translations.pnlCard.share[locale]}
         </button>
         <button onClick={handleDownload} disabled={downloading} className="flex-1 py-2.5 rounded-[10px] border border-white/[0.07] bg-white/[0.03] text-white/50 text-[11px] font-semibold hover:bg-white/[0.07] hover:text-white transition-all disabled:opacity-50">
-          {downloaded ? "\u2713" : downloading ? "\u23F3" : "\u2B07\uFE0F"} {locale === "fr" ? "Image" : "Image"}
+          {downloaded ? "\u2713" : downloading ? "\u23F3" : "\u2B07\uFE0F"} {translations.pnlCard.imageLabel[locale]}
         </button>
       </div>
     </div>

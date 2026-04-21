@@ -178,20 +178,20 @@ function mapError(code: string, locale: "fr" | "en"): string {
   const t = translations.wallet;
   switch (code) {
     case "insufficient_balance":
-      return locale === "fr" ? "Solde insuffisant" : "Insufficient balance";
+      return t.errorInsufficientBalance[locale];
     case "wrong_bet":
-      return locale === "fr" ? "Mise invalide" : "Invalid bet";
+      return t.errorWrongBet[locale];
     case "already_joined":
-      return locale === "fr" ? "Vous etes deja dans cette partie" : "You already joined this game";
+      return t.errorAlreadyJoined[locale];
     case "already_full":
-      return locale === "fr" ? "Partie complete" : "Game is full";
+      return t.errorAlreadyFull[locale];
     case "invalid_bet":
-      return locale === "fr" ? "Mise non autorisee pour cette table" : "Bet not allowed on this table";
+      return t.errorInvalidBet[locale];
     case "invalid_param":
-      return locale === "fr" ? "Parametre de jeu invalide" : "Invalid game parameter";
+      return t.errorInvalidParam[locale];
     case "not_found":
     case "table_not_found":
-      return locale === "fr" ? "Partie introuvable" : "Game not found";
+      return t.errorNotFound[locale];
     default:
       return t.error[locale];
   }

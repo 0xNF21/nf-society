@@ -108,7 +108,7 @@ function RoundHistory({ rounds, locale }: { rounds: RoundResult[]; locale: "fr" 
 
   return (
     <div className="space-y-1.5">
-      <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Historique" : "History"}</p>
+      <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{t.history[locale]}</p>
       {rounds.map((r, i) => (
         <div key={i} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
           <span className="text-xs text-ink/40">{t.round[locale]} {i + 1}</span>
@@ -255,7 +255,7 @@ function DemoPfcGame({ slug }: { slug: string }) {
         {gameFinished && (
           <Link href="/pfc">
             <Button className="w-full rounded-xl font-bold mt-4" style={{ background: "#DC2626" }}>
-              {locale === "fr" ? "Rejouer" : "Play again"}
+              {t.playAgain[locale]}
             </Button>
           </Link>
         )}
@@ -343,7 +343,7 @@ function RealPfcGame({ slug }: { slug: string }) {
 
   if (!game) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <p className="text-ink/50">{locale === "fr" ? "Partie introuvable" : "Game not found"}</p>
+      <p className="text-ink/50">{t.gameNotFound[locale]}</p>
       <Link href="/pfc"><Button variant="outline" className="rounded-xl">{t.back[locale]}</Button></Link>
     </div>
   );
@@ -432,7 +432,7 @@ function RealPfcGame({ slug }: { slug: string }) {
                 </span>
               </div>
               {myRole && game.winnerAddress?.toLowerCase() === myAddress.toLowerCase() && (
-                <p className="text-xs text-ink/50">{winAmount} CRC {locale === "fr" ? "en route" : "on the way"}</p>
+                <p className="text-xs text-ink/50">{winAmount} CRC {t.onTheWay[locale]}</p>
               )}
             </CardContent>
           </Card>
@@ -481,7 +481,7 @@ function RealPfcGame({ slug }: { slug: string }) {
           <Card className="bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
             <CardContent className="p-4 text-center">
               <p className="text-sm text-ink/60">
-                {locale === "fr" ? "Mode spectateur — vous regardez cette partie" : "Spectator mode — you are watching this game"}
+                {t.spectatorMode[locale]}
               </p>
             </CardContent>
           </Card>
@@ -520,7 +520,7 @@ function RealPfcGame({ slug }: { slug: string }) {
                 setAddressConfirmed(true);
                 await fetchGame();
               }} className="w-full py-1.5 rounded-lg bg-ink/5 text-xs text-ink/40 hover:text-ink/60 hover:bg-ink/10 transition-all">
-                {locale === "fr" ? "Injecter 2 faux joueurs" : "Inject 2 test players"}
+                {t.injectTestPlayers[locale]}
               </button>
             )}
           </div>

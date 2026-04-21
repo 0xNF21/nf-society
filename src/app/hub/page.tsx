@@ -38,8 +38,8 @@ export default function HubPage() {
       icon: <Trophy className="h-8 w-8 text-amber-500" />,
       iconBg: "bg-amber-50 group-hover:bg-amber-100",
       borderHover: "hover:border-amber-200",
-      title: locale === "fr" ? "Classement" : "Leaderboard",
-      desc: locale === "fr" ? "Les meilleurs joueurs de NF Society" : "Top NF Society players",
+      title: t.leaderboardTitle[locale],
+      desc: t.leaderboardDesc[locale],
       color: "text-amber-500",
     },
     {
@@ -61,17 +61,17 @@ export default function HubPage() {
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
               <ArrowLeft className="h-4 w-4" />
-              {locale === "fr" ? "Accueil" : "Home"}
+              {t.home[locale]}
             </Link>
           </div>
 
           <header className="text-center space-y-2">
             <span className="text-4xl">🎮</span>
             <h1 className="font-display text-3xl sm:text-4xl font-bold text-ink dark:text-white">
-              {locale === "fr" ? "Jouer" : "Play"}
+              {t.play[locale]}
             </h1>
             <p className="text-ink/60 dark:text-white/60">
-              {locale === "fr" ? "Jeux de chance, multijoueur, classement et boutique" : "Games of chance, multiplayer, leaderboard and shop"}
+              {t.playDesc[locale]}
             </p>
           </header>
 
