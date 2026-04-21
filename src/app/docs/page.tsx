@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { ArrowLeft, ChevronDown, Gamepad2, Star, Trophy, Gift, Dice5, ShoppingBag, HelpCircle } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 
@@ -42,9 +43,9 @@ export default function DocsPage() {
     <main className="min-h-screen flex flex-col items-center px-4 py-8">
       <div className="w-full max-w-lg space-y-4">
         <div className="space-y-2">
-          <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
+          <BackLink fallback="/home" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" /> {fr ? "Accueil" : "Home"}
-          </Link>
+          </BackLink>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-marine/10 flex items-center justify-center">
               <HelpCircle className="w-6 h-6 text-marine" />

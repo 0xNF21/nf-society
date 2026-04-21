@@ -4,6 +4,7 @@ import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw, Users, Clock } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GAME_REGISTRY, GAME_LABELS } from "@/lib/game-registry";
@@ -64,9 +65,9 @@ export default function LobbyPage() {
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="mb-6 space-y-2">
-          <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
+          <BackLink fallback="/home" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" /> {t.home[locale]}
-          </Link>
+          </BackLink>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">

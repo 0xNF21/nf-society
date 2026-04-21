@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, CalendarCheck, Ticket, Gift, ArrowRight, Spade } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { useLocale } from "@/components/language-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
 import { useDemo } from "@/components/demo-provider";
@@ -155,10 +156,10 @@ export default function ChancePage() {
   return (
     <main className="min-h-screen bg-sand text-ink">
       <div className="max-w-2xl mx-auto px-4 pt-16 pb-8">
-        <Link href="/" className="inline-flex items-center gap-2 text-ink/60 hover:text-ink mb-6">
+        <BackLink fallback="/home" className="inline-flex items-center gap-2 text-ink/60 hover:text-ink mb-6">
           <ArrowLeft className="w-4 h-4" />
           <span>{locale === "fr" ? "Accueil" : "Home"}</span>
-        </Link>
+        </BackLink>
 
         <h1 className="text-3xl font-bold mb-2">{t.title[locale]}</h1>
         <p className="text-ink/60 mb-8">

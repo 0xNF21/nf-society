@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, ArrowLeft, Users } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { useLocale } from "@/components/language-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
 import { translations } from "@/lib/i18n";
@@ -17,13 +18,13 @@ export default function MultiplayerPage() {
       <div className="flex-1 flex flex-col items-center px-4 py-16">
         <div className="w-full max-w-2xl flex flex-col gap-8">
           <div className="flex items-center gap-4">
-            <Link
-              href="/"
+            <BackLink
+              fallback="/home"
               className="flex items-center gap-2 text-sm text-ink/50 hover:text-ink transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
               {t.back[locale]}
-            </Link>
+            </BackLink>
           </div>
 
           <header className="text-center space-y-2">

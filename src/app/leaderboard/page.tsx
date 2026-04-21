@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { ArrowLeft, Trophy, Medal, Crown, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLocale } from "@/components/language-provider";
@@ -93,9 +94,9 @@ export default function LeaderboardPage() {
 
         {/* Header */}
         <div className="space-y-2">
-          <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
+          <BackLink fallback="/home" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
-          </Link>
+          </BackLink>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow">
               <Trophy className="w-6 h-6 text-white" />

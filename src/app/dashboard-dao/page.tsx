@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import {
   ArrowLeft,
   BarChart3,
@@ -382,10 +383,10 @@ export default function DashboardDaoPage() {
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       <div className="max-w-7xl mx-auto px-4 pt-16 pb-8">
         <div className="flex items-center justify-between mb-8">
-          <Link href="/" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
+          <BackLink fallback="/home" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
             <ArrowLeft className="h-4 w-4" />
             {t.back[locale]}
-          </Link>
+          </BackLink>
           <div className="flex items-center gap-3">
             {data && (
               <button

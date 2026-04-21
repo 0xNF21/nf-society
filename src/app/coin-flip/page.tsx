@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { coinFlipTables } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -19,12 +20,12 @@ export default async function CoinFlipLobbyPage() {
 
   return (
     <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto">
-      <Link
-        href="/"
+      <BackLink
+        fallback="/chance"
         className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6"
       >
         &larr; Accueil
-      </Link>
+      </BackLink>
 
       <div className="text-center mb-8">
         <div className="text-5xl mb-3">🪙</div>

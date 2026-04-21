@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { ArrowLeft, Lock, Loader2, Copy, QrCode, CheckCircle2, Wallet } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
@@ -205,13 +206,13 @@ export default function PrivacyPage() {
   if (authState !== "confirmed") {
     return (
       <div className="min-h-screen px-4 py-8 max-w-md mx-auto">
-        <Link
-          href="/"
+        <BackLink
+          fallback="/home"
           className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           {t.back[locale]}
-        </Link>
+        </BackLink>
 
         <div className="text-center mb-8">
           <div className="h-16 w-16 rounded-2xl bg-marine/10 flex items-center justify-center mx-auto mb-4">
@@ -339,13 +340,13 @@ export default function PrivacyPage() {
 
   return (
     <div className="min-h-screen px-4 py-8 max-w-md mx-auto">
-      <Link
-        href="/"
+      <BackLink
+        fallback="/home"
         className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
         {t.back[locale]}
-      </Link>
+      </BackLink>
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-ink mb-1">{t.title[locale]}</h1>

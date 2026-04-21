@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Lock, Globe, Users } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocale } from "@/components/language-provider";
@@ -89,9 +90,9 @@ export default function CrcRacesLobbyPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-start px-4 py-12">
       <div className="w-full max-w-md">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink mb-8 transition-colors">
+        <BackLink fallback="/multijoueur" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
-        </Link>
+        </BackLink>
 
         <div className="text-center mb-10">
           <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl ${config.iconBg} mb-4`}>
