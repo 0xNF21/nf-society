@@ -147,32 +147,37 @@ export default async function OpengraphImage() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
-                fontSize: 20,
-                fontWeight: 500,
-                color: "rgba(255, 255, 255, 0.75)",
+                gap: 14,
+                padding: "10px 20px",
+                borderRadius: 999,
+                backgroundColor: "white",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               }}
             >
-              <span>Built on</span>
+              <span style={{ fontSize: 18, fontWeight: 600, color: "#251B9F" }}>Built on</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={gnosisSrc} alt="Gnosis" width={28} height={28} />
+              <img src={gnosisSrc} alt="Gnosis" width={36} height={36} />
+              <div style={{ width: 1, height: 24, backgroundColor: "rgba(0,0,0,0.1)" }} />
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={circlesSrc} alt="Circles" width={72} height={22} style={{ objectFit: "contain" }} />
+              <img src={circlesSrc} alt="Circles" width={108} height={32} style={{ objectFit: "contain" }} />
             </div>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
-                fontSize: 20,
-                fontWeight: 600,
-                color: "white",
+                gap: 12,
+                padding: "10px 20px 10px 12px",
+                borderRadius: 999,
+                backgroundColor: "white",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               }}
             >
-              <span style={{ color: "rgba(255,255,255,0.75)", fontWeight: 500 }}>Made by</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={nfSrc} alt="NF Society" width={28} height={28} style={{ borderRadius: 6 }} />
-              <span>NF Society</span>
+              <img src={nfSrc} alt="NF Society" width={40} height={40} style={{ borderRadius: 999 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: "#251B9F", opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.05em" }}>Made by</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#251B9F" }}>NF Society</span>
+              </div>
             </div>
           </div>
         </div>
