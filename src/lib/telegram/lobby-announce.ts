@@ -90,10 +90,18 @@ export async function announceNewLobbyGame(params: {
   creatorAddress: string | null;
   isPrivate: boolean;
 }): Promise<void> {
+  console.log("[lobby-announce] announceNewLobbyGame called", {
+    gameKey: params.gameKey,
+    slug: params.slug,
+    isPrivate: params.isPrivate,
+  });
   if (params.isPrivate) return;
 
   const chatId = getLobbyChatId();
-  if (chatId === null) return;
+  if (chatId === null) {
+    console.log("[lobby-announce] no TELEGRAM_LOBBY_CHAT_ID, bail");
+    return;
+  }
   const threadId = getLobbyThreadId();
 
   try {
@@ -111,7 +119,10 @@ export async function announceNewLobbyGame(params: {
       .onConflictDoNothing()
       .returning();
 
-    if (!reserved) return;
+    if (!reserved) {
+      console.log("[lobby-announce] already reserved by another invocation, skip");
+      return;
+    }
 
     const text = buildNewGameText(
       params.gameKey,
@@ -130,6 +141,8 @@ export async function announceNewLobbyGame(params: {
       .update(multiplayerAnnouncements)
       .set({ telegramMessageId: sent.message_id })
       .where(eq(multiplayerAnnouncements.id, reserved.id));
+
+    console.log("[lobby-announce] announce done", { messageId: sent.message_id });
   } catch (err) {
     console.error("[telegram] announceNewLobbyGame failed:", err);
   }
@@ -145,8 +158,12 @@ export async function markLobbyGameStarted(params: {
   betCrc: number;
   creatorAddress: string | null;
 }): Promise<void> {
+  console.log("[lobby-announce] markLobbyGameStarted called", params);
   const chatId = getLobbyChatId();
-  if (chatId === null) return;
+  if (chatId === null) {
+    console.log("[lobby-announce] no chatId, bail");
+    return;
+  }
 
   try {
     const [row] = await db
@@ -160,7 +177,18 @@ export async function markLobbyGameStarted(params: {
       )
       .limit(1);
 
-    if (!row || row.startedAt) return; // pas d'annonce, ou deja marquee
+    console.log("[lobby-announce] markStarted row lookup:", {
+      found: !!row,
+      startedAt: row?.startedAt,
+      telegramMessageId: row?.telegramMessageId,
+    });
+
+    if (!row) return;
+    if (row.startedAt) return;
+    if (row.telegramMessageId === 0) {
+      console.log("[lobby-announce] placeholder message_id, announce incomplete, skip");
+      return;
+    }
 
     const text = buildStartedText(
       params.gameKey,
@@ -169,15 +197,24 @@ export async function markLobbyGameStarted(params: {
       params.creatorAddress
     );
 
+    console.log("[lobby-announce] calling editMessageText", {
+      chatId: row.telegramChatId,
+      messageId: row.telegramMessageId,
+    });
+
     await getBot().api.editMessageText(row.telegramChatId, row.telegramMessageId, text, {
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
     });
 
+    console.log("[lobby-announce] edit succeeded, marking startedAt");
+
     await db
       .update(multiplayerAnnouncements)
       .set({ startedAt: new Date() })
       .where(eq(multiplayerAnnouncements.id, row.id));
+
+    console.log("[lobby-announce] markLobbyGameStarted done");
   } catch (err) {
     console.error("[telegram] markLobbyGameStarted failed:", err);
   }
