@@ -32,6 +32,7 @@ export * from "./lottery";
 export * from "./memory";
 export * from "./mines";
 export * from "./morpion";
+export * from "./multiplayer-announcements";
 export * from "./pfc";
 export * from "./plinko";
 export * from "./relics";
