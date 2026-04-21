@@ -27,13 +27,13 @@ export default function LandingHeroMockup() {
           </MockCard>
         </div>
 
-        {/* Card secondaire gauche : Dice */}
+        {/* Card secondaire gauche : Pierre-Feuille-Ciseaux */}
         <div
-          className="absolute top-[52%] left-[12%] w-[28%] sm:w-[24%]"
+          className="absolute top-[52%] left-[10%] w-[30%] sm:w-[26%]"
           style={{ transform: "rotateY(14deg) rotateX(2deg) translateZ(-20px)" }}
         >
-          <MockCard accent="#F59E0B" emoji="🎲" label="Dice">
-            <DiceMock />
+          <MockCard accent="#DC2626" emoji="✊" label="Pierre-Feuille-Ciseaux">
+            <PfcMock />
           </MockCard>
         </div>
 
@@ -47,13 +47,13 @@ export default function LandingHeroMockup() {
           </MockCard>
         </div>
 
-        {/* Card centrale : Morpion */}
+        {/* Card centrale : Dames */}
         <div
           className="absolute top-[18%] left-1/2 -translate-x-1/2 w-[44%] sm:w-[38%]"
           style={{ transform: "translateX(-50%) rotateX(-2deg)" }}
         >
-          <MockCard accent="#251B9F" emoji="❌⭕" label="Morpion" featured>
-            <MorpionMock />
+          <MockCard accent="#F59E0B" emoji="♟️" label="Dames" featured>
+            <DamesMock />
             <div className="mt-3 flex items-center justify-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400">
               <span>🏆</span>
               <span>Gain : +9 CRC</span>
@@ -103,31 +103,40 @@ function MockCard({
   );
 }
 
-function MorpionMock() {
-  // X | O | X
-  // . | X | O
-  // O | . | X    — diagonale gagnante X
-  const board = [
-    ["X", "O", "X"],
-    ["", "X", "O"],
-    ["O", "", "X"],
+function DamesMock() {
+  // Plateau 8x8 — position en cours de partie, blancs en bas, noirs en haut
+  // 'w' = pion blanc, 'b' = pion noir, '.' = case vide (cases jouables seulement)
+  // Les cases non jouables (light) restent vides visuellement
+  const board: string[][] = [
+    [".", "b", ".", "b", ".", "b", ".", "b"],
+    ["b", ".", "b", ".", "b", ".", "b", "."],
+    [".", "b", ".", ".", ".", "b", ".", "b"],
+    [".", ".", ".", ".", "b", ".", ".", "."],
+    [".", ".", ".", "w", ".", ".", ".", "."],
+    ["w", ".", "w", ".", ".", ".", "w", "."],
+    [".", "w", ".", "w", ".", "w", ".", "w"],
+    ["w", ".", "w", ".", "w", ".", "w", "."],
   ];
-  const winning = new Set(["0-0", "1-1", "2-2"]);
   return (
-    <div className="grid grid-cols-3 gap-1 sm:gap-1.5 aspect-square">
+    <div className="grid grid-cols-8 gap-0 aspect-square rounded-md overflow-hidden ring-1 ring-amber-900/30">
       {board.flatMap((row, r) =>
         row.map((cell, c) => {
-          const isWin = winning.has(`${r}-${c}`);
+          const isDark = (r + c) % 2 === 1;
           return (
             <div
               key={`${r}-${c}`}
-              className={`flex items-center justify-center rounded-md sm:rounded-lg text-lg sm:text-2xl font-black ${
-                isWin
-                  ? "bg-marine/10 text-marine ring-2 ring-marine"
-                  : "bg-ink/[0.03] dark:bg-white/[0.05]"
-              } ${cell === "O" ? "text-citrus" : ""} ${cell === "X" && !isWin ? "text-ink dark:text-white" : ""}`}
+              className={`aspect-square flex items-center justify-center ${
+                isDark
+                  ? "bg-amber-900/70 dark:bg-amber-950"
+                  : "bg-amber-100 dark:bg-amber-200/90"
+              }`}
             >
-              {cell}
+              {cell === "w" && (
+                <div className="w-[70%] h-[70%] rounded-full bg-gradient-to-br from-white to-gray-200 shadow-[inset_0_-2px_2px_rgba(0,0,0,0.15)] ring-1 ring-gray-400" />
+              )}
+              {cell === "b" && (
+                <div className="w-[70%] h-[70%] rounded-full bg-gradient-to-br from-gray-700 to-black shadow-[inset_0_-2px_2px_rgba(255,255,255,0.15)] ring-1 ring-gray-900" />
+              )}
             </div>
           );
         }),
@@ -136,33 +145,21 @@ function MorpionMock() {
   );
 }
 
-function DiceMock() {
+function PfcMock() {
+  // Duel : joueur 1 (pierre, gauche) vs joueur 2 (ciseaux, droite) → pierre gagne
   return (
-    <div className="flex items-center justify-center gap-1.5 sm:gap-2 py-2">
-      <DieFace value={5} />
-      <DieFace value={3} />
-    </div>
-  );
-}
-
-function DieFace({ value }: { value: number }) {
-  const positions: Record<number, boolean[]> = {
-    1: [false, false, false, false, true, false, false, false, false],
-    2: [true, false, false, false, false, false, false, false, true],
-    3: [true, false, false, false, true, false, false, false, true],
-    4: [true, false, true, false, false, false, true, false, true],
-    5: [true, false, true, false, true, false, true, false, true],
-    6: [true, false, true, true, false, true, true, false, true],
-  };
-  const dots = positions[value] ?? positions[1];
-  return (
-    <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-lg bg-white dark:bg-white/10 border-2 border-ink/10 dark:border-white/10 shadow-md p-1.5 grid grid-cols-3 gap-0.5">
-      {dots.map((show, i) => (
-        <div
-          key={i}
-          className={`rounded-full ${show ? "bg-ink dark:bg-white" : "bg-transparent"}`}
-        />
-      ))}
+    <div className="flex flex-col items-center py-2">
+      <div className="flex items-center justify-between w-full px-2 gap-2">
+        <div className="flex flex-col items-center gap-1">
+          <div className="text-3xl sm:text-4xl">✊</div>
+          <div className="text-[8px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400">GAGNE</div>
+        </div>
+        <div className="text-sm sm:text-base font-black text-ink/40 dark:text-white/40">VS</div>
+        <div className="flex flex-col items-center gap-1">
+          <div className="text-3xl sm:text-4xl opacity-50 grayscale">✌️</div>
+          <div className="text-[8px] sm:text-[10px] font-bold text-red-500 dark:text-red-400">PERD</div>
+        </div>
+      </div>
     </div>
   );
 }
