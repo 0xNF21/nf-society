@@ -111,20 +111,20 @@ export default async function OpengraphImage() {
           </div>
         </div>
 
-        {/* Footer : emojis a gauche + logos partenaires a droite */}
+        {/* Footer : emojis a gauche + logos partenaires a droite (colle au bas) */}
         <div
           style={{
             display: "flex",
-            alignItems: "flex-end",
+            alignItems: "center",
             justifyContent: "space-between",
-            padding: "0 64px 56px 64px",
+            padding: "0 48px 32px 48px",
           }}
         >
           <div
             style={{
               display: "flex",
-              gap: 14,
-              fontSize: 44,
+              gap: 16,
+              fontSize: 52,
             }}
           >
             <span>❌⭕</span>
@@ -138,45 +138,44 @@ export default async function OpengraphImage() {
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
-              gap: 14,
-              alignItems: "flex-end",
+              gap: 12,
+              alignItems: "center",
             }}
           >
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 14,
-                padding: "10px 20px",
+                gap: 16,
+                padding: "14px 22px",
                 borderRadius: 999,
                 backgroundColor: "white",
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               }}
             >
-              <span style={{ fontSize: 18, fontWeight: 600, color: "#251B9F" }}>Built on</span>
+              <span style={{ fontSize: 20, fontWeight: 600, color: "#251B9F" }}>Built on</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={gnosisSrc} alt="Gnosis" width={36} height={36} />
-              <div style={{ width: 1, height: 24, backgroundColor: "rgba(0,0,0,0.1)" }} />
+              <img src={gnosisSrc} alt="Gnosis" width={44} height={44} />
+              <div style={{ width: 1, height: 28, backgroundColor: "rgba(0,0,0,0.1)" }} />
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={circlesSrc} alt="Circles" width={108} height={32} style={{ objectFit: "contain" }} />
+              <img src={circlesSrc} alt="Circles" width={140} height={42} style={{ objectFit: "contain" }} />
             </div>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
-                padding: "10px 20px 10px 12px",
+                gap: 14,
+                padding: "10px 22px 10px 10px",
                 borderRadius: 999,
                 backgroundColor: "white",
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={nfSrc} alt="NF Society" width={40} height={40} style={{ borderRadius: 999 }} />
+              <img src={nfSrc} alt="NF Society" width={52} height={52} style={{ borderRadius: 999 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ fontSize: 14, fontWeight: 500, color: "#251B9F", opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.05em" }}>Made by</span>
-                <span style={{ fontSize: 18, fontWeight: 800, color: "#251B9F" }}>NF Society</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#251B9F", opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.08em" }}>Made by</span>
+                <span style={{ fontSize: 22, fontWeight: 800, color: "#251B9F" }}>NF Society</span>
               </div>
             </div>
           </div>
