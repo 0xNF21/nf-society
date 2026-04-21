@@ -97,6 +97,22 @@ export async function announceNewLobbyGame(params: {
   const threadId = getLobbyThreadId();
 
   try {
+    // Reservation atomique : si une autre execution (polling parallele de 2 onglets,
+    // 2 scans concurrents...) a deja insere la ligne, notre insert ne retourne rien
+    // et on bail — garantit un unique message Telegram par partie.
+    const [reserved] = await db
+      .insert(multiplayerAnnouncements)
+      .values({
+        gameKey: params.gameKey,
+        slug: params.slug,
+        telegramChatId: chatId,
+        telegramMessageId: 0, // placeholder, update apres sendMessage
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (!reserved) return;
+
     const text = buildNewGameText(
       params.gameKey,
       params.slug,
@@ -110,12 +126,10 @@ export async function announceNewLobbyGame(params: {
       ...(threadId !== undefined ? { message_thread_id: threadId } : {}),
     });
 
-    await db.insert(multiplayerAnnouncements).values({
-      gameKey: params.gameKey,
-      slug: params.slug,
-      telegramChatId: chatId,
-      telegramMessageId: sent.message_id,
-    }).onConflictDoNothing();
+    await db
+      .update(multiplayerAnnouncements)
+      .set({ telegramMessageId: sent.message_id })
+      .where(eq(multiplayerAnnouncements.id, reserved.id));
   } catch (err) {
     console.error("[telegram] announceNewLobbyGame failed:", err);
   }
