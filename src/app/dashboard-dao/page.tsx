@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale } from "@/components/language-provider";
-import { translations } from "@/lib/i18n";
+import { translations, localeBcp47 } from "@/lib/i18n";
 
 type DaoData = {
   groupAddress: string;
@@ -611,7 +611,7 @@ export default function DashboardDaoPage() {
                         onClick={() => setChartOpen(!chartOpen)}
                         className="w-full flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-50/50 transition-colors"
                       >
-                        <span className="text-base font-bold text-gray-900">{locale === "fr" ? "Répartition" : "Breakdown"}</span>
+                        <span className="text-base font-bold text-gray-900">{t.breakdown[locale]}</span>
                         <ChevronDown className={`h-5 w-5 text-ink/30 transition-transform duration-200 ${chartOpen ? "rotate-180" : ""}`} />
                       </button>
                       {chartOpen && (
@@ -970,7 +970,7 @@ export default function DashboardDaoPage() {
               </div>
               {data.fetchedAt && (
                 <p className="text-[10px] text-ink/20">
-                  {t.lastUpdate[locale]}: {new Date(data.fetchedAt).toLocaleTimeString(locale === "fr" ? "fr-FR" : "en-US")}
+                  {t.lastUpdate[locale]}: {new Date(data.fetchedAt).toLocaleTimeString(localeBcp47(locale))}
                 </p>
               )}
             </footer>
@@ -987,21 +987,14 @@ function formatTimeAgo(ts: number, locale: "fr" | "en"): string {
   const days = Math.floor(diff / 86400);
   const hours = Math.floor(diff / 3600);
   const minutes = Math.floor(diff / 60);
+  const t = translations.dao;
 
-  if (locale === "fr") {
-    if (days > 60) return `il y a ${Math.floor(days / 30)} mois`;
-    if (days > 30) return `il y a 1 mois`;
-    if (days > 0) return `il y a ${days}j`;
-    if (hours > 0) return `il y a ${hours}h`;
-    if (minutes > 0) return `il y a ${minutes}min`;
-    return "maintenant";
-  }
-  if (days > 60) return `${Math.floor(days / 30)}mo ago`;
-  if (days > 30) return `1mo ago`;
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return "now";
+  if (days > 60) return t.agoMonths[locale].replace("{n}", String(Math.floor(days / 30)));
+  if (days > 30) return t.agoOneMonth[locale];
+  if (days > 0) return t.agoDays[locale].replace("{n}", String(days));
+  if (hours > 0) return t.agoHours[locale].replace("{n}", String(hours));
+  if (minutes > 0) return t.agoMinutes[locale].replace("{n}", String(minutes));
+  return t.agoNow[locale];
 }
 
 function StatCard({ icon, value, label, sub }: { icon: React.ReactNode; value: number | string; label: string; sub?: string }) {
@@ -1043,6 +1036,7 @@ const GAME_TYPE_LABELS: Record<string, string> = {
 };
 
 function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
+  const t = translations.dao;
   const [data, setData] = useState<PlatformTreasuryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -1065,10 +1059,10 @@ function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
           </div>
           <div className="text-left">
             <h3 className="text-sm font-bold text-ink">
-              {locale === "fr" ? "Trésorerie Plateforme" : "Platform Treasury"}
+              {t.platformTreasury[locale]}
             </h3>
             <p className="text-[10px] text-ink/40">
-              {locale === "fr" ? "Revenus, commissions et redistribution" : "Revenue, commissions and redistribution"}
+              {t.platformTreasuryDesc[locale]}
             </p>
           </div>
         </div>
@@ -1085,7 +1079,7 @@ function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
               {data.safeBalance !== null && (
                 <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200 dark:border-emerald-800 p-3 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-emerald-600/60 font-bold uppercase tracking-widest">{locale === "fr" ? "Solde Safe (on-chain)" : "Safe Balance (on-chain)"}</p>
+                    <p className="text-[10px] text-emerald-600/60 font-bold uppercase tracking-widest">{t.safeBalanceOnChain[locale]}</p>
                     <p className="text-2xl font-black text-emerald-600">{data.safeBalance.toLocaleString()} <span className="text-sm">CRC</span></p>
                   </div>
                   <Wallet className="h-6 w-6 text-emerald-400" />
@@ -1096,39 +1090,39 @@ function PlatformTreasury({ locale }: { locale: "fr" | "en" }) {
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3 text-center">
                   <p className="text-lg font-black text-ink dark:text-white">{data.totalBets} <span className="text-xs font-normal text-ink/40">CRC</span></p>
-                  <p className="text-[10px] text-ink/40">{locale === "fr" ? "Volume total" : "Total volume"}</p>
+                  <p className="text-[10px] text-ink/40">{t.totalVolume[locale]}</p>
                 </div>
                 <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-3 text-center">
                   <p className={`text-lg font-black ${data.totalCommissions >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.totalCommissions} <span className="text-xs font-normal">CRC</span></p>
-                  <p className="text-[10px] text-emerald-600/60">{locale === "fr" ? "Commissions" : "Commissions"}</p>
+                  <p className="text-[10px] text-emerald-600/60">{t.commissionsLabel[locale]}</p>
                 </div>
                 <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 p-3 text-center">
                   <p className="text-lg font-black text-blue-600">{data.totalRedistributed} <span className="text-xs font-normal text-blue-400">CRC</span></p>
-                  <p className="text-[10px] text-blue-600/60">{locale === "fr" ? "Redistribué" : "Redistributed"}</p>
+                  <p className="text-[10px] text-blue-600/60">{t.redistributed[locale]}</p>
                 </div>
               </div>
 
               {/* Revenue per day + games played */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5">
-                  <span className="text-xs text-ink/50">{locale === "fr" ? "Revenu moy/jour" : "Avg rev/day"}</span>
+                  <span className="text-xs text-ink/50">{t.avgRevPerDay[locale]}</span>
                   <span className={`text-sm font-bold ${data.avgRevenuePerDay >= 0 ? "text-emerald-600" : "text-red-500"}`}>{data.avgRevenuePerDay} CRC</span>
                 </div>
                 <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5">
-                  <span className="text-xs text-ink/50">{locale === "fr" ? "Parties jouées" : "Games played"}</span>
+                  <span className="text-xs text-ink/50">{t.gamesPlayed[locale]}</span>
                   <span className="text-sm font-bold text-ink dark:text-white">{data.totalGamesPlayed}</span>
                 </div>
               </div>
 
               {/* Period breakdown */}
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{locale === "fr" ? "Periodes" : "Periods"}</p>
+                <p className="text-[10px] font-bold text-ink/30 uppercase tracking-widest">{t.periods[locale]}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: locale === "fr" ? "Aujourd'hui" : "Today", data: data.periods.today },
-                    { label: locale === "fr" ? "Cette semaine" : "This week", data: data.periods.week },
-                    { label: locale === "fr" ? "Ce mois" : "This month", data: data.periods.month },
-                    { label: locale === "fr" ? "Mois dernier" : "Last month", data: data.periods.lastMonth },
+                    { label: t.today[locale], data: data.periods.today },
+                    { label: t.thisWeek[locale], data: data.periods.week },
+                    { label: t.thisMonth[locale], data: data.periods.month },
+                    { label: t.lastMonthPeriod[locale], data: data.periods.lastMonth },
                   ].map(p => (
                     <div key={p.label} className="rounded-xl bg-ink/[0.03] dark:bg-white/5 p-3">
                       <p className="text-[10px] text-ink/40 mb-1">{p.label}</p>
