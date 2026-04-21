@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { shopItems } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -6,6 +7,9 @@ import { checkAdminAuth } from "@/lib/admin-auth";
 
 // GET — list all shop items
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-shop", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const items = await db.select().from(shopItems);
   return NextResponse.json({ items });
@@ -13,6 +17,9 @@ export async function GET(req: NextRequest) {
 
 // PATCH — update a shop item
 export async function PATCH(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-shop", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await req.json();
@@ -45,6 +52,9 @@ export async function PATCH(req: NextRequest) {
 
 // POST — create a new shop item
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-shop", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { slug, name, description, icon, category, xpCost, levelRequired, stock, active } = await req.json();

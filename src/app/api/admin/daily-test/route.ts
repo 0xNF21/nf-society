@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -8,6 +9,9 @@ import { checkAdminAuth } from "@/lib/admin-auth";
 
 // POST — create a test daily session with real scratch/spin/payout (no payment needed)
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-daily-test", 10, 60000);
+  if (limited) return limited;
+
   if (process.env.NODE_ENV !== "development") {
     return NextResponse.json({ error: "Not available in production" }, { status: 404 });
   }

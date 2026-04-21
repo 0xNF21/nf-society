@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { retryPayout } from "@/lib/payout";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const limited = await enforceRateLimit(request, "payout-retry", 10, 60000);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { payoutId, password } = body;

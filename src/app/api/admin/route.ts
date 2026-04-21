@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-login", 10, 60000);
+  if (limited) return limited;
+
   try {
     const { password } = await req.json();
     const adminPassword = process.env.ADMIN_PASSWORD;

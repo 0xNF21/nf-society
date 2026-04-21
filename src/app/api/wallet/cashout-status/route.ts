@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { cashoutTokens, claimedPayments } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -29,6 +30,9 @@ const WEI_1_CRC = BigInt("1000000000000000000");
  *     balanceAfter?, error? }
  */
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "wallet-cashout-status", 30, 60000);
+  if (limited) return limited;
+
   try {
     const token = req.nextUrl.searchParams.get("token");
     if (!token) {

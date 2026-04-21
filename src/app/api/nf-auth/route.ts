@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { nfAuthTokens, claimedPayments } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -18,7 +19,10 @@ function generateToken(): string {
 }
 
 // POST — create auth session for ticket recovery
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "nf-auth", 5, 60000);
+  if (limited) return limited;
+
   try {
     const token = generateToken();
     const expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS);
@@ -43,6 +47,9 @@ export async function POST() {
 
 // GET — poll auth token status (scans blockchain, matches payment, returns address)
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "nf-auth", 5, 60000);
+  if (limited) return limited;
+
   try {
     const token = req.nextUrl.searchParams.get("token");
     if (!token) {

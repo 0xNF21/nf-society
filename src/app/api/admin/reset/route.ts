@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { payouts, claimedPayments, lootboxOpens, dailySessions, jackpotPool, morpionGames, memoryGames, relicsGames, damesGames, pfcGames, playerBadges, players, shopPurchases, shopCoupons } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
@@ -33,6 +34,9 @@ const RESET_TARGETS: Record<string, { label: string; tables: string[]; where?: s
 };
 
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-reset", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   return NextResponse.json({
     targets: Object.entries(RESET_TARGETS).map(([key, val]) => ({
@@ -44,6 +48,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-reset", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {

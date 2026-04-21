@@ -4,12 +4,16 @@
  * Creates a new game with same settings, then patches the old game with rematch_slug.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { getServerGameConfig } from "@/lib/game-registry-server";
 import { createMultiplayerGame } from "@/lib/multiplayer";
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "rematch", 5, 60000);
+  if (limited) return limited;
+
   try {
     const { gameKey, slug } = await req.json();
 

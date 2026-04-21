@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { payouts, dailySessions } from "@/lib/db/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
@@ -20,6 +21,9 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { address: string } }
 ) {
+  const limited = await enforceRateLimit(_req, "players-address-transactions", 30, 60000);
+  if (limited) return limited;
+
   try {
     const addr = params.address.toLowerCase();
     const transactions: Transaction[] = [];

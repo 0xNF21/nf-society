@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { getPayoutConfig, getSafeCrcBalance, getBotXdaiBalance } from "@/lib/payout";
 import { ethers } from "ethers";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "payout-status", 10, 60000);
+  if (limited) return limited;
+
   try {
     const config = getPayoutConfig();
 

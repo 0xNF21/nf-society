@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { featureFlags } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -9,6 +10,9 @@ const VALID_STATUSES = ["enabled", "coming_soon", "hidden"];
 
 // GET — list all flags, auto-create missing ones from game registry
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-flags", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -50,6 +54,9 @@ export async function GET(req: NextRequest) {
 
 // PATCH — change a flag's status
 export async function PATCH(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-flags", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

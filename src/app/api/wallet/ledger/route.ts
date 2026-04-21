@@ -1,8 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { getLedger } from "@/lib/wallet";
 
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "wallet-ledger", 30, 60000);
+  if (limited) return limited;
+
   try {
     const address = req.nextUrl.searchParams.get("address");
     if (!address) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { payouts } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
@@ -7,6 +8,9 @@ import { executePayout } from "@/lib/payout";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const limited = await enforceRateLimit(request, "payout", 10, 60000);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { gameType, gameId, recipientAddress, amountCrc, reason, password } = body;
@@ -46,6 +50,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const limited = await enforceRateLimit(request, "payout", 10, 60000);
+  if (limited) return limited;
+
   try {
     const authHeader = request.headers.get("authorization");
     const password = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;

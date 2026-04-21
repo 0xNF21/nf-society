@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { xpConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -7,6 +8,9 @@ import { checkAdminAuth } from "@/lib/admin-auth";
 
 // GET — list all XP config
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-xp", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const configs = await db.select().from(xpConfig);
   return NextResponse.json({ configs });
@@ -14,6 +18,9 @@ export async function GET(req: NextRequest) {
 
 // PATCH — update a single config value
 export async function PATCH(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-xp", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { key, value, label } = await req.json();
@@ -36,6 +43,9 @@ export async function PATCH(req: NextRequest) {
 
 // POST — create a new XP config entry
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-xp", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { key, value, category, label } = await req.json();
@@ -63,6 +73,9 @@ export async function POST(req: NextRequest) {
 
 // DELETE — remove a config entry
 export async function DELETE(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-xp", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { key } = await req.json();

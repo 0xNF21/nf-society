@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import {
   nfAuthTokens,
@@ -39,6 +40,9 @@ const CHANCE_TABLES: Record<string, { tables: any; rounds: any; excludeFinished?
 };
 
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "game-ticket", 5, 60000);
+  if (limited) return limited;
+
   try {
     const gameKey = req.nextUrl.searchParams.get("gameKey");
     const slug = req.nextUrl.searchParams.get("slug");

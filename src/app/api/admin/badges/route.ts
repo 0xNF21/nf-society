@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { badges, playerBadges } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -6,6 +7,9 @@ import { checkAdminAuth } from "@/lib/admin-auth";
 
 // GET — list all badges
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-badges", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const allBadges = await db.select().from(badges);
   return NextResponse.json({ badges: allBadges });
@@ -13,6 +17,9 @@ export async function GET(req: NextRequest) {
 
 // POST — create a new badge
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-badges", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { slug, name, description, icon, category, secret, condition } = await req.json();
@@ -39,6 +46,9 @@ export async function POST(req: NextRequest) {
 
 // PATCH — update a badge
 export async function PATCH(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-badges", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await req.json();
@@ -68,6 +78,9 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE — delete a badge and its awards
 export async function DELETE(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-badges", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { slug } = await req.json();

@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { DAO_TREASURY_ADDRESS, getBalance, getLedger } from "@/lib/wallet";
 
 /**
@@ -12,7 +13,10 @@ import { DAO_TREASURY_ADDRESS, getBalance, getLedger } from "@/lib/wallet";
  *
  * Public read. No sensitive info — just aggregated fee stats.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "wallet-commission", 30, 60000);
+  if (limited) return limited;
+
   try {
     const [balanceCrc, ledger] = await Promise.all([
       getBalance(DAO_TREASURY_ADDRESS),

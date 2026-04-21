@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { getLedger } from "@/lib/wallet";
 import {
@@ -82,6 +83,9 @@ function isOnchain(h: string | null | undefined): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "wallet-activity", 30, 60000);
+  if (limited) return limited;
+
   try {
     const address = req.nextUrl.searchParams.get("address");
     if (!address) {

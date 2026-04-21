@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { dailyRewardsConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -7,6 +8,9 @@ import { checkAdminAuth } from "@/lib/admin-auth";
 
 // GET — get scratch and spin reward tables
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-daily", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const rows = await db.select().from(dailyRewardsConfig);
   const result: Record<string, unknown> = {};
@@ -18,6 +22,9 @@ export async function GET(req: NextRequest) {
 
 // PATCH — update a reward table (scratch or spin)
 export async function PATCH(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-daily", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { key, rewards } = await req.json();

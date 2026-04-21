@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { ethers } from "ethers";
 import { db } from "@/lib/db";
 import { players } from "@/lib/db/schema";
@@ -23,6 +24,9 @@ import { checkAdminAuth } from "@/lib/admin-auth";
  * Auth: `x-admin-password` header must match ADMIN_PASSWORD env.
  */
 export async function GET(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "admin-wallet-health", 10, 60000);
+  if (limited) return limited;
+
   if (!checkAdminAuth(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

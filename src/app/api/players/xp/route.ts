@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { players, shopPurchases } from "@/lib/db/schema";
 import { eq, and, gt, sql } from "drizzle-orm";
@@ -7,6 +8,9 @@ import { loadXpConfig } from "@/lib/xp-server";
 import { checkAndAwardBadges, awardSupremeFounder } from "@/lib/badges";
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "players-xp", 30, 60000);
+  if (limited) return limited;
+
   try {
     const { address, action, xpOverride } = await req.json();
     if (!address || !action) {

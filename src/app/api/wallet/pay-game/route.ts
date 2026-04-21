@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { payGameFromBalance } from "@/lib/wallet";
 
 /**
@@ -33,6 +34,9 @@ import { payGameFromBalance } from "@/lib/wallet";
  * transaction. If anything fails the balance is untouched.
  */
 export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "wallet-pay-game", 30, 60000);
+  if (limited) return limited;
+
   try {
     const body = await req.json().catch(() => ({}));
     const { gameKey, slug, address, playerToken, amount, ballValue, mineCount, pickCount, choice } = body || {};
