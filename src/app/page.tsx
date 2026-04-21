@@ -21,6 +21,7 @@ import { useDemo } from "@/components/demo-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY, CHANCE_REGISTRY } from "@/lib/game-registry";
+import LandingHeroMockup from "@/components/landing-hero-mockup";
 
 const MULTI_EMOJI: Record<string, string> = {
   morpion: "❌⭕",
@@ -157,6 +158,9 @@ export default function LandingPage() {
               </Link>
               <span className="text-xs text-ink/40 dark:text-white/40">{t.heroCtaSecondaryHint[locale]}</span>
             </div>
+          </div>
+          <div className="mt-16 sm:mt-20">
+            <LandingHeroMockup />
           </div>
         </div>
       </section>
