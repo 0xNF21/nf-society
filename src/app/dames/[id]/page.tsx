@@ -59,8 +59,8 @@ function DamesScoreboard({ state, locale, p1Label, p2Label, isDark }: {
         <div className="flex items-baseline gap-3">
           <span className="text-2xl font-black text-ink dark:text-white">{p1}<span className="text-sm font-bold text-ink/40 dark:text-white/40">/12</span></span>
           <div className="text-[10px] text-ink/50 dark:text-white/50 space-y-0.5">
-            <p>♛ {p1Kings} {locale === 'fr' ? 'dames' : 'kings'}</p>
-            <p>💥 {p1Captured} {locale === 'fr' ? 'prises' : 'captures'}</p>
+            <p>♛ {p1Kings} {translations.dames.kings[locale]}</p>
+            <p>💥 {p1Captured} {translations.dames.captures[locale]}</p>
           </div>
         </div>
       </div>
@@ -76,8 +76,8 @@ function DamesScoreboard({ state, locale, p1Label, p2Label, isDark }: {
         <div className="flex items-baseline gap-3">
           <span className="text-2xl font-black text-ink dark:text-white">{p2}<span className="text-sm font-bold text-ink/40 dark:text-white/40">/12</span></span>
           <div className="text-[10px] text-ink/50 dark:text-white/50 space-y-0.5">
-            <p>♛ {p2Kings} {locale === 'fr' ? 'dames' : 'kings'}</p>
-            <p>💥 {p2Captured} {locale === 'fr' ? 'prises' : 'captures'}</p>
+            <p>♛ {p2Kings} {translations.dames.kings[locale]}</p>
+            <p>💥 {p2Captured} {translations.dames.captures[locale]}</p>
           </div>
         </div>
       </div>
@@ -92,7 +92,7 @@ function MoveLog({ entries, locale, isDark }: { entries: string[], locale: 'fr' 
   return (
     <div className={`w-full max-w-lg rounded-xl p-3 ${isDark ? 'bg-white/5 border border-white/10' : 'bg-white/60 border border-ink/10'}`}>
       <p className="text-[10px] font-bold text-ink/40 dark:text-white/40 uppercase tracking-widest mb-1">
-        {locale === 'fr' ? 'Derniers coups' : 'Last moves'}
+        {translations.dames.lastMoves[locale]}
       </p>
       <div className="flex flex-col gap-0.5 max-h-20 overflow-y-auto">
         {entries.slice(-5).reverse().map((entry, i) => (
@@ -105,13 +105,13 @@ function MoveLog({ entries, locale, isDark }: { entries: string[], locale: 'fr' 
   )
 }
 
-function describeMove(move: Move, player: number, locale: string) {
+function describeMove(move: Move, player: number, locale: 'fr' | 'en') {
   const cols = 'ABCDEFGH'
   const from = `${cols[move.from[1]]}${GRID_SIZE - move.from[0]}`
   const to = `${cols[move.to[1]]}${GRID_SIZE - move.to[0]}`
-  const who = player === 1 ? (locale === 'fr' ? 'Toi' : 'You') : 'IA'
+  const who = player === 1 ? translations.dames.you[locale] : 'IA'
   const cap = move.captures.length > 0
-    ? ` (${move.captures.length} ${locale === 'fr' ? 'prise' : 'capture'}${move.captures.length > 1 ? 's' : ''})`
+    ? ` (${move.captures.length} ${translations.dames.captureSingular[locale]}${move.captures.length > 1 ? 's' : ''})`
     : ''
   return `${who}: ${from} → ${to}${cap}`
 }
@@ -165,7 +165,7 @@ function DemoGame() {
       <div className="w-full max-w-lg">
         <div className="flex items-center justify-between mb-6">
           <Link href="/dames" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> {locale === 'fr' ? 'Retour' : 'Back'}
+            <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
           </Link>
           <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg font-bold">DEMO</span>
         </div>
@@ -203,7 +203,7 @@ function DemoGame() {
         <div className="mb-4">
           <DamesScoreboard
             state={state} locale={locale} isDark={isDark}
-            p1Label={`${demoPlayer.name} (${locale === 'fr' ? 'vous' : 'you'})`}
+            p1Label={`${demoPlayer.name} (${t.youShort[locale]})`}
             p2Label="🤖 Bot"
           />
         </div>
@@ -219,13 +219,13 @@ function DemoGame() {
         </div>
 
         <p className="text-center text-xs text-ink/40 dark:text-white/40 mb-4">
-          {locale === 'fr' ? 'Coups' : 'Moves'} : {state.moveCount}
+          {t.moves[locale]} : {state.moveCount}
         </p>
 
         {result && (
           <Link href="/dames">
             <Button className="w-full rounded-xl font-bold" style={{ background: '#251B9F' }}>
-              {locale === 'fr' ? 'Rejouer' : 'Play again'}
+              {t.playAgain[locale]}
             </Button>
           </Link>
         )}
@@ -299,7 +299,7 @@ function RealGame({ id }: { id: string }) {
 
   if (!game) return (
     <div className="min-h-screen flex items-center justify-center">
-      <p className="text-ink/50">{locale === 'fr' ? 'Chargement…' : 'Loading…'}</p>
+      <p className="text-ink/50">{t.loading[locale]}</p>
     </div>
   )
 
@@ -317,10 +317,10 @@ function RealGame({ id }: { id: string }) {
       <div className="w-full max-w-lg">
         <div className="mb-6 space-y-2">
           <Link href="/dames" className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> {locale === 'fr' ? 'Retour' : 'Back'}
+            <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
           </Link>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-ink/40">{locale === 'fr' ? 'Partie' : 'Game'}</span>
+            <span className="text-xs text-ink/40">{t.gameLabel[locale]}</span>
             <span className="font-mono font-bold text-marine text-sm bg-marine/10 px-2.5 py-1 rounded-lg">{id}</span>
             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg font-bold">{game.betCrc} CRC</span>
           </div>
@@ -413,7 +413,7 @@ function RealGame({ id }: { id: string }) {
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
             <CardContent className="p-5 text-center">
               <p className="text-sm text-ink/60 dark:text-white/60">
-                {locale === 'fr' ? 'Mode spectateur — vous regardez cette partie' : 'Spectator mode — you are watching this game'}
+                {t.spectatorMode[locale]}
               </p>
             </CardContent>
           </Card>
@@ -439,7 +439,7 @@ function RealGame({ id }: { id: string }) {
             </div>
 
             <p className="text-center text-xs text-ink/40 dark:text-white/40 mb-4">
-              Pot: {game.betCrc * 2} CRC · {locale === 'fr' ? 'Coups' : 'Moves'}: {state.moveCount}
+              Pot: {game.betCrc * 2} CRC · {t.moves[locale]}: {state.moveCount}
             </p>
           </>
         )}
