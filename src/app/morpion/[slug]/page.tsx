@@ -15,6 +15,7 @@ import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
+import { formatCrc } from "@/lib/format";
 
 type GameStatus = "waiting_p1" | "waiting_p2" | "active" | "finished" | "cancelled";
 
@@ -445,7 +446,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
                     <Trophy className="w-5 h-5 text-citrus" />
                     <span className="font-bold text-ink">{t.gameOver[locale]}</span>
                   </div>
-                  <p className="text-xs text-ink/50">{t.winnerLabel[locale]} : {game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"} — {winAmount} CRC</p>
+                  <p className="text-xs text-ink/50">{t.winnerLabel[locale]} : {game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"} — {formatCrc(winAmount)} CRC</p>
                 </div>
               );
 
@@ -455,7 +456,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
                     <Trophy className="w-5 h-5 text-citrus" />
                     <span className="font-bold text-ink">{t.youWon[locale]}</span>
                   </div>
-                  <p className="text-xs text-ink/50">{winAmount} CRC {t.onTheWay[locale]}</p>
+                  <p className="text-xs text-ink/50">{formatCrc(winAmount)} CRC {t.onTheWay[locale]}</p>
                 </div>
               );
 
@@ -465,7 +466,7 @@ function RealMorpionGame({ slug }: { slug: string }) {
                   <p className="font-bold text-ink text-sm">{t.youLost[locale]}</p>
                   <div className="text-xs text-ink/50 space-y-0.5">
                     <p>{t.winnerLabel[locale]} : <span className="font-semibold text-ink/60">{game.winnerAddress ? (profiles[game.winnerAddress.toLowerCase()]?.name || shortenAddress(game.winnerAddress)) : "—"}</span></p>
-                    <p>{t.betWon[locale]} <span className="font-bold text-ink/60">{winAmount} CRC</span></p>
+                    <p>{t.betWon[locale]} <span className="font-bold text-ink/60">{formatCrc(winAmount)} CRC</span></p>
                   </div>
                 </div>
               );

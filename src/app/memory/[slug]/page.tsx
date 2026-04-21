@@ -15,6 +15,7 @@ import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
+import { formatCrc } from "@/lib/format";
 
 type GameStatus = "waiting_p1" | "waiting_p2" | "playing" | "finished" | "cancelled";
 
@@ -458,7 +459,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
                   <span className="font-bold text-ink">{iWon ? t.youWon[locale] : iLost ? t.youLost[locale] : t.gameOver[locale]}</span>
                 </div>
                 <p className="text-xs text-ink/50">
-                  {t.betWon[locale]} <span className="font-bold text-ink/60">{winAmount} CRC</span>
+                  {t.betWon[locale]} <span className="font-bold text-ink/60">{formatCrc(winAmount)} CRC</span>
                 </p>
               </div>
             )}

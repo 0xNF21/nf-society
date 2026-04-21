@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ChevronDown } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations, localeBcp47 } from "@/lib/i18n";
+import { formatCrc } from "@/lib/format";
 import BadgeIcon from "@/components/ui/badge-icon";
 
 interface LevelDef {
@@ -326,7 +327,7 @@ export default function PlayerProfileClient({
                           </>
                         ) : (
                           <span className={`font-bold font-mono ${g.net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                            {g.net >= 0 ? "+" : ""}{g.net} CRC
+                            {g.net >= 0 ? "+" : ""}{formatCrc(g.net)} CRC
                           </span>
                         )}
                       </div>

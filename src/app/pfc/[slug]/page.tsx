@@ -15,6 +15,7 @@ import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
+import { formatCrc } from "@/lib/format";
 import { resolveRound, getScore, getWinner, isGameOver, getBotMove, createInitialState, MOVE_EMOJI } from "@/lib/pfc";
 import type { Move, PfcState, RoundResult } from "@/lib/pfc";
 import type { PfcGameRow } from "@/lib/db/schema/pfc";
@@ -432,7 +433,7 @@ function RealPfcGame({ slug }: { slug: string }) {
                 </span>
               </div>
               {myRole && game.winnerAddress?.toLowerCase() === myAddress.toLowerCase() && (
-                <p className="text-xs text-ink/50">{winAmount} CRC {t.onTheWay[locale]}</p>
+                <p className="text-xs text-ink/50">{formatCrc(winAmount)} CRC {t.onTheWay[locale]}</p>
               )}
             </CardContent>
           </Card>

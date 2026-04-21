@@ -14,6 +14,7 @@ import { PnlCard } from "@/components/pnl-card"
 import { usePlayerToken } from "@/hooks/use-player-token"
 import { useGamePolling } from "@/hooks/use-game-polling"
 import { translations } from "@/lib/i18n"
+import { formatCrc } from "@/lib/format"
 import Link from "next/link"
 import { ArrowLeft, RotateCcw, Trophy, Clock, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -675,7 +676,7 @@ function RealRelicsGame({ id }: { id: string }) {
                     {game.winnerAddress?.toLowerCase() === myAddress.toLowerCase() ? t.victory[locale] : t.defeat[locale]}
                   </span>
                 </div>
-                <p className="text-xs text-ink/50 dark:text-white/50">{winAmount} CRC</p>
+                <p className="text-xs text-ink/50 dark:text-white/50">{formatCrc(winAmount)} CRC</p>
               </div>
             )}
           </CardContent>

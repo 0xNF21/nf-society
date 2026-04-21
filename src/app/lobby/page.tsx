@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GAME_REGISTRY, GAME_LABELS } from "@/lib/game-registry";
 import { translations } from "@/lib/i18n";
+import { formatCrc } from "@/lib/format";
 
 interface Room {
   slug: string;
@@ -170,7 +171,7 @@ export default function LobbyPage() {
                               {t.betLabel[locale]}: <span className="font-bold text-ink dark:text-white">{room.betCrc} CRC</span>
                             </span>
                             <span className="text-[10px] text-ink/30 dark:text-white/30">
-                              → {winAmount} CRC
+                              → {formatCrc(winAmount)} CRC
                             </span>
                           </div>
                         </div>
