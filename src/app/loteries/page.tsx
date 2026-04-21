@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, Archive, CheckCircle2, Lock, Sparkles, Ticket, Trophy, Users } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
@@ -172,10 +171,10 @@ export default function HomePage() {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
         <header className="space-y-4 text-center relative">
           <div className="absolute left-0 top-0">
-            <BackLink fallback="/chance" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
+            <Link href="/chance" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
               <ArrowLeft className="h-4 w-4" />
               {locale === "fr" ? "Retour" : "Back"}
-            </BackLink>
+            </Link>
           </div>
           <div className="flex items-center justify-center gap-4">
             <img src="/nf-society-logo.png" alt="NF Society" className="h-20 w-20 rounded-2xl object-cover" />

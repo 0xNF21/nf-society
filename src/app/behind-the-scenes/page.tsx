@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import { ArrowLeft, Link2, QrCode, Radar, ShieldCheck } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,13 +19,13 @@ export default function BehindTheScenesPage() {
             className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-ink/10 bg-white/80 px-4 py-3 text-sm shadow-[0_10px_28px_-24px_rgba(15,23,42,0.35)] backdrop-blur"
           >
             <div className="flex flex-wrap items-center gap-4">
-              <BackLink
-                fallback="/home"
+              <Link
+                href="/home"
                 className="inline-flex items-center gap-2 font-semibold text-ink transition hover:text-ink/70"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to the builder
-              </BackLink>
+              </Link>
               <span className="hidden h-4 w-px bg-ink/10 sm:block" aria-hidden />
               <span className="text-xs uppercase tracking-[0.35em] text-ink/50">
                 Technical overview

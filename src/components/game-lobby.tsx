@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Loader2, Lock, Globe } from "lucide-react";
@@ -10,7 +11,6 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY } from "@/lib/game-registry";
 import { GameRulesModal } from "@/components/game-rules-modal";
-import { BackLink } from "@/components/back-link";
 
 interface GameLobbyProps {
   gameKey: string;
@@ -20,7 +20,7 @@ interface GameLobbyProps {
   getExtraBody?: () => Record<string, unknown>;
   /** Custom demo slug generator (default: DEMO-XXXXXX) */
   getDemoSlug?: () => string;
-  /** Back link fallback destination if no browser history (default: "/home") */
+  /** Back link destination (default: "/multijoueur") */
   backHref?: string;
 }
 
@@ -29,7 +29,7 @@ export function GameLobby({
   extraCreateFields,
   getExtraBody,
   getDemoSlug,
-  backHref = "/home",
+  backHref = "/multijoueur",
 }: GameLobbyProps) {
   const router = useRouter();
   const { locale } = useLocale();
@@ -88,9 +88,9 @@ export function GameLobby({
       <div className="w-full max-w-md">
 
         {/* Back */}
-        <BackLink fallback={backHref} className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink mb-8 transition-colors">
+        <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
-        </BackLink>
+        </Link>
 
         {/* Header */}
         <div className="text-center mb-10">

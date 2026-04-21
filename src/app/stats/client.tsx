@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import { ArrowLeft, TrendingUp, Users, Coins, Gamepad2, History, ExternalLink } from "lucide-react";
 import {
   LineChart,
@@ -68,13 +67,13 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
   return (
     <div className="min-h-screen bg-sand dark:bg-black">
       <main className="mx-auto max-w-4xl px-4 py-10 flex flex-col gap-6">
-        <BackLink
-          fallback="/home"
+        <Link
+          href="/home"
           className="flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink/80 dark:text-white/50 dark:hover:text-white/80 transition-colors font-medium w-fit"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           {t.back[locale]}
-        </BackLink>
+        </Link>
 
         <header className="text-center space-y-2">
           <h1 className="font-display text-4xl font-bold text-ink dark:text-white">

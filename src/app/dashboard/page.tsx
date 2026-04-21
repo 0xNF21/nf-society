@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import Image from "next/image";
 import { ArrowLeft, Check, Palette, RefreshCw, Sparkles, Wallet, AlertCircle, CheckCircle, XCircle, Send, ChevronDown, ExternalLink, Loader2, Gift, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -250,10 +249,10 @@ export default function DashboardPage() {
       <main className="px-4 py-10 md:py-16">
         <div className="mx-auto max-w-md">
           <div className="text-center mb-8 relative">
-            <BackLink fallback="/home" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6">
+            <Link href="/hub" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6">
               <ArrowLeft className="h-4 w-4" />
               {d.backToHome[locale]}
-            </BackLink>
+            </Link>
             <h1 className="font-display text-3xl font-bold text-ink mt-4">{d.title[locale]}</h1>
             <p className="text-ink/50 mt-2">{d.loginSubtitle[locale]}</p>
           </div>
@@ -290,10 +289,10 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <BackLink fallback="/home" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
+            <Link href="/hub" className="inline-flex items-center gap-2 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
               <ArrowLeft className="h-4 w-4" />
               {d.backToHome[locale]}
-            </BackLink>
+            </Link>
             <h1 className="font-display text-3xl font-bold text-ink">{d.createTitle[locale]}</h1>
             <p className="text-ink/50 mt-1">{d.createSubtitle[locale]}</p>
           </div>

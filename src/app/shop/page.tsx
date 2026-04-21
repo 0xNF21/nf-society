@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import { ArrowLeft, ShoppingBag, Lock, Check, Zap, Shield, Sparkles, Coins, Gamepad2, Loader2, Copy, QrCode, CheckCircle2, Wallet } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
@@ -381,13 +380,13 @@ export default function ShopPage() {
   if (authState !== "confirmed") {
     return (
       <div className="min-h-screen px-4 py-8 max-w-md mx-auto">
-        <BackLink
-          fallback="/home"
+        <Link
+          href="/hub"
           className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
           {t.back[locale]}
-        </BackLink>
+        </Link>
 
         <div className="text-center mb-8">
           <div className="h-16 w-16 rounded-2xl bg-pink-50 flex items-center justify-center mx-auto mb-4">
@@ -496,13 +495,13 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto">
       <div className="mb-6">
-        <BackLink
-          fallback="/home"
+        <Link
+          href="/hub"
           className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           {t.back[locale]}
-        </BackLink>
+        </Link>
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-xl bg-pink-50 flex items-center justify-center">
             <ShoppingBag className="h-6 w-6 text-pink-500" />

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import { ArrowLeft, ChevronDown } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations, localeBcp47 } from "@/lib/i18n";
@@ -163,10 +162,10 @@ export default function PlayerProfileClient({
   return (
     <div className="min-h-screen bg-sand">
       <main className="mx-auto max-w-lg px-4 py-10 flex flex-col gap-4">
-        <BackLink fallback="/home" className="flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink/80 transition-colors font-medium w-fit">
+        <Link href="/hub" className="flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink/80 transition-colors font-medium w-fit">
           <ArrowLeft className="h-3.5 w-3.5" />
           {t.home[locale]}
-        </BackLink>
+        </Link>
 
         {/* Card profil — avatar Circles + nom */}
         <div className="rounded-2xl bg-white/70 backdrop-blur-sm border border-ink/10 shadow-sm p-6 flex items-center gap-4">

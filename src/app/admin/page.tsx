@@ -8,7 +8,6 @@ import {
   Palette, Check, Archive
 } from "lucide-react";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 
 /* ─── Types ─── */
 type FlagStatus = "enabled" | "coming_soon" | "hidden";
@@ -120,9 +119,9 @@ export default function AdminPage() {
       <div className="flex-1 flex flex-col items-center px-4 py-8">
         <div className="w-full max-w-3xl flex flex-col gap-6">
           <div className="flex items-center gap-4">
-            <BackLink fallback="/home" className="flex items-center gap-2 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
+            <Link href="/home" className="flex items-center gap-2 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
               <ArrowLeft className="h-4 w-4" /> Retour
-            </BackLink>
+            </Link>
           </div>
 
           <header className="text-center space-y-2">
