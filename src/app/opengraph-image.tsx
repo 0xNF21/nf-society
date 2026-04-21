@@ -146,8 +146,8 @@ export default async function OpengraphImage() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 16,
-                padding: "14px 22px",
+                gap: 14,
+                padding: "10px 20px",
                 borderRadius: 999,
                 backgroundColor: "white",
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
@@ -155,24 +155,24 @@ export default async function OpengraphImage() {
             >
               <span style={{ fontSize: 20, fontWeight: 600, color: "#251B9F" }}>Built on</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={gnosisSrc} alt="Gnosis" width={44} height={44} />
-              <div style={{ width: 1, height: 28, backgroundColor: "rgba(0,0,0,0.1)" }} />
+              <img src={gnosisSrc} alt="Gnosis" width={60} height={60} />
+              <div style={{ width: 1, height: 32, backgroundColor: "rgba(0,0,0,0.1)" }} />
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={circlesSrc} alt="Circles" width={140} height={42} style={{ objectFit: "contain" }} />
+              <img src={circlesSrc} alt="Circles" width={180} height={54} style={{ objectFit: "contain" }} />
             </div>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 14,
-                padding: "10px 22px 10px 10px",
+                gap: 12,
+                padding: "6px 22px 6px 6px",
                 borderRadius: 999,
                 backgroundColor: "white",
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={nfSrc} alt="NF Society" width={52} height={52} style={{ borderRadius: 999 }} />
+              <img src={nfSrc} alt="NF Society" width={68} height={68} style={{ borderRadius: 999 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: "#251B9F", opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.08em" }}>Made by</span>
                 <span style={{ fontSize: 22, fontWeight: 800, color: "#251B9F" }}>NF Society</span>
