@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lootboxes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isEthereumAddress } from "@/lib/validation";
 
 export async function GET() {
   try {
@@ -24,6 +25,10 @@ export async function POST(req: NextRequest) {
 
     if (!slug || !title || !recipientAddress) {
       return NextResponse.json({ error: "slug, title and recipientAddress are required" }, { status: 400 });
+    }
+
+    if (!isEthereumAddress(recipientAddress)) {
+      return NextResponse.json({ error: "Invalid recipientAddress (expected 0x + 40 hex chars)" }, { status: 400 });
     }
 
     const price = pricePerOpenCrc || 10;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lotteries } from "@/lib/db/schema";
 import { eq, ne } from "drizzle-orm";
+import { isEthereumAddress } from "@/lib/validation";
 
 export async function GET(req: NextRequest) {
   try {
@@ -41,6 +42,16 @@ export async function POST(req: NextRequest) {
 
     if (!title || !organizer || !recipientAddress) {
       return NextResponse.json({ error: "Missing required fields: title, organizer, recipientAddress" }, { status: 400 });
+    }
+
+    if (!isEthereumAddress(recipientAddress)) {
+      return NextResponse.json({ error: "Invalid recipientAddress (expected 0x + 40 hex chars)" }, { status: 400 });
+    }
+
+    if (commissionPercent !== undefined) {
+      if (!Number.isFinite(commissionPercent) || commissionPercent < 0 || commissionPercent > 100) {
+        return NextResponse.json({ error: "commissionPercent must be a number between 0 and 100" }, { status: 400 });
+      }
     }
 
     const slug = body.slug || title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
