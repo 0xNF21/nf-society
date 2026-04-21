@@ -357,47 +357,5 @@ export const botState = pgTable("bot_state", {
   updatedAt:  timestamp("updated_at").defaultNow().notNull(),
 });
 
-export { relicsGames } from "./schema/relics";
-export type { RelicsGameRow, NewRelicsGame } from "./schema/relics";
-
-export { damesGames } from "./schema/dames";
-export type { DamesGameRow, NewDamesGame } from "./schema/dames";
-
-export { pfcGames } from "./schema/pfc";
-export type { PfcGameRow, NewPfcGame } from "./schema/pfc";
-
-export { blackjackTables, blackjackHands } from "./schema/blackjack";
-export type { BlackjackTableRow, BlackjackHandRow, NewBlackjackTable, NewBlackjackHand } from "./schema/blackjack";
-
-export { coinFlipTables, coinFlipResults } from "./schema/coin-flip";
-export type { CoinFlipTableRow, CoinFlipResultRow, NewCoinFlipTable, NewCoinFlipResult } from "./schema/coin-flip";
-
-export { hiloTables, hiloRounds } from "./schema/hilo";
-export type { HiloTableRow, HiloRoundRow, NewHiloTable, NewHiloRound } from "./schema/hilo";
-
-export { minesTables, minesRounds } from "./schema/mines";
-export type { MinesTableRow, MinesRoundRow, NewMinesTable, NewMinesRound } from "./schema/mines";
-
-export { diceTables, diceRounds } from "./schema/dice";
-export type { DiceTableRow, DiceRoundRow, NewDiceTable, NewDiceRound } from "./schema/dice";
-
-export { crashDashTables, crashDashRounds } from "./schema/crash-dash";
-export type { CrashDashTableRow, CrashDashRoundRow, NewCrashDashTable, NewCrashDashRound } from "./schema/crash-dash";
-
-export { kenoTables, kenoRounds } from "./schema/keno";
-export type { KenoTableRow, KenoRoundRow, NewKenoTable, NewKenoRound } from "./schema/keno";
-
-export { rouletteTables, rouletteRounds } from "./schema/roulette";
-export type { RouletteTableRow, RouletteRoundRow, NewRouletteTable, NewRouletteRound } from "./schema/roulette";
-
-export { plinkoTables, plinkoRounds } from "./schema/plinko";
-export type { PlinkoTableRow, PlinkoRoundRow, NewPlinkoTable, NewPlinkoRound } from "./schema/plinko";
-
-export { supportMessages } from "./schema/support";
-export type { SupportMessageRow, NewSupportMessage } from "./schema/support";
-
-export { crcRacesGames } from "./schema/crc-races";
-export type { CrcRacesGameRow, NewCrcRacesGame, PayoutEntry as CrcRacesPayoutEntry } from "./schema/crc-races";
-
-export { cashoutTokens } from "./schema/cashout";
-export type { CashoutTokenRow, NewCashoutToken } from "./schema/cashout";
+// Re-exports from sub-files have moved to `./index.ts`.
+// This file holds only the tables that were defined inline before PR #9.
