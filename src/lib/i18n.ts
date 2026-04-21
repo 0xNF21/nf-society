@@ -948,8 +948,8 @@ export const translations = {
       en: "{amount} CRC on {gameName}! \uD83C\uDFC6\n\nPlay on NF Society \uD83D\uDC49 https://nf-society.vercel.app",
     },
     tweetReward: {
-      fr: "{amount} CRC {tier} sur {gameName} ! \uD83C\uDFB0\n\nhttps://nf-society.vercel.app",
-      en: "{amount} CRC {tier} on {gameName}! \uD83C\uDFB0\n\nhttps://nf-society.vercel.app",
+      fr: "{amount} CRC{tier} sur {gameName} ! \uD83C\uDFB0\n\nhttps://nf-society.vercel.app",
+      en: "{amount} CRC{tier} on {gameName}! \uD83C\uDFB0\n\nhttps://nf-society.vercel.app",
     },
   },
   shop: {

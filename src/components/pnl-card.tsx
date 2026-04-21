@@ -425,7 +425,7 @@ function buildTweetText(props: PnlCardProps): string {
     return translations.pnlCard.tweetWin[locale].replace("{amount}", amount).replace("{gameName}", gameName);
   }
   if (props.result === "reward") {
-    const tier = props.tier ? `(${props.tier})` : "";
+    const tier = props.tier ? ` (${props.tier})` : "";
     return translations.pnlCard.tweetReward[locale].replace("{amount}", amount).replace("{tier}", tier).replace("{gameName}", gameName);
   }
   return `${amount} CRC — ${gameName}\n\nhttps://nf-society.vercel.app`;
