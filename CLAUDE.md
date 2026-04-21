@@ -5,9 +5,16 @@ Plateforme communautaire du DAO NF Society sur Gnosis Chain (Circles Protocol).
 ## Commands
 
 ```bash
-npm run dev     # Dev server (Next.js, port 3000)
-npm run build   # Production build
-npm run lint    # ESLint
+npm run dev          # Dev server (Next.js, port 3000)
+npm run build        # Production build
+npm run lint         # ESLint
+npm run typecheck    # tsc --noEmit
+
+npm run db:generate  # Generate a migration from a schema change
+npm run db:migrate   # Apply pending migrations to DATABASE_URL
+npm run db:push      # Sync schema directly (dev only, skips migration files)
+npm run db:studio    # Browse the DB via drizzle-kit studio
+npm run db:check     # Validate migrations + snapshots consistency
 ```
 
 ## Stack
@@ -128,12 +135,13 @@ Le projet utilise un pattern pour les jeux de chance single-player (coin-flip, b
 12. **Server page** : `src/app/{jeu}/[slug]/page.tsx` — detection DEMO + query DB + passe au client
 13. **Client component** : `src/components/{jeu}-page.tsx` — DemoGame (client-only) + RealGame (paiement + polling + actions API)
 14. **Chance hub** : ajouter carte dans `src/app/chance/page.tsx`
-15. **Migration DB locale** : creer route API temporaire `src/app/api/migrate-xxx/route.ts` avec `db.execute(sql\`CREATE TABLE...\`)`, appeler via `preview_eval`, puis supprimer la route
-16. **Migration Neon** : `npx vercel env pull .env.neon-temp --environment=production`, script node avec pg Pool + pool.query(sql), puis `rm .env.neon-temp`
-17. **Creer table classic** : POST via `preview_eval` sur `/api/{jeu}` avec le `recipientAddress` (recuperer depuis une table existante : `fetch('/api/hilo?slug=classic')`)
-18. **Meme chose sur Neon** : INSERT via script node + pg avec les env Vercel
-19. **Build** : verifier `npx tsc --noEmit`
-20. **Commit + push** : deploiement auto Vercel
+15. **Generer la migration** : `npm run db:generate -- --name add_{jeu}_tables`
+    → drizzle-kit compare schema vs meta snapshot, ecrit `drizzle/NNNN_add_{jeu}_tables.sql` + met a jour le snapshot. Plus besoin de route API temporaire ni de script node manuel.
+16. **Appliquer en local** : `npm run db:migrate` (utilise DATABASE_URL de `.env.local`)
+17. **Appliquer sur Neon** : `npx vercel env pull .env.neon && DATABASE_URL=$(grep DATABASE_URL .env.neon | cut -d= -f2-) npm run db:migrate && rm .env.neon`
+18. **Creer la table 'classic'** : POST sur `/api/{jeu}` avec `recipientAddress = SAFE_ADDRESS` (en local puis en prod via fetch sur nf-society.vercel.app)
+19. **Build** : `npm run typecheck` puis `npm run build`
+20. **Commit + push** : deploiement auto Vercel + migration deja appliquee sur Neon
 
 ### SAFE_ADDRESS (Relayer NF Society)
 `0x960A0784640fD6581D221A56df1c60b65b5ebB6f` — utiliser comme recipientAddress pour tous les jeux.
