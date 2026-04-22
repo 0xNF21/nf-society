@@ -120,7 +120,7 @@ export default function LootboxesClient({ lootboxes }: { lootboxes: LootboxData[
             {t.footer[locale]}
           </p>
           <p className="text-xs text-ink/50">
-            NF Society — {locale === "fr" ? "Lootboxes décentralisées" : "Decentralized Lootboxes"}
+            NF Society — {t.decentralizedLootboxes[locale]}
           </p>
         </footer>
       </div>

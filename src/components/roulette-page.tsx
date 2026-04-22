@@ -287,7 +287,7 @@ function BettingTable({
       {/* ── Chip denomination selector ── */}
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold shrink-0">
-          {locale === "fr" ? "Jeton" : "Chip"}
+          {t.chip[locale]}
         </span>
         <div className="flex gap-1.5 flex-1">
           {[1, 5, 10].map((v) => (

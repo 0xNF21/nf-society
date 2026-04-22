@@ -693,10 +693,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                   <ol className="space-y-3 text-sm text-ink/70">
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">1</span>
-                      <span>{locale === "fr"
-                        ? <>{t.rulesStep1[locale].split("{price}")[0]}<strong className="text-ink">{t.payWithCircles[locale]}</strong>{" "}<strong className="text-ink">{lootbox.pricePerOpenCrc} CRC</strong>{" depuis ton wallet."}</>
-                        : <>{<strong className="text-ink">{t.payWithCircles[locale]}</strong>}{" and send exactly "}<strong className="text-ink">{lootbox.pricePerOpenCrc} CRC</strong>{" from your wallet."}</>
-                      }</span>
+                      <span>{t.rulesStep1[locale].replace("{price}", String(lootbox.pricePerOpenCrc))}</span>
                     </li>
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">2</span>
@@ -704,17 +701,11 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                     </li>
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">3</span>
-                      <span>{locale === "fr"
-                        ? <>{"La boîte révèle ton gain — de "}<strong className="text-ink">{getRewardTable(lootbox.pricePerOpenCrc)[0].reward} CRC</strong>{" jusqu'à "}<strong className="text-ink">{getRewardTable(lootbox.pricePerOpenCrc).at(-1)!.reward} CRC</strong>{" pour le jackpot !"}</>
-                        : <>{"The box reveals your win — from "}<strong className="text-ink">{getRewardTable(lootbox.pricePerOpenCrc)[0].reward} CRC</strong>{" up to "}<strong className="text-ink">{getRewardTable(lootbox.pricePerOpenCrc).at(-1)!.reward} CRC</strong>{" for the jackpot!"}</>
-                      }</span>
+                      <span>{t.rulesStep3[locale].replace("{min}", String(getRewardTable(lootbox.pricePerOpenCrc)[0].reward)).replace("{max}", String(getRewardTable(lootbox.pricePerOpenCrc).at(-1)!.reward))}</span>
                     </li>
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">4</span>
-                      <span>{locale === "fr"
-                        ? <>{"Les CRC gagnés sont envoyés "}<strong className="text-ink">{"automatiquement"}</strong>{" sur ton adresse."}</>
-                        : <>{"Your CRC winnings are sent "}<strong className="text-ink">{"automatically"}</strong>{" to your address."}</>
-                      }</span>
+                      <span>{t.rulesStep4[locale]}</span>
                     </li>
                   </ol>
 
@@ -762,10 +753,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                     </div>
 
                     <p className="text-sm text-ink/60 leading-relaxed text-center">
-                      {locale === "fr"
-                        ? <>{"Pour "}<strong className="text-ink">{"100 CRC"}</strong>{" misés, tu récupères en moyenne "}<strong className="text-ink">{rtpDisplay} CRC</strong>{". Ce chiffre est basé sur les probabilités déclarées par la plateforme."}</>
-                        : <>{"For every "}<strong className="text-ink">{"100 CRC"}</strong>{" wagered, you get back on average "}<strong className="text-ink">{rtpDisplay} CRC</strong>{". This figure is based on the probabilities declared by the platform."}</>
-                      }
+                      {t.rtpDesc[locale].replace("{rtp}", rtpDisplay)}
                     </p>
 
                     <div className="rounded-xl bg-ink/[0.03] border border-ink/5 p-3 space-y-2">

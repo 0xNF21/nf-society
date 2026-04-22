@@ -3,11 +3,11 @@
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
-export default function PrivacyPage() {
-  const { locale } = useLocale();
-  const t = translations.legal;
+type Locale = "fr" | "en";
+type T = typeof translations.legal;
 
-  const content = locale === "fr" ? (
+function PrivacyContentFr({ t, locale }: { t: T; locale: Locale }) {
+  return (
     <>
       <h1>{t.privacyTitle[locale]}</h1>
       <p className="text-sm text-ink/50 dark:text-white/50">
@@ -78,7 +78,11 @@ export default function PrivacyPage() {
         A designer. Consultation juridique requise pour la designation d'un DPO selon l'activite du DAO.
       </p>
     </>
-  ) : (
+  );
+}
+
+function PrivacyContentEn({ t, locale }: { t: T; locale: Locale }) {
+  return (
     <>
       <h1>{t.privacyTitle[locale]}</h1>
       <p className="text-sm text-ink/50 dark:text-white/50">
@@ -150,6 +154,16 @@ export default function PrivacyPage() {
       </p>
     </>
   );
+}
 
-  return content;
+const CONTENT: Record<Locale, (props: { t: T; locale: Locale }) => JSX.Element> = {
+  fr: PrivacyContentFr,
+  en: PrivacyContentEn,
+};
+
+export default function PrivacyPage() {
+  const { locale } = useLocale();
+  const t = translations.legal;
+  const Content = CONTENT[locale];
+  return <Content t={t} locale={locale} />;
 }

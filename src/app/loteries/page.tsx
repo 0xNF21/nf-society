@@ -173,7 +173,7 @@ export default function HomePage() {
           <div className="absolute left-0 top-0">
             <Link href="/" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
               <ArrowLeft className="h-4 w-4" />
-              {locale === "fr" ? "Retour" : "Back"}
+              {translations.landing.back[locale]}
             </Link>
           </div>
           <div className="flex items-center justify-center gap-4">
@@ -186,7 +186,7 @@ export default function HomePage() {
             {h.subtitleBefore[locale]}{" "}
             <span className="inline-flex items-center gap-1.5 align-middle">
               <img src="/gnosis-logo.png" alt="Gnosis" className="h-5 w-5 inline" />
-              Gnosis{locale === "en" ? " blockchain" : ""}
+              Gnosis{translations.lobby.gnosisBlockchain[locale]}
             </span>
           </p>
         </header>

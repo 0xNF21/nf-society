@@ -22,17 +22,17 @@ interface LeaderboardEntry {
   label: string;
 }
 
-const TYPES = [
-  { key: "xp", label_fr: "XP", label_en: "XP", emoji: "⭐" },
-  { key: "wins", label_fr: "Victoires", label_en: "Wins", emoji: "🏆" },
-  { key: "winrate", label_fr: "Win Rate", label_en: "Win Rate", emoji: "📊" },
-  { key: "crc", label_fr: "CRC Gagnes", label_en: "CRC Won", emoji: "💰" },
+const TYPES: { key: string; labelKey: "typeXp" | "typeWins" | "typeWinRate" | "typeCrc"; emoji: string }[] = [
+  { key: "xp", labelKey: "typeXp", emoji: "⭐" },
+  { key: "wins", labelKey: "typeWins", emoji: "🏆" },
+  { key: "winrate", labelKey: "typeWinRate", emoji: "📊" },
+  { key: "crc", labelKey: "typeCrc", emoji: "💰" },
 ];
 
-const PERIODS = [
-  { key: "all", label_fr: "Tout", label_en: "All Time" },
-  { key: "month", label_fr: "Ce mois", label_en: "This Month" },
-  { key: "week", label_fr: "Semaine", label_en: "This Week" },
+const PERIODS: { key: string; labelKey: "periodAll" | "periodMonth" | "periodWeek" }[] = [
+  { key: "all", labelKey: "periodAll" },
+  { key: "month", labelKey: "periodMonth" },
+  { key: "week", labelKey: "periodWeek" },
 ];
 
 const RANK_STYLES: Record<number, { bg: string; border: string; text: string; icon: typeof Crown }> = {
@@ -115,7 +115,7 @@ export default function LeaderboardPage() {
                 type === tp.key ? "bg-marine text-white border-marine" : "border-ink/10 dark:border-white/10 text-ink/50 dark:text-white/50 hover:border-ink/30"
               }`}>
               <span>{tp.emoji}</span>
-              {locale === "fr" ? tp.label_fr : tp.label_en}
+              {t[tp.labelKey][locale]}
             </button>
           ))}
         </div>
@@ -129,13 +129,13 @@ export default function LeaderboardPage() {
                   className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
                     period === p.key ? "bg-ink/10 dark:bg-white/10 border-ink/20 text-ink dark:text-white" : "border-ink/5 text-ink/40"
                   }`}>
-                  {locale === "fr" ? p.label_fr : p.label_en}
+                  {t[p.labelKey][locale]}
                 </button>
               ))}
             </div>
             <select value={game} onChange={e => setGame(e.target.value)}
               className="px-2 py-1.5 rounded-lg border border-ink/10 text-[10px] font-bold bg-white dark:bg-white/10">
-              <option value="all">{locale === "fr" ? "Tous les jeux" : "All games"}</option>
+              <option value="all">{t.allGames[locale]}</option>
               {ALL_GAMES.map(g => (
                 <option key={g.key} value={g.key}>{GAME_LABELS[g.key]}</option>
               ))}
@@ -198,7 +198,7 @@ export default function LeaderboardPage() {
                     {/* Name + level */}
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-bold truncate ${isMe ? "text-marine" : "text-ink dark:text-white"}`}>
-                        {name} {isMe && <span className="text-[10px] text-marine/60">({locale === "fr" ? "vous" : "you"})</span>}
+                        {name} {isMe && <span className="text-[10px] text-marine/60">({t.youShort[locale]})</span>}
                       </p>
                       <p className="text-[10px] text-ink/40">Lv.{entry.level}</p>
                     </div>

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { ScratchResult } from "@/lib/daily-shared";
+import { translations } from "@/lib/i18n";
 
 type Props = {
   result: ScratchResult;
@@ -49,7 +50,7 @@ export default function ScratchCard({ result, onComplete, locale }: Props) {
       ctx.font = "bold 14px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(locale === "fr" ? "Grattez" : "Scratch", CARD_SIZE / 2, CARD_SIZE / 2);
+      ctx.fillText(translations.daily.scratchAction[locale], CARD_SIZE / 2, CARD_SIZE / 2);
     });
   }, [locale, revealed]);
 

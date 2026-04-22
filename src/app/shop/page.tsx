@@ -528,9 +528,7 @@ export default function ShopPage() {
       {!player && !demo && verifiedAddress && (
         <div className="bg-ink/[0.03] rounded-2xl p-6 mb-6 text-center space-y-3">
           <p className="text-sm text-ink/60">
-            {locale === "fr"
-              ? "Aucun profil XP trouvé pour cette adresse. Jouez pour gagner de l'XP !"
-              : "No XP profile found for this address. Play to earn XP!"}
+            {t.noXpProfile[locale]}
           </p>
         </div>
       )}

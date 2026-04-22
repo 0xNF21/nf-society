@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Ticket } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
-import { translations } from "@/lib/i18n";
+import { translations, localeBcp47 } from "@/lib/i18n";
 
 export type ParticipantEntry = {
   address: string;
@@ -49,7 +49,7 @@ export function TicketHistory({
   function formatDate(dateStr: string): string {
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
+      return d.toLocaleDateString(localeBcp47(locale), {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
