@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   FlaskConical,
@@ -21,6 +21,7 @@ import { useDemo } from "@/components/demo-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY, CHANCE_REGISTRY } from "@/lib/game-registry";
+import { useCountUp } from "@/hooks/use-count-up";
 import LandingHeroMockup from "@/components/landing-hero-mockup";
 
 const MULTI_EMOJI: Record<string, string> = {
@@ -84,6 +85,8 @@ export default function LandingPage() {
   const t = translations.landingMarketing;
 
   const [stats, setStats] = useState<PlatformStatsLite | null>(null);
+  const statsSectionRef = useRef<HTMLElement | null>(null);
+  const [statsVisible, setStatsVisible] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +103,22 @@ export default function LandingPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const el = statsSectionRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setStatsVisible(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.3 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
   function handleTryDemo() {
@@ -166,31 +185,39 @@ export default function LandingPage() {
       </section>
 
       {/* ─── Stats ───────────────────────────────────────── */}
-      <section className="max-w-6xl mx-auto px-4 pb-16 w-full">
+      <section ref={statsSectionRef} className="max-w-6xl mx-auto px-4 pb-16 w-full">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
             icon={<Sparkles className="h-5 w-5" />}
-            value={stats ? stats.allTime.rounds.toLocaleString(locale) : null}
+            target={stats?.allTime.rounds ?? null}
             label={t.statsPlayed[locale]}
             loading={t.statsLoading[locale]}
+            locale={locale}
+            visible={statsVisible}
           />
           <StatCard
             icon={<Users className="h-5 w-5" />}
-            value={stats ? stats.allTime.players.toLocaleString(locale) : null}
+            target={stats?.allTime.players ?? null}
             label={t.statsPlayers[locale]}
             loading={t.statsLoading[locale]}
+            locale={locale}
+            visible={statsVisible}
           />
           <StatCard
             icon={<Zap className="h-5 w-5" />}
-            value={stats ? Math.round(stats.allTime.wagered).toLocaleString(locale) : null}
+            target={stats ? Math.round(stats.allTime.wagered) : null}
             label={t.statsWagered[locale]}
             loading={t.statsLoading[locale]}
+            locale={locale}
+            visible={statsVisible}
           />
           <StatCard
             icon={<Wallet className="h-5 w-5" />}
-            value={stats ? Math.round(stats.allTime.paidOut).toLocaleString(locale) : null}
+            target={stats ? Math.round(stats.allTime.paidOut) : null}
             label={t.statsPaidOut[locale]}
             loading={t.statsLoading[locale]}
+            locale={locale}
+            visible={statsVisible}
           />
         </div>
       </section>
@@ -380,23 +407,29 @@ export default function LandingPage() {
 
 function StatCard({
   icon,
-  value,
+  target,
   label,
   loading,
+  locale,
+  visible,
 }: {
   icon: React.ReactNode;
-  value: string | null;
+  target: number | null;
   label: string;
   loading: string;
+  locale: "fr" | "en";
+  visible: boolean;
 }) {
+  const animated = useCountUp(target, { enabled: visible, duration: 1500 });
+  const display = animated != null ? animated.toLocaleString(locale) : null;
   return (
     <div className="rounded-2xl bg-white dark:bg-white/5 border border-ink/5 dark:border-white/10 p-5">
       <div className="flex items-center gap-2 text-ink/50 dark:text-white/50 text-xs font-semibold uppercase tracking-widest">
         {icon}
         {label}
       </div>
-      <div className="mt-2 font-display text-3xl font-bold text-ink dark:text-white">
-        {value ?? <span className="text-ink/30 dark:text-white/30 text-base font-normal">{loading}</span>}
+      <div className="mt-2 font-display text-3xl font-bold text-ink dark:text-white tabular-nums">
+        {display ?? <span className="text-ink/30 dark:text-white/30 text-base font-normal">{loading}</span>}
       </div>
     </div>
   );
