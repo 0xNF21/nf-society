@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale } from "@/components/language-provider";
+import { translations } from "@/lib/i18n";
 
 function shortenAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -40,7 +41,7 @@ function PlayerCard({ addr, label, isMe, side, profiles }: {
       <div className={side === "right" ? "text-right" : ""}>
         <p className="text-xs font-bold text-ink dark:text-white truncate max-w-[100px]">{name}</p>
         <p className="text-[10px] text-ink/40">
-          {label} {isMe ? (locale === "fr" ? "(vous)" : "(you)") : ""}
+          {label} {isMe ? translations.gameLobby.youParens[locale] : ""}
         </p>
       </div>
     </div>

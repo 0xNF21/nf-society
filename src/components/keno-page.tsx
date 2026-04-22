@@ -623,7 +623,7 @@ function RealKenoGame({ table }: { table: KenoTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   // Poll scan when watching payment
   useEffect(() => {
@@ -689,7 +689,7 @@ function RealKenoGame({ table }: { table: KenoTable }) {
       console.error(err);
       setDrawing(false);
     }
-  }, [round, picks, drawing]);
+  }, [round, picks, drawing, tokenRef]);
 
   const resetGame = useCallback(() => {
     setRound(null);

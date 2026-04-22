@@ -96,7 +96,7 @@ async function reserveNonce(): Promise<number> {
   );
   const row = (result as any).rows?.[0] ?? (result as any)[0];
   if (!row || typeof row.last_nonce !== "number") {
-    throw new Error("bot_state row missing — run scripts/init-bot-nonce.mjs first");
+    throw new Error("bot_state row missing — run scripts/ops/init-bot-nonce.mjs first");
   }
   return row.last_nonce;
 }

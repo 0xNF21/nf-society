@@ -381,7 +381,7 @@ export default function ShopPage() {
     return (
       <div className="min-h-screen px-4 py-8 max-w-md mx-auto">
         <Link
-          href="/"
+          href="/hub"
           className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -496,7 +496,7 @@ export default function ShopPage() {
     <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <Link
-          href="/"
+          href="/hub"
           className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -528,9 +528,7 @@ export default function ShopPage() {
       {!player && !demo && verifiedAddress && (
         <div className="bg-ink/[0.03] rounded-2xl p-6 mb-6 text-center space-y-3">
           <p className="text-sm text-ink/60">
-            {locale === "fr"
-              ? "Aucun profil XP trouvé pour cette adresse. Jouez pour gagner de l'XP !"
-              : "No XP profile found for this address. Play to earn XP!"}
+            {t.noXpProfile[locale]}
           </p>
         </div>
       )}

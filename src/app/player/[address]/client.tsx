@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ChevronDown } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
-import { translations } from "@/lib/i18n";
+import { translations, localeBcp47 } from "@/lib/i18n";
+import { formatCrc } from "@/lib/format";
 import BadgeIcon from "@/components/ui/badge-icon";
 
 interface LevelDef {
@@ -161,7 +162,7 @@ export default function PlayerProfileClient({
   return (
     <div className="min-h-screen bg-sand">
       <main className="mx-auto max-w-lg px-4 py-10 flex flex-col gap-4">
-        <Link href="/" className="flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink/80 transition-colors font-medium w-fit">
+        <Link href="/hub" className="flex items-center gap-1.5 text-sm text-ink/50 hover:text-ink/80 transition-colors font-medium w-fit">
           <ArrowLeft className="h-3.5 w-3.5" />
           {t.home[locale]}
         </Link>
@@ -317,7 +318,7 @@ export default function PlayerProfileClient({
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-xs shrink-0">
-                        <span className="text-ink/50">{g.played} {locale === "fr" ? "parties" : "games"}</span>
+                        <span className="text-ink/50">{g.played} {t.games[locale]}</span>
                         {g.type === "multi" && g.winRate !== undefined ? (
                           <>
                             <span className="font-bold text-emerald-600 dark:text-emerald-400">{g.wins}W</span>
@@ -326,7 +327,7 @@ export default function PlayerProfileClient({
                           </>
                         ) : (
                           <span className={`font-bold font-mono ${g.net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                            {g.net >= 0 ? "+" : ""}{g.net} CRC
+                            {g.net >= 0 ? "+" : ""}{formatCrc(g.net)} CRC
                           </span>
                         )}
                       </div>
@@ -352,7 +353,7 @@ export default function PlayerProfileClient({
                             <p className="text-xs font-semibold text-ink dark:text-white truncate">
                               {GAME_LABELS[h.game]} {h.opponent ? `${t.vs[locale]} ${h.opponent.slice(0, 6)}…${h.opponent.slice(-4)}` : ""}
                             </p>
-                            <p className="text-[10px] text-ink/30">{new Date(h.date).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" })}</p>
+                            <p className="text-[10px] text-ink/30">{new Date(h.date).toLocaleDateString(localeBcp47(locale), { day: "numeric", month: "short" })}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -433,6 +434,7 @@ export default function PlayerProfileClient({
 type Tx = { type: "in" | "out"; amount: number; label: string; category: string; date: string };
 
 function TransactionHistory({ address, locale }: { address: string; locale: "fr" | "en" }) {
+  const t = translations.playerProfile;
   const [txs, setTxs] = useState<Tx[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -457,7 +459,7 @@ function TransactionHistory({ address, locale }: { address: string; locale: "fr"
       <button onClick={load}
         className="w-full flex items-center justify-between p-5 text-left hover:bg-ink/[0.02] transition-colors">
         <span className="text-xs text-ink/40 font-bold uppercase tracking-widest">
-          {locale === "fr" ? "Transactions" : "Transactions"}
+          {t.transactionsTitle[locale]}
         </span>
         <div className="flex items-center gap-2">
           {loaded && <span className="text-xs text-ink/30 font-semibold">{txs.length}</span>}
@@ -467,10 +469,10 @@ function TransactionHistory({ address, locale }: { address: string; locale: "fr"
 
       {open && (
         <div className="px-5 pb-5 space-y-3">
-          {loading && <p className="text-center text-xs text-ink/40 py-4">{locale === "fr" ? "Chargement..." : "Loading..."}</p>}
+          {loading && <p className="text-center text-xs text-ink/40 py-4">{t.loading[locale]}</p>}
 
           {loaded && txs.length === 0 && (
-            <p className="text-center text-xs text-ink/40 py-4">{locale === "fr" ? "Aucune transaction" : "No transactions"}</p>
+            <p className="text-center text-xs text-ink/40 py-4">{t.noTransactions[locale]}</p>
           )}
 
           {loaded && txs.length > 0 && (
@@ -479,11 +481,11 @@ function TransactionHistory({ address, locale }: { address: string; locale: "fr"
               <div className="flex gap-2">
                 <div className="flex-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-2 text-center">
                   <p className="text-sm font-bold text-emerald-600">+{Math.round(totalIn * 1000) / 1000} CRC</p>
-                  <p className="text-[10px] text-emerald-600/60">{locale === "fr" ? "Recu" : "Received"}</p>
+                  <p className="text-[10px] text-emerald-600/60">{t.received[locale]}</p>
                 </div>
                 <div className="flex-1 rounded-xl bg-red-50 dark:bg-red-900/20 p-2 text-center">
                   <p className="text-sm font-bold text-red-500">-{Math.round(totalOut * 1000) / 1000} CRC</p>
-                  <p className="text-[10px] text-red-500/60">{locale === "fr" ? "Depense" : "Spent"}</p>
+                  <p className="text-[10px] text-red-500/60">{t.spent[locale]}</p>
                 </div>
               </div>
 
@@ -498,7 +500,7 @@ function TransactionHistory({ address, locale }: { address: string; locale: "fr"
                       <div className="min-w-0">
                         <p className="text-xs text-ink dark:text-white truncate">{tx.label}</p>
                         <p className="text-[10px] text-ink/30">
-                          {new Date(tx.date).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          {new Date(tx.date).toLocaleDateString(localeBcp47(locale), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                         </p>
                       </div>
                     </div>

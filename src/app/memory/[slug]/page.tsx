@@ -15,6 +15,7 @@ import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
+import { formatCrc } from "@/lib/format";
 
 type GameStatus = "waiting_p1" | "waiting_p2" | "playing" | "finished" | "cancelled";
 
@@ -174,6 +175,9 @@ function DemoMemoryGame({ slug }: { slug: string }) {
     if (finished && xpGained === 0) {
       setXpGained(addXp("memory_win"));
     }
+    // `xpGained` est le guard (ajouter cause re-trigger apres setXpGained) ;
+    // `addXp` est stable via le context useDemo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished]);
 
   function handleClick(index: number) {
@@ -224,7 +228,7 @@ function DemoMemoryGame({ slug }: { slug: string }) {
                 <div className="flex items-center gap-2">
                   <Trophy className="w-5 h-5 text-citrus" />
                   <span className="font-bold text-ink">
-                    {locale === "fr" ? "Bravo !" : "Well done!"} {moves} {locale === "fr" ? "coups" : "moves"} — {formatTime(elapsed)}
+                    {t.wellDone[locale]} {moves} {t.movesLabel[locale]} — {formatTime(elapsed)}
                   </span>
                 </div>
                 {xpGained > 0 && <span className="text-xs text-emerald-600 font-bold">+{xpGained} XP</span>}
@@ -233,10 +237,10 @@ function DemoMemoryGame({ slug }: { slug: string }) {
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <Brain className="w-4 h-4 text-pink-500" />
-                  <span className="font-semibold text-ink">{matched.size / 2} / {config.pairs} {locale === "fr" ? "paires" : "pairs"}</span>
+                  <span className="font-semibold text-ink">{matched.size / 2} / {config.pairs} {t.pairsLabel[locale]}</span>
                 </div>
                 <div className="flex items-center gap-3 text-ink/50">
-                  <span>{moves} {locale === "fr" ? "coups" : "moves"}</span>
+                  <span>{moves} {t.movesLabel[locale]}</span>
                   <span className="font-mono">{formatTime(elapsed)}</span>
                 </div>
               </div>
@@ -270,7 +274,7 @@ function DemoMemoryGame({ slug }: { slug: string }) {
         {finished && (
           <Link href="/memory">
             <Button className="w-full rounded-xl font-bold mt-2" style={{ background: "#EC4899" }}>
-              {locale === "fr" ? "Rejouer" : "Play again"}
+              {t.playAgain[locale]}
             </Button>
           </Link>
         )}
@@ -329,7 +333,10 @@ function RealMemoryGame({ slug }: { slug: string }) {
       setMyAddress(game.player2Address);
       setAddressConfirmed(true);
     }
-  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed]);
+    // `game` en dep entière re-triggerait a chaque polling (toutes les 2s) —
+    // on track explicitement les champs player-specific qui nous intéressent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.player1Token, game?.player2Token, game?.player1Address, game?.player2Address, addressConfirmed, playerTokenRef]);
 
   useEffect(() => {
     if (!game) return;
@@ -344,6 +351,10 @@ function RealMemoryGame({ slug }: { slug: string }) {
     }).then(r => r.json()).then(data => {
       if (data.profiles) setProfiles(prev => ({ ...prev, ...data.profiles }));
     }).catch(() => {});
+    // `profiles` en dep causerait une boucle infinie (l'effet set profiles via
+    // le functional updater) ; `game` entier re-triggerait a chaque polling —
+    // on track les adresses player-specific qui suffisent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.player1Address, game?.player2Address]);
 
   const isP1 = myAddress && game?.player1Address?.toLowerCase() === myAddress.toLowerCase();
@@ -393,7 +404,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
 
   if (!game) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <p className="text-ink/50">{locale === "fr" ? "Partie introuvable" : "Game not found"}</p>
+      <p className="text-ink/50">{t.gameNotFound[locale]}</p>
       <Link href="/memory"><Button variant="outline" className="rounded-xl">← {t.back[locale]}</Button></Link>
     </div>
   );
@@ -444,7 +455,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
                 <span className="text-sm font-bold text-ink">
                   {isMyTurn
                     ? t.yourTurn[locale]
-                    : `${locale === "fr" ? "Tour de" : "Turn of"} ${game.currentTurn === "player1" ? "J1" : "J2"}`}
+                    : `${t.turnOf[locale]} ${game.currentTurn === "player1" ? "J1" : "J2"}`}
                 </span>
               </div>
             )}
@@ -458,7 +469,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
                   <span className="font-bold text-ink">{iWon ? t.youWon[locale] : iLost ? t.youLost[locale] : t.gameOver[locale]}</span>
                 </div>
                 <p className="text-xs text-ink/50">
-                  {t.betWon[locale]} <span className="font-bold text-ink/60">{winAmount} CRC</span>
+                  {t.betWon[locale]} <span className="font-bold text-ink/60">{formatCrc(winAmount)} CRC</span>
                 </p>
               </div>
             )}
@@ -524,7 +535,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
             <CardContent className="p-4 text-center">
               <p className="text-sm text-ink/60 dark:text-white/60">
-                {locale === "fr" ? "Mode spectateur — vous regardez cette partie" : "Spectator mode — you are watching this game"}
+                {t.spectatorMode[locale]}
               </p>
             </CardContent>
           </Card>
@@ -603,7 +614,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
                 {addr ? (
                   <p className="text-xs font-semibold text-ink/70">
                     {profile?.name || shortenAddress(addr)}
-                    {isMe && <span className="text-ink/50 ml-1">({locale === "fr" ? "vous" : "you"})</span>}
+                    {isMe && <span className="text-ink/50 ml-1">({t.youShort[locale]})</span>}
                   </p>
                 ) : (
                   <p className="text-xs text-ink/50">{t.waiting[locale]}</p>
@@ -632,18 +643,18 @@ function RealMemoryGame({ slug }: { slug: string }) {
                 disabled={testLoading}
                 className="w-full py-1.5 rounded-lg bg-ink/5 text-xs text-ink/40 hover:text-ink/60 hover:bg-ink/10 transition-all"
               >
-                {testLoading ? "..." : locale === "fr" ? "Injecter 2 faux joueurs" : "Inject 2 test players"}
+                {testLoading ? "..." : t.injectTestPlayers[locale]}
               </button>
             )}
             {game.status === "playing" && !addressConfirmed && (
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => { setMyAddress("0xtest000000000000000000000000000000000001"); setAddressConfirmed(true); }}
                   className="py-1.5 rounded-lg text-xs font-bold transition-all" style={{ background: "rgba(59,130,246,0.1)", color: "#3B82F6" }}>
-                  {locale === "fr" ? "Jouer en J1" : "Play as P1"}
+                  {t.playAsP1[locale]}
                 </button>
                 <button onClick={() => { setMyAddress("0xtest000000000000000000000000000000000002"); setAddressConfirmed(true); }}
                   className="py-1.5 rounded-lg text-xs font-bold transition-all" style={{ background: "rgba(249,115,22,0.1)", color: "#F97316" }}>
-                  {locale === "fr" ? "Jouer en J2" : "Play as P2"}
+                  {t.playAsP2[locale]}
                 </button>
               </div>
             )}

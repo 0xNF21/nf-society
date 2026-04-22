@@ -206,7 +206,7 @@ export default function PrivacyPage() {
     return (
       <div className="min-h-screen px-4 py-8 max-w-md mx-auto">
         <Link
-          href="/"
+          href="/home"
           className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -340,7 +340,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen px-4 py-8 max-w-md mx-auto">
       <Link
-        href="/"
+        href="/home"
         className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-6"
       >
         <ArrowLeft className="w-4 h-4" />

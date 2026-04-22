@@ -10,6 +10,7 @@ import { generateGameCode } from "@/lib/utils";
 import { checkAllNewPayments } from "@/lib/circles";
 import { getServerGameConfig, ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 import { ALL_CHANCE_SERVER_GAMES, getAllChancePlayerStats } from "@/lib/chance-registry-server";
+import { announceNewLobbyGame, markLobbyGameStarted } from "@/lib/telegram/lobby-announce";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
@@ -169,6 +170,15 @@ export async function scanGamePayments(gameKey: string, slug: string) {
       game.player1Address = playerAddress;
       game.player1TxHash = txHash;
       game.status = "waiting_p2";
+
+      // Annonce Telegram de la partie joinable (no-op si privee ou TG pas config).
+      await announceNewLobbyGame({
+        gameKey,
+        slug: game.slug,
+        betCrc: game.betCrc,
+        creatorAddress: playerAddress,
+        isPrivate: game.isPrivate,
+      });
     } else if (!game.player2Address && playerAddress !== game.player1Address?.toLowerCase()) {
       const extraFields = config.onBothPlayersPaid ? config.onBothPlayersPaid() : {};
 
@@ -184,6 +194,14 @@ export async function scanGamePayments(gameKey: string, slug: string) {
       game.player2Address = playerAddress;
       game.player2TxHash = txHash;
       game.status = config.activeStatus;
+
+      // Edite l'annonce TG en "Joueur trouve, partie demarree".
+      await markLobbyGameStarted({
+        gameKey,
+        slug: game.slug,
+        betCrc: game.betCrc,
+        creatorAddress: game.player1Address,
+      });
     }
   }
 

@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
 import { ArrowLeft, Loader2, Lock, Globe } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
@@ -20,7 +20,7 @@ interface GameLobbyProps {
   getExtraBody?: () => Record<string, unknown>;
   /** Custom demo slug generator (default: DEMO-XXXXXX) */
   getDemoSlug?: () => string;
-  /** Back link destination (default: "/") */
+  /** Back link destination (default: "/multijoueur") */
   backHref?: string;
 }
 
@@ -29,7 +29,7 @@ export function GameLobby({
   extraCreateFields,
   getExtraBody,
   getDemoSlug,
-  backHref = "/",
+  backHref = "/multijoueur",
 }: GameLobbyProps) {
   const router = useRouter();
   const { locale } = useLocale();
@@ -145,8 +145,8 @@ export function GameLobby({
                 {isPrivate ? <Lock className="w-4 h-4 text-ink/40" /> : <Globe className="w-4 h-4 text-ink/40" />}
                 <span className="text-xs font-semibold text-ink/60">
                   {isPrivate
-                    ? (locale === "fr" ? "Partie privée" : "Private game")
-                    : (locale === "fr" ? "Partie publique" : "Public game")}
+                    ? translations.gameLobby.privateGame[locale]
+                    : translations.gameLobby.publicGame[locale]}
                 </span>
               </div>
               <button onClick={() => setIsPrivate(!isPrivate)}

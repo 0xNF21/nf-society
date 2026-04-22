@@ -54,8 +54,8 @@ export default function ChancePage() {
       icon: <span className="text-3xl">🃏</span>,
       iconBg: "bg-green-50 group-hover:bg-green-100",
       borderHover: "hover:border-green-200",
-      title: locale === "fr" ? "Blackjack" : "Blackjack",
-      desc: locale === "fr" ? "Blackjack classique contre la banque. 3:2." : "Classic blackjack vs dealer. 3:2.",
+      title: t.blackjackTitle[locale],
+      desc: t.blackjackDesc[locale],
       color: "text-green-600",
     },
     {
@@ -155,16 +155,14 @@ export default function ChancePage() {
   return (
     <main className="min-h-screen bg-sand text-ink">
       <div className="max-w-2xl mx-auto px-4 pt-16 pb-8">
-        <Link href="/" className="inline-flex items-center gap-2 text-ink/60 hover:text-ink mb-6">
+        <Link href="/hub" className="inline-flex items-center gap-2 text-ink/60 hover:text-ink mb-6">
           <ArrowLeft className="w-4 h-4" />
-          <span>{locale === "fr" ? "Accueil" : "Home"}</span>
+          <span>{t.home[locale]}</span>
         </Link>
 
         <h1 className="text-3xl font-bold mb-2">{t.title[locale]}</h1>
         <p className="text-ink/60 mb-8">
-          {locale === "fr"
-            ? "Tentez votre chance avec nos jeux quotidiens et \u00e9v\u00e9nements."
-            : "Try your luck with our daily games and events."}
+          {t.hubSubtitle[locale]}
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

@@ -494,7 +494,7 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   // Poll scan
   useEffect(() => {
@@ -530,7 +530,7 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
       console.error("[HiLo] Action fetch error:", err);
       setAnimating(false);
     }
-  }, [round, animating]);
+  }, [round, animating, tokenRef]);
 
   const resetGame = useCallback(() => {
     setRound(null);

@@ -307,8 +307,8 @@ export default function DailyModal() {
       if (!res.ok || !data.ok) {
         setBalanceClaimError(
           data?.error === "no_balance"
-            ? (locale === "fr" ? "Chargez d'abord votre solde" : "Top up your balance first")
-            : (locale === "fr" ? "Echec — reessayez" : "Failed — try again"),
+            ? t.topUpBalanceFirst[locale]
+            : t.failedTryAgain[locale],
         );
         return;
       }
@@ -329,10 +329,13 @@ export default function DailyModal() {
       else if (s.scratchPlayed) setPhase("spin");
       else setPhase("scratch");
     } catch (err: any) {
-      setBalanceClaimError(err?.message || (locale === "fr" ? "Erreur" : "Error"));
+      setBalanceClaimError(err?.message || t.errorGeneric[locale]);
     } finally {
       setClaimingFromBalance(false);
     }
+    // `t.xxx` sont des refs vers le translations object (stable, import-time) —
+    // locale couvre deja le changement FR/EN.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedAddress, claimingFromBalance, locale]);
 
   // Demo mode — simulate payment + generate fake results client-side
@@ -432,7 +435,7 @@ export default function DailyModal() {
                     onClick={handleDemo}
                     className="w-full mt-3 py-2.5 bg-ink/5 hover:bg-ink/10 text-ink/60 font-medium rounded-xl text-sm transition-colors"
                   >
-                    🧪 Demo ({locale === "fr" ? "tester sans payer" : "test without paying"})
+                    🧪 Demo ({t.testWithoutPaying[locale]})
                   </button>
                   )}
 
@@ -443,7 +446,7 @@ export default function DailyModal() {
                       className="w-full flex items-center justify-between py-2.5 px-3 bg-ink/[0.03] hover:bg-ink/[0.06] rounded-xl transition-colors"
                     >
                       <span className="text-sm font-medium text-ink/60">
-                        {locale === "fr" ? "Voir les probabilités" : "View probabilities"}
+                        {t.viewProbabilities[locale]}
                       </span>
                       <ChevronDown className={`w-4 h-4 text-ink/40 transition-transform ${showProbs ? "rotate-180" : ""}`} />
                     </button>
@@ -452,12 +455,12 @@ export default function DailyModal() {
                       <div className="mt-2 space-y-3 text-xs">
                         {/* Scratch Card */}
                         <div className="bg-ink/[0.02] rounded-xl p-3 border border-ink/5">
-                          <h4 className="font-bold text-ink/70 mb-2">🎫 {locale === "fr" ? "Carte à gratter" : "Scratch Card"}</h4>
+                          <h4 className="font-bold text-ink/70 mb-2">🎫 {t.scratchCardLabel[locale]}</h4>
                           <div className="space-y-1">
                             {[
-                              { emoji: "💨", label: locale === "fr" ? "Rien" : "Nothing", prob: "20%" },
+                              { emoji: "💨", label: t.nothing[locale], prob: "20%" },
                               { emoji: "⭐", label: "+50 XP", prob: "15%" },
-                              { emoji: "🪙", label: locale === "fr" ? "Remboursé (1 CRC)" : "Refund (1 CRC)", prob: "33%" },
+                              { emoji: "🪙", label: t.refundOneCrc[locale], prob: "33%" },
                               { emoji: "🌟", label: "+100 XP", prob: "13.2%" },
                               { emoji: "💰", label: "+2 CRC", prob: "10.8%" },
                               { emoji: "🔥", label: "Streak x2", prob: "4%" },
@@ -474,10 +477,10 @@ export default function DailyModal() {
 
                         {/* Spin Wheel */}
                         <div className="bg-ink/[0.02] rounded-xl p-3 border border-ink/5">
-                          <h4 className="font-bold text-ink/70 mb-2">🎰 {locale === "fr" ? "Roue du jour" : "Daily Spin"}</h4>
+                          <h4 className="font-bold text-ink/70 mb-2">🎰 {t.wheelLabel[locale]}</h4>
                           <div className="space-y-1">
                             {[
-                              { color: "#6B7280", label: locale === "fr" ? "Rien" : "Nothing", prob: "20%" },
+                              { color: "#6B7280", label: t.nothing[locale], prob: "20%" },
                               { color: "#8B5CF6", label: "+50 XP", prob: "15%" },
                               { color: "#10B981", label: "+1 CRC", prob: "30%" },
                               { color: "#6366F1", label: "+100 XP", prob: "13%" },
@@ -532,12 +535,12 @@ export default function DailyModal() {
                             {tw.paying[locale]}
                           </span>
                         ) : (
-                          locale === "fr" ? "Reclamer mon daily (gratuit)" : "Claim my daily (free)"
+                          t.claimFree[locale]
                         )}
                       </button>
                       {balanceClaimError && <p className="text-xs text-red-500 font-semibold">{balanceClaimError}</p>}
                       <p className="text-[11px] text-ink/40">
-                        {locale === "fr" ? "Aucun CRC debite (daily est gratuit)." : "No CRC debited (daily is free)."}
+                        {t.noCrcDebited[locale]}
                       </p>
                     </div>
                   )}
@@ -573,7 +576,7 @@ export default function DailyModal() {
                         rel="noopener noreferrer"
                         className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-sm shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] mb-3"
                       >
-                        💳 {locale === "fr" ? "Payer 1 CRC avec Circles" : "Pay 1 CRC with Circles"}
+                        💳 {t.payWithCircles[locale]}
                       </a>
 
                       <p className="text-xs text-ink/50 mb-2">{t.orCopy[locale]}</p>

@@ -3,11 +3,11 @@
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
-export default function ImprintPage() {
-  const { locale } = useLocale();
-  const t = translations.legal;
+type Locale = "fr" | "en";
+type T = typeof translations.legal;
 
-  const content = locale === "fr" ? (
+function ImprintContentFr({ t, locale }: { t: T; locale: Locale }) {
+  return (
     <>
       <h1>{t.imprintTitle[locale]}</h1>
       <p className="text-sm text-ink/50 dark:text-white/50">
@@ -52,7 +52,11 @@ export default function ImprintPage() {
         Pour tout signalement de contenu illicite, contacter le DAO via le support ou le canal Telegram officiel.
       </p>
     </>
-  ) : (
+  );
+}
+
+function ImprintContentEn({ t, locale }: { t: T; locale: Locale }) {
+  return (
     <>
       <h1>{t.imprintTitle[locale]}</h1>
       <p className="text-sm text-ink/50 dark:text-white/50">
@@ -98,6 +102,16 @@ export default function ImprintPage() {
       </p>
     </>
   );
+}
 
-  return content;
+const CONTENT: Record<Locale, (props: { t: T; locale: Locale }) => JSX.Element> = {
+  fr: ImprintContentFr,
+  en: ImprintContentEn,
+};
+
+export default function ImprintPage() {
+  const { locale } = useLocale();
+  const t = translations.legal;
+  const Content = CONTENT[locale];
+  return <Content t={t} locale={locale} />;
 }

@@ -18,7 +18,7 @@ export default function MultiplayerPage() {
         <div className="w-full max-w-2xl flex flex-col gap-8">
           <div className="flex items-center gap-4">
             <Link
-              href="/"
+              href="/hub"
               className="flex items-center gap-2 text-sm text-ink/50 hover:text-ink transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -54,8 +54,8 @@ export default function MultiplayerPage() {
                   <Users className="h-6 w-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-ink text-lg">{locale === "fr" ? "Lobby" : "Lobby"}</h3>
-                  <p className="text-xs text-ink/50">{locale === "fr" ? "Rejoins une partie ouverte par un autre joueur" : "Join a game created by another player"}</p>
+                  <h3 className="font-bold text-ink text-lg">{translations.lobby.title[locale]}</h3>
+                  <p className="text-xs text-ink/50">{translations.lobby.subtitleAnother[locale]}</p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-purple-400 group-hover:translate-x-1 transition-transform" />
               </Link>

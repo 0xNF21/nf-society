@@ -90,6 +90,9 @@ export function TicketRecovery({ gameKey, slug, storageKey }: TicketRecoveryProp
       stopped = true;
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
+    // `fetchTicket` est une fonction locale qui change a chaque render ;
+    // l'ajouter re-créerait l'interval. L'effet depend de l'etat step/token.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, authToken]);
 
   async function fetchTicket(token: string) {

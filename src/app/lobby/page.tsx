@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GAME_REGISTRY, GAME_LABELS } from "@/lib/game-registry";
 import { translations } from "@/lib/i18n";
+import { formatCrc } from "@/lib/format";
 
 interface Room {
   slug: string;
@@ -19,19 +20,21 @@ interface Room {
 
 function timeAgo(dateStr: string, locale: "fr" | "en") {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 60) return locale === "fr" ? "à l'instant" : "just now";
+  const t = translations.lobby;
+  if (diff < 60) return t.justNow[locale];
   if (diff < 3600) {
     const m = Math.floor(diff / 60);
-    return locale === "fr" ? `il y a ${m}min` : `${m}m ago`;
+    return t.minAgo[locale].replace("{n}", String(m));
   }
   const h = Math.floor(diff / 3600);
-  return locale === "fr" ? `il y a ${h}h` : `${h}h ago`;
+  return t.hourAgo[locale].replace("{n}", String(h));
 }
 
 export default function LobbyPage() {
   const { locale } = useLocale();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const t = translations.lobby;
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
@@ -61,8 +64,8 @@ export default function LobbyPage() {
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="mb-6 space-y-2">
-          <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
-            <ArrowLeft className="w-4 h-4" /> {locale === "fr" ? "Accueil" : "Home"}
+          <Link href="/hub" className="inline-flex items-center gap-1.5 text-sm text-ink/50 dark:text-white/50 hover:text-ink dark:hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4" /> {t.home[locale]}
           </Link>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -71,10 +74,10 @@ export default function LobbyPage() {
               </div>
               <div>
                 <h1 className="text-xl font-black text-ink dark:text-white">
-                  {locale === "fr" ? "Lobby" : "Lobby"}
+                  {t.title[locale]}
                 </h1>
                 <p className="text-xs text-ink/50 dark:text-white/50">
-                  {locale === "fr" ? "Rejoins une partie ouverte" : "Join an open game"}
+                  {t.subtitle[locale]}
                 </p>
               </div>
             </div>
@@ -122,10 +125,10 @@ export default function LobbyPage() {
             <CardContent className="py-12 text-center">
               <Users className="w-10 h-10 mx-auto mb-3 text-ink/20 dark:text-white/20" />
               <p className="text-sm font-semibold text-ink/50 dark:text-white/50">
-                {locale === "fr" ? "Aucune partie en attente" : "No games waiting"}
+                {t.noGamesWaiting[locale]}
               </p>
               <p className="text-xs text-ink/30 dark:text-white/30 mt-1">
-                {locale === "fr" ? "Crée une partie pour commencer !" : "Create a game to get started!"}
+                {t.createToStart[locale]}
               </p>
             </CardContent>
           </Card>
@@ -165,10 +168,10 @@ export default function LobbyPage() {
                           </div>
                           <div className="flex items-center gap-3 mt-0.5">
                             <span className="text-xs text-ink/50 dark:text-white/50">
-                              {locale === "fr" ? "Mise" : "Bet"}: <span className="font-bold text-ink dark:text-white">{room.betCrc} CRC</span>
+                              {t.betLabel[locale]}: <span className="font-bold text-ink dark:text-white">{room.betCrc} CRC</span>
                             </span>
                             <span className="text-[10px] text-ink/30 dark:text-white/30">
-                              → {winAmount} CRC
+                              → {formatCrc(winAmount)} CRC
                             </span>
                           </div>
                         </div>
@@ -179,7 +182,7 @@ export default function LobbyPage() {
                             <Clock className="w-3 h-3" /> {timeAgo(room.createdAt, locale)}
                           </span>
                           <span className="text-[10px] font-bold text-marine dark:text-blue-400 bg-marine/10 dark:bg-blue-400/10 px-2 py-0.5 rounded-full">
-                            {locale === "fr" ? "Rejoindre" : "Join"}
+                            {t.joinBtn[locale]}
                           </span>
                         </div>
                       </div>
@@ -194,7 +197,7 @@ export default function LobbyPage() {
         {/* Quick create buttons */}
         <div className="mt-8">
           <p className="text-xs font-semibold text-ink/40 dark:text-white/40 uppercase tracking-widest mb-3">
-            {locale === "fr" ? "Ou crée ta partie" : "Or create your game"}
+            {t.orCreateGame[locale]}
           </p>
           <div className="grid grid-cols-2 gap-2">
             {Object.values(GAME_REGISTRY).map((g) => (

@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import type { SpinResult } from "@/lib/daily-shared";
 import { SPIN_SEGMENTS } from "@/lib/daily-shared";
 import { useTheme } from "@/components/theme-provider";
+import { translations } from "@/lib/i18n";
 
 type Props = {
   result: SpinResult | null;
@@ -147,7 +148,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
           disabled={spinning}
           className="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
         >
-          {locale === "fr" ? "Tourner !" : "Spin!"}
+          {translations.daily.spinButton[locale]}
         </button>
       )}
 
@@ -168,7 +169,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
             <p className="text-sm mt-1">⭐ +{result.xpValue} XP</p>
           )}
           {result.type === "streak_x2" && (
-            <p className="text-sm mt-1">🔥 {locale === "fr" ? "Double XP demain !" : "Double XP tomorrow!"}</p>
+            <p className="text-sm mt-1">🔥 {translations.daily.doubleXpTomorrow[locale]}</p>
           )}
         </div>
       )}

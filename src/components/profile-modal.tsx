@@ -235,10 +235,10 @@ export default function ProfileModal() {
                     </div>
                     <div className="flex justify-between text-xs text-ink/50">
                       <span>{player.xp.toLocaleString()} XP</span>
-                      {player.level < 10 && <span>+{player.xpToNext} {locale === "fr" ? "pour" : "to"} Lv.{player.level + 1}</span>}
+                      {player.level < 10 && <span>+{player.xpToNext} {translations.playerProfile.xpTo[locale]} Lv.{player.level + 1}</span>}
                     </div>
                     {player.streak > 0 && (
-                      <p className="text-xs font-semibold text-citrus">🔥 Streak {player.streak} {locale === "fr" ? `jour${player.streak > 1 ? "s" : ""}` : `day${player.streak > 1 ? "s" : ""}`}</p>
+                      <p className="text-xs font-semibold text-citrus">🔥 Streak {player.streak} {player.streak > 1 ? translations.playerProfile.daysPlural[locale] : translations.playerProfile.days[locale]}</p>
                     )}
                   </div>
                 )}

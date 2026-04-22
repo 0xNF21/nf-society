@@ -30,7 +30,7 @@ export default function LootboxesClient({ lootboxes }: { lootboxes: LootboxData[
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
         <header className="space-y-4 text-center relative">
           <div className="absolute left-0 top-0">
-            <Link href="/" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
+            <Link href="/chance" className="flex items-center gap-2 text-sm text-ink/40 hover:text-ink/70 transition-colors">
               <ArrowLeft className="h-4 w-4" />
               {t.back[locale]}
             </Link>
@@ -120,7 +120,7 @@ export default function LootboxesClient({ lootboxes }: { lootboxes: LootboxData[
             {t.footer[locale]}
           </p>
           <p className="text-xs text-ink/50">
-            NF Society — {locale === "fr" ? "Lootboxes décentralisées" : "Decentralized Lootboxes"}
+            NF Society — {t.decentralizedLootboxes[locale]}
           </p>
         </footer>
       </div>

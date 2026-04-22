@@ -16,6 +16,10 @@ export const RELICS: Record<RelicId, {
 export const RELIC_ORDER: RelicId[] = ['crown', 'scepter', 'cup', 'scroll', 'owl']
 export const GRID_SIZE = 10
 
+export function getRelicName(id: RelicId, locale: 'fr' | 'en'): string {
+  return locale === 'fr' ? RELICS[id].name_fr : RELICS[id].name_en
+}
+
 export interface PlacedRelic {
   id: RelicId; cells: [number, number][]; hitCount: number; sunk: boolean
 }

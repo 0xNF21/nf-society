@@ -32,22 +32,13 @@ export const metadata: Metadata = {
     description: "Multiplayer games, lotteries & gambling with CRC on Gnosis Chain.",
     url: "https://nf-society.vercel.app",
     siteName: "NF Society",
-    images: [
-      {
-        url: "/nf-society-logo.png",
-        width: 512,
-        height: 512,
-        alt: "NF Society",
-      },
-    ],
     locale: "fr_FR",
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "NF Society",
     description: "Multiplayer games, lotteries & gambling with CRC on Gnosis Chain.",
-    images: ["/nf-society-logo.png"],
   },
   icons: {
     icon: "/nf-society-logo.png",

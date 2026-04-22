@@ -357,7 +357,7 @@ function DemoMinesGame({ table }: { table: MinesTable }) {
             </div>
             <div className="flex justify-between text-xs text-ink/40">
               <span>x{calculateMultiplier(selectedMines, 1).toFixed(2)} / {t.gemsFound[locale].toLowerCase()}</span>
-              <span>{25 - selectedMines} {locale === "fr" ? "gemmes" : "gems"}</span>
+              <span>{25 - selectedMines} {t.gems[locale]}</span>
             </div>
           </div>
 
@@ -480,7 +480,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   // Poll scan
   useEffect(() => {
@@ -515,7 +515,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
       console.error("[Mines] Action fetch error:", err);
       setAnimating(false);
     }
-  }, [round, animating]);
+  }, [round, animating, tokenRef]);
 
   // Handle cashout action
   const handleCashout = useCallback(async () => {
@@ -542,7 +542,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
       console.error("[Mines] Cashout fetch error:", err);
       setAnimating(false);
     }
-  }, [round, animating]);
+  }, [round, animating, tokenRef]);
 
   const resetGame = useCallback(() => {
     setRound(null);
@@ -616,7 +616,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
             </div>
             <div className="flex justify-between text-xs text-ink/40">
               <span>x{calculateMultiplier(selectedMines, 1).toFixed(2)} / {t.gemsFound[locale].toLowerCase()}</span>
-              <span>{25 - selectedMines} {locale === "fr" ? "gemmes" : "gems"}</span>
+              <span>{25 - selectedMines} {t.gems[locale]}</span>
             </div>
           </div>
 

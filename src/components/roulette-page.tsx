@@ -102,6 +102,10 @@ function RouletteWheel({
       onSpinEnd?.();
     }, 4000);
     return () => clearTimeout(timer);
+    // `onSpinEnd` est un callback parent — l'ajouter re-triggerait l'animation
+    // a chaque nouveau render parent. On lance l'animation uniquement sur
+    // changement de spinning/resultNumber.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spinning, resultNumber]);
 
   const segments = WHEEL_ORDER.map((num, i) => {
@@ -287,7 +291,7 @@ function BettingTable({
       {/* ── Chip denomination selector ── */}
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold shrink-0">
-          {locale === "fr" ? "Jeton" : "Chip"}
+          {t.chip[locale]}
         </span>
         <div className="flex gap-1.5 flex-1">
           {[1, 5, 10].map((v) => (
@@ -947,7 +951,7 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
       if (activeData.round) { setWatchingPayment(false); setRound(activeData.round); }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   useEffect(() => {
     if (round || restoring) return;
@@ -989,7 +993,7 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
       console.error("[Roulette] Fetch error:", err);
       setSpinning(false);
     }
-  }, [round, spinning, bets, table.slug]);
+  }, [round, spinning, bets, table.slug, tokenRef]);
 
   const resetGame = useCallback(() => {
     setRound(null); setBets([]); setWatchingPayment(false);

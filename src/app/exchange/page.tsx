@@ -16,7 +16,7 @@ export default function ExchangePage() {
         <div className="w-full max-w-2xl flex flex-col gap-8">
           <div className="flex items-center gap-4">
             <Link
-              href="/"
+              href="/home"
               className="flex items-center gap-2 text-sm text-ink/50 hover:text-ink transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />

@@ -22,6 +22,7 @@ import { useFeatureFlags } from "@/components/feature-flag-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY, CHANCE_REGISTRY } from "@/lib/game-registry";
 import { useCountUp } from "@/hooks/use-count-up";
+import LandingHeroMockup from "@/components/landing-hero-mockup";
 
 const MULTI_EMOJI: Record<string, string> = {
   morpion: "❌⭕",
@@ -122,7 +123,7 @@ export default function LandingPage() {
 
   function handleTryDemo() {
     enterDemo();
-    router.push("/hub");
+    router.push("/home");
   }
 
   const multiGames = Object.values(GAME_REGISTRY).filter((g) => isVisible(g.featureFlag));
@@ -167,7 +168,7 @@ export default function LandingPage() {
             </div>
             <div className="flex flex-col items-center gap-1.5 w-full sm:w-auto">
               <Link
-                href="/hub"
+                href="/home"
                 className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white dark:bg-white/10 border-2 border-ink/10 dark:border-white/10 text-ink dark:text-white font-bold hover:border-marine/30 hover:shadow-md transition-all w-full sm:w-auto"
               >
                 <Wallet className="h-5 w-5" />
@@ -176,6 +177,9 @@ export default function LandingPage() {
               </Link>
               <span className="text-xs text-ink/40 dark:text-white/40">{t.heroCtaSecondaryHint[locale]}</span>
             </div>
+          </div>
+          <div className="mt-16 sm:mt-20">
+            <LandingHeroMockup />
           </div>
         </div>
       </section>
@@ -266,7 +270,7 @@ export default function LandingPage() {
 
         <div className="mt-10 text-center">
           <Link
-            href="/hub"
+            href="/home"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-marine font-semibold hover:underline"
           >
             {t.gamesViewAll[locale]}

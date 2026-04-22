@@ -348,7 +348,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   // Poll scan for payment detection
   // Fast poll (5s) when actively watching, slow poll (15s) as fallback

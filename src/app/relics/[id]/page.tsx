@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
-import { RELICS, RELIC_ORDER, GRID_SIZE, buildCellMap, placeRelic, removeRelic, canPlace, allRelicsPlaced, emptyGrid, processShot, isDefeated } from "@/lib/relics"
+import { RELICS, RELIC_ORDER, GRID_SIZE, buildCellMap, placeRelic, removeRelic, canPlace, allRelicsPlaced, emptyGrid, processShot, isDefeated, getRelicName } from "@/lib/relics"
 import type { RelicId, Orientation, PlayerGrid } from "@/lib/relics"
 import type { RelicsGameRow } from "@/lib/db/schema/relics"
 import { useDemo } from "@/components/demo-provider"
@@ -14,6 +14,7 @@ import { PnlCard } from "@/components/pnl-card"
 import { usePlayerToken } from "@/hooks/use-player-token"
 import { useGamePolling } from "@/hooks/use-game-polling"
 import { translations } from "@/lib/i18n"
+import { formatCrc } from "@/lib/format"
 import Link from "next/link"
 import { ArrowLeft, RotateCcw, Trophy, Clock, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -50,25 +51,25 @@ function GameScoreboard({ myGrid, opponentGrid, locale, isDark }: {
       <div className="grid grid-cols-2 gap-2">
         <div className={`rounded-xl p-3 ${isDark ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-emerald-50 border border-emerald-200/50"}`}>
           <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-2">
-            {locale === "fr" ? "Mes tirs" : "My shots"}
+            {translations.relics.myShots[locale]}
           </p>
           <div className="flex items-baseline gap-3">
             <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{myAttacks.sunkCount}<span className="text-sm font-bold">/{RELIC_ORDER.length}</span></span>
             <div className="text-[10px] text-ink/50 dark:text-white/50 space-y-0.5">
-              <p>💥 {myAttacks.hits} {locale === "fr" ? "touchés" : "hits"}</p>
-              <p>💧 {myAttacks.misses} {locale === "fr" ? "ratés" : "misses"}</p>
+              <p>💥 {myAttacks.hits} {translations.relics.shotHits[locale]}</p>
+              <p>💧 {myAttacks.misses} {translations.relics.shotMisses[locale]}</p>
             </div>
           </div>
         </div>
         <div className={`rounded-xl p-3 ${isDark ? "bg-red-500/10 border border-red-500/20" : "bg-red-50 border border-red-200/50"}`}>
           <p className="text-[10px] font-bold text-red-500 dark:text-red-400 uppercase tracking-widest mb-2">
-            {locale === "fr" ? "Tirs adverses" : "Opponent shots"}
+            {translations.relics.opponentShots[locale]}
           </p>
           <div className="flex items-baseline gap-3">
             <span className="text-2xl font-black text-red-500 dark:text-red-400">{oppAttacks.sunkCount}<span className="text-sm font-bold">/{RELIC_ORDER.length}</span></span>
             <div className="text-[10px] text-ink/50 dark:text-white/50 space-y-0.5">
-              <p>💥 {oppAttacks.hits} {locale === "fr" ? "touchés" : "hits"}</p>
-              <p>💧 {oppAttacks.misses} {locale === "fr" ? "ratés" : "misses"}</p>
+              <p>💥 {oppAttacks.hits} {translations.relics.shotHits[locale]}</p>
+              <p>💧 {oppAttacks.misses} {translations.relics.shotMisses[locale]}</p>
             </div>
           </div>
         </div>
@@ -77,7 +78,7 @@ function GameScoreboard({ myGrid, opponentGrid, locale, isDark }: {
       {/* Opponent relics tracker */}
       <div className={`rounded-xl p-3 ${isDark ? "bg-white/5 border border-white/10" : "bg-white/60 border border-ink/10"}`}>
         <p className="text-[10px] font-bold text-ink/40 dark:text-white/40 uppercase tracking-widest mb-2">
-          {locale === "fr" ? "Reliques adverses" : "Opponent relics"}
+          {translations.relics.opponentRelics[locale]}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {RELIC_ORDER.map(rid => {
@@ -90,7 +91,7 @@ function GameScoreboard({ myGrid, opponentGrid, locale, isDark }: {
                   : "border-ink/10 dark:border-white/10"}`}>
                 <span>{RELICS[rid].emoji}</span>
                 <span className={`font-medium ${isSunk ? "line-through text-red-500 dark:text-red-400" : "text-ink/50 dark:text-white/50"}`}>
-                  {locale === "fr" ? RELICS[rid].name_fr : RELICS[rid].name_en}
+                  {getRelicName(rid, locale)}
                 </span>
                 {isSunk && <span className="text-red-500 dark:text-red-400 font-bold">✕</span>}
               </div>
@@ -102,7 +103,7 @@ function GameScoreboard({ myGrid, opponentGrid, locale, isDark }: {
       {/* My relics tracker */}
       <div className={`rounded-xl p-3 ${isDark ? "bg-white/5 border border-white/10" : "bg-white/60 border border-ink/10"}`}>
         <p className="text-[10px] font-bold text-ink/40 dark:text-white/40 uppercase tracking-widest mb-2">
-          {locale === "fr" ? "Mes reliques" : "My relics"}
+          {translations.relics.myRelics[locale]}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {RELIC_ORDER.map(rid => {
@@ -120,7 +121,7 @@ function GameScoreboard({ myGrid, opponentGrid, locale, isDark }: {
                     : "border-ink/10 dark:border-white/10"}`}>
                 <span>{RELICS[rid].emoji}</span>
                 <span className={`font-medium ${isSunk ? "line-through text-red-500 dark:text-red-400" : hasHits ? "text-amber-600 dark:text-amber-400" : "text-ink/50 dark:text-white/50"}`}>
-                  {locale === "fr" ? RELICS[rid].name_fr : RELICS[rid].name_en}
+                  {getRelicName(rid, locale)}
                 </span>
                 {isSunk && <span className="text-red-500 dark:text-red-400 font-bold">✕</span>}
                 {hasHits && !isSunk && <span className="text-amber-600 dark:text-amber-400 text-[10px] font-bold">{hitCount}/{size}</span>}
@@ -204,19 +205,19 @@ function DemoRelicsGame() {
     if (result === "already_shot") return
     setBotGrid(newGrid)
     const RELIC_NAMES_DEMO: Record<string, string> = {
-      crown: locale === "fr" ? "👑 Couronne" : "👑 Crown",
-      scepter: locale === "fr" ? "🔱 Sceptre" : "🔱 Scepter",
-      cup: locale === "fr" ? "🏆 Coupe" : "🏆 Cup",
-      scroll: locale === "fr" ? "📜 Parchemin" : "📜 Scroll",
-      owl: locale === "fr" ? "🦉 Hibou" : "🦉 Owl",
+      crown: t.relicCrown[locale],
+      scepter: t.relicScepter[locale],
+      cup: t.relicCup[locale],
+      scroll: t.relicScroll[locale],
+      owl: t.relicOwl[locale],
     }
     let demoMsg = ""
     if (result === "sunk") {
       const sunkRelic = newGrid.relics.find(r => r.sunk && r.cells.some(([cr, cc]) => cr === row && cc === col))
       const name = sunkRelic ? (RELIC_NAMES_DEMO[sunkRelic.id] ?? sunkRelic.id) : ""
-      demoMsg = locale === "fr" ? `💥 ${name} coulé !` : `💥 ${name} sunk!`
+      demoMsg = t.sunkRelic[locale].replace("{name}", name)
     } else if (result === "hit") {
-      demoMsg = locale === "fr" ? "🔥 Touché ! Rejoue !" : "🔥 Hit! Play again!"
+      demoMsg = t.hitPlayAgain[locale]
     } else {
       demoMsg = t.miss[locale]
     }
@@ -259,6 +260,9 @@ function DemoRelicsGame() {
       setBotThinking(false)
     }, 800)
     return () => clearTimeout(timeout)
+    // `addXp` (context), `locale`/`t.yourTurn` (translations statiques) sont
+    // stables — l'effet depend uniquement de l'etat du tour du bot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMyTurn, phase, botThinking, myGrid])
 
   function renderGrid(grid: PlayerGrid | null, clickable: boolean, showRelics: boolean) {
@@ -321,7 +325,7 @@ function DemoRelicsGame() {
                 className={`px-3 py-2 rounded-lg border text-sm font-medium transition
                   ${placed ? "border-green-500/50 text-green-600 dark:text-green-400 opacity-60" : ""}
                   ${selectedRelic === rid && !placed ? "border-marine dark:border-blue-400 text-marine dark:text-blue-400 bg-marine/10 dark:bg-blue-400/10" : "border-ink/20 dark:border-white/20 text-ink/60 dark:text-white/60"}`}>
-                {RELICS[rid].emoji} {locale === "fr" ? RELICS[rid].name_fr : RELICS[rid].name_en} ({RELICS[rid].size})
+                {RELICS[rid].emoji} {getRelicName(rid, locale)} ({RELICS[rid].size})
                 {placed && " ✓"}
               </button>
             )
@@ -405,7 +409,7 @@ function DemoRelicsGame() {
       {phase === "finished" && (
         <Link href="/relics">
           <Button className="rounded-xl font-bold mt-2" style={{ background: "#251B9F" }}>
-            {locale === "fr" ? "Rejouer" : "Play again"}
+            {t.playAgain[locale]}
           </Button>
         </Link>
       )}
@@ -450,7 +454,10 @@ function RealRelicsGame({ id }: { id: string }) {
       setMyAddress(game.player2Address)
       setAddressConfirmed(true)
     }
-  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed])
+    // `game` en dep entière re-triggerait a chaque polling (toutes les 2s) —
+    // on track explicitement les champs player-specific qui nous intéressent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.player1Token, game?.player2Token, game?.player1Address, game?.player2Address, addressConfirmed, playerTokenRef])
 
   // Detect turn change → show "your turn" popup
   const prevTurnRef = useRef<string | null>(null)
@@ -464,6 +471,10 @@ function RealRelicsGame({ id }: { id: string }) {
       setTimeout(() => setLastResult(""), 3000)
     }
     prevTurnRef.current = currentTurn
+    // `game`/`locale`/`t.yourTurn` changement ne doit pas re-trigger — l'effet
+    // gere un popup visuel déclenché par currentTurn (autres deps lues une
+    // seule fois lors du trigger).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.currentTurn, game?.status, myAddress])
 
   // Fetch profiles
@@ -480,6 +491,10 @@ function RealRelicsGame({ id }: { id: string }) {
     }).then(r => r.json()).then(data => {
       if (data.profiles) setProfiles(prev => ({ ...prev, ...data.profiles }))
     }).catch(() => {})
+    // `profiles` en dep causerait une boucle infinie (l'effet set profiles via
+    // le functional updater) ; `game` entier re-triggerait a chaque polling —
+    // on track les adresses player-specific qui suffisent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.player1Address, game?.player2Address])
 
   // Placement handlers
@@ -525,18 +540,18 @@ function RealRelicsGame({ id }: { id: string }) {
     const data = await res.json()
     if (data.result) {
       const RELIC_NAMES: Record<string, string> = {
-        crown: locale === "fr" ? "👑 Couronne" : "👑 Crown",
-        scepter: locale === "fr" ? "🔱 Sceptre" : "🔱 Scepter",
-        cup: locale === "fr" ? "🏆 Coupe" : "🏆 Cup",
-        scroll: locale === "fr" ? "📜 Parchemin" : "📜 Scroll",
-        owl: locale === "fr" ? "🦉 Hibou" : "🦉 Owl",
+        crown: t.relicCrown[locale],
+        scepter: t.relicScepter[locale],
+        cup: t.relicCup[locale],
+        scroll: t.relicScroll[locale],
+        owl: t.relicOwl[locale],
       }
       let msg = ""
       if (data.result === "sunk" && data.sunkRelicId) {
         const name = RELIC_NAMES[data.sunkRelicId] ?? data.sunkRelicId
-        msg = locale === "fr" ? `💥 ${name} coulé !` : `💥 ${name} sunk!`
+        msg = t.sunkRelic[locale].replace("{name}", name)
       } else if (data.result === "hit") {
-        msg = locale === "fr" ? "🔥 Touché ! Rejoue !" : "🔥 Hit! Play again!"
+        msg = t.hitPlayAgain[locale]
       } else if (data.result === "miss") {
         msg = t.miss[locale]
       }
@@ -608,7 +623,7 @@ function RealRelicsGame({ id }: { id: string }) {
     )
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-ink/50 dark:text-white/50">{locale === "fr" ? "Partie introuvable" : "Game not found"}</p>
+        <p className="text-ink/50 dark:text-white/50">{t.gameNotFound[locale]}</p>
         <Link href="/relics"><Button variant="outline" className="rounded-xl">← {t.title[locale]}</Button></Link>
       </div>
     )
@@ -635,7 +650,7 @@ function RealRelicsGame({ id }: { id: string }) {
             <ArrowLeft className="w-4 h-4" /> {t.title[locale]}
           </Link>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-ink/40 dark:text-white/40">{locale === "fr" ? "Partie" : "Game"}</span>
+            <span className="text-xs text-ink/40 dark:text-white/40">{t.gameLabel[locale]}</span>
             <span className="font-mono font-bold text-marine dark:text-blue-400 text-sm bg-marine/10 dark:bg-blue-400/10 px-2.5 py-1 rounded-lg">{game.slug}</span>
           </div>
         </div>
@@ -675,7 +690,7 @@ function RealRelicsGame({ id }: { id: string }) {
                     {game.winnerAddress?.toLowerCase() === myAddress.toLowerCase() ? t.victory[locale] : t.defeat[locale]}
                   </span>
                 </div>
-                <p className="text-xs text-ink/50 dark:text-white/50">{winAmount} CRC</p>
+                <p className="text-xs text-ink/50 dark:text-white/50">{formatCrc(winAmount)} CRC</p>
               </div>
             )}
           </CardContent>
@@ -740,7 +755,7 @@ function RealRelicsGame({ id }: { id: string }) {
           <Card className="mb-4 bg-white/60 dark:bg-white/5 backdrop-blur-sm border-ink/10 dark:border-white/10 shadow-sm rounded-2xl">
             <CardContent className="p-4 text-center">
               <p className="text-sm text-ink/60 dark:text-white/60">
-                {locale === "fr" ? "Mode spectateur — vous regardez cette partie" : "Spectator mode — you are watching this game"}
+                {t.spectatorMode[locale]}
               </p>
             </CardContent>
           </Card>
@@ -757,7 +772,7 @@ function RealRelicsGame({ id }: { id: string }) {
                     className={`px-3 py-2 rounded-lg border text-sm font-medium transition
                       ${placed ? "border-green-500/50 text-green-600 dark:text-green-400 opacity-60" : ""}
                       ${selectedRelic === rid && !placed ? "border-marine dark:border-blue-400 text-marine dark:text-blue-400 bg-marine/10 dark:bg-blue-400/10" : "border-ink/20 dark:border-white/20 text-ink/60 dark:text-white/60"}`}>
-                    {RELICS[rid].emoji} {locale === "fr" ? RELICS[rid].name_fr : RELICS[rid].name_en} ({RELICS[rid].size})
+                    {RELICS[rid].emoji} {getRelicName(rid, locale)} ({RELICS[rid].size})
                     {placed && " ✓"}
                   </button>
                 )
@@ -838,7 +853,7 @@ function RealRelicsGame({ id }: { id: string }) {
                         )}
                         <div>
                           <span className="text-xs font-semibold text-ink/70 dark:text-white/70 block leading-tight">{profile?.name || shortenAddress(addr)}</span>
-                          {isMe && <span className="text-[10px] text-ink/50 dark:text-white/50">{locale === "fr" ? "vous" : "you"}</span>}
+                          {isMe && <span className="text-[10px] text-ink/50 dark:text-white/50">{t.you[locale]}</span>}
                         </div>
                       </>
                     ) : (
@@ -866,7 +881,7 @@ function RealRelicsGame({ id }: { id: string }) {
                   setAddressConfirmed(true)
                   await fetchGame()
                 }} className="py-1.5 rounded-lg bg-ink/5 dark:bg-white/10 text-xs text-ink/40 dark:text-white/40 hover:text-ink/60 dark:hover:text-white/60 transition-all">
-                  {locale === "fr" ? "Injecter joueurs" : "Inject players"}
+                  {t.injectPlayers[locale]}
                 </button>
                 <button onClick={async () => {
                   await fetch(`/api/relics/${id}/test?mode=skip`, { method: "POST" })
@@ -874,7 +889,7 @@ function RealRelicsGame({ id }: { id: string }) {
                   setAddressConfirmed(true)
                   await fetchGame()
                 }} className="py-1.5 rounded-lg bg-emerald-500/10 text-xs text-emerald-500 font-bold hover:bg-emerald-500/20 transition-all">
-                  {locale === "fr" ? "Passer au jeu" : "Skip to game"}
+                  {t.skipToGame[locale]}
                 </button>
               </div>
             )}
@@ -895,7 +910,7 @@ function RealRelicsGame({ id }: { id: string }) {
                 await fetch(`/api/relics/${id}/test?mode=skip`, { method: "POST" })
                 await fetchGame()
               }} className="w-full py-1.5 rounded-lg bg-emerald-500/10 text-xs text-emerald-500 font-bold hover:bg-emerald-500/20 transition-all">
-                {locale === "fr" ? "Passer au jeu (auto-place)" : "Skip to game (auto-place)"}
+                {t.skipToGameAuto[locale]}
               </button>
             )}
           </div>
