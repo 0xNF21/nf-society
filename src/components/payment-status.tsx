@@ -105,6 +105,10 @@ export function TicketHistory({
     return () => {
       cancelled = true;
     };
+    // `profiles` en dep causerait une boucle infinie (l'effet set profiles
+    // via le functional updater) — on ne re-fetch que quand la liste de
+    // participants change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participants]);
 
   const getProfile = (address: string): CirclesProfile | null => {

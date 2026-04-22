@@ -746,7 +746,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
       if (activeData.round) { setWatchingPayment(false); setRound(activeData.round); }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   // Poll scan
   useEffect(() => {
@@ -844,7 +844,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
       console.error("[Plinko] Drop fetch error:", err);
       setServerInFlight(false);
     }
-  }, [round, serverInFlight, pendingBalls, selectedDropMode, anim]);
+  }, [round, serverInFlight, pendingBalls, selectedDropMode, anim, tokenRef]);
 
   const handleCashout = useCallback(async () => {
     if (!round || serverInFlight || pendingBalls.length > 0 || anim.running || round.status !== "playing") return;
@@ -865,7 +865,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
       console.error("[Plinko] Cashout fetch error:", err);
     }
     setServerInFlight(false);
-  }, [round, serverInFlight, pendingBalls, anim]);
+  }, [round, serverInFlight, pendingBalls, anim, tokenRef]);
 
   const resetGame = useCallback(() => {
     setRound(null); setWatchingPayment(false); setPlayerProfile(null);

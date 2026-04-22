@@ -90,6 +90,9 @@ export default function ScratchCard({ result, onComplete, locale }: Props) {
         checkMatch(newRevealed);
       }
     }
+    // `checkMatch` est un useCallback defini apres (forward ref via closure).
+    // Ajouter aux deps creerait une dependance circulaire.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealed]);
 
   const checkMatch = useCallback((rev: boolean[]) => {

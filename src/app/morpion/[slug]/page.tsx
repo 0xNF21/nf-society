@@ -166,6 +166,10 @@ function DemoMorpionGame({ slug }: { slug: string }) {
       setBotThinking(false);
     }, 600);
     return () => clearTimeout(timeout);
+    // `addXp` (context), `botMove`/`checkWinner` (imports purs) sont stables —
+    // les ajouter cause pas de re-trigger, mais on garde deps minimales pour
+    // clarifier l'intention : l'effet depend de l'etat du tour.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTurn, status, botThinking, board]);
 
   const winLine = status === "finished" ? getWinLine(board) : null;
@@ -317,6 +321,10 @@ function RealMorpionGame({ slug }: { slug: string }) {
     }).then(r => r.json()).then(data => {
       if (data.profiles) setProfiles(prev => ({ ...prev, ...data.profiles }));
     }).catch(() => {});
+    // `profiles` en dep causerait une boucle infinie (l'effet set profiles via
+    // le functional updater qui lit prev) ; `game` entier re-triggerait a
+    // chaque polling — on track les adresses player-specific qui suffisent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.player1Address, game?.player2Address]);
 
   // Auto-identify player via token match
@@ -330,7 +338,10 @@ function RealMorpionGame({ slug }: { slug: string }) {
       setMyAddress(game.player2Address);
       setAddressConfirmed(true);
     }
-  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed]);
+    // `game` en dep entière re-triggerait a chaque polling (toutes les 2s) —
+    // on track explicitement les champs player-specific qui nous intéressent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.player1Token, game?.player2Token, game?.player1Address, game?.player2Address, addressConfirmed, playerTokenRef]);
 
   async function activateTestMode() {
     setTestLoading(true);

@@ -533,7 +533,7 @@ function RealDiceGame({ table }: { table: DiceTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   // Poll scan
   useEffect(() => {
@@ -568,7 +568,7 @@ function RealDiceGame({ table }: { table: DiceTable }) {
       console.error("[Dice] Action fetch error:", err);
     }
     setRolling(false);
-  }, [round, rolling, target, direction]);
+  }, [round, rolling, target, direction, tokenRef]);
 
   const resetGame = useCallback(() => {
     setRound(null);

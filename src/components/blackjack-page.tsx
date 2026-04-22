@@ -393,7 +393,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
     checkPayment();
     const interval = setInterval(checkPayment, 5000);
     return () => { active = false; clearInterval(interval); };
-  }, [watchingActionPayment, pendingPaidAction, handId]);
+  }, [watchingActionPayment, pendingPaidAction, handId, tokenRef]);
 
   const scanForHand = useCallback(async () => {
     setScanning(true);
@@ -409,7 +409,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   // Poll scan for initial payment detection
   // Fast poll (5s) when actively watching, slow poll (15s) as fallback
@@ -443,7 +443,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
       active = false;
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [handId]);
+  }, [handId, tokenRef]);
 
   // Fetch player profile when hand is available
   useEffect(() => {
