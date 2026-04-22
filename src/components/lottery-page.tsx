@@ -13,7 +13,7 @@ import { usePlayerToken } from "@/hooks/use-player-token";
 import { TicketHistory, type ParticipantEntry } from "@/components/payment-status";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
-import { translations } from "@/lib/i18n";
+import { translations, localeBcp47 } from "@/lib/i18n";
 import { darkSafeColor } from "@/lib/utils";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
@@ -530,7 +530,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
               betCrc={lottery.ticketPriceCrc}
               playerName={winnerProfile?.name || `${winner.address.slice(0, 6)}...${winner.address.slice(-4)}`}
               playerAvatar={winnerProfile?.imageUrl || undefined}
-              stats={`${ticketCount} ${locale === "fr" ? "tickets" : "tickets"}`}
+              stats={`${ticketCount} ${translations.tickets.tickets[locale]}`}
               date={new Date().toLocaleDateString()}
               locale={locale}
             />
@@ -633,7 +633,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
                   {drawHistory.map((draw) => {
                     const prof = historyProfiles[draw.winnerAddress.toLowerCase()];
                     const displayName = prof?.name || `${draw.winnerAddress.slice(0, 6)}...${draw.winnerAddress.slice(-4)}`;
-                    const drawDate = new Date(draw.drawnAt).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
+                    const drawDate = new Date(draw.drawnAt).toLocaleDateString(localeBcp47(locale), {
                       day: "numeric",
                       month: "long",
                       year: "numeric",

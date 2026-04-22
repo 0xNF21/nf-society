@@ -704,6 +704,7 @@ export const translations = {
     maxGain: { fr: "Max gain", en: "Max win" },
     open: { fr: "Ouvrir", en: "Open" },
     footer: { fr: "Construit sur la blockchain Gnosis avec l'infrastructure Circles.", en: "Built on the Gnosis blockchain with Circles infrastructure." },
+    decentralizedLootboxes: { fr: "Lootboxes décentralisées", en: "Decentralized Lootboxes" },
   },
   morpion: {
     back: { fr: "Retour", en: "Back" },
@@ -786,6 +787,7 @@ export const translations = {
     noTransactions: { fr: "Aucune transaction", en: "No transactions" },
     received: { fr: "Recu", en: "Received" },
     spent: { fr: "Depense", en: "Spent" },
+    xpTo: { fr: "pour", en: "to" },
   },
   memory: {
     title: { fr: "Memory CRC", en: "Memory CRC" },
@@ -884,6 +886,8 @@ export const translations = {
     copied: { fr: "Copié !", en: "Copied!" },
     expired: { fr: "Session expirée", en: "Session expired" },
     tryAgain: { fr: "Réessayer", en: "Try again" },
+    doubleXpTomorrow: { fr: "Double XP demain !", en: "Double XP tomorrow!" },
+    scratchAction: { fr: "Grattez", en: "Scratch" },
     topUpBalanceFirst: { fr: "Chargez d'abord votre solde", en: "Top up your balance first" },
     failedTryAgain: { fr: "Echec — reessayez", en: "Failed — try again" },
     errorGeneric: { fr: "Erreur", en: "Error" },
@@ -920,7 +924,25 @@ export const translations = {
     rouletteDesc: { fr: "Placez vos mises sur le tapis, lancez la roue. RTP ~99%.", en: "Place your bets on the table, spin the wheel. ~99% RTP." },
     plinkoTitle: { fr: "Plinko", en: "Plinko" },
     plinkoDesc: { fr: "Lachez la bille, laissez la gravite decider. RTP ~99%.", en: "Drop the ball, let gravity decide. ~99% RTP." },
+    blackjackTitle: { fr: "Blackjack", en: "Blackjack" },
+    blackjackDesc: { fr: "Blackjack classique contre la banque. 3:2.", en: "Classic blackjack vs dealer. 3:2." },
+    home: { fr: "Accueil", en: "Home" },
+    hubSubtitle: { fr: "Tentez votre chance avec nos jeux quotidiens et événements.", en: "Try your luck with our daily games and events." },
     action: { fr: "Jouer", en: "Play" },
+  },
+  gamePayment: {
+    paymentReceived: { fr: "Paiement reçu !", en: "Payment received!" },
+    waitingP2: { fr: "En attente du joueur 2...", en: "Waiting for player 2..." },
+    shareInvite: { fr: "Partage ce lien pour inviter un adversaire", en: "Share this link to invite an opponent" },
+    scanOpenGnosis: { fr: "Scannez pour ouvrir dans Gnosis App", en: "Scan to open in Gnosis App" },
+  },
+  gameRulesModal: {
+    title: { fr: "Règles du jeu", en: "Game Rules" },
+  },
+  gameLobby: {
+    privateGame: { fr: "Partie privée", en: "Private game" },
+    publicGame: { fr: "Partie publique", en: "Public game" },
+    youParens: { fr: "(vous)", en: "(you)" },
   },
   chancePayment: {
     copied: { fr: "Copie !", en: "Copied!" },
@@ -955,6 +977,7 @@ export const translations = {
   shop: {
     title: { fr: "Boutique XP", en: "XP Shop" },
     back: { fr: "Retour", en: "Back" },
+    noXpProfile: { fr: "Aucun profil XP trouvé pour cette adresse. Jouez pour gagner de l'XP !", en: "No XP profile found for this address. Play to earn XP!" },
     availableXp: { fr: "XP disponible", en: "Available XP" },
     level: { fr: "Niveau", en: "Level" },
     buy: { fr: "Acheter", en: "Buy" },
@@ -1062,6 +1085,13 @@ export const translations = {
     split: { fr: "Répartition du pot", en: "Pot split" },
     potTotal: { fr: "Pot total", en: "Total pot" },
     commission: { fr: "(5% commission)", en: "(5% commission)" },
+    paymentReceived: { fr: "Paiement reçu !", en: "Payment received!" },
+    shareInviteRacers: { fr: "Partagez ce lien pour inviter d'autres coureurs", en: "Share this link to invite more racers" },
+    scanOpenGnosis: { fr: "Scannez pour ouvrir dans Gnosis App", en: "Scan to open in Gnosis App" },
+    raceNotFound: { fr: "Course introuvable", en: "Race not found" },
+    demoNoPayment: { fr: "Mode démo — aucun paiement réel", en: "Demo mode — no real payment" },
+    privateRace: { fr: "Course privée", en: "Private race" },
+    publicRace: { fr: "Course publique", en: "Public race" },
     rules: {
       fr: "**Courses CRC**\n- 2 à 8 joueurs, chacun mise la même somme\n- Choix de tier : Bronze 1 / Silver 5 / Gold 20 / VIP 100 CRC\n- La course démarre quand tous les joueurs ont payé\n- Chaque joueur avance automatiquement (RNG pondéré)\n- **Tap pour booster** : +vitesse, max 10 boosts, cooldown 2s\n- Split : 2j 100% / 3j 80-20 / 4j 75-25 / 5-6j 65-25-10 / 7-8j 60-25-15\n- Commission 5% prélevée sur le pot",
       en: "**CRC Races**\n- 2 to 8 players, each bets the same amount\n- Tier choice: Bronze 1 / Silver 5 / Gold 20 / VIP 100 CRC\n- Race starts when everyone has paid\n- Each player advances automatically (weighted RNG)\n- **Tap to boost**: +speed, max 10 boosts, 2s cooldown\n- Split: 2p 100% / 3p 80-20 / 4p 75-25 / 5-6p 65-25-10 / 7-8p 60-25-15\n- 5% commission taken from the pot",
@@ -1268,6 +1298,15 @@ export const translations = {
     title: { fr: "Classement", en: "Leaderboard" },
     subtitle: { fr: "Les meilleurs joueurs de NF Society", en: "Top NF Society players" },
     empty: { fr: "Aucun joueur pour le moment", en: "No players yet" },
+    allGames: { fr: "Tous les jeux", en: "All games" },
+    youShort: { fr: "vous", en: "you" },
+    typeXp: { fr: "XP", en: "XP" },
+    typeWins: { fr: "Victoires", en: "Wins" },
+    typeWinRate: { fr: "Win Rate", en: "Win Rate" },
+    typeCrc: { fr: "CRC Gagnes", en: "CRC Won" },
+    periodAll: { fr: "Tout", en: "All Time" },
+    periodMonth: { fr: "Ce mois", en: "This Month" },
+    periodWeek: { fr: "Semaine", en: "This Week" },
   },
   rematch: {
     btn: { fr: "Revanche", en: "Rematch" },
@@ -1303,6 +1342,10 @@ export const translations = {
       fr: "Regle appliquee : sur split d'As, chaque main recoit 1 carte puis stand automatique.",
       en: "Rule applied: after splitting aces, each hand gets 1 card then auto-stands.",
     },
+    dealer: { fr: "Dealer", en: "Dealer" },
+    extraBet: { fr: "Mise supplementaire", en: "Extra bet" },
+    cancel: { fr: "Annuler", en: "Cancel" },
+    pay: { fr: "Payer", en: "Pay" },
   },
   coinFlip: {
     title: { fr: "Pile ou Face", en: "Coin Flip" },
@@ -1343,6 +1386,7 @@ export const translations = {
     rtp: { fr: "Retour au joueur : ~99%", en: "Return to player: ~99%" },
     tapToReveal: { fr: "Cliquez sur une case", en: "Tap a cell to reveal" },
     allGemsFound: { fr: "Toutes les gemmes trouvees !", en: "All gems found!" },
+    gems: { fr: "gemmes", en: "gems" },
   },
   dice: {
     title: { fr: "Dice", en: "Dice" },
@@ -1520,6 +1564,7 @@ export const translations = {
     dozen1: { fr: "1-12", en: "1-12" },
     dozen2: { fr: "13-24", en: "13-24" },
     dozen3: { fr: "25-36", en: "25-36" },
+    chip: { fr: "Jeton", en: "Chip" },
   },
   miniapp: {
     payBtn: { fr: "Payer {amount} CRC", en: "Pay {amount} CRC" },
@@ -1578,6 +1623,10 @@ export const translations = {
     errorInvalidBet: { fr: "Mise non autorisee pour cette table", en: "Bet not allowed on this table" },
     errorInvalidParam: { fr: "Parametre de jeu invalide", en: "Invalid game parameter" },
     errorNotFound: { fr: "Partie introuvable", en: "Game not found" },
+    errorBelowMin: { fr: "Le minimum est {n} CRC", en: "Minimum is {n} CRC" },
+    errorAboveMax: { fr: "Le maximum est {n} CRC", en: "Maximum is {n} CRC" },
+    errorSafeMissing: { fr: "Configuration serveur manquante", en: "Server configuration missing" },
+    errorRateLimited: { fr: "Trop de tentatives. R\u00e9essayez dans {n}s.", en: "Too many attempts. Try again in {n}s." },
     preparing: { fr: "Pr\u00e9paration...", en: "Preparing..." },
     // Phase 3b — pay-from-balance in game payment components
     payWithBalance: { fr: "Payer avec mon solde", en: "Pay with my balance" },
@@ -1752,6 +1801,8 @@ export const translations = {
     betLabel: { fr: "Mise", en: "Bet" },
     joinBtn: { fr: "Rejoindre", en: "Join" },
     orCreateGame: { fr: "Ou crée ta partie", en: "Or create your game" },
+    subtitleAnother: { fr: "Rejoins une partie ouverte par un autre joueur", en: "Join a game created by another player" },
+    gnosisBlockchain: { fr: "", en: " blockchain" },
     justNow: { fr: "à l'instant", en: "just now" },
     justNow2: { fr: "a l'instant", en: "just now" },
     minAgo: { fr: "il y a {n}min", en: "{n}m ago" },
@@ -1821,6 +1872,10 @@ export const translations = {
 
 export function localeBcp47(locale: Locale): string {
   return locale === "fr" ? "fr-FR" : "en-US";
+}
+
+export function isFr(locale: Locale): boolean {
+  return locale === "fr";
 }
 
 export function t(section: string, key: string, locale: Locale): string {

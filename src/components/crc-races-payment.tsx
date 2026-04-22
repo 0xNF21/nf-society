@@ -137,7 +137,7 @@ export function CrcRacesPayment({ game, playerToken, onScanComplete, scanInterva
             <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
             <div>
               <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                {locale === "fr" ? "Paiement reçu !" : "Payment received!"}
+                {t.paymentReceived[locale]}
               </p>
               <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">{game.betCrc} CRC</p>
             </div>
@@ -152,7 +152,7 @@ export function CrcRacesPayment({ game, playerToken, onScanComplete, scanInterva
 
           <div className="space-y-2">
             <p className="text-xs text-ink/40 dark:text-white/40 text-center">
-              {locale === "fr" ? "Partagez ce lien pour inviter d'autres coureurs" : "Share this link to invite more racers"}
+              {t.shareInviteRacers[locale]}
             </p>
             <div className="flex gap-2">
               <code className="flex-1 px-3 py-2.5 rounded-xl border border-ink/10 bg-white/80 dark:bg-white/5 text-xs font-mono text-ink/70 dark:text-white/70 truncate text-center">
@@ -244,7 +244,7 @@ export function CrcRacesPayment({ game, playerToken, onScanComplete, scanInterva
                   <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">QR Error</div>
                 )}
                 <p className="text-xs text-ink/40 mt-2 text-center">
-                  {locale === "fr" ? "Scannez pour ouvrir dans Gnosis App" : "Scan to open in Gnosis App"}
+                  {t.scanOpenGnosis[locale]}
                 </p>
               </div>
             </div>

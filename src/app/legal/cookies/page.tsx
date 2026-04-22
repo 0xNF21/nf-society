@@ -3,11 +3,11 @@
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
-export default function CookiesPage() {
-  const { locale } = useLocale();
-  const t = translations.legal;
+type Locale = "fr" | "en";
+type T = typeof translations.legal;
 
-  const content = locale === "fr" ? (
+function CookiesContentFr({ t, locale }: { t: T; locale: Locale }) {
+  return (
     <>
       <h1>{t.cookiesTitle[locale]}</h1>
       <p className="text-sm text-ink/50 dark:text-white/50">
@@ -53,7 +53,11 @@ export default function CookiesPage() {
         Le stockage local est conserve jusqu'a ce que l'utilisateur le supprime manuellement ou vide son cache navigateur.
       </p>
     </>
-  ) : (
+  );
+}
+
+function CookiesContentEn({ t, locale }: { t: T; locale: Locale }) {
+  return (
     <>
       <h1>{t.cookiesTitle[locale]}</h1>
       <p className="text-sm text-ink/50 dark:text-white/50">
@@ -99,6 +103,16 @@ export default function CookiesPage() {
       </p>
     </>
   );
+}
 
-  return content;
+const CONTENT: Record<Locale, (props: { t: T; locale: Locale }) => JSX.Element> = {
+  fr: CookiesContentFr,
+  en: CookiesContentEn,
+};
+
+export default function CookiesPage() {
+  const { locale } = useLocale();
+  const t = translations.legal;
+  const Content = CONTENT[locale];
+  return <Content t={t} locale={locale} />;
 }

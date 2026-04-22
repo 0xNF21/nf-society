@@ -158,8 +158,8 @@ export default function CrcRacesLobbyPage() {
                 {isPrivate ? <Lock className="w-4 h-4 text-ink/40" /> : <Globe className="w-4 h-4 text-ink/40" />}
                 <span className="text-xs font-semibold text-ink/60">
                   {isPrivate
-                    ? (locale === "fr" ? "Course privée" : "Private race")
-                    : (locale === "fr" ? "Course publique" : "Public race")}
+                    ? t.privateRace[locale]
+                    : t.publicRace[locale]}
                 </span>
               </div>
               <button onClick={() => setIsPrivate(!isPrivate)}

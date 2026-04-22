@@ -597,7 +597,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
             {/* Dealer hand */}
             <HandDisplay
               cards={hand.dealerVisibleCards}
-              label={locale === "fr" ? "Dealer" : "Dealer"}
+              label={t.dealer[locale]}
               score={dealerScore}
               hidden={hand.dealerHoleHidden}
             />
@@ -717,13 +717,13 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
             <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-ink">
-                  {pendingPaidAction === "double" ? t.double[locale] : t.split[locale]} — {locale === "fr" ? "Mise supplementaire" : "Extra bet"}
+                  {pendingPaidAction === "double" ? t.double[locale] : t.split[locale]} — {t.extraBet[locale]}
                 </h3>
                 <button
                   onClick={() => setPendingPaidAction(null)}
                   className="text-xs text-ink/40 hover:text-ink/60"
                 >
-                  {locale === "fr" ? "Annuler" : "Cancel"}
+                  {t.cancel[locale]}
                 </button>
               </div>
 
@@ -741,7 +741,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   gameType="blackjack"
                   gameId={`${table.slug}-${pendingPaidAction}-${handId}`}
                   accentColor={pendingPaidAction === "double" ? "#F59E0B" : "#8B5CF6"}
-                  payLabel={`${locale === "fr" ? "Payer" : "Pay"} ${hand.baseBet} CRC`}
+                  payLabel={`${t.pay[locale]} ${hand.baseBet} CRC`}
                   onPaymentInitiated={() => setWatchingActionPayment(true)}
                   scanning={false}
                   paymentStatus={watchingActionPayment ? "watching" : "idle"}

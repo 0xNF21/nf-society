@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ChevronDown, Gamepad2, Star, Trophy, Gift, Dice5, ShoppingBag, HelpCircle } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { isFr } from "@/lib/i18n";
 
 function Section({ title, icon, children, defaultOpen = false }: {
   title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean;
@@ -36,7 +37,7 @@ function Bullet({ children }: { children: React.ReactNode }) {
 
 export default function DocsPage() {
   const { locale } = useLocale();
-  const fr = locale === "fr";
+  const fr = isFr(locale);
 
   return (
     <main className="min-h-screen flex flex-col items-center px-4 py-8">

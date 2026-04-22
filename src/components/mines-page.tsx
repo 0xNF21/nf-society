@@ -357,7 +357,7 @@ function DemoMinesGame({ table }: { table: MinesTable }) {
             </div>
             <div className="flex justify-between text-xs text-ink/40">
               <span>x{calculateMultiplier(selectedMines, 1).toFixed(2)} / {t.gemsFound[locale].toLowerCase()}</span>
-              <span>{25 - selectedMines} {locale === "fr" ? "gemmes" : "gems"}</span>
+              <span>{25 - selectedMines} {t.gems[locale]}</span>
             </div>
           </div>
 
@@ -616,7 +616,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
             </div>
             <div className="flex justify-between text-xs text-ink/40">
               <span>x{calculateMultiplier(selectedMines, 1).toFixed(2)} / {t.gemsFound[locale].toLowerCase()}</span>
-              <span>{25 - selectedMines} {locale === "fr" ? "gemmes" : "gems"}</span>
+              <span>{25 - selectedMines} {t.gems[locale]}</span>
             </div>
           </div>
 

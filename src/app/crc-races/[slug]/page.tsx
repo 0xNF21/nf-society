@@ -376,7 +376,7 @@ function RealRace({ slug }: { slug: string }) {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-ink/30" /></div>;
   if (notFound || !game) {
     return <div className="min-h-screen flex items-center justify-center p-6">
-      <p className="text-sm text-ink/60">{locale === "fr" ? "Course introuvable" : "Race not found"}</p>
+      <p className="text-sm text-ink/60">{t.raceNotFound[locale]}</p>
     </div>;
   }
 
@@ -691,7 +691,7 @@ function ResultsCard({
       {!hidePnl && (
         <PnlCard
           gameType="crc-races"
-          gameLabel={locale === "fr" ? "Courses CRC" : "CRC Races"}
+          gameLabel={t.title[locale]}
           stats={`${rank ? `#${rank}` : "—"} / ${totalPlayers}`}
           result={isWin ? "win" : "loss"}
           betCrc={betCrc}
@@ -705,7 +705,7 @@ function ResultsCard({
 
       {isDemo && (
         <p className="text-[10px] text-ink/40 text-center">
-          {locale === "fr" ? "Mode démo — aucun paiement réel" : "Demo mode — no real payment"}
+          {t.demoNoPayment[locale]}
         </p>
       )}
     </div>

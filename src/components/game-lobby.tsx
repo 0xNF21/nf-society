@@ -145,8 +145,8 @@ export function GameLobby({
                 {isPrivate ? <Lock className="w-4 h-4 text-ink/40" /> : <Globe className="w-4 h-4 text-ink/40" />}
                 <span className="text-xs font-semibold text-ink/60">
                   {isPrivate
-                    ? (locale === "fr" ? "Partie privée" : "Private game")
-                    : (locale === "fr" ? "Partie publique" : "Public game")}
+                    ? translations.gameLobby.privateGame[locale]
+                    : translations.gameLobby.publicGame[locale]}
                 </span>
               </div>
               <button onClick={() => setIsPrivate(!isPrivate)}

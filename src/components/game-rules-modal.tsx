@@ -30,7 +30,7 @@ export function GameRulesModal({ gameKey }: GameRulesModalProps) {
       <button onClick={() => setOpen(true)}
         className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-ink/10 dark:border-white/10 bg-white/60 dark:bg-white/5 text-sm font-semibold text-ink/60 dark:text-white/60 hover:border-marine/40 hover:text-marine transition-all">
         <HelpCircle className="w-4 h-4" />
-        {locale === "fr" ? "Règles du jeu" : "Game Rules"}
+        {translations.gameRulesModal.title[locale]}
       </button>
 
       {open && (
@@ -43,7 +43,7 @@ export function GameRulesModal({ gameKey }: GameRulesModalProps) {
               <div className="flex items-center gap-2">
                 <span className="text-xl">{config.emoji}</span>
                 <h2 className="text-base font-bold text-ink dark:text-white">
-                  {locale === "fr" ? "Règles du jeu" : "Game Rules"}
+                  {translations.gameRulesModal.title[locale]}
                 </h2>
               </div>
               <button onClick={() => setOpen(false)} className="text-ink/40 hover:text-ink transition-colors">

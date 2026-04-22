@@ -498,21 +498,15 @@ function mapInitError(code: string, data: any, locale: "fr" | "en"): string {
   const t = translations.wallet;
   switch (code) {
     case "below_minimum":
-      return locale === "fr"
-        ? `Le minimum est ${data?.minimum || 1} CRC`
-        : `Minimum is ${data?.minimum || 1} CRC`;
+      return t.errorBelowMin[locale].replace("{n}", String(data?.minimum || 1));
     case "above_maximum":
-      return locale === "fr"
-        ? `Le maximum est ${data?.maximum || 1000} CRC`
-        : `Maximum is ${data?.maximum || 1000} CRC`;
+      return t.errorAboveMax[locale].replace("{n}", String(data?.maximum || 1000));
     case "invalid_amount":
       return t.invalidAmount[locale];
     case "safe_address_missing":
-      return locale === "fr" ? "Configuration serveur manquante" : "Server configuration missing";
+      return t.errorSafeMissing[locale];
     case "rate_limited":
-      return locale === "fr"
-        ? `Trop de tentatives. R\u00e9essayez dans ${data?.retryAfterSec || 60}s.`
-        : `Too many attempts. Try again in ${data?.retryAfterSec || 60}s.`;
+      return t.errorRateLimited[locale].replace("{n}", String(data?.retryAfterSec || 60));
     default:
       return t.error[locale];
   }

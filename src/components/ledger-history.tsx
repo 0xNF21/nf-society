@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Loader2, ChevronDown, ArrowDownCircle, ArrowUpCircle, Trophy, Gift, Coins, ExternalLink } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
-import { translations } from "@/lib/i18n";
+import { translations, localeBcp47 } from "@/lib/i18n";
 
 type LedgerEntry = {
   id: number | string;
@@ -218,7 +218,7 @@ function labelFor(entry: LedgerEntry, locale: "fr" | "en"): string {
 function formatDate(iso: string, locale: "fr" | "en"): string {
   try {
     const d = new Date(iso);
-    return d.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", {
+    return d.toLocaleDateString(localeBcp47(locale), {
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
