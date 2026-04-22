@@ -599,7 +599,7 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   // Poll scan
   useEffect(() => {
@@ -628,7 +628,7 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
     } catch (err) {
       console.error("[CrashDash] Harvest error:", err);
     }
-  }, [round]);
+  }, [round, tokenRef]);
 
   // Handle crash — inform server
   const handleCrash = useCallback(async (cp: number) => {
@@ -649,7 +649,7 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
     } catch (err) {
       console.error("[CrashDash] Crash report error:", err);
     }
-  }, [round]);
+  }, [round, tokenRef]);
 
   const resetGame = useCallback(() => {
     setRound(null);

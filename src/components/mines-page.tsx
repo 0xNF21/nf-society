@@ -480,7 +480,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug]);
+  }, [table.slug, tokenRef]);
 
   // Poll scan
   useEffect(() => {
@@ -515,7 +515,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
       console.error("[Mines] Action fetch error:", err);
       setAnimating(false);
     }
-  }, [round, animating]);
+  }, [round, animating, tokenRef]);
 
   // Handle cashout action
   const handleCashout = useCallback(async () => {
@@ -542,7 +542,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
       console.error("[Mines] Cashout fetch error:", err);
       setAnimating(false);
     }
-  }, [round, animating]);
+  }, [round, animating, tokenRef]);
 
   const resetGame = useCallback(() => {
     setRound(null);

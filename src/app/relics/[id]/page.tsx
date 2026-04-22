@@ -260,6 +260,9 @@ function DemoRelicsGame() {
       setBotThinking(false)
     }, 800)
     return () => clearTimeout(timeout)
+    // `addXp` (context), `locale`/`t.yourTurn` (translations statiques) sont
+    // stables — l'effet depend uniquement de l'etat du tour du bot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMyTurn, phase, botThinking, myGrid])
 
   function renderGrid(grid: PlayerGrid | null, clickable: boolean, showRelics: boolean) {
@@ -451,7 +454,10 @@ function RealRelicsGame({ id }: { id: string }) {
       setMyAddress(game.player2Address)
       setAddressConfirmed(true)
     }
-  }, [game?.player1Token, game?.player2Token, game?.status, addressConfirmed])
+    // `game` en dep entière re-triggerait a chaque polling (toutes les 2s) —
+    // on track explicitement les champs player-specific qui nous intéressent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.player1Token, game?.player2Token, game?.player1Address, game?.player2Address, addressConfirmed, playerTokenRef])
 
   // Detect turn change → show "your turn" popup
   const prevTurnRef = useRef<string | null>(null)
@@ -465,6 +471,10 @@ function RealRelicsGame({ id }: { id: string }) {
       setTimeout(() => setLastResult(""), 3000)
     }
     prevTurnRef.current = currentTurn
+    // `game`/`locale`/`t.yourTurn` changement ne doit pas re-trigger — l'effet
+    // gere un popup visuel déclenché par currentTurn (autres deps lues une
+    // seule fois lors du trigger).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.currentTurn, game?.status, myAddress])
 
   // Fetch profiles
@@ -481,6 +491,10 @@ function RealRelicsGame({ id }: { id: string }) {
     }).then(r => r.json()).then(data => {
       if (data.profiles) setProfiles(prev => ({ ...prev, ...data.profiles }))
     }).catch(() => {})
+    // `profiles` en dep causerait une boucle infinie (l'effet set profiles via
+    // le functional updater) ; `game` entier re-triggerait a chaque polling —
+    // on track les adresses player-specific qui suffisent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.player1Address, game?.player2Address])
 
   // Placement handlers

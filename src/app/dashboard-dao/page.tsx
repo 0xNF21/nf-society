@@ -326,6 +326,10 @@ export default function DashboardDaoPage() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
+    // Mount-only : on veut charger une fois + setup de l'interval. Ajouter
+    // loadData aux deps re-créerait l'interval a chaque render car loadData
+    // est recréée a chaque render du composant.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function getFilteredInactive(): string[] {

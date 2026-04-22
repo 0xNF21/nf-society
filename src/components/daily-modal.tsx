@@ -333,6 +333,9 @@ export default function DailyModal() {
     } finally {
       setClaimingFromBalance(false);
     }
+    // `t.xxx` sont des refs vers le translations object (stable, import-time) —
+    // locale couvre deja le changement FR/EN.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedAddress, claimingFromBalance, locale]);
 
   // Demo mode — simulate payment + generate fake results client-side

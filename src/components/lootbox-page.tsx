@@ -527,7 +527,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
         await fetchProfiles(addresses);
       }
     } catch {}
-  }, [lootbox.id, fetchProfiles, runAnimation]);
+  }, [lootbox.id, fetchProfiles, runAnimation, tokenRef]);
 
   const scanNow = useCallback(async () => {
     setScanning(true);
