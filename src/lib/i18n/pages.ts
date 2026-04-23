@@ -413,6 +413,7 @@ export const pagesTranslations = {
       en: "On-chain balance on the relayer safe, available to pay players",
     },
     innerCrc: { fr: "CRC", en: "CRC" },
+    playerBalances: { fr: "Solde joueurs", en: "Player balances" },
     last24h: { fr: "24 h", en: "24 h" },
     last7d: { fr: "7 jours", en: "7 days" },
     last30d: { fr: "30 jours", en: "30 days" },
