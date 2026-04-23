@@ -17,6 +17,7 @@ import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 import { aggregateAllChance, ALL_CHANCE_SERVER_GAMES, ChanceAggregate } from "@/lib/chance-registry-server";
 import { getSafeCrcBalance } from "@/lib/payout";
 import { getRecentGames, RecentGameRow } from "@/lib/recent-games";
+import { DAO_TREASURY_ADDRESS } from "@/lib/wallet-ledger";
 
 export type PeriodStats = {
   wagered: number;
@@ -53,10 +54,11 @@ export type TopGameMeta = {
 export type PlatformStats = {
   // Banque casino - on-chain (methode A)
   casinoBank: {
-    innerCrc: string;   // en CRC (decimal string, 18 decimales converties)
-    wrappedCrc: string; // xCRC ERC20
-    totalCrc: string;   // inner + wrapped
-    updatedAt: string;  // ISO
+    innerCrc: string;          // en CRC (decimal string, 18 decimales converties)
+    wrappedCrc: string;        // xCRC ERC20
+    totalCrc: string;          // inner + wrapped
+    playerBalancesCrc: string; // somme des balances joueurs (off-chain, hors treasury)
+    updatedAt: string;         // ISO
   };
 
   // Volumes par periode (methode B)
@@ -379,9 +381,28 @@ async function computeGamesBreakdown(): Promise<GameStatLine[]> {
  * Banque casino on-chain - somme CRC natif + xCRC wrapped du safe relayer.
  * Source de verite temps reel pour "combien la banque peut payer actuellement".
  */
+async function getPlayerBalancesCrc(): Promise<number> {
+  try {
+    const res = await db.execute(
+      sql`SELECT COALESCE(SUM(balance_crc), 0)::float AS total
+          FROM players
+          WHERE balance_crc > 0
+            AND lower(address) <> ${DAO_TREASURY_ADDRESS}`,
+    );
+    const row = (res as any).rows?.[0] ?? (res as any)[0] ?? { total: 0 };
+    return Number(row.total) || 0;
+  } catch (err) {
+    console.error("[platform-stats] player balances fetch failed:", err);
+    return 0;
+  }
+}
+
 async function getCasinoBank(): Promise<PlatformStats["casinoBank"]> {
   try {
-    const balance = await getSafeCrcBalance();
+    const [balance, playerBalancesCrc] = await Promise.all([
+      getSafeCrcBalance(),
+      getPlayerBalancesCrc(),
+    ]);
     const inner = ethers.formatUnits(balance.erc1155, 18);
     const wrapped = ethers.formatUnits(balance.erc20, 18);
     const total = ethers.formatUnits(balance.erc1155 + balance.erc20, 18);
@@ -389,6 +410,7 @@ async function getCasinoBank(): Promise<PlatformStats["casinoBank"]> {
       innerCrc: inner,
       wrappedCrc: wrapped,
       totalCrc: total,
+      playerBalancesCrc: playerBalancesCrc.toFixed(6),
       updatedAt: new Date().toISOString(),
     };
   } catch (err) {
@@ -397,6 +419,7 @@ async function getCasinoBank(): Promise<PlatformStats["casinoBank"]> {
       innerCrc: "0",
       wrappedCrc: "0",
       totalCrc: "0",
+      playerBalancesCrc: "0",
       updatedAt: new Date().toISOString(),
     };
   }

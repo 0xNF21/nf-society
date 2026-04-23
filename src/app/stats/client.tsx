@@ -94,12 +94,15 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
           <p className="mt-2 text-xs text-white/60">
             {t.casinoBankDesc[locale]}
           </p>
-          <div className="mt-4 flex gap-3 text-xs text-white/70">
+          <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/70">
             <span>
               {t.innerCrc[locale]} : <b>{formatCrc(casinoBank.innerCrc, 2)}</b>
             </span>
             <span>
               xCRC : <b>{formatCrc(casinoBank.wrappedCrc, 2)}</b>
+            </span>
+            <span>
+              {t.playerBalances[locale]} : <b>{formatCrc(casinoBank.playerBalancesCrc, 2)}</b>
             </span>
           </div>
         </div>
