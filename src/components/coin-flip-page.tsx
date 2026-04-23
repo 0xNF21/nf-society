@@ -261,6 +261,39 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+              {translations.quickReplay.pickSide[locale]}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setSelectedChoice("heads")}
+                className={`py-4 rounded-xl text-center font-bold transition-all border-2 ${
+                  selectedChoice === "heads"
+                    ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20 scale-105 shadow-lg"
+                    : "border-ink/10 bg-white/60 dark:bg-white/5 hover:border-ink/20"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/crc-logo.png" alt="" className="w-8 h-8 mx-auto mb-1 rounded-full object-cover" />
+                <div className="text-sm text-ink">{translations.quickReplay.heads[locale]}</div>
+              </button>
+              <button
+                onClick={() => setSelectedChoice("tails")}
+                className={`py-4 rounded-xl text-center font-bold transition-all border-2 ${
+                  selectedChoice === "tails"
+                    ? "border-slate-400 bg-slate-50 dark:bg-slate-900/20 scale-105 shadow-lg"
+                    : "border-ink/10 bg-white/60 dark:bg-white/5 hover:border-ink/20"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/nf-society-logo.png" alt="" className="w-8 h-8 mx-auto mb-1 rounded-full object-cover" />
+                <div className="text-sm text-ink">{translations.quickReplay.tails[locale]}</div>
+              </button>
+            </div>
+          </div>
+        }
       >
         {selectedChoice && (
           <DemoBalancePayButton
@@ -592,6 +625,39 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+              {translations.quickReplay.pickSide[locale]}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setSelectedChoice("heads")}
+                className={`py-4 rounded-xl text-center font-bold transition-all border-2 ${
+                  selectedChoice === "heads"
+                    ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20 scale-105 shadow-lg"
+                    : "border-ink/10 bg-white/60 dark:bg-white/5 hover:border-ink/20"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/crc-logo.png" alt="" className="w-8 h-8 mx-auto mb-1 rounded-full object-cover" />
+                <div className="text-sm text-ink">{t.heads[locale]}</div>
+              </button>
+              <button
+                onClick={() => setSelectedChoice("tails")}
+                className={`py-4 rounded-xl text-center font-bold transition-all border-2 ${
+                  selectedChoice === "tails"
+                    ? "border-slate-400 bg-slate-50 dark:bg-slate-900/20 scale-105 shadow-lg"
+                    : "border-ink/10 bg-white/60 dark:bg-white/5 hover:border-ink/20"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/nf-society-logo.png" alt="" className="w-8 h-8 mx-auto mb-1 rounded-full object-cover" />
+                <div className="text-sm text-ink">{t.tails[locale]}</div>
+              </button>
+            </div>
+          </div>
+        }
       >
         {selectedChoice && (
           <ChancePayment

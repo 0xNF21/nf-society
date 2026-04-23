@@ -851,6 +851,10 @@ function DemoRouletteGame({ table }: { table: RouletteTable }) {
         currentBet={selectedBet}
         onBetChange={(bet) => { setSelectedBet(bet); setBets([]); }}
         accentColor={accentColor}
+        onChangeConfig={() => {
+          setShowReplay(false);
+          resetGame();
+        }}
       >
         <DemoBalancePayButton
           amountCrc={selectedBet}
@@ -1115,6 +1119,10 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        onChangeConfig={() => {
+          setShowReplay(false);
+          resetGame();
+        }}
       >
         <ChancePayment
           recipientAddress={table.recipientAddress}

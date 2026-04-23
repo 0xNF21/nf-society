@@ -501,6 +501,49 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+              {translations.quickReplay.autoHarvest[locale]}
+            </p>
+            <div className="grid grid-cols-5 gap-2">
+              <button
+                onClick={() => { setAutoHarvest(null); setAutoHarvestInput(""); }}
+                className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                  autoHarvest === null ? "text-white" : "bg-ink/5 dark:bg-white/5 text-ink/40"
+                }`}
+                style={autoHarvest === null ? { backgroundColor: accentColor } : {}}
+              >
+                {translations.quickReplay.manual[locale]}
+              </button>
+              {quickAuto.map((val) => (
+                <button
+                  key={val}
+                  onClick={() => { setAutoHarvest(val); setAutoHarvestInput(String(val)); }}
+                  className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                    autoHarvest === val ? "text-white" : "bg-ink/5 dark:bg-white/5 text-ink/40"
+                  }`}
+                  style={autoHarvest === val ? { backgroundColor: accentColor } : {}}
+                >
+                  {val}x
+                </button>
+              ))}
+            </div>
+            <input
+              type="number"
+              min="1.01"
+              step="0.01"
+              placeholder={translations.quickReplay.manual[locale]}
+              value={autoHarvestInput}
+              onChange={(e) => {
+                setAutoHarvestInput(e.target.value);
+                const v = parseFloat(e.target.value);
+                setAutoHarvest(!isNaN(v) && v >= 1.01 ? v : null);
+              }}
+              className="w-full bg-ink/5 dark:bg-white/5 border border-ink/10 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-ink outline-none focus:border-emerald-400 placeholder:text-ink/30"
+            />
+          </div>
+        }
       >
         <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-emerald-900/10 p-4 space-y-3">
           <div className="flex items-center justify-between text-xs">
@@ -845,6 +888,49 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+              {translations.quickReplay.autoHarvest[locale]}
+            </p>
+            <div className="grid grid-cols-5 gap-2">
+              <button
+                onClick={() => { setAutoHarvest(null); setAutoHarvestInput(""); }}
+                className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                  autoHarvest === null ? "text-white" : "bg-ink/5 dark:bg-white/5 text-ink/40"
+                }`}
+                style={autoHarvest === null ? { backgroundColor: accentColor } : {}}
+              >
+                {translations.quickReplay.manual[locale]}
+              </button>
+              {quickAuto.map((val) => (
+                <button
+                  key={val}
+                  onClick={() => { setAutoHarvest(val); setAutoHarvestInput(String(val)); }}
+                  className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                    autoHarvest === val ? "text-white" : "bg-ink/5 dark:bg-white/5 text-ink/40"
+                  }`}
+                  style={autoHarvest === val ? { backgroundColor: accentColor } : {}}
+                >
+                  {val}x
+                </button>
+              ))}
+            </div>
+            <input
+              type="number"
+              min="1.01"
+              step="0.01"
+              placeholder={translations.quickReplay.manual[locale]}
+              value={autoHarvestInput}
+              onChange={(e) => {
+                setAutoHarvestInput(e.target.value);
+                const v = parseFloat(e.target.value);
+                setAutoHarvest(!isNaN(v) && v >= 1.01 ? v : null);
+              }}
+              className="w-full bg-ink/5 dark:bg-white/5 border border-ink/10 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-ink outline-none focus:border-emerald-400 placeholder:text-ink/30"
+            />
+          </div>
+        }
       >
         <ChancePayment
           recipientAddress={table.recipientAddress}
