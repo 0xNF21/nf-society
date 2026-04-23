@@ -9,6 +9,8 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
+import { QuickReplayModal } from "@/components/quick-replay-modal";
+import { DemoBalancePayButton } from "@/components/demo-balance-pay-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { encodeGameData } from "@/lib/game-data";
 import { darkSafeColor } from "@/lib/utils";
@@ -147,13 +149,14 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
   const [selectedBet, setSelectedBet] = useState<number>(table.betOptions[0] || 5);
   const [gameState, setGameState] = useState<BlackjackState | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
 
   const visible = gameState ? getVisibleState(gameState) : null;
   const isFinished = gameState?.status === "finished";
 
-  const startGame = useCallback(() => {
+  const startGame = useCallback((bet: number = selectedBet) => {
     const deck = createDeck(6);
-    const state = dealInitialHands(deck, selectedBet);
+    const state = dealInitialHands(deck, bet);
     setGameState(state);
   }, [selectedBet]);
 
@@ -212,7 +215,7 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
               ))}
             </div>
           </div>
-          <button onClick={startGame} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{ backgroundColor: accentColor }}>
+          <button onClick={() => startGame()} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{ backgroundColor: accentColor }}>
             🧪 {t.betBtn[locale]} {selectedBet} CRC (Demo)
           </button>
         </div>
@@ -284,12 +287,31 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
                 </p>
                 {gameState.totalPayout > 0 && <p className="text-sm text-emerald-600 font-bold mt-1">+{Math.round(gameState.totalPayout * 1000) / 1000} CRC</p>}
               </div>
+              <button onClick={() => setShowReplay(true)} className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: accentColor }}><RefreshCw className="w-4 h-4" />{t.playAgain[locale]}</button>
               <PnlCard gameType="blackjack" result={gameState.totalPayout > selectedBet ? "win" : gameState.totalPayout === selectedBet ? "draw" : "loss"} betCrc={selectedBet} gainCrc={gameState.totalPayout - selectedBet} playerName="Demo Player" stats={gameState.playerHands[0]?.outcome === "blackjack" ? "Blackjack 3:2" : undefined} date={new Date().toLocaleDateString()} locale={locale} />
-              <button onClick={resetGame} className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90" style={{ backgroundColor: accentColor }}>{t.playAgain[locale]}</button>
             </div>
           )}
         </div>
       )}
+
+      {/* Quick replay modal (demo) */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        <DemoBalancePayButton
+          amountCrc={selectedBet}
+          accentColor={accentColor}
+          onPaid={() => {
+            setShowReplay(false);
+            startGame(selectedBet);
+          }}
+        />
+      </QuickReplayModal>
     </div>
   );
 }
@@ -324,6 +346,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastFinishedHandRef = useRef<number | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const [showReplay, setShowReplay] = useState(false);
 
   // Restore active hand on mount (after page refresh) — re-runs when token becomes available after SSR hydration
   const tokenValue = tokenRef.current;
@@ -795,6 +818,16 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                 )}
               </div>
 
+              {/* Play again */}
+              <button
+                onClick={() => setShowReplay(true)}
+                className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ backgroundColor: accentColor }}
+              >
+                <RefreshCw className="w-4 h-4" />
+                {t.playAgain[locale]}
+              </button>
+
               {/* PNL Card */}
               <PnlCard
                 gameType="blackjack"
@@ -808,19 +841,39 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                 date={new Date().toLocaleDateString()}
                 locale={locale}
               />
-
-              {/* Play again */}
-              <button
-                onClick={resetGame}
-                className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"
-                style={{ backgroundColor: accentColor }}
-              >
-                {t.playAgain[locale]}
-              </button>
             </div>
           )}
         </div>
       )}
+
+      {/* Quick replay modal */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        <ChancePayment
+          recipientAddress={table.recipientAddress}
+          amountCrc={selectedBet}
+          gameType="blackjack"
+          gameId={table.slug}
+          accentColor={accentColor}
+          payLabel={`${t.betBtn[locale]} ${selectedBet} CRC`}
+          onPaymentInitiated={async () => {
+            setShowReplay(false);
+            resetGame();
+            setWatchingPayment(true);
+            await scanForHand();
+          }}
+          onScan={scanForHand}
+          scanning={scanning}
+          paymentStatus={watchingPayment ? "watching" : "idle"}
+          playerToken={tokenRef.current}
+        />
+      </QuickReplayModal>
     </div>
   );
 }

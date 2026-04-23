@@ -27,6 +27,15 @@ export const componentsTranslations = {
     scanning: { fr: "Scan en cours...", en: "Scanning..." },
     scanPayments: { fr: "Scanner les paiements", en: "Scan payments" },
   },
+  quickReplay: {
+    title: { fr: "Rejouer", en: "Play again" },
+    bet: { fr: "Mise", en: "Bet" },
+    close: { fr: "Fermer", en: "Close" },
+    openReplay: { fr: "Rejouer", en: "Play again" },
+    demoBalance: { fr: "Solde démo", en: "Demo balance" },
+    demoPay: { fr: "Payer {amount} CRC (démo)", en: "Pay {amount} CRC (demo)" },
+    demoInsufficient: { fr: "Solde démo insuffisant", en: "Insufficient demo balance" },
+  },
   pnlCard: {
     grossLabel: { fr: "Gain brut", en: "Gross" },
     betLost: { fr: "Mise perdue", en: "Bet lost" },

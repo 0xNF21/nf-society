@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
+import { QuickReplayModal } from "@/components/quick-replay-modal";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { darkSafeColor } from "@/lib/utils";
 import {
@@ -284,6 +285,15 @@ function ResultPanel({
         )}
       </div>
 
+      <button
+        onClick={onPlayAgain}
+        className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90 flex items-center justify-center gap-2"
+        style={{ backgroundColor: accentColor }}
+      >
+        <RefreshCw className="w-4 h-4" />
+        {t.playAgain[locale]}
+      </button>
+
       <PnlCard
         gameType="crash_dash"
         result={won ? "win" : "loss"}
@@ -295,14 +305,6 @@ function ResultPanel({
         date={new Date().toLocaleDateString()}
         locale={locale}
       />
-
-      <button
-        onClick={onPlayAgain}
-        className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90"
-        style={{ backgroundColor: accentColor }}
-      >
-        {t.playAgain[locale]}
-      </button>
     </div>
   );
 }
@@ -327,15 +329,17 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
   const [demoProfit, setDemoProfit] = useState(0);
   const [demoGames, setDemoGames] = useState(0);
   const [demoBest, setDemoBest] = useState<number | null>(null);
+  const [showReplay, setShowReplay] = useState(false);
 
   const betOptions = table.betOptions as number[];
   const quickAuto = [1.5, 2, 5, 10];
 
-  const startGame = useCallback(() => {
-    if (selectedBet > demoBalance) return;
+  const startGame = useCallback((bet: number = selectedBet) => {
+    if (bet > demoBalance) return;
     const cp = generateCrashPoint();
     setCrashPoint(cp);
-    setDemoBalance(prev => prev - selectedBet);
+    setDemoBalance(prev => prev - bet);
+    setResult(null);
     setPhase("playing");
   }, [selectedBet, demoBalance]);
 
@@ -451,7 +455,7 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
 
           {/* Plant button */}
           <button
-            onClick={startGame}
+            onClick={() => startGame()}
             disabled={selectedBet > demoBalance}
             className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 disabled:opacity-30"
             style={{ backgroundColor: accentColor }}
@@ -485,9 +489,47 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
           payoutCrc={result.payoutCrc}
           accentColor={accentColor}
           locale={locale}
-          onPlayAgain={resetGame}
+          onPlayAgain={() => setShowReplay(true)}
         />
       )}
+
+      {/* Quick replay modal (demo — uses local demoBalance) */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-emerald-900/10 p-4 space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+              {translations.quickReplay.demoBalance[locale]}
+            </div>
+            <span className="text-emerald-700 dark:text-emerald-400 tabular-nums font-medium">
+              {demoBalance.toFixed(2)} CRC
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              if (selectedBet > demoBalance) return;
+              setShowReplay(false);
+              startGame(selectedBet);
+            }}
+            disabled={selectedBet > demoBalance}
+            className="w-full h-11 rounded-xl font-bold text-white transition-all disabled:opacity-40 hover:opacity-90"
+            style={{ backgroundColor: accentColor }}
+          >
+            🧪 {translations.quickReplay.demoPay[locale].replace("{amount}", String(selectedBet))}
+          </button>
+          {selectedBet > demoBalance && (
+            <p className="text-xs text-red-500 text-center font-semibold">
+              {translations.quickReplay.demoInsufficient[locale]}
+            </p>
+          )}
+        </div>
+      </QuickReplayModal>
 
       {/* Stats bar */}
       <div className="mt-6 rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4">
@@ -547,6 +589,7 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const [restoring, setRestoring] = useState(true);
   const [history, setHistory] = useState<Array<{ crashPoint: number; won: boolean }>>([]);
+  const [showReplay, setShowReplay] = useState(false);
 
   const betOptions = table.betOptions as number[];
   const quickAuto = [1.5, 2, 5, 10];
@@ -790,9 +833,38 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
           locale={locale}
           playerName={playerProfile?.name || (round.playerAddress ? shortenAddress(round.playerAddress) : undefined)}
           playerAvatar={playerProfile?.imageUrl || undefined}
-          onPlayAgain={resetGame}
+          onPlayAgain={() => setShowReplay(true)}
         />
       )}
+
+      {/* Quick replay modal */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        <ChancePayment
+          recipientAddress={table.recipientAddress}
+          amountCrc={selectedBet}
+          gameType="crash_dash"
+          gameId={table.slug}
+          accentColor={accentColor}
+          payLabel={`Demurrage Dash — ${selectedBet} CRC`}
+          onPaymentInitiated={async () => {
+            setShowReplay(false);
+            resetGame();
+            setWatchingPayment(true);
+            await scanForRound();
+          }}
+          onScan={scanForRound}
+          scanning={scanning}
+          paymentStatus={watchingPayment ? "watching" : "idle"}
+          playerToken={tokenRef.current}
+        />
+      </QuickReplayModal>
 
       {/* History */}
       {history.length > 0 && (

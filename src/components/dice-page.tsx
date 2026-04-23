@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Dices } from "lucide-react";
+import { ArrowLeft, Loader2, Dices, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
+import { QuickReplayModal } from "@/components/quick-replay-modal";
+import { DemoBalancePayButton } from "@/components/demo-balance-pay-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { darkSafeColor } from "@/lib/utils";
 import {
@@ -277,6 +279,15 @@ function ResultPanel({
         )}
       </div>
 
+      <button
+        onClick={onPlayAgain}
+        className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90 flex items-center justify-center gap-2"
+        style={{ backgroundColor: accentColor }}
+      >
+        <RefreshCw className="w-4 h-4" />
+        {t.playAgain[locale]}
+      </button>
+
       <PnlCard
         gameType="dice"
         result={won ? "win" : "loss"}
@@ -288,14 +299,6 @@ function ResultPanel({
         date={new Date().toLocaleDateString()}
         locale={locale}
       />
-
-      <button
-        onClick={onPlayAgain}
-        className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90"
-        style={{ backgroundColor: accentColor }}
-      >
-        {t.playAgain[locale]}
-      </button>
     </div>
   );
 }
@@ -336,14 +339,15 @@ function DemoDiceGame({ table }: { table: DiceTable }) {
   const [direction, setDirection] = useState<DiceDirection>("over");
   const [result, setResult] = useState<RoundResponse | null>(null);
   const [rolling, setRolling] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
 
   const betOptions = table.betOptions as number[];
 
-  const handleRoll = useCallback(() => {
+  const performRoll = useCallback((bet: number) => {
     if (rolling) return;
+    setResult(null);
     setRolling(true);
 
-    // Simulate roll with delay for animation
     setTimeout(() => {
       const rollResult = generateResult();
       const multiplier = calculateMultiplier(target, direction);
@@ -355,11 +359,11 @@ function DemoDiceGame({ table }: { table: DiceTable }) {
         won = rollResult < target;
       }
 
-      const payoutCrc = won ? Math.floor(selectedBet * multiplier * 100) / 100 : 0;
+      const payoutCrc = won ? Math.floor(bet * multiplier * 100) / 100 : 0;
 
       setResult({
         status: won ? "won" : "lost",
-        betCrc: selectedBet,
+        betCrc: bet,
         target,
         direction,
         result: rollResult,
@@ -374,7 +378,9 @@ function DemoDiceGame({ table }: { table: DiceTable }) {
       });
       setRolling(false);
     }, 1500);
-  }, [rolling, target, direction, selectedBet]);
+  }, [rolling, target, direction]);
+
+  const handleRoll = useCallback(() => performRoll(selectedBet), [performRoll, selectedBet]);
 
   const resetGame = useCallback(() => {
     setResult(null);
@@ -446,9 +452,28 @@ function DemoDiceGame({ table }: { table: DiceTable }) {
           round={result}
           accentColor={accentColor}
           locale={locale}
-          onPlayAgain={resetGame}
+          onPlayAgain={() => setShowReplay(true)}
         />
       )}
+
+      {/* Quick replay modal (demo) */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        <DemoBalancePayButton
+          amountCrc={selectedBet}
+          accentColor={accentColor}
+          onPaid={() => {
+            setShowReplay(false);
+            performRoll(selectedBet);
+          }}
+        />
+      </QuickReplayModal>
     </div>
   );
 }
@@ -480,6 +505,7 @@ function RealDiceGame({ table }: { table: DiceTable }) {
   const [rolling, setRolling] = useState(false);
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const [showReplay, setShowReplay] = useState(false);
 
   const betOptions = table.betOptions as number[];
 
@@ -675,9 +701,38 @@ function RealDiceGame({ table }: { table: DiceTable }) {
           locale={locale}
           playerName={playerProfile?.name || (round.playerAddress ? shortenAddress(round.playerAddress) : undefined)}
           playerAvatar={playerProfile?.imageUrl || undefined}
-          onPlayAgain={resetGame}
+          onPlayAgain={() => setShowReplay(true)}
         />
       )}
+
+      {/* Quick replay modal */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        <ChancePayment
+          recipientAddress={table.recipientAddress}
+          amountCrc={selectedBet}
+          gameType="dice"
+          gameId={table.slug}
+          accentColor={accentColor}
+          payLabel={`Dice — ${selectedBet} CRC`}
+          onPaymentInitiated={async () => {
+            setShowReplay(false);
+            resetGame();
+            setWatchingPayment(true);
+            await scanForRound();
+          }}
+          onScan={scanForRound}
+          scanning={scanning}
+          paymentStatus={watchingPayment ? "watching" : "idle"}
+          playerToken={tokenRef.current}
+        />
+      </QuickReplayModal>
     </div>
   );
 }

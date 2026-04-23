@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
+import { QuickReplayModal } from "@/components/quick-replay-modal";
+import { DemoBalancePayButton } from "@/components/demo-balance-pay-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { darkSafeColor } from "@/lib/utils";
 import {
@@ -317,16 +319,17 @@ function ResultPanel({
         </p>
       </div>
 
+      <button onClick={onPlayAgain}
+        className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90 flex items-center justify-center gap-2"
+        style={{ backgroundColor: accentColor }}>
+        <RefreshCw className="w-4 h-4" />
+        {t.playAgain[locale]}
+      </button>
+
       <PnlCard gameType="plinko" result={won ? "win" : "loss"} betCrc={round.totalBet}
         gainCrc={Math.round(net)} playerName={playerName || "Player"} playerAvatar={playerAvatar}
         stats={`${round.balls.length}/${round.ballCount} ${t.balls[locale]} | ${payout.toFixed(2)} CRC`}
         date={new Date().toLocaleDateString()} locale={locale} />
-
-      <button onClick={onPlayAgain}
-        className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90"
-        style={{ backgroundColor: accentColor }}>
-        {t.playAgain[locale]}
-      </button>
     </div>
   );
 }
@@ -448,6 +451,7 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
   // In-flight count = balls currently animating but not yet landed (reserved from ballCount)
   const [inFlightCount, setInFlightCount] = useState(0);
   const [result, setResult] = useState<RoundResponse | null>(null);
+  const [showReplay, setShowReplay] = useState(false);
   const anim = useConcurrentBallAnim();
 
   const validCombo = selectedTotal % selectedBallValue === 0;
@@ -460,12 +464,13 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
     }
   }, [selectedTotal, selectedBallValue]);
 
-  const handleStart = useCallback(() => {
-    if (!validCombo) return;
-    setState(createInitialState(selectedTotal, selectedBallValue));
+  const handleStart = useCallback((total: number = selectedTotal) => {
+    if (total % selectedBallValue !== 0) return;
+    setState(createInitialState(total, selectedBallValue));
     setResult(null);
     setInFlightCount(0);
-  }, [selectedTotal, selectedBallValue, validCombo]);
+    anim.reset();
+  }, [selectedTotal, selectedBallValue, anim]);
 
   const handleDrop = useCallback(() => {
     if (!state || state.status !== "playing") return;
@@ -566,7 +571,8 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
   const showResult = result;
 
   const cashoutAmount = state ? calculateCashoutAmount(state) : 0;
-  const ballsLeft = state ? state.ballCount - state.balls.length - inFlightCount : 0;
+  const ballsLeft = state ? state.ballCount - state.balls.length : 0;
+  const ballsAvailable = state ? state.ballCount - state.balls.length - inFlightCount : 0;
 
   return (
     <div className="min-h-screen px-4 py-8 max-w-lg mx-auto">
@@ -609,7 +615,7 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
 
           <PlinkoBoard settledBalls={[]} flyingBalls={[]} accentColor={accentColor} />
 
-          <button onClick={handleStart} disabled={!validCombo}
+          <button onClick={() => handleStart()} disabled={!validCombo}
             className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2"
             style={{ backgroundColor: accentColor }}>
             📌 {selectedTotal} CRC (Demo)
@@ -648,7 +654,7 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
               className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
               {t.cashout[locale]} {cashoutAmount.toFixed(2)}
             </button>
-            <button onClick={handleDrop} disabled={ballsLeft === 0}
+            <button onClick={handleDrop} disabled={ballsAvailable === 0}
               className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
               style={{ backgroundColor: accentColor }}>
               📌 {selectedDropMode === "all" ? t.dropAll[locale] : selectedDropMode === 1 ? t.dropOne[locale] : `×${selectedDropMode}`}
@@ -660,9 +666,28 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
       {showResult && result && (
         <div>
           <PlinkoBoard settledBalls={result.balls} flyingBalls={[]} accentColor={accentColor} />
-          <ResultPanel round={result} accentColor={accentColor} locale={locale} onPlayAgain={resetGame} />
+          <ResultPanel round={result} accentColor={accentColor} locale={locale} onPlayAgain={() => setShowReplay(true)} />
         </div>
       )}
+
+      {/* Quick replay modal (demo) */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={table.betOptions as number[]}
+        currentBet={selectedTotal}
+        onBetChange={setSelectedTotal}
+        accentColor={accentColor}
+      >
+        <DemoBalancePayButton
+          amountCrc={selectedTotal}
+          accentColor={accentColor}
+          onPaid={() => {
+            setShowReplay(false);
+            handleStart(selectedTotal);
+          }}
+        />
+      </QuickReplayModal>
     </div>
   );
 }
@@ -696,6 +721,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
   const [serverInFlight, setServerInFlight] = useState(false); // waiting for HTTP response
   // Balls returned by server but not yet landed visually — they are NOT shown in settledBalls yet
   const [pendingBalls, setPendingBalls] = useState<BallResult[]>([]);
+  const [showReplay, setShowReplay] = useState(false);
   const anim = useConcurrentBallAnim();
 
   const validCombo = selectedTotal % selectedBallValue === 0;
@@ -947,7 +973,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
           <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4 grid grid-cols-2 gap-3 text-center">
             <div>
               <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.ballsRemaining[locale]}</p>
-              <p className="text-xl font-bold text-ink">{Math.max(round.ballsRemaining - pendingBalls.length, 0)} / {round.ballCount}</p>
+              <p className="text-xl font-bold text-ink">{round.ballsRemaining} / {round.ballCount}</p>
             </div>
             <div>
               <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.accumulated[locale]}</p>
@@ -985,10 +1011,42 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
             locale={locale}
             playerName={playerProfile?.name || (round.playerAddress ? shortenAddress(round.playerAddress) : undefined)}
             playerAvatar={playerProfile?.imageUrl || undefined}
-            onPlayAgain={resetGame}
+            onPlayAgain={() => setShowReplay(true)}
           />
         </div>
       )}
+
+      {/* Quick replay modal */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={table.betOptions as number[]}
+        currentBet={selectedTotal}
+        onBetChange={setSelectedTotal}
+        accentColor={accentColor}
+      >
+        {validCombo && (
+          <ChancePayment
+            recipientAddress={table.recipientAddress}
+            amountCrc={selectedTotal}
+            gameType="plinko"
+            gameId={table.slug}
+            accentColor={accentColor}
+            payLabel={`Plinko — ${ballCount} ${ballCount === 1 ? t.ball[locale] : t.balls[locale]} × ${selectedBallValue} CRC`}
+            onPaymentInitiated={async () => {
+              setShowReplay(false);
+              resetGame();
+              setWatchingPayment(true);
+              await scanForRound();
+            }}
+            onScan={scanForRound}
+            scanning={scanning}
+            paymentStatus={watchingPayment ? "watching" : "idle"}
+            playerToken={tokenRef.current}
+            ballValue={selectedBallValue}
+          />
+        )}
+      </QuickReplayModal>
     </div>
   );
 }

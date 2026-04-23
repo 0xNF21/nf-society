@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Gem, Bomb, Banknote } from "lucide-react";
+import { ArrowLeft, Loader2, Gem, Bomb, Banknote, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
+import { QuickReplayModal } from "@/components/quick-replay-modal";
+import { DemoBalancePayButton } from "@/components/demo-balance-pay-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { encodeGameData } from "@/lib/game-data";
 import { darkSafeColor } from "@/lib/utils";
@@ -224,6 +226,15 @@ function ResultPanel({
         )}
       </div>
 
+      <button
+        onClick={onPlayAgain}
+        className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90 flex items-center justify-center gap-2"
+        style={{ backgroundColor: accentColor }}
+      >
+        <RefreshCw className="w-4 h-4" />
+        {t.playAgain[locale]}
+      </button>
+
       <PnlCard
         gameType="mines"
         result={won ? "win" : "loss"}
@@ -235,14 +246,6 @@ function ResultPanel({
         date={new Date().toLocaleDateString()}
         locale={locale}
       />
-
-      <button
-        onClick={onPlayAgain}
-        className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90"
-        style={{ backgroundColor: accentColor }}
-      >
-        {t.playAgain[locale]}
-      </button>
     </div>
   );
 }
@@ -260,13 +263,14 @@ function DemoMinesGame({ table }: { table: MinesTable }) {
   const [selectedMines, setSelectedMines] = useState<number>(table.mineOptions[1] || 3);
   const [gameState, setGameState] = useState<MinesState | null>(null);
   const [animating, setAnimating] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
 
   const betOptions = table.betOptions as number[];
   const mineOptions = table.mineOptions as number[];
 
-  const startGame = useCallback(() => {
+  const startGame = useCallback((bet: number = selectedBet) => {
     const grid = createGrid(selectedMines);
-    const state = createInitialState(grid, selectedBet);
+    const state = createInitialState(grid, bet);
     setGameState(state);
   }, [selectedBet, selectedMines]);
 
@@ -362,7 +366,7 @@ function DemoMinesGame({ table }: { table: MinesTable }) {
           </div>
 
           <button
-            onClick={startGame}
+            onClick={() => startGame()}
             className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"
             style={{ backgroundColor: accentColor }}
           >
@@ -389,9 +393,29 @@ function DemoMinesGame({ table }: { table: MinesTable }) {
           visible={visible}
           accentColor={accentColor}
           locale={locale}
-          onPlayAgain={resetGame}
+          onPlayAgain={() => setShowReplay(true)}
         />
       )}
+
+      {/* Quick replay modal (demo) */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        <DemoBalancePayButton
+          amountCrc={selectedBet}
+          accentColor={accentColor}
+          onPaid={() => {
+            setShowReplay(false);
+            setGameState(null);
+            startGame(selectedBet);
+          }}
+        />
+      </QuickReplayModal>
     </div>
   );
 }
@@ -422,6 +446,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
   const [animating, setAnimating] = useState(false);
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const [showReplay, setShowReplay] = useState(false);
 
   const betOptions = table.betOptions as number[];
   const mineOptions = table.mineOptions as number[];
@@ -663,9 +688,41 @@ function RealMinesGame({ table }: { table: MinesTable }) {
           locale={locale}
           playerName={playerProfile?.name || (round.playerAddress ? shortenAddress(round.playerAddress) : undefined)}
           playerAvatar={playerProfile?.imageUrl || undefined}
-          onPlayAgain={resetGame}
+          onPlayAgain={() => setShowReplay(true)}
         />
       )}
+
+      {/* Quick replay modal */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        <ChancePayment
+          recipientAddress={table.recipientAddress}
+          amountCrc={selectedBet}
+          gameType="mines"
+          gameId={gameId}
+          tableSlug={table.slug}
+          accentColor={accentColor}
+          payLabel={`Mines — ${selectedBet} CRC / ${selectedMines} mines`}
+          onPaymentInitiated={async () => {
+            setShowReplay(false);
+            resetGame();
+            setWatchingPayment(true);
+            await scanForRound();
+          }}
+          onScan={scanForRound}
+          scanning={scanning}
+          paymentStatus={watchingPayment ? "watching" : "idle"}
+          playerToken={tokenRef.current}
+          balanceSlug={table.slug}
+          balanceExtras={{ mineCount: selectedMines }}
+        />
+      </QuickReplayModal>
     </div>
   );
 }

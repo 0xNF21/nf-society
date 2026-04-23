@@ -9,6 +9,8 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
+import { QuickReplayModal } from "@/components/quick-replay-modal";
+import { DemoBalancePayButton } from "@/components/demo-balance-pay-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { encodeGameData } from "@/lib/game-data";
 import { darkSafeColor } from "@/lib/utils";
@@ -83,22 +85,23 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
   const [result, setResult] = useState<CoinFlipResult | null>(null);
   const [flipping, setFlipping] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
 
   const betOptions = table.betOptions as number[];
 
-  const doFlip = useCallback(() => {
-    if (!selectedChoice || flipping) return;
-    setFlipping(true);
+  const doFlip = useCallback((bet: number, side: CoinSide) => {
+    if (flipping) return;
+    setResult(null);
     setShowResult(false);
+    setFlipping(true);
 
-    // Resolve after animation
     setTimeout(() => {
-      const flipResult = resolveCoinFlip(selectedChoice, selectedBet);
+      const flipResult = resolveCoinFlip(side, bet);
       setResult(flipResult);
       setFlipping(false);
       setTimeout(() => setShowResult(true), 300);
     }, 1500);
-  }, [selectedChoice, selectedBet, flipping]);
+  }, [flipping]);
 
   const resetGame = useCallback(() => {
     setResult(null);
@@ -192,7 +195,7 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
 
           {/* Flip button */}
           <button
-            onClick={doFlip}
+            onClick={() => selectedChoice && doFlip(selectedBet, selectedChoice)}
             disabled={!selectedChoice}
             className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 disabled:opacity-40"
             style={{ backgroundColor: accentColor }}>
@@ -233,6 +236,11 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
             )}
           </div>
 
+          <button onClick={() => setShowReplay(true)} className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: accentColor }}>
+            <RefreshCw className="w-4 h-4" />
+            {t.playAgain[locale]}
+          </button>
+
           <PnlCard
             gameType="coin_flip"
             result={result.outcome === "win" ? "win" : "loss"}
@@ -242,12 +250,29 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
             date={new Date().toLocaleDateString()}
             locale={locale}
           />
-
-          <button onClick={resetGame} className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90" style={{ backgroundColor: accentColor }}>
-            {t.playAgain[locale]}
-          </button>
         </div>
       )}
+
+      {/* Quick replay modal (demo) */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        {selectedChoice && (
+          <DemoBalancePayButton
+            amountCrc={selectedBet}
+            accentColor={accentColor}
+            onPaid={() => {
+              setShowReplay(false);
+              doFlip(selectedBet, selectedChoice);
+            }}
+          />
+        )}
+      </QuickReplayModal>
     </div>
   );
 }
@@ -279,6 +304,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
   const [watchingPayment, setWatchingPayment] = useState(false);
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const [restoring, setRestoring] = useState(true);
+  const [showReplay, setShowReplay] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const betOptions = table.betOptions as number[];
@@ -540,6 +566,11 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
             )}
           </div>
 
+          <button onClick={() => setShowReplay(true)} className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: accentColor }}>
+            <RefreshCw className="w-4 h-4" />
+            {t.playAgain[locale]}
+          </button>
+
           <PnlCard
             gameType="coin_flip"
             result={result.outcome === "win" ? "win" : "loss"}
@@ -550,12 +581,62 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
             date={new Date(result.createdAt).toLocaleDateString()}
             locale={locale}
           />
-
-          <button onClick={resetGame} className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90" style={{ backgroundColor: accentColor }}>
-            {t.playAgain[locale]}
-          </button>
         </div>
       )}
+
+      {/* Quick replay modal */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={betOptions}
+        currentBet={selectedBet}
+        onBetChange={setSelectedBet}
+        accentColor={accentColor}
+      >
+        {selectedChoice && (
+          <ChancePayment
+            recipientAddress={table.recipientAddress}
+            amountCrc={selectedBet}
+            gameType="coin_flip"
+            gameId={gameId}
+            tableSlug={table.slug}
+            accentColor={accentColor}
+            payLabel={`${t.heads[locale]} / ${t.tails[locale]} — ${selectedBet} CRC`}
+            onPaymentInitiated={async () => {
+              setShowReplay(false);
+              setResult(null);
+              setShowResult(false);
+              setWatchingPayment(true);
+              await scanForFlip();
+            }}
+            onScan={scanForFlip}
+            scanning={scanning}
+            paymentStatus={watchingPayment ? "watching" : "idle"}
+            playerToken={tokenRef.current}
+            balanceSlug={table.slug}
+            balanceExtras={{ choice: selectedChoice }}
+            onBalancePaid={(data) => {
+              setShowReplay(false);
+              const row = data?.gameRow;
+              if (!row) return;
+              const flipResult: FlipResultResponse = {
+                id: row.id,
+                playerAddress: row.playerAddress,
+                betCrc: row.betCrc,
+                playerChoice: row.playerChoice,
+                coinResult: row.coinResult,
+                outcome: row.outcome,
+                payoutCrc: row.payoutCrc ?? null,
+                payoutStatus: row.payoutStatus ?? "success",
+                createdAt: row.createdAt ?? new Date().toISOString(),
+              };
+              setWatchingPayment(false);
+              setResult(flipResult);
+              setShowResult(true);
+            }}
+          />
+        )}
+      </QuickReplayModal>
     </div>
   );
 }
