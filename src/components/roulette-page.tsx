@@ -791,7 +791,16 @@ function DemoRouletteGame({ table }: { table: RouletteTable }) {
   return (
     <div className="min-h-screen px-4 py-8 max-w-lg mx-auto">
       <div className="mb-6">
-        <Link href="/chance" className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
+        <Link
+          href="/chance"
+          onClick={(e) => {
+            if (result && !spinning) {
+              e.preventDefault();
+              resetGame();
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4"
+        >
           <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
         </Link>
         <div className="flex items-center gap-3">
@@ -1036,7 +1045,16 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
   return (
     <div className="min-h-screen px-4 py-8 max-w-lg mx-auto">
       <div className="mb-6">
-        <Link href="/chance" className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
+        <Link
+          href="/chance"
+          onClick={(e) => {
+            if (isFinished && !spinning) {
+              e.preventDefault();
+              resetGame();
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4"
+        >
           <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
         </Link>
         <div className="flex items-center gap-3">

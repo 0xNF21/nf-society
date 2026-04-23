@@ -372,7 +372,16 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
     <div className="min-h-screen px-4 py-8 max-w-lg mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link href="/chance" className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
+        <Link
+          href="/chance"
+          onClick={(e) => {
+            if (phase === "result") {
+              e.preventDefault();
+              resetGame();
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4"
+        >
           <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
         </Link>
         <div className="flex items-center gap-3">
@@ -716,7 +725,16 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
     <div className="min-h-screen px-4 py-8 max-w-lg mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link href="/chance" className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
+        <Link
+          href="/chance"
+          onClick={(e) => {
+            if (isFinished) {
+              e.preventDefault();
+              resetGame();
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4"
+        >
           <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
         </Link>
         <div className="flex items-center gap-3">
