@@ -188,7 +188,16 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
       <style>{`@keyframes cardDeal { from { opacity: 0; transform: translateY(-30px) scale(0.8); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
 
       <div className="mb-6">
-        <Link href="/chance" className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
+        <Link
+          href="/chance"
+          onClick={(e) => {
+            if (isFinished) {
+              e.preventDefault();
+              resetGame();
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4"
+        >
           <ArrowLeft className="w-4 h-4" /> {t.back[locale]}
         </Link>
         <div className="flex items-center gap-3">
@@ -543,7 +552,16 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
 
       {/* Header */}
       <div className="mb-6">
-        <Link href="/blackjack" className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4">
+        <Link
+          href="/blackjack"
+          onClick={(e) => {
+            if (isFinished) {
+              e.preventDefault();
+              resetGame();
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-sm text-ink/40 hover:text-ink/60 transition-colors mb-4"
+        >
           <ArrowLeft className="w-4 h-4" /> {t.tables[locale]}
         </Link>
         <div className="flex items-center gap-3">
