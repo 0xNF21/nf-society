@@ -47,7 +47,7 @@ function PlayingCard({ card, size = "md", highlight }: { card: Card; size?: "sm"
   const isRed = cardColor(card) === "red";
   const sym = suitSymbol(card.suit);
   const sizeClasses = {
-    sm: "w-10 h-14 text-xs",
+    sm: "w-14 h-20 text-xs",
     md: "w-16 h-24 sm:w-20 sm:h-28 text-sm",
     lg: "w-24 h-36 sm:w-28 sm:h-40 text-base",
   };
@@ -74,7 +74,7 @@ function PlayingCard({ card, size = "md", highlight }: { card: Card; size?: "sm"
 }
 
 function CardBack({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
-  const sizeClasses = { sm: "w-10 h-14", md: "w-16 h-24 sm:w-20 sm:h-28", lg: "w-24 h-36 sm:w-28 sm:h-40" };
+  const sizeClasses = { sm: "w-14 h-20", md: "w-16 h-24 sm:w-20 sm:h-28", lg: "w-24 h-36 sm:w-28 sm:h-40" };
   return (
     <div
       className={`${sizeClasses[size]} rounded-xl border border-violet-700/40 overflow-hidden shadow-lg`}
