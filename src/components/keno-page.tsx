@@ -557,6 +557,10 @@ function DemoKenoGame({ table }: { table: KenoTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        onChangeConfig={() => {
+          setShowReplay(false);
+          resetGame();
+        }}
       >
         <DemoBalancePayButton
           amountCrc={selectedBet}
@@ -933,6 +937,10 @@ function RealKenoGame({ table }: { table: KenoTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        onChangeConfig={() => {
+          setShowReplay(false);
+          resetGame();
+        }}
       >
         <ChancePayment
           recipientAddress={table.recipientAddress}

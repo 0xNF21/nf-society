@@ -718,6 +718,32 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
         currentBet={selectedTotal}
         onBetChange={setSelectedTotal}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+              {translations.quickReplay.ballValue[locale]}
+            </p>
+            <div className="grid grid-cols-4 gap-2">
+              {BALL_VALUE_OPTIONS.filter((v) => selectedTotal % v === 0 && v <= selectedTotal).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setSelectedBallValue(v)}
+                  className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                    selectedBallValue === v
+                      ? "text-white shadow-md scale-105"
+                      : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                  }`}
+                  style={selectedBallValue === v ? { backgroundColor: accentColor } : {}}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-ink/40 text-center">
+              {Math.floor(selectedTotal / selectedBallValue)} {Math.floor(selectedTotal / selectedBallValue) === 1 ? t.ball[locale] : t.balls[locale]}
+            </p>
+          </div>
+        }
       >
         <DemoBalancePayButton
           amountCrc={selectedTotal}
@@ -1070,6 +1096,32 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
         currentBet={selectedTotal}
         onBetChange={setSelectedTotal}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+              {translations.quickReplay.ballValue[locale]}
+            </p>
+            <div className="grid grid-cols-4 gap-2">
+              {BALL_VALUE_OPTIONS.filter((v) => selectedTotal % v === 0 && v <= selectedTotal).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setSelectedBallValue(v)}
+                  className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                    selectedBallValue === v
+                      ? "text-white shadow-md scale-105"
+                      : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                  }`}
+                  style={selectedBallValue === v ? { backgroundColor: accentColor } : {}}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-ink/40 text-center">
+              {ballCount} {ballCount === 1 ? t.ball[locale] : t.balls[locale]}
+            </p>
+          </div>
+        }
       >
         {validCombo && (
           <ChancePayment

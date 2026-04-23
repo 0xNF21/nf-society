@@ -414,6 +414,29 @@ function DemoMinesGame({ table }: { table: MinesTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+              {translations.quickReplay.mineCount[locale]}
+            </p>
+            <div className="grid grid-cols-5 gap-2">
+              {mineOptions.map((count) => (
+                <button
+                  key={count}
+                  onClick={() => setSelectedMines(count)}
+                  className={`py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    selectedMines === count
+                      ? "text-white shadow-md scale-105"
+                      : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                  }`}
+                  style={selectedMines === count ? { backgroundColor: accentColor } : {}}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+          </div>
+        }
       >
         <DemoBalancePayButton
           amountCrc={selectedBet}
@@ -718,6 +741,29 @@ function RealMinesGame({ table }: { table: MinesTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+              {translations.quickReplay.mineCount[locale]}
+            </p>
+            <div className="grid grid-cols-5 gap-2">
+              {mineOptions.map((count) => (
+                <button
+                  key={count}
+                  onClick={() => setSelectedMines(count)}
+                  className={`py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    selectedMines === count
+                      ? "text-white shadow-md scale-105"
+                      : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                  }`}
+                  style={selectedMines === count ? { backgroundColor: accentColor } : {}}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+          </div>
+        }
       >
         <ChancePayment
           recipientAddress={table.recipientAddress}

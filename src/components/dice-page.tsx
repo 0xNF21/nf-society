@@ -473,6 +473,50 @@ function DemoDiceGame({ table }: { table: DiceTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+                {translations.quickReplay.target[locale]}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDirection("under")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${
+                    direction === "under" ? "text-white shadow-md" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                  }`}
+                  style={direction === "under" ? { backgroundColor: accentColor } : {}}
+                >
+                  {translations.quickReplay.rollUnder[locale]}
+                </button>
+                <button
+                  onClick={() => setDirection("over")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${
+                    direction === "over" ? "text-white shadow-md" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                  }`}
+                  style={direction === "over" ? { backgroundColor: accentColor } : {}}
+                >
+                  {translations.quickReplay.rollOver[locale]}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-ink/50">
+                <span>{translations.quickReplay.target[locale]}</span>
+                <span className="font-bold text-ink text-base">{target.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={MIN_TARGET}
+                max={MAX_TARGET}
+                step={0.5}
+                value={target}
+                onChange={(e) => setTarget(parseFloat(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-ink/10 dark:bg-white/10"
+              />
+            </div>
+          </div>
+        }
       >
         <DemoBalancePayButton
           amountCrc={selectedBet}
@@ -731,6 +775,50 @@ function RealDiceGame({ table }: { table: DiceTable }) {
         currentBet={selectedBet}
         onBetChange={setSelectedBet}
         accentColor={accentColor}
+        configPanel={
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-ink/60 uppercase tracking-widest">
+                {translations.quickReplay.target[locale]}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDirection("under")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${
+                    direction === "under" ? "text-white shadow-md" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                  }`}
+                  style={direction === "under" ? { backgroundColor: accentColor } : {}}
+                >
+                  {translations.quickReplay.rollUnder[locale]}
+                </button>
+                <button
+                  onClick={() => setDirection("over")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${
+                    direction === "over" ? "text-white shadow-md" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
+                  }`}
+                  style={direction === "over" ? { backgroundColor: accentColor } : {}}
+                >
+                  {translations.quickReplay.rollOver[locale]}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-ink/50">
+                <span>{translations.quickReplay.target[locale]}</span>
+                <span className="font-bold text-ink text-base">{target.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={MIN_TARGET}
+                max={MAX_TARGET}
+                step={0.5}
+                value={target}
+                onChange={(e) => setTarget(parseFloat(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-ink/10 dark:bg-white/10"
+              />
+            </div>
+          </div>
+        }
       >
         <ChancePayment
           recipientAddress={table.recipientAddress}
