@@ -448,11 +448,14 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
   const [selectedDropMode, setSelectedDropMode] = useState<DropMode>(1);
   // Committed state = balls that have landed (for bucket counters + cashout calc)
   const [state, setState] = useState<ReturnType<typeof createInitialState> | null>(null);
-  // In-flight count = balls currently animating but not yet landed (reserved from ballCount)
+  // In-flight count = balls currently animating OR queued but not yet landed
   const [inFlightCount, setInFlightCount] = useState(0);
+  // Queued count = balls scheduled but not yet launched (can be cancelled by stop)
+  const [queuedCount, setQueuedCount] = useState(0);
   const [result, setResult] = useState<RoundResponse | null>(null);
   const [showReplay, setShowReplay] = useState(false);
   const anim = useConcurrentBallAnim();
+  const pendingTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const validCombo = selectedTotal % selectedBallValue === 0;
 
@@ -469,6 +472,9 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
     setState(createInitialState(total, selectedBallValue));
     setResult(null);
     setInFlightCount(0);
+    setQueuedCount(0);
+    pendingTimeoutsRef.current.forEach(clearTimeout);
+    pendingTimeoutsRef.current = [];
     anim.reset();
   }, [selectedTotal, selectedBallValue, anim]);
 
@@ -494,10 +500,13 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
     }
 
     setInFlightCount((c) => c + batchSize);
+    setQueuedCount((c) => c + batchSize);
 
     // Launch each ball with slight stagger for better visual effect
     newBalls.forEach((ball, idx) => {
-      setTimeout(() => {
+      const tid = setTimeout(() => {
+        pendingTimeoutsRef.current = pendingTimeoutsRef.current.filter((t) => t !== tid);
+        setQueuedCount((c) => Math.max(c - 1, 0));
         anim.launch(ball.path, () => {
           // When ball lands: commit it to state
           setState((prev) => {
@@ -511,8 +520,21 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
           setInFlightCount((c) => c - 1);
         });
       }, idx * 120); // 120ms stagger between balls in same batch
+      pendingTimeoutsRef.current.push(tid);
     });
   }, [state, inFlightCount, selectedDropMode, anim]);
+
+  // Stop the cadence: cancel queued (not-yet-launched) balls. In-flight balls keep
+  // falling and commit normally. Cancelled balls stay available for a future drop.
+  const handleStop = useCallback(() => {
+    const cancelled = pendingTimeoutsRef.current.length;
+    pendingTimeoutsRef.current.forEach(clearTimeout);
+    pendingTimeoutsRef.current = [];
+    if (cancelled > 0) {
+      setInFlightCount((c) => Math.max(c - cancelled, 0));
+      setQueuedCount(0);
+    }
+  }, []);
 
   // Auto-finalize result when game status becomes "finished" and no balls in flight
   useEffect(() => {
@@ -650,15 +672,24 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={handleCashout} disabled={inFlightCount > 0}
-              className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
-              {t.cashout[locale]} {cashoutAmount.toFixed(2)}
-            </button>
-            <button onClick={handleDrop} disabled={ballsAvailable === 0}
-              className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
-              style={{ backgroundColor: accentColor }}>
-              📌 {selectedDropMode === "all" ? t.dropAll[locale] : selectedDropMode === 1 ? t.dropOne[locale] : `×${selectedDropMode}`}
-            </button>
+            {queuedCount > 0 ? (
+              <button onClick={handleStop}
+                className="col-span-2 py-4 rounded-xl font-bold text-base bg-red-500 text-white hover:bg-red-600">
+                ⏹ {t.stop[locale]}
+              </button>
+            ) : (
+              <>
+                <button onClick={handleCashout} disabled={inFlightCount > 0}
+                  className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
+                  {t.cashout[locale]} {cashoutAmount.toFixed(2)}
+                </button>
+                <button onClick={handleDrop} disabled={ballsAvailable === 0}
+                  className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
+                  style={{ backgroundColor: accentColor }}>
+                  📌 {selectedDropMode === "all" ? t.dropAll[locale] : selectedDropMode === 1 ? t.dropOne[locale] : `×${selectedDropMode}`}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -721,8 +752,11 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
   const [serverInFlight, setServerInFlight] = useState(false); // waiting for HTTP response
   // Balls returned by server but not yet landed visually — they are NOT shown in settledBalls yet
   const [pendingBalls, setPendingBalls] = useState<BallResult[]>([]);
+  // True while a drop sequence is auto-dropping (looping server requests) — cancellable via stop
+  const [dropping, setDropping] = useState(false);
   const [showReplay, setShowReplay] = useState(false);
   const anim = useConcurrentBallAnim();
+  const dropControllerRef = useRef<{ cancelled: boolean } | null>(null);
 
   const validCombo = selectedTotal % selectedBallValue === 0;
 
@@ -782,95 +816,77 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
     return () => clearInterval(interval);
   }, [round, restoring, watchingPayment, scanForRound]);
 
-  // Drop N balls: server resolves all, client animates them with stagger,
-  // each ball is added to "displayed settled" one by one as it lands.
+  // Drop N balls: loop server requests one-by-one with stagger, so stop can cancel mid-sequence.
+  // Each request commits 1 ball server-side; cancelled balls never reach the server.
   const handleDrop = useCallback(async () => {
-    if (!round || serverInFlight || round.status !== "playing") return;
-    // Balls still available to request = total - already-committed - pending
+    if (!round || dropping || round.status !== "playing") return;
     const ballsAvailable = round.ballsRemaining - pendingBalls.length;
     if (ballsAvailable <= 0) return;
     const batchSize = selectedDropMode === "all" ? ballsAvailable : Math.min(selectedDropMode, ballsAvailable);
     if (batchSize <= 0) return;
 
-    setServerInFlight(true);
-    try {
-      const res = await fetch(`/api/plinko/${round.id}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "drop", count: batchSize, playerToken: tokenRef.current }),
-      });
-      const data = await res.json() as RoundResponse;
-      if (!res.ok) {
-        console.error("[Plinko] Drop error:", (data as any).error);
-        setServerInFlight(false);
-        return;
-      }
+    const controller = { cancelled: false };
+    dropControllerRef.current = controller;
+    setDropping(true);
 
-      // The server returned `data.balls` = ALL balls up to now (including new ones).
-      // Slice just the new ones (last `batchSize`):
-      const newBalls = data.balls.slice(-batchSize);
+    for (let i = 0; i < batchSize; i++) {
+      if (controller.cancelled) break;
+      try {
+        const res = await fetch(`/api/plinko/${round.id}/action`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "drop", count: 1, playerToken: tokenRef.current }),
+        });
+        const data = await res.json() as RoundResponse;
+        if (!res.ok) {
+          console.error("[Plinko] Drop error:", (data as any).error);
+          break;
+        }
+        if (controller.cancelled) break;
 
-      // Keep current displayed balls, save the incoming ones as "pending"
-      setPendingBalls((prev) => [...prev, ...newBalls]);
+        const newBall = data.balls[data.balls.length - 1];
+        setPendingBalls((prev) => [...prev, newBall]);
 
-      // Keep `round` with the OLD balls (not spoiled) but everything else from new data
-      // (accumulatedPayout will be updated per ball as they land)
-      const displayedBalls = round.balls; // keep what's already shown
-      // We want to know the final round data for when all have landed
-      const finalRoundData = data;
-
-      // Launch each ball with stagger
-      newBalls.forEach((ball, idx) => {
-        setTimeout(() => {
-          anim.launch(ball.path, () => {
-            // Ball landed — move from pending to round.balls, bump accumulated
-            setRound((prev) => {
-              if (!prev) return prev;
-              const newDisplayed = [...prev.balls, ball];
-              const newAcc = Math.round((prev.accumulatedPayout + prev.ballValue * ball.multiplier) * 100) / 100;
-              return {
-                ...prev,
-                balls: newDisplayed,
-                accumulatedPayout: newAcc,
-                ballsRemaining: prev.ballsRemaining - 1,
-                cashoutAmount: Math.round(((prev.ballsRemaining - 1) * prev.ballValue + newAcc) * 100) / 100,
-              };
-            });
-            setPendingBalls((prev) => prev.filter((b) => b !== ball));
-          });
-        }, idx * 120);
-      });
-
-      // After all balls have been launched, sync final round data (when last ball lands)
-      const lastIdx = newBalls.length - 1;
-      if (newBalls.length > 0) {
-        // We track completion by counting pending balls; when all land, optionally sync server data
-        // The actual round status update happens automatically via the setRound above.
-        // But we need to reconcile with server when ALL pending are landed
-        const totalDelay = lastIdx * 120 + TOTAL_DUR + 100;
-        setTimeout(() => {
-          // Only apply server's final status/payout data; balls should already be committed
+        anim.launch(newBall.path, () => {
           setRound((prev) => {
             if (!prev) return prev;
+            const newBalls = [...prev.balls, newBall];
+            const newAcc = Math.round((prev.accumulatedPayout + prev.ballValue * newBall.multiplier) * 100) / 100;
+            const newRemaining = prev.ballsRemaining - 1;
             return {
               ...prev,
-              status: finalRoundData.status,
-              accumulatedPayout: finalRoundData.accumulatedPayout,
-              finalPayout: finalRoundData.finalPayout,
-              outcome: finalRoundData.outcome,
-              payoutCrc: finalRoundData.payoutCrc,
-              payoutStatus: finalRoundData.payoutStatus,
+              balls: newBalls,
+              accumulatedPayout: newAcc,
+              ballsRemaining: newRemaining,
+              cashoutAmount: Math.round((newRemaining * prev.ballValue + newAcc) * 100) / 100,
+              status: data.status,
+              finalPayout: data.finalPayout,
+              outcome: data.outcome,
+              payoutCrc: data.payoutCrc,
+              payoutStatus: data.payoutStatus,
             };
           });
-        }, totalDelay);
-      }
+          setPendingBalls((prev) => prev.filter((b) => b !== newBall));
+        });
 
-      setServerInFlight(false);
-    } catch (err) {
-      console.error("[Plinko] Drop fetch error:", err);
-      setServerInFlight(false);
+        if (i < batchSize - 1) {
+          await new Promise((r) => setTimeout(r, 120));
+        }
+      } catch (err) {
+        console.error("[Plinko] Drop fetch error:", err);
+        break;
+      }
     }
-  }, [round, serverInFlight, pendingBalls, selectedDropMode, anim, tokenRef]);
+
+    dropControllerRef.current = null;
+    setDropping(false);
+  }, [round, dropping, pendingBalls, selectedDropMode, anim, tokenRef]);
+
+  // Stop the cadence: cancel the drop loop. Balls already sent to the server keep their
+  // in-flight animation and commit normally. Balls not yet sent never reach the server.
+  const handleStop = useCallback(() => {
+    if (dropControllerRef.current) dropControllerRef.current.cancelled = true;
+  }, []);
 
   const handleCashout = useCallback(async () => {
     if (!round || serverInFlight || pendingBalls.length > 0 || anim.running || round.status !== "playing") return;
@@ -894,6 +910,9 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
   }, [round, serverInFlight, pendingBalls, anim, tokenRef]);
 
   const resetGame = useCallback(() => {
+    if (dropControllerRef.current) dropControllerRef.current.cancelled = true;
+    dropControllerRef.current = null;
+    setDropping(false);
     setRound(null); setWatchingPayment(false); setPlayerProfile(null);
     setServerInFlight(false);
     setPendingBalls([]);
@@ -989,15 +1008,24 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={handleCashout} disabled={serverInFlight || pendingBalls.length > 0 || anim.running}
-              className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
-              {t.cashout[locale]} {round.cashoutAmount.toFixed(2)}
-            </button>
-            <button onClick={handleDrop} disabled={serverInFlight || (round.ballsRemaining - pendingBalls.length) <= 0}
-              className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
-              style={{ backgroundColor: accentColor }}>
-              📌 {selectedDropMode === "all" ? t.dropAll[locale] : selectedDropMode === 1 ? t.dropOne[locale] : `×${selectedDropMode}`}
-            </button>
+            {dropping ? (
+              <button onClick={handleStop}
+                className="col-span-2 py-4 rounded-xl font-bold text-base bg-red-500 text-white hover:bg-red-600">
+                ⏹ {t.stop[locale]}
+              </button>
+            ) : (
+              <>
+                <button onClick={handleCashout} disabled={serverInFlight || pendingBalls.length > 0 || anim.running}
+                  className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
+                  {t.cashout[locale]} {round.cashoutAmount.toFixed(2)}
+                </button>
+                <button onClick={handleDrop} disabled={serverInFlight || (round.ballsRemaining - pendingBalls.length) <= 0}
+                  className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
+                  style={{ backgroundColor: accentColor }}>
+                  📌 {selectedDropMode === "all" ? t.dropAll[locale] : selectedDropMode === 1 ? t.dropOne[locale] : `×${selectedDropMode}`}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
