@@ -446,6 +446,7 @@ export const chanceTranslations = {
     accumulated: { fr: "Gains accumules", en: "Accumulated gains" },
     drop: { fr: "Lacher", en: "Drop" },
     dropOne: { fr: "Lacher une bille", en: "Drop a ball" },
+    stop: { fr: "Arreter", en: "Stop" },
     cashout: { fr: "Cashout", en: "Cashout" },
     cashoutAmount: { fr: "Retirer {amount} CRC", en: "Cashout {amount} CRC" },
     dropping: { fr: "Chute en cours...", en: "Dropping..." },
