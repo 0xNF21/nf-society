@@ -5,7 +5,7 @@ import {
   Loader2, Eye, EyeOff, Clock,
   Flag, Gift, Sparkles, Trash2, RefreshCw, Send,
   ChevronDown, ExternalLink, AlertCircle, CheckCircle, XCircle,
-  Palette, Check, Archive,
+  Palette, Check, Archive, Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import type { FlagRow, FlagStatus } from "../types";
@@ -25,17 +25,42 @@ export function PayoutsTab({ password }: { password: string }) {
   const [manualResult, setManualResult] = useState<any>(null);
   const [monitorRunning, setMonitorRunning] = useState(false);
   const [monitorResult, setMonitorResult] = useState<any>(null);
+  const [balances, setBalances] = useState<{ address: string; balanceCrc: number; lastSeen: string }[]>([]);
+  const [balancesTotal, setBalancesTotal] = useState(0);
+  const [balancesLoading, setBalancesLoading] = useState(true);
+  const [profiles, setProfiles] = useState<Record<string, { name?: string; imageUrl?: string | null }>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setBalancesLoading(true);
     try {
-      const [sRes, lRes] = await Promise.all([
+      const [sRes, lRes, bRes] = await Promise.all([
         fetch("/api/payout/status", { cache: "no-store" }),
         fetch("/api/payout?limit=20", { cache: "no-store", headers: { Authorization: `Bearer ${password}` } }),
+        fetch("/api/admin/balances", { cache: "no-store", headers: { "x-admin-password": password } }),
       ]);
       if (sRes.ok) setPayoutStatus(await sRes.json());
       if (lRes.ok) { const d = await lRes.json(); setPayoutList(d.payouts || []); }
-    } catch {} finally { setLoading(false); }
+      if (bRes.ok) {
+        const d = await bRes.json();
+        const list = d.players || [];
+        setBalances(list);
+        setBalancesTotal(d.totalCrc || 0);
+        if (list.length > 0) {
+          try {
+            const pRes = await fetch("/api/profiles", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ addresses: list.map((p: any) => p.address) }),
+            });
+            if (pRes.ok) {
+              const pd = await pRes.json();
+              setProfiles(pd.profiles || {});
+            }
+          } catch {}
+        }
+      }
+    } catch {} finally { setLoading(false); setBalancesLoading(false); }
   }, [password]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -231,6 +256,65 @@ export function PayoutsTab({ password }: { password: string }) {
           )}
         </div>
       )}
+
+      {/* Balances actives (lecture seule) */}
+      <div className="rounded-2xl border-2 border-ink/10 bg-white/80 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-ink flex items-center gap-2">
+            <Wallet className="h-4 w-4" />
+            Balances actives
+            {!balancesLoading && (
+              <span className="text-xs font-normal text-ink/40">
+                ({balances.length} joueur{balances.length > 1 ? "s" : ""} · {balancesTotal.toFixed(2)} CRC)
+              </span>
+            )}
+          </h3>
+          <button onClick={fetchData} className="text-ink/40 hover:text-ink/60" title="Rafraichir">
+            <RefreshCw className={`h-4 w-4 ${balancesLoading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+        {balancesLoading ? (
+          <div className="text-center py-4"><Loader2 className="h-5 w-5 animate-spin mx-auto text-ink/30" /></div>
+        ) : balances.length === 0 ? (
+          <p className="text-sm text-ink/40 text-center py-4">Aucun joueur avec solde actif</p>
+        ) : (
+          <div className="space-y-1.5 max-h-96 overflow-y-auto">
+            {balances.map((p) => {
+              const prof = profiles[p.address.toLowerCase()];
+              const name = prof?.name;
+              return (
+                <div key={p.address} className="flex items-center justify-between gap-3 bg-ink/5 rounded-lg px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {prof?.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={prof.imageUrl} alt="" className="h-7 w-7 rounded-full shrink-0 object-cover" />
+                    ) : (
+                      <div className="h-7 w-7 rounded-full bg-marine/10 shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      {name && <p className="font-semibold text-ink truncate">{name}</p>}
+                      <a
+                        href={`https://gnosisscan.io/address/${p.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-xs text-ink/50 hover:text-marine inline-flex items-center gap-0.5"
+                      >
+                        {shortAddr(p.address)} <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-semibold text-ink">{p.balanceCrc.toFixed(2)} CRC</p>
+                    <p className="text-xs text-ink/40">
+                      {new Date(p.lastSeen).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Payout list */}
       <div className="rounded-2xl border-2 border-ink/10 bg-white/80 p-4 space-y-3">
