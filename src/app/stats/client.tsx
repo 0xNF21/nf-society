@@ -46,7 +46,6 @@ function formatCrc(n: number | string, decimals = 0): string {
   const num = typeof n === "string" ? parseFloat(n) : n;
   if (!isFinite(num)) return "0";
   if (Math.abs(num) >= 1_000_000) return (num / 1_000_000).toFixed(2) + "M";
-  if (Math.abs(num) >= 1_000) return (num / 1_000).toFixed(1) + "k";
   return num.toLocaleString(undefined, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
@@ -244,10 +243,10 @@ function PeriodCard({
         </div>
         <div className="flex justify-between text-xs text-ink/50 dark:text-white/50 pt-1">
           <span>
-            {stats.rounds} {t.rounds[locale]}
+            {formatCrc(stats.rounds, 0)} {t.rounds[locale]}
           </span>
           <span>
-            {stats.players} {t.players[locale]}
+            {formatCrc(stats.players, 0)} {t.players[locale]}
           </span>
         </div>
       </div>
