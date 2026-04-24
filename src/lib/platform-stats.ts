@@ -70,9 +70,10 @@ export type PlatformStats = {
   // Breakdown par jeu (30j)
   games: GameStatLine[];
 
-  // Graph volume 30j — total + top 5 jeux par volume sur la periode
+  // Graph volume 30j — total + une ligne par jeu avec volume > 0 sur la periode
+  // (tri par volume decroissant, tous jeux confondus multi + chance).
   daily30d: DailyVolumePoint[];
-  top5Games: TopGameMeta[];
+  chartGames: TopGameMeta[];
 
   // Historique des 100 dernieres parties (multi + chance confondus)
   recentGames: RecentGameRow[];
@@ -330,9 +331,10 @@ async function computePeriodStats(since?: Date): Promise<PeriodStats> {
 
 /**
  * Volume journalier 30j avec breakdown complet par jeu (multi + chance).
- * Retourne les points quotidiens + les 5 jeux les plus actifs sur la periode.
+ * Retourne les points quotidiens + la liste de tous les jeux avec volume > 0
+ * sur la periode, tries par volume decroissant (pour la legende du graph).
  */
-async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; top5: TopGameMeta[] }> {
+async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; chartGames: TopGameMeta[] }> {
   const since = daysAgo(30);
 
   // Multi : deux queries — claimedPayments (on-chain) + walletLedger (balance-pay).
@@ -404,19 +406,20 @@ async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; top5: To
     }
   }
 
-  // Totaux par jeu sur la periode pour identifier top 5
+  // Totaux par jeu sur la periode — une ligne pour chaque jeu avec volume > 0,
+  // tries par volume decroissant (le plus volumineux en premier dans la legende).
   const totalByGame: Record<string, number> = {};
   for (const day of Object.values(perDay)) {
     for (const [k, v] of Object.entries(day)) {
       totalByGame[k] = (totalByGame[k] ?? 0) + v;
     }
   }
-  const top5keys = Object.entries(totalByGame)
+  const activeKeys = Object.entries(totalByGame)
+    .filter(([, v]) => v > 0)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
     .map(([k]) => k);
 
-  const top5: TopGameMeta[] = top5keys.map((key) => {
+  const chartGames: TopGameMeta[] = activeKeys.map((key) => {
     // Multi game ?
     const multiMeta = MULTI_GAME_META[key];
     if (multiMeta) {
@@ -444,7 +447,7 @@ async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; top5: To
     return { date: day, totalCrc: total, perGame: dayMap };
   });
 
-  return { points, top5 };
+  return { points, chartGames };
 }
 
 /**
@@ -570,7 +573,7 @@ export async function computePlatformStats(): Promise<PlatformStats> {
     allTime,
     games,
     daily30d: dailyData.points,
-    top5Games: dailyData.top5,
+    chartGames: dailyData.chartGames,
     recentGames,
   };
 }
