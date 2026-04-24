@@ -8,6 +8,8 @@ import { generateGamePaymentLink } from "@/lib/circles";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { useConnectedAddress } from "@/hooks/use-connected-address";
+import { BalancePayButton } from "@/components/balance-pay-button";
 import { GAME_REGISTRY } from "@/lib/game-registry";
 import type { RacePlayer } from "@/lib/crc-races";
 
@@ -28,6 +30,7 @@ interface Props {
 export function CrcRacesPayment({ game, playerToken, onScanComplete, scanInterval = 5000 }: Props) {
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
+  const connectedAddress = useConnectedAddress();
   const t = translations.crcRaces;
   const tm = translations.miniapp;
   const config = GAME_REGISTRY["crc-races"];
@@ -179,6 +182,19 @@ export function CrcRacesPayment({ game, playerToken, onScanComplete, scanInterva
   return (
     <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
       <CardContent className="pt-2 px-4 pb-4 space-y-3">
+        {/* Pay-from-balance — renders nothing when the connected address has
+            not enough balance, so the on-chain / Mini App flow below stays
+            unchanged. onSuccess triggers a parent refresh so the new racer
+            appears in the players list. */}
+        <BalancePayButton
+          gameKey="crc-races"
+          slug={game.slug}
+          amountCrc={game.betCrc}
+          playerToken={playerToken}
+          address={walletAddress || connectedAddress || undefined}
+          onSuccess={onScanComplete}
+          accentColor={config.accentColor}
+        />
         <div className="flex items-center justify-between gap-3 mb-3">
           <span className="text-xs font-semibold text-ink/40 uppercase tracking-widest">
             {t.payToJoin[locale].replace("{bet}", String(game.betCrc))}
