@@ -252,7 +252,7 @@ export const chanceTranslations = {
   },
   lootboxes: {
     back: { fr: "Retour", en: "Back" },
-    subtitle: { fr: "Ouvre des lootboxes et gagne des CRC instantanément sur", en: "Open lootboxes and win CRC instantly on" },
+    subtitle: { fr: "Ouvre des lootboxes et gagne des récompenses instantanément sur", en: "Open lootboxes and win rewards instantly on" },
     noActive: { fr: "Aucune lootbox active", en: "No active lootbox" },
     comeBack: { fr: "Reviens bientôt !", en: "Come back soon!" },
     available: { fr: "Lootboxes disponibles", en: "Available lootboxes" },
@@ -264,7 +264,7 @@ export const chanceTranslations = {
   },
   daily: {
     title: { fr: "Tirage Quotidien", en: "Daily Spin" },
-    subtitle: { fr: "Payez 1 CRC, grattez et tournez !", en: "Pay 1 CRC, scratch and spin!" },
+    subtitle: { fr: "Grattez et tournez la roue chaque jour !", en: "Scratch and spin the wheel every day!" },
     payButton: { fr: "Payer 1 CRC pour jouer", en: "Pay 1 CRC to play" },
     waitingPayment: { fr: "En attente du paiement...", en: "Waiting for payment..." },
     detecting: { fr: "Détection en cours...", en: "Detecting payment..." },
@@ -309,11 +309,11 @@ export const chanceTranslations = {
   chance: {
     title: { fr: "Jeux de Chance", en: "Games of Chance" },
     dailyTitle: { fr: "Tirage Quotidien", en: "Daily Spin" },
-    dailyDesc: { fr: "Payez 1 CRC pour gratter et tourner la roue chaque jour.", en: "Pay 1 CRC to scratch and spin the wheel every day." },
+    dailyDesc: { fr: "Grattez et tournez la roue chaque jour.", en: "Scratch and spin the wheel every day." },
     lotteriesTitle: { fr: "Loteries", en: "Lotteries" },
     lotteriesDesc: { fr: "Loteries transparentes sur la blockchain Gnosis.", en: "Transparent lotteries on Gnosis blockchain." },
     lootboxTitle: { fr: "Lootboxes", en: "Lootboxes" },
-    lootboxDesc: { fr: "Ouvrez des lootboxes pour gagner des CRC.", en: "Open lootboxes to win CRC." },
+    lootboxDesc: { fr: "Ouvrez des lootboxes pour gagner.", en: "Open lootboxes to win prizes." },
     coinFlipTitle: { fr: "Pile ou Face", en: "Coin Flip" },
     coinFlipDesc: { fr: "Pile ou face, 50/50, RTP 99%.", en: "Heads or tails, 50/50, 99% RTP." },
     hiloTitle: { fr: "Hi-Lo", en: "Hi-Lo" },
@@ -371,7 +371,7 @@ export const chanceTranslations = {
   },
   coinFlip: {
     title: { fr: "Pile ou Face", en: "Coin Flip" },
-    subtitle: { fr: "Choisissez pile ou face, misez vos CRC. RTP 99%.", en: "Pick heads or tails, bet your CRC. 99% RTP." },
+    subtitle: { fr: "Choisissez pile ou face. RTP 99%.", en: "Pick heads or tails. 99% RTP." },
     chooseBet: { fr: "Choisir la mise", en: "Choose bet" },
     pickSide: { fr: "Choisir un cote", en: "Pick a side" },
     heads: { fr: "Pile", en: "Heads" },

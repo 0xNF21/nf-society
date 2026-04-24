@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { MiniAppProvider } from "@/components/miniapp-provider";
 import { FeatureFlagProvider } from "@/components/feature-flag-provider";
 import DemoBanner from "@/components/demo-banner";
+import StakesDisabledBanner from "@/components/stakes-disabled-banner";
 import ProfileModal from "@/components/profile-modal";
 import DailyModal from "@/components/daily-modal";
 import BottomNav from "@/components/bottom-nav";
@@ -68,6 +69,7 @@ export default function RootLayout({
             <LanguageProvider>
               <MiniAppProvider>
                 <FeatureFlagProvider>
+                  <StakesDisabledBanner />
                   <DemoBanner />
                   {children}
                   <ProfileModal />
