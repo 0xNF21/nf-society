@@ -9,8 +9,6 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
-import { QuickReplayModal } from "@/components/quick-replay-modal";
-import { DemoBalancePayButton } from "@/components/demo-balance-pay-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { darkSafeColor } from "@/lib/utils";
 import {
@@ -338,7 +336,6 @@ function DemoKenoGame({ table }: { table: KenoTable }) {
   const [drawing, setDrawing] = useState(false);
   const [drawData, setDrawData] = useState<{ draws: number[]; picks: Set<number> } | null>(null);
   const [animIdx, setAnimIdx] = useState(-1);
-  const [showReplay, setShowReplay] = useState(false);
   const resultRef = useRef<VisibleState | null>(null);
 
   const betOptions = table.betOptions as number[];
@@ -545,32 +542,9 @@ function DemoKenoGame({ table }: { table: KenoTable }) {
           visible={result}
           accentColor={accentColor}
           locale={locale}
-          onPlayAgain={() => setShowReplay(true)}
+          onPlayAgain={resetGame}
         />
       )}
-
-      {/* Quick replay modal (demo) */}
-      <QuickReplayModal
-        open={showReplay}
-        onClose={() => setShowReplay(false)}
-        betOptions={betOptions}
-        currentBet={selectedBet}
-        onBetChange={setSelectedBet}
-        accentColor={accentColor}
-        onChangeConfig={() => {
-          setShowReplay(false);
-          resetGame();
-        }}
-      >
-        <DemoBalancePayButton
-          amountCrc={selectedBet}
-          accentColor={accentColor}
-          onPaid={() => {
-            setShowReplay(false);
-            performDraw(selectedBet);
-          }}
-        />
-      </QuickReplayModal>
     </div>
   );
 }
@@ -604,7 +578,6 @@ function RealKenoGame({ table }: { table: KenoTable }) {
   const [animIdx, setAnimIdx] = useState(-1);
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const [restoring, setRestoring] = useState(true);
-  const [showReplay, setShowReplay] = useState(false);
   const pendingRoundRef = useRef<RoundResponse | null>(null);
 
   const betOptions = table.betOptions as number[];
@@ -925,45 +898,9 @@ function RealKenoGame({ table }: { table: KenoTable }) {
           locale={locale}
           playerName={playerProfile?.name || (round?.playerAddress ? `${round.playerAddress.slice(0, 6)}...` : undefined)}
           playerAvatar={playerProfile?.imageUrl || undefined}
-          onPlayAgain={() => setShowReplay(true)}
+          onPlayAgain={resetGame}
         />
       )}
-
-      {/* Quick replay modal */}
-      <QuickReplayModal
-        open={showReplay}
-        onClose={() => setShowReplay(false)}
-        betOptions={betOptions}
-        currentBet={selectedBet}
-        onBetChange={setSelectedBet}
-        accentColor={accentColor}
-        onChangeConfig={() => {
-          setShowReplay(false);
-          resetGame();
-        }}
-      >
-        <ChancePayment
-          recipientAddress={table.recipientAddress}
-          amountCrc={selectedBet}
-          gameType="keno"
-          gameId={gameId}
-          tableSlug={table.slug}
-          accentColor={accentColor}
-          payLabel={`🎱 Keno — ${selectedBet} CRC / ${pickCount} ${t.picks[locale]}`}
-          onPaymentInitiated={async () => {
-            setShowReplay(false);
-            resetGame();
-            setWatchingPayment(true);
-            await scanForRound();
-          }}
-          onScan={scanForRound}
-          scanning={scanning}
-          paymentStatus={watchingPayment ? "watching" : "idle"}
-          playerToken={tokenRef.current}
-          balanceSlug={table.slug}
-          balanceExtras={{ pickCount }}
-        />
-      </QuickReplayModal>
     </div>
   );
 }
