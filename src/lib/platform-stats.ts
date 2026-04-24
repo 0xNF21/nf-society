@@ -11,8 +11,8 @@
 
 import { ethers } from "ethers";
 import { db } from "@/lib/db";
-import { claimedPayments, payouts } from "@/lib/db/schema";
-import { sql, gte, lt, and, inArray } from "drizzle-orm";
+import { claimedPayments, payouts, walletLedger, crcRacesGames, lotteries } from "@/lib/db/schema";
+import { sql, gte, lt, and, eq, inArray } from "drizzle-orm";
 import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 import { aggregateAllChance, ALL_CHANCE_SERVER_GAMES, ChanceAggregate } from "@/lib/chance-registry-server";
 import { getSafeCrcBalance } from "@/lib/payout";
@@ -88,9 +88,12 @@ const MULTI_GAME_META: Record<string, { label: string; emoji: string; color: str
   lottery: { label: "Loterie", emoji: "🎟️", color: "#A855F7" },
 };
 
-// gameTypes valides dans claimedPayments, en plus des jeux multi.
-// Lottery passe par claimedPayments mais n'est pas un jeu multi conceptuel.
-const EXTRA_CLAIMED_GAMES = ["lottery"] as const;
+// gameTypes valides en plus des jeux multi standard (ALL_SERVER_GAMES).
+// - crc-races : jeu multi mais hors GAME_SERVER_REGISTRY (schema jsonb players).
+// - lottery   : chance mais passe par claimedPayments/walletLedger comme les multi.
+const EXTRA_CLAIMED_MULTI = ["crc-races"] as const;
+const EXTRA_CLAIMED_CHANCE = ["lottery"] as const;
+const EXTRA_CLAIMED_GAMES = [...EXTRA_CLAIMED_MULTI, ...EXTRA_CLAIMED_CHANCE] as const;
 
 function daysAgo(n: number): Date {
   const d = new Date();
@@ -99,12 +102,16 @@ function daysAgo(n: number): Date {
 }
 
 /**
- * Agrege les paiements multi (via claimedPayments).
+ * Agrege les paiements multi (union claimedPayments on-chain + walletLedger balance-pay).
+ *
  * claimedPayments.amountCrc = mise de CHAQUE joueur (pas le pot). gameType = key du jeu multi.
+ * walletLedger (kind='debit', amountCrc negatif) = mise payee depuis le solde.
+ *
  * Une partie multi = 2 paiements (un par joueur). Donc :
- *   - wagered = SUM(amountCrc)           (total effectivement misé par les joueurs)
- *   - rounds  = COUNT(DISTINCT gameId)   (parties reelles)
- *   - players = COUNT(DISTINCT address)  (joueurs uniques par jeu, dedup cross-jeux fait ailleurs)
+ *   - wagered = SUM(amountCrc) des deux sources (total effectivement misé)
+ *   - rounds  = COUNT(DISTINCT gameId/gameSlug) des deux sources (approximation :
+ *               une partie mixte on-chain + balance peut etre comptee 2x, rare)
+ *   - players = COUNT(DISTINCT address)  (joueurs uniques, dedup cross-source + cross-jeux fait ailleurs)
  */
 export async function multiAggregate(since?: Date, until?: Date): Promise<{
   total: PeriodStats;
@@ -118,7 +125,7 @@ export async function multiAggregate(since?: Date, until?: Date): Promise<{
   if (until) whereParts.push(lt(claimedPayments.claimedAt, until));
   const whereClause = whereParts.length === 1 ? whereParts[0] : and(...whereParts);
 
-  // Wagered par jeu + COUNT DISTINCT gameId pour avoir les vrais parties
+  // Source 1 : claimedPayments (on-chain)
   const wageredRows = await db
     .select({
       gameType: claimedPayments.gameType,
@@ -130,14 +137,43 @@ export async function multiAggregate(since?: Date, until?: Date): Promise<{
     .where(whereClause)
     .groupBy(claimedPayments.gameType);
 
-  // Collect toutes les adresses distinctes (pour dedup cross-jeux plus haut)
   const addressRows = await db
     .select({ address: claimedPayments.playerAddress })
     .from(claimedPayments)
     .where(whereClause)
     .groupBy(claimedPayments.playerAddress);
 
+  // Source 2 : walletLedger kind='debit' (paiement depuis le solde).
+  // On restreint aux memes gameType que claimedKeys pour exclure les autres
+  // chance games (deja comptes via aggregateAllChance) et les non-jeux (topup,
+  // cashout, etc.).
+  const ledgerParts: any[] = [
+    eq(walletLedger.kind, "debit"),
+    inArray(walletLedger.gameType, claimedKeys as unknown as string[]),
+  ];
+  if (since) ledgerParts.push(gte(walletLedger.createdAt, since));
+  if (until) ledgerParts.push(lt(walletLedger.createdAt, until));
+  const ledgerWhere = ledgerParts.length === 1 ? ledgerParts[0] : and(...ledgerParts);
+
+  const ledgerWageredRows = await db
+    .select({
+      gameType: walletLedger.gameType,
+      wagered: sql<number>`COALESCE(SUM(-${walletLedger.amountCrc}), 0)`,
+      players: sql<number>`COUNT(DISTINCT ${walletLedger.address})`,
+      rounds: sql<number>`COUNT(DISTINCT ${walletLedger.gameSlug})`,
+    })
+    .from(walletLedger)
+    .where(ledgerWhere)
+    .groupBy(walletLedger.gameType);
+
+  const ledgerAddressRows = await db
+    .select({ address: walletLedger.address })
+    .from(walletLedger)
+    .where(ledgerWhere)
+    .groupBy(walletLedger.address);
+
   const uniqueAddresses = new Set<string>(addressRows.map((r) => r.address.toLowerCase()));
+  for (const r of ledgerAddressRows) uniqueAddresses.add(r.address.toLowerCase());
 
   // Payouts par jeu (depuis payouts table)
   const paidParts: any[] = [inArray(payouts.gameType, claimedKeys)];
@@ -166,6 +202,65 @@ export async function multiAggregate(since?: Date, until?: Date): Promise<{
     entry.players = Number(r.players);
     byGame[r.gameType] = entry;
   }
+  // Ajout des montants balance-pay. On additionne le wagered (exact) et les
+  // players par jeu (approximation acceptable : pour une partie mixte ou les
+  // deux joueurs sont distincts, COUNT DISTINCT est deja correct dans chaque
+  // source). Les rounds sont reecrits plus bas via une dedup par slug pour
+  // eviter de compter 2x une partie mixte on-chain + balance.
+  for (const r of ledgerWageredRows) {
+    if (!r.gameType) continue;
+    const entry = byGame[r.gameType] ?? { wagered: 0, paidOut: 0, rounds: 0, players: 0, profit: 0 };
+    entry.wagered += Number(r.wagered);
+    entry.players += Number(r.players);
+    byGame[r.gameType] = entry;
+  }
+
+  // Rounds exacts : COUNT DISTINCT slug sur l'union des 2 sources. Necessite
+  // un JOIN sur chaque table de jeu pour resoudre claimedPayments.gameId -> slug,
+  // puis union avec walletLedger.gameSlug.
+  const multiGameConfigs: Array<{ key: string; table: any }> = [
+    ...ALL_SERVER_GAMES.map((g) => ({ key: g.key, table: g.table })),
+    { key: "crc-races", table: crcRacesGames },
+    { key: "lottery", table: lotteries },
+  ];
+  await Promise.all(
+    multiGameConfigs.map(async ({ key, table }) => {
+      const slugs = new Set<string>();
+
+      const onchainParts: any[] = [eq(claimedPayments.gameType, key)];
+      if (since) onchainParts.push(gte(claimedPayments.claimedAt, since));
+      if (until) onchainParts.push(lt(claimedPayments.claimedAt, until));
+      const onchainRows = await db
+        .select({ slug: table.slug })
+        .from(claimedPayments)
+        .innerJoin(table, eq(claimedPayments.gameId, table.id))
+        .where(and(...onchainParts))
+        .groupBy(table.slug);
+      for (const r of onchainRows) if (r.slug) slugs.add(r.slug as string);
+
+      const balanceParts: any[] = [
+        eq(walletLedger.kind, "debit"),
+        eq(walletLedger.gameType, key),
+      ];
+      if (since) balanceParts.push(gte(walletLedger.createdAt, since));
+      if (until) balanceParts.push(lt(walletLedger.createdAt, until));
+      const balanceRows = await db
+        .select({ slug: walletLedger.gameSlug })
+        .from(walletLedger)
+        .where(and(...balanceParts))
+        .groupBy(walletLedger.gameSlug);
+      for (const r of balanceRows) if (r.slug) slugs.add(r.slug);
+
+      if (slugs.size > 0) {
+        const entry = byGame[key] ?? { wagered: 0, paidOut: 0, rounds: 0, players: 0, profit: 0 };
+        entry.rounds = slugs.size;
+        byGame[key] = entry;
+      } else if (byGame[key]) {
+        byGame[key].rounds = 0;
+      }
+    }),
+  );
+
   for (const r of paidRows) {
     const entry = byGame[r.gameType] ?? { wagered: 0, paidOut: 0, rounds: 0, players: 0, profit: 0 };
     entry.paidOut = Number(r.paidOut);
@@ -240,13 +335,13 @@ async function computePeriodStats(since?: Date): Promise<PeriodStats> {
 async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; top5: TopGameMeta[] }> {
   const since = daysAgo(30);
 
-  // Multi : une seule query groupee day + game.
-  // Filtre par claimedKeys (multi + lottery) pour exclure les non-jeux
+  // Multi : deux queries — claimedPayments (on-chain) + walletLedger (balance-pay).
+  // Filtre par claimedKeys (multi + crc-races + lottery) pour exclure les non-jeux
   // (shop_auth, nf_auth, nf_cashout, daily-*, blackjack-refunded, etc.) et
   // eviter le double-comptage avec les chance games (ex: "lootbox" ici vs
   // "lootboxes" via chance-registry — ce dernier reste source de verite).
   const claimedKeys = [...ALL_SERVER_GAMES.map((g) => g.key), ...EXTRA_CLAIMED_GAMES];
-  const multiDailyPromise = db
+  const multiDailyOnchainPromise = db
     .select({
       day: sql<string>`TO_CHAR(DATE_TRUNC('day', ${claimedPayments.claimedAt}), 'YYYY-MM-DD')`,
       game: claimedPayments.gameType,
@@ -259,6 +354,23 @@ async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; top5: To
       claimedPayments.gameType
     );
 
+  const multiDailyBalancePromise = db
+    .select({
+      day: sql<string>`TO_CHAR(DATE_TRUNC('day', ${walletLedger.createdAt}), 'YYYY-MM-DD')`,
+      game: walletLedger.gameType,
+      vol: sql<number>`COALESCE(SUM(-${walletLedger.amountCrc}), 0)`,
+    })
+    .from(walletLedger)
+    .where(and(
+      gte(walletLedger.createdAt, since),
+      eq(walletLedger.kind, "debit"),
+      inArray(walletLedger.gameType, claimedKeys as unknown as string[]),
+    ))
+    .groupBy(
+      sql`DATE_TRUNC('day', ${walletLedger.createdAt})`,
+      walletLedger.gameType
+    );
+
   // Chance : 1 query par jeu (en parallele)
   const chanceDailyPromise = Promise.all(
     ALL_CHANCE_SERVER_GAMES.map(async (cfg) => ({
@@ -267,14 +379,23 @@ async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; top5: To
     }))
   );
 
-  const [multiDaily, chanceDaily] = await Promise.all([multiDailyPromise, chanceDailyPromise]);
+  const [multiDailyOnchain, multiDailyBalance, chanceDaily] = await Promise.all([
+    multiDailyOnchainPromise,
+    multiDailyBalancePromise,
+    chanceDailyPromise,
+  ]);
 
   // Build perDay[day][gameKey] = volume
   const perDay: Record<string, Record<string, number>> = {};
 
-  for (const row of multiDaily) {
+  for (const row of multiDailyOnchain) {
     if (!perDay[row.day]) perDay[row.day] = {};
-    perDay[row.day][row.game] = Number(row.vol);
+    perDay[row.day][row.game] = (perDay[row.day][row.game] ?? 0) + Number(row.vol);
+  }
+  for (const row of multiDailyBalance) {
+    if (!row.game) continue;
+    if (!perDay[row.day]) perDay[row.day] = {};
+    perDay[row.day][row.game] = (perDay[row.day][row.game] ?? 0) + Number(row.vol);
   }
   for (const { cfg, rows } of chanceDaily) {
     for (const r of rows) {
@@ -343,18 +464,19 @@ async function computeGamesBreakdown(): Promise<GameStatLine[]> {
     if (stats.rounds === 0) continue;
     const meta = MULTI_GAME_META[key] ?? { label: key, emoji: "🎮" };
     // Lottery passe par claimedPayments comme les multi mais reste un jeu de hasard.
-    const isExtra = (EXTRA_CLAIMED_GAMES as readonly string[]).includes(key);
+    // crc-races reste un jeu multi.
+    const isChanceExtra = (EXTRA_CLAIMED_CHANCE as readonly string[]).includes(key);
     lines.push({
       key,
       label: meta.label,
       emoji: meta.emoji,
-      category: isExtra ? "chance" : "multi",
+      category: isChanceExtra ? "chance" : "multi",
       wagered: stats.wagered,
       paidOut: stats.paidOut,
       rounds: stats.rounds,
       // Pas de RTP pour la lottery : les jackpots peuvent depasser les ventes
       // (cumul entre tirages, sponsoring), donc le ratio n'est pas representatif.
-      rtp: isExtra ? null : (stats.wagered > 0 ? (stats.paidOut / stats.wagered) * 100 : null),
+      rtp: isChanceExtra ? null : (stats.wagered > 0 ? (stats.paidOut / stats.wagered) * 100 : null),
     });
   }
 
