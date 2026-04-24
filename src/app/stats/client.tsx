@@ -284,6 +284,42 @@ function Metric({
   );
 }
 
+// Tooltip compact : filtre les jeux a 0 CRC ce jour-la, trie par volume decroissant,
+// met le Total en tete. Evite le debordement vertical quand beaucoup de jeux.
+function VolumeTooltip({ active, payload, label }: any) {
+  if (!active || !payload || payload.length === 0) return null;
+  const total = payload.find((p: any) => p.dataKey === "total");
+  const games = payload
+    .filter((p: any) => p.dataKey !== "total" && Number(p.value) > 0)
+    .sort((a: any, b: any) => Number(b.value) - Number(a.value));
+  return (
+    <div
+      style={{
+        background: "rgba(255,255,255,0.97)",
+        border: "1px solid rgba(0,0,0,0.1)",
+        borderRadius: 12,
+        fontSize: 12,
+        padding: "8px 12px",
+        maxHeight: 240,
+        overflowY: "auto",
+        color: "#0f172a",
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      {total && (
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>
+          Total : {formatCrc(Number(total.value ?? 0), 0)} CRC
+        </div>
+      )}
+      {games.map((g: any) => (
+        <div key={g.dataKey} style={{ color: g.color }}>
+          {g.name} : {formatCrc(Number(g.value ?? 0), 0)} CRC
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Volume30dChart({ points, games }: { points: DailyVolumePoint[]; games: TopGameMeta[] }) {
   // Transforme les points en data utilisable par recharts :
   // { date, total, <key1>: vol, <key2>: vol, ... }
@@ -298,27 +334,21 @@ function Volume30dChart({ points, games }: { points: DailyVolumePoint[]; games: 
     return base;
   });
 
+  // Hauteur proportionnelle au nombre de jeux : chaque legende wrap = ~20px.
+  // Cap a 28rem (~450px) pour ne pas envahir la page.
+  const minRows = Math.ceil((games.length + 1) / 4);
+  const chartHeight = Math.min(288 + (minRows - 2) * 24, 450);
+
   return (
-    <div className="h-72 w-full">
+    <div style={{ height: chartHeight }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.1} />
           <XAxis dataKey="date" stroke="currentColor" opacity={0.5} tick={{ fontSize: 10 }} />
           <YAxis stroke="currentColor" opacity={0.5} tick={{ fontSize: 10 }} />
-          <Tooltip
-            contentStyle={{
-              background: "rgba(255,255,255,0.95)",
-              border: "1px solid rgba(0,0,0,0.1)",
-              borderRadius: 12,
-              fontSize: 12,
-            }}
-            formatter={(value: any, name: any) => [
-              `${formatCrc(Number(value ?? 0), 0)} CRC`,
-              name,
-            ]}
-          />
+          <Tooltip content={<VolumeTooltip />} />
           <Legend
-            wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+            wrapperStyle={{ fontSize: 11, paddingTop: 8, lineHeight: "18px" }}
             iconType="circle"
           />
           {/* Ligne totale en gras */}
