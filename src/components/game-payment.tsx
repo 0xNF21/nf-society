@@ -12,6 +12,8 @@ import { useMiniApp } from "@/components/miniapp-provider";
 import { TicketRecovery } from "@/components/ticket-recovery";
 import { BalancePayButton } from "@/components/balance-pay-button";
 import { useConnectedAddress } from "@/hooks/use-connected-address";
+import { useFeatureFlags } from "@/components/feature-flag-provider";
+import { FreePlayStart } from "@/components/free-play-start";
 
 interface GamePaymentPlayer {
   token: string | null;
@@ -56,6 +58,7 @@ export function GamePayment({
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const connectedAddress = useConnectedAddress();
+  const { flagStatus, loading: flagsLoading } = useFeatureFlags();
   const config = GAME_REGISTRY[gameKey];
   const t = translations[config.translationKey as keyof typeof translations] as Record<string, Record<string, string>>;
   const tm = translations.miniapp;
@@ -68,6 +71,14 @@ export function GamePayment({
   const isActiveStatus = isNPlayerMode
     ? game.status === "waiting"
     : game.status === "waiting_p1" || game.status === "waiting_p2";
+
+  // Free-to-Play mode: compute here but the early return happens AFTER all
+  // hooks below, to avoid "React Hook called conditionally" (rules-of-hooks).
+  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  const fpAddress = connectedAddress ?? walletAddress ?? null;
+  const fpAlreadyJoined = isNPlayerMode
+    ? hasPaidNMode
+    : isCreator || game.status === "waiting_p2";
 
   const [scanning, setScanning] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -163,6 +174,25 @@ export function GamePayment({
     navigator.clipboard.writeText(window.location.href);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
+  }
+
+  // Free-to-Play : bypass le flow CRC (QR, Mini App, balance-pay, scan) et
+  // render l'equivalent XP. Place APRES tous les hooks pour respecter
+  // les rules-of-hooks (pas de hook conditionnel).
+  if (realStakesDisabled) {
+    return (
+      <FreePlayStart
+        gameKey={gameKey}
+        gameSlug={game.slug}
+        address={fpAddress}
+        playerToken={playerToken}
+        betCrc={game.betCrc}
+        alreadyJoined={fpAlreadyJoined}
+        currentPlayers={isNPlayerMode ? currentCount : undefined}
+        maxPlayers={maxPlayers}
+        onStarted={() => onScanComplete()}
+      />
+    );
   }
 
   if (!isActiveStatus) return null;

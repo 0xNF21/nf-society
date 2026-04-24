@@ -8,6 +8,7 @@ import { translations } from "@/lib/i18n";
 import { TopupModal } from "@/components/topup-modal";
 import { CashoutModal, cashoutPendingKey, type PendingCashoutStored } from "@/components/cashout-modal";
 import { LedgerHistory } from "@/components/ledger-history";
+import { useFeatureFlags } from "@/components/feature-flag-provider";
 
 interface WalletBalanceCardProps {
   address: string;
@@ -24,6 +25,8 @@ interface WalletBalanceCardProps {
 export function WalletBalanceCard({ address }: WalletBalanceCardProps) {
   const { locale } = useLocale();
   const { isDemo, demoPlayer } = useDemo();
+  const { flagStatus, loading: flagsLoading } = useFeatureFlags();
+  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
   const t = translations.wallet;
   const [realBalance, setRealBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(!isDemo);
@@ -133,23 +136,39 @@ export function WalletBalanceCard({ address }: WalletBalanceCardProps) {
           <span className="text-sm font-bold text-ink/60">CRC</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => setTopupOpen(true)}
-            className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-marine text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t.topupBtn[locale]}
-          </button>
-          <button
-            onClick={() => setCashoutOpen(true)}
-            disabled={!balance || balance < 1}
-            className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white text-marine border border-marine/30 text-sm font-semibold hover:bg-marine/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ArrowDownCircle className="h-3.5 w-3.5" />
-            {t.cashoutBtn[locale]}
-          </button>
-        </div>
+        {realStakesDisabled ? (
+          <>
+            <button
+              onClick={() => setCashoutOpen(true)}
+              disabled={!balance || balance < 1}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-marine text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ArrowDownCircle className="h-3.5 w-3.5" />
+              {t.cashoutBtn[locale]}
+            </button>
+            <p className="text-[11px] leading-snug text-ink/50 dark:text-white/50">
+              {balance && balance > 0 ? t.f2pLegacyNotice[locale] : t.f2pLegacyNoticeEmpty[locale]}
+            </p>
+          </>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setTopupOpen(true)}
+              className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-marine text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t.topupBtn[locale]}
+            </button>
+            <button
+              onClick={() => setCashoutOpen(true)}
+              disabled={!balance || balance < 1}
+              className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white text-marine border border-marine/30 text-sm font-semibold hover:bg-marine/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ArrowDownCircle className="h-3.5 w-3.5" />
+              {t.cashoutBtn[locale]}
+            </button>
+          </div>
+        )}
       </div>
 
       {pendingCashout && (

@@ -10,6 +10,8 @@ import { useMiniApp } from "@/components/miniapp-provider";
 import { TicketRecovery } from "@/components/ticket-recovery";
 import { BalancePayButton } from "@/components/balance-pay-button";
 import { useConnectedAddress } from "@/hooks/use-connected-address";
+import { useFeatureFlags } from "@/components/feature-flag-provider";
+import { FreePlayStart } from "@/components/free-play-start";
 
 interface ChancePaymentProps {
   /** Recipient address for the payment */
@@ -73,8 +75,13 @@ export function ChancePayment({
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const connectedAddress = useConnectedAddress();
+  const { flagStatus, loading: flagsLoading } = useFeatureFlags();
   const tm = translations.miniapp;
   const t = translations.chancePayment;
+
+  // Free-to-Play mode: compute here, but the early return happens AFTER
+  // all hooks below (rules-of-hooks).
+  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
 
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
@@ -145,6 +152,27 @@ export function ChancePayment({
   const balKey = balanceGameKey || gameType;
   const balSlug = balanceSlug || tableSlug || gameId;
   const balExtras = balanceExtras || (ballValue !== undefined ? { ballValue } : undefined);
+
+  // Free-to-Play : bypass le flow CRC (QR, Mini App, balance-pay) et render
+  // l'equivalent XP. Place APRES tous les hooks pour respecter rules-of-hooks.
+  if (realStakesDisabled) {
+    const fpAddress = connectedAddress ?? walletAddress ?? null;
+    return (
+      <FreePlayStart
+        gameKey={balKey}
+        gameSlug={balSlug}
+        address={fpAddress}
+        playerToken={playerToken || ""}
+        betCrc={amountCrc}
+        isChance
+        extraBody={balExtras as Record<string, unknown> | undefined}
+        onStarted={() => {
+          onPaymentInitiated?.();
+          onBalancePaid?.({ family: "chance" });
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
