@@ -619,6 +619,7 @@ function GameUI({
   spinning,
   resultNumber,
   isDemo,
+  showSpinButton = true,
 }: {
   bets: RouletteBet[];
   setBets: (b: RouletteBet[]) => void;
@@ -629,6 +630,8 @@ function GameUI({
   spinning: boolean;
   resultNumber: number | null;
   isDemo?: boolean;
+  /** When false, the Spin button is hidden (used during the payment phase). Default: true. */
+  showSpinButton?: boolean;
 }) {
   const t = translations.roulette;
   const totalPlaced = bets.reduce((s, b) => s + b.amount, 0);
@@ -712,15 +715,17 @@ function GameUI({
       </div>
 
       {/* Spin button */}
-      <button
-        onClick={onSpin}
-        disabled={totalPlaced === 0 || totalPlaced > betCrc || spinning}
-        className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2"
-        style={{ backgroundColor: accentColor }}
-      >
-        <RotateCcw className="w-5 h-5" />
-        {spinning ? t.spinning[locale] : t.spin[locale]}
-      </button>
+      {showSpinButton && (
+        <button
+          onClick={onSpin}
+          disabled={totalPlaced === 0 || totalPlaced > betCrc || spinning}
+          className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2"
+          style={{ backgroundColor: accentColor }}
+        >
+          <RotateCcw className="w-5 h-5" />
+          {spinning ? t.spinning[locale] : t.spin[locale]}
+        </button>
+      )}
     </div>
   );
 }
@@ -1042,14 +1047,14 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
         </div>
       </div>
 
-      {/* Payment phase */}
+      {/* Payment phase — bet selector + table (place bets) + payment on the same page */}
       {!round && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4 space-y-3">
             <h2 className="text-sm font-bold text-ink/60 uppercase tracking-widest">{t.chooseBet[locale]}</h2>
             <div className="grid grid-cols-4 gap-2">
               {betOptions.map((bet) => (
-                <button key={bet} onClick={() => setSelectedBet(bet)}
+                <button key={bet} onClick={() => { setSelectedBet(bet); setBets([]); }}
                   className={`py-2.5 rounded-xl text-sm font-bold transition-all ${
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
@@ -1059,6 +1064,19 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
               ))}
             </div>
           </div>
+
+          <GameUI
+            bets={bets}
+            setBets={setBets}
+            betCrc={selectedBet}
+            accentColor={accentColor}
+            locale={locale}
+            onSpin={() => {}}
+            spinning={false}
+            resultNumber={null}
+            showSpinButton={false}
+          />
+
           <ChancePayment
             recipientAddress={table.recipientAddress}
             amountCrc={selectedBet}

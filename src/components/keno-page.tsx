@@ -749,7 +749,7 @@ function RealKenoGame({ table }: { table: KenoTable }) {
         </div>
       </div>
 
-      {/* Before payment: bet + pick count + payment */}
+      {/* Before payment: bet + pick count + grid (place picks) + payment on the same page */}
       {!round && (
         <div className="space-y-4">
           {/* Bet selection */}
@@ -778,7 +778,7 @@ function RealKenoGame({ table }: { table: KenoTable }) {
               {Array.from({ length: MAX_PICKS }, (_, i) => i + 1).map((n) => (
                 <button
                   key={n}
-                  onClick={() => setPickCount(n)}
+                  onClick={() => { setPickCount(n); setPicks(new Set()); }}
                   className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${
                     pickCount === n ? "text-white" : "bg-ink/5 dark:bg-white/5 text-ink/50 hover:bg-ink/10"
                   }`}
@@ -788,6 +788,40 @@ function RealKenoGame({ table }: { table: KenoTable }) {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Picks grid */}
+          <div className="rounded-2xl border border-ink/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm p-4 space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-ink/40">
+                {t.picksCount[locale].replace("{n}", String(picks.size))} / {pickCount}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPicks(new Set())}
+                  className="flex items-center gap-1 text-xs text-ink/40 hover:text-ink/60"
+                >
+                  <Trash2 className="w-3 h-3" /> {t.clearPicks[locale]}
+                </button>
+                <button
+                  onClick={autoSelect}
+                  className="flex items-center gap-1 text-xs text-ink/40 hover:text-ink/60"
+                >
+                  <Shuffle className="w-3 h-3" /> {t.autoSelect[locale]}
+                </button>
+              </div>
+            </div>
+
+            <KenoGrid
+              picks={picks}
+              draws={[]}
+              hits={[]}
+              onToggle={togglePick}
+              disabled={false}
+              maxPicks={pickCount}
+              accentColor={accentColor}
+              animatingIndex={-1}
+            />
           </div>
 
           {/* Pay table */}
