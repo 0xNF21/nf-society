@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trophy, Volume2, VolumeX, HelpCircle, X, ChevronDown } from "lucide-react";
+import { ArrowLeft, Trophy, Volume2, VolumeX, HelpCircle, X, ChevronDown, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
@@ -14,6 +14,7 @@ import { usePlayerToken } from "@/hooks/use-player-token";
 import { playRollingSound, playRevealSound, setSoundMuted, isSoundMuted } from "@/lib/sounds";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
+import { QuickReplayModal } from "@/components/quick-replay-modal";
 
 type LootboxData = {
   id: number;
@@ -419,6 +420,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const [showVideo, setShowVideo] = useState(false);
   const [showRewardTable, setShowRewardTable] = useState(false);
   const [showRecentOpens, setShowRecentOpens] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
   const [videoOpen, setVideoOpen] = useState<LootboxOpen | null>(null);
   const [profiles, setProfiles] = useState<Record<string, { name?: string; imageUrl?: string | null }>>({});
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -816,6 +818,18 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
               </div>
             )}
 
+            {/* Bouton rejouer au-dessus de la PnlCard */}
+            {latestOpen && animPhase === "idle" && (
+              <button
+                onClick={() => setShowReplay(true)}
+                className="w-full max-w-xs py-3 rounded-xl font-bold text-sm text-white hover:opacity-90 flex items-center justify-center gap-2 shadow-sm"
+                style={{ backgroundColor: accentColor }}
+              >
+                <RefreshCw className="w-4 h-4" />
+                {translations.quickReplay.openReplay[locale]}
+              </button>
+            )}
+
             {/* PNL Card after reveal */}
             {latestOpen && animPhase === "idle" && (
               <PnlCard
@@ -947,6 +961,52 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
           </div>
         </div>
       </main>
+
+      {/* Quick replay modal */}
+      <QuickReplayModal
+        open={showReplay}
+        onClose={() => setShowReplay(false)}
+        betOptions={[lootbox.pricePerOpenCrc]}
+        currentBet={lootbox.pricePerOpenCrc}
+        onBetChange={() => {}}
+        accentColor={accentColor}
+      >
+        <ChancePayment
+          recipientAddress={lootbox.recipientAddress}
+          amountCrc={lootbox.pricePerOpenCrc}
+          gameType="lootbox"
+          gameId={lootbox.slug}
+          accentColor={accentColorRaw}
+          payLabel={t.payWithCircles[locale]}
+          onPaymentInitiated={async () => {
+            setShowReplay(false);
+            await scanNow();
+            setWatchingPayment(true);
+          }}
+          onScan={scanNow}
+          scanning={scanning}
+          paymentStatus={showConfirmed ? "confirmed" : watchingPayment ? (paymentStatus === "error" ? "error" : "watching") : "idle"}
+          qrLabel={t.scanQr[locale]}
+          playerToken={tokenRef.current}
+          balanceSlug={lootbox.slug}
+          onBalancePaid={(data) => {
+            const row = data?.gameRow;
+            if (!row) return;
+            const open: LootboxOpen = {
+              id: row.id,
+              playerAddress: row.playerAddress,
+              transactionHash: row.transactionHash ?? "",
+              playerToken: row.playerToken ?? null,
+              rewardCrc: row.rewardCrc,
+              payoutStatus: row.payoutStatus ?? "success",
+              openedAt: row.openedAt ?? new Date().toISOString(),
+            };
+            setShowReplay(false);
+            setWatchingPayment(false);
+            runAnimation(open);
+          }}
+        />
+      </QuickReplayModal>
     </div>
   );
 }
