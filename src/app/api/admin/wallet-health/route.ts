@@ -3,11 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { ethers } from "ethers";
 import { db } from "@/lib/db";
-import { players } from "@/lib/db/schema";
-import { sql, eq } from "drizzle-orm";
+import { players, walletLedger } from "@/lib/db/schema";
+import { sql, eq, and, inArray } from "drizzle-orm";
 import { getSafeCrcBalance } from "@/lib/payout";
 import { DAO_TREASURY_ADDRESS } from "@/lib/wallet";
 import { checkAdminAuth } from "@/lib/admin-auth";
+import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 
 /**
  * GET /api/admin/wallet-health
@@ -65,6 +66,81 @@ export async function GET(req: NextRequest) {
     const diff =
       safeCrcBalance !== null ? Math.round((totalDbBalances - safeCrcBalance) * 1_000_000) / 1_000_000 : null;
 
+    // Balance-pay orphan check: debits in wallet_ledger for multiplayer
+    // games whose player address isn't assigned to player1/player2 of the
+    // game row. Should always be 0 — payGameFromBalance rolls back the debit
+    // on an `already_full` slot. This is a safety-net check to catch future
+    // regressions in the transactional path.
+    type OrphanSample = {
+      gameKey: string;
+      gameSlug: string | null;
+      ledgerId: number;
+      address: string;
+      amountCrc: number;
+      createdAt: string;
+    };
+    const orphanSamples: OrphanSample[] = [];
+    const orphanByGame: Record<string, { count: number; totalCrc: number }> = {};
+    let orphanTotalCount = 0;
+    let orphanTotalCrc = 0;
+
+    for (const config of ALL_SERVER_GAMES) {
+      const debits = await db
+        .select({
+          id: walletLedger.id,
+          address: walletLedger.address,
+          amountCrc: walletLedger.amountCrc,
+          gameSlug: walletLedger.gameSlug,
+          createdAt: walletLedger.createdAt,
+        })
+        .from(walletLedger)
+        .where(and(eq(walletLedger.kind, "debit"), eq(walletLedger.gameType, config.key)));
+
+      if (debits.length === 0) continue;
+
+      const slugs = [...new Set(debits.map((d) => d.gameSlug).filter((s): s is string => !!s))];
+      const gameMap = new Map<string, { player1Address: string | null; player2Address: string | null }>();
+      if (slugs.length > 0) {
+        const games = await db
+          .select({
+            slug: config.table.slug,
+            player1Address: config.table.player1Address,
+            player2Address: config.table.player2Address,
+          })
+          .from(config.table)
+          .where(inArray(config.table.slug, slugs));
+        for (const g of games) gameMap.set(g.slug, g);
+      }
+
+      let gameCount = 0;
+      let gameCrc = 0;
+      for (const d of debits) {
+        const game = d.gameSlug ? gameMap.get(d.gameSlug) : null;
+        const addr = d.address.toLowerCase();
+        const p1 = game?.player1Address?.toLowerCase() ?? null;
+        const p2 = game?.player2Address?.toLowerCase() ?? null;
+        const isAssigned = addr === p1 || addr === p2;
+        if (isAssigned) continue;
+
+        const lost = Math.abs(d.amountCrc);
+        gameCount++;
+        gameCrc += lost;
+        orphanTotalCount++;
+        orphanTotalCrc += lost;
+        if (orphanSamples.length < 20) {
+          orphanSamples.push({
+            gameKey: config.key,
+            gameSlug: d.gameSlug,
+            ledgerId: d.id,
+            address: d.address,
+            amountCrc: lost,
+            createdAt: d.createdAt.toISOString(),
+          });
+        }
+      }
+      if (gameCount > 0) orphanByGame[config.key] = { count: gameCount, totalCrc: gameCrc };
+    }
+
     // Secondary ledger-sum invariant (should equal sum of balances).
     const ledgerSumRes = await db.execute(
       sql`SELECT COALESCE(SUM(amount_crc), 0)::float AS total,
@@ -102,6 +178,15 @@ export async function GET(req: NextRequest) {
          *  (possibly over-credited somewhere), <0 means Safe holds more than DB claims
          *  (normal for house-edge accumulated before Phase 3e treasury tracking). */
         diffVsSafeCrc: diff,
+      },
+      balanceDebitOrphans: {
+        /** Debits charged to a player whose address isn't assigned to either
+         *  slot of the target multiplayer game. Should always be 0 — if not,
+         *  the transactional rollback in payGameFromBalance has regressed. */
+        count: orphanTotalCount,
+        totalCrc: Math.round(orphanTotalCrc * 1_000_000) / 1_000_000,
+        byGame: orphanByGame,
+        samples: orphanSamples,
       },
     });
   } catch (error: any) {

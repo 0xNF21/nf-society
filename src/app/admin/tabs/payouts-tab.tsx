@@ -29,6 +29,10 @@ export function PayoutsTab({ password }: { password: string }) {
   const [balancesTotal, setBalancesTotal] = useState(0);
   const [balancesLoading, setBalancesLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, { name?: string; imageUrl?: string | null }>>({});
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundScanning, setRefundScanning] = useState(false);
+  const [refundExecuting, setRefundExecuting] = useState(false);
+  const [refundResult, setRefundResult] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -93,6 +97,25 @@ export function PayoutsTab({ password }: { password: string }) {
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
+
+  const handleRefundScan = async (execute: boolean) => {
+    if (execute) setRefundExecuting(true); else setRefundScanning(true);
+    setRefundResult(null);
+    try {
+      const res = await fetch(`/api/admin/refund-overpayments${execute ? "?execute=true" : ""}`, {
+        method: "POST",
+        headers: { "x-admin-password": password },
+      });
+      const data = await res.json();
+      setRefundResult(data);
+      if (execute) fetchData();
+    } catch (e: any) {
+      setRefundResult({ error: e.message });
+    } finally {
+      setRefundScanning(false);
+      setRefundExecuting(false);
+    }
+  };
 
   const handleManual = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,6 +223,89 @@ export function PayoutsTab({ password }: { password: string }) {
                 {manualSubmitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Envoyer le payout"}
               </button>
             </form>
+          )}
+        </div>
+      )}
+
+      {/* Refund overpayments */}
+      {payoutStatus?.configured && (
+        <div className="rounded-2xl border-2 border-ink/10 bg-white/80 p-4">
+          <button onClick={() => setRefundOpen(!refundOpen)} className="w-full flex items-center justify-between text-sm font-semibold text-ink">
+            <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-amber-600" /> Rembourser overpayments multijoueur</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${refundOpen ? "rotate-180" : ""}`} />
+          </button>
+          {refundOpen && (
+            <div className="mt-4 space-y-3">
+              <p className="text-xs text-ink/60">
+                Scan les paiements historiques jamais assignes a player1/player2 (3e joueur arrive apres slot plein, double-pay, etc.). Lance d&apos;abord un dry-run pour voir la liste, puis execute.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRefundScan(false)}
+                  disabled={refundScanning || refundExecuting}
+                  className="flex-1 py-2 rounded-xl bg-blue-50 text-blue-700 text-sm font-semibold hover:bg-blue-100 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {refundScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                  Dry-run
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!confirm(`Rembourser ${refundResult?.count || 0} paiement(s) pour un total de ${refundResult?.totalCrc || 0} CRC ?`)) return;
+                    handleRefundScan(true);
+                  }}
+                  disabled={refundExecuting || refundScanning || !refundResult?.count || refundResult?.dryRun === false}
+                  className="flex-1 py-2 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {refundExecuting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Executer
+                </button>
+              </div>
+              {refundResult && !refundResult.error && (
+                <div className="rounded-lg bg-ink/5 p-3 text-sm space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">
+                      {refundResult.dryRun ? "Dry-run" : "Resultat"} : {refundResult.count} orphan(s)
+                    </span>
+                    <span className="text-ink/60">{refundResult.totalCrc} CRC total</span>
+                  </div>
+                  {refundResult.orphans?.length > 0 && (
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {refundResult.orphans.map((o: any) => (
+                        <div key={o.txHash} className="text-xs bg-white rounded px-2 py-1.5 flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold">{o.gameKey}</span>
+                              <span className="text-ink/40">#{o.gameSlug}</span>
+                              {o.refundStatus && (
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                  o.refundStatus === "sending" || o.refundStatus === "success" ? "bg-green-100 text-green-700"
+                                  : o.refundStatus === "already_paid" || o.refundStatus === "already_sending" ? "bg-blue-100 text-blue-700"
+                                  : "bg-red-100 text-red-700"
+                                }`}>{o.refundStatus}</span>
+                              )}
+                            </div>
+                            <a href={`https://gnosisscan.io/tx/${o.txHash}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[10px] text-ink/50 hover:text-marine inline-flex items-center gap-0.5">
+                              {o.txHash.slice(0, 10)}...{o.txHash.slice(-6)} <ExternalLink className="h-2.5 w-2.5" />
+                            </a>
+                            {o.refundError && <p className="text-[10px] text-red-500 truncate">{o.refundError}</p>}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold">{o.amountCrc} CRC</p>
+                            <p className="font-mono text-[10px] text-ink/40">{shortAddr(o.playerAddress)}</p>
+                            {o.claimedAt && <p className="text-[10px] text-ink/40">{new Date(o.claimedAt).toLocaleDateString()}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {refundResult?.error && (
+                <div className="text-sm p-2 rounded-lg bg-red-50 text-red-700">{refundResult.error}</div>
+              )}
+            </div>
           )}
         </div>
       )}

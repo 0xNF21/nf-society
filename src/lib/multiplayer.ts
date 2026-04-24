@@ -11,6 +11,7 @@ import { checkAllNewPayments } from "@/lib/circles";
 import { getServerGameConfig, ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 import { ALL_CHANCE_SERVER_GAMES, getAllChancePlayerStats } from "@/lib/chance-registry-server";
 import { announceNewLobbyGame, markLobbyGameStarted } from "@/lib/telegram/lobby-announce";
+import { executePayout } from "@/lib/payout";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
@@ -103,11 +104,6 @@ export async function scanGamePayments(gameKey: string, slug: string) {
 
   if (!game) throw new Error("Game not found");
 
-  // Skip if game already started
-  if (config.skipStatuses.includes(game.status)) {
-    return { game, newPayments: 0 };
-  }
-
   const priceWei = BigInt(game.betCrc) * WEI_PER_CRC;
 
   // Get all globally claimed payments
@@ -142,6 +138,44 @@ export async function scanGamePayments(gameKey: string, slug: string) {
       continue;
     }
 
+    const playerToken = payment.gameData?.t || null;
+    const p1 = game.player1Address?.toLowerCase() ?? null;
+    const p2 = game.player2Address?.toLowerCase() ?? null;
+
+    // Overpayment detection: both slots filled, same player paid twice,
+    // or game already moved past the payment phase (race condition between
+    // concurrent joiners). Refund the sender automatically via Safe+Roles.
+    const isOverpayment =
+      (p1 !== null && p2 !== null) ||
+      (p1 !== null && p1 === playerAddress) ||
+      config.skipStatuses.includes(game.status);
+
+    if (isOverpayment) {
+      await db.insert(claimedPayments).values({
+        txHash,
+        gameType: `${gameKey}-refund`,
+        gameId: game.id,
+        playerAddress,
+        amountCrc: game.betCrc,
+      }).onConflictDoNothing();
+
+      knownTxHashes.add(txHash);
+      globalClaimedTxHashes.add(txHash);
+
+      try {
+        await executePayout({
+          gameType: `${gameKey}-refund`,
+          gameId: `${gameKey}-refund-${txHash}`,
+          recipientAddress: payment.sender,
+          amountCrc: game.betCrc,
+          reason: `Remboursement overpayment ${gameKey} ${game.slug} (tx ${txHash.slice(0, 10)})`,
+        });
+      } catch (err) {
+        console.error(`[scanGamePayments] Refund failed for ${txHash}:`, err);
+      }
+      continue;
+    }
+
     // Claim the payment
     await db.insert(claimedPayments).values({
       txHash,
@@ -154,8 +188,6 @@ export async function scanGamePayments(gameKey: string, slug: string) {
     knownTxHashes.add(txHash);
     globalClaimedTxHashes.add(txHash);
     claimedCount++;
-
-    const playerToken = payment.gameData?.t || null;
 
     // Assign player 1 or player 2
     if (!game.player1Address) {
@@ -179,7 +211,7 @@ export async function scanGamePayments(gameKey: string, slug: string) {
         creatorAddress: playerAddress,
         isPrivate: game.isPrivate,
       });
-    } else if (!game.player2Address && playerAddress !== game.player1Address?.toLowerCase()) {
+    } else if (!game.player2Address) {
       const extraFields = config.onBothPlayersPaid ? config.onBothPlayersPaid() : {};
 
       await db.update(config.table).set({
