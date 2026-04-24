@@ -6,6 +6,7 @@ import { ArrowLeft, Trophy, Clock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GamePayment } from "@/components/game-payment";
+import { TicketRecovery } from "@/components/ticket-recovery";
 import { PlayerBanner } from "@/components/player-banner";
 import { RematchButton, RematchBanner } from "@/components/rematch-button";
 import { PnlCard } from "@/components/pnl-card";
@@ -545,10 +546,11 @@ function RealMorpionGame({ slug }: { slug: string }) {
         {/* Spectator notice */}
         {game.status === "active" && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-5 text-center">
+            <CardContent className="p-5 text-center space-y-3">
               <p className="text-sm text-ink/60 dark:text-white/60">
                 {t.spectatorMode[locale]}
               </p>
+              <TicketRecovery gameKey="morpion" slug={game.slug} />
             </CardContent>
           </Card>
         )}

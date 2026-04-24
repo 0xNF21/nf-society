@@ -7,6 +7,7 @@ import { ArrowLeft, Trophy, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GamePayment } from "@/components/game-payment";
+import { TicketRecovery } from "@/components/ticket-recovery";
 import { PlayerBanner } from "@/components/player-banner";
 import { RematchButton, RematchBanner } from "@/components/rematch-button";
 import { PnlCard } from "@/components/pnl-card";
@@ -487,10 +488,11 @@ function RealPfcGame({ slug }: { slug: string }) {
         {/* Spectator notice */}
         {game.status === "playing" && !addressConfirmed && (
           <Card className="bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 text-center">
+            <CardContent className="p-4 text-center space-y-3">
               <p className="text-sm text-ink/60">
                 {t.spectatorMode[locale]}
               </p>
+              <TicketRecovery gameKey="pfc" slug={game.slug} />
             </CardContent>
           </Card>
         )}
