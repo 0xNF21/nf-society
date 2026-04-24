@@ -61,7 +61,7 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
   const { locale } = useLocale();
   const t = translations.stats;
 
-  const { casinoBank, period24h, period7d, period30d, allTime, games, daily30d, top5Games, recentGames } = stats;
+  const { casinoBank, period24h, period7d, period30d, allTime, games, daily30d, chartGames, recentGames } = stats;
 
   return (
     <div className="min-h-screen bg-sand dark:bg-black">
@@ -142,7 +142,7 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
             <TrendingUp className="h-4 w-4" />
             {t.volumeChart[locale]}
           </div>
-          <Volume30dChart points={daily30d} top5={top5Games} />
+          <Volume30dChart points={daily30d} games={chartGames} />
         </div>
 
         {/* Breakdown par jeu - all time */}
@@ -284,7 +284,7 @@ function Metric({
   );
 }
 
-function Volume30dChart({ points, top5 }: { points: DailyVolumePoint[]; top5: TopGameMeta[] }) {
+function Volume30dChart({ points, games }: { points: DailyVolumePoint[]; games: TopGameMeta[] }) {
   // Transforme les points en data utilisable par recharts :
   // { date, total, <key1>: vol, <key2>: vol, ... }
   const chartData = points.map((p) => {
@@ -292,7 +292,7 @@ function Volume30dChart({ points, top5 }: { points: DailyVolumePoint[]; top5: To
       date: p.date.slice(5), // MM-DD
       total: p.totalCrc,
     };
-    for (const g of top5) {
+    for (const g of games) {
       base[g.key] = p.perGame[g.key] ?? 0;
     }
     return base;
@@ -330,8 +330,8 @@ function Volume30dChart({ points, top5 }: { points: DailyVolumePoint[]; top5: To
             dot={false}
             name="Total"
           />
-          {/* Top 5 jeux en lignes colorees fines */}
-          {top5.map((g) => (
+          {/* Une ligne coloree fine par jeu avec volume > 0 sur la periode */}
+          {games.map((g) => (
             <Line
               key={g.key}
               type="monotone"
