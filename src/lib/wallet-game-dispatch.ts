@@ -341,6 +341,12 @@ export async function createChanceRound(
       if (!betOptions.includes(amount)) return { error: "invalid_bet" };
       const deck = blackjackCreateDeck();
       const state = blackjackDealInitial(deck, amount);
+      // Natural blackjack / dealer BJ / push resolve on the initial deal.
+      // Persist outcome + payout fields so history & admin views are accurate,
+      // and return prizeCrc so payGameFromBalance credits the gain atomically.
+      const resolved = state.status === "finished";
+      const naturalOutcome = resolved ? (state.playerHands[0]?.outcome || null) : null;
+      const naturalPayout = resolved ? state.totalPayout : null;
       const [inserted] = await tx.insert(blackjackHands).values({
         tableId: table.id,
         playerAddress: addr,
@@ -349,8 +355,16 @@ export async function createChanceRound(
         playerToken,
         gameState: state as unknown as Record<string, unknown>,
         status: state.status,
+        outcome: naturalOutcome,
+        payoutCrc: naturalPayout,
+        payoutStatus: resolved && (naturalPayout || 0) > 0 ? "success" : "pending",
       }).returning({ id: blackjackHands.id });
-      return { id: inserted.id, tableId: table.id, gameRow: { ...inserted, gameState: state } };
+      return {
+        id: inserted.id,
+        tableId: table.id,
+        gameRow: { ...inserted, gameState: state },
+        prizeCrc: resolved ? state.totalPayout : undefined,
+      };
     }
 
     case "coin_flip": {
