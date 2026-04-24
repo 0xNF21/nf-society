@@ -26,6 +26,10 @@ import {
   applyLedgerEntry,
   DAO_TREASURY_ADDRESS,
 } from "./wallet-ledger";
+import {
+  announceNewLobbyGame,
+  markLobbyGameStarted,
+} from "./telegram/lobby-announce";
 
 /**
  * Does the given source tx hash identify a balance-paid round?
@@ -221,7 +225,7 @@ export async function payGameFromBalance(
   }
 
   try {
-    return await db.transaction(async (tx) => {
+    const txResult = await db.transaction(async (tx) => {
       // Step 1: atomic debit. UPDATE...WHERE balance_crc >= amount RETURNING
       // is serialized per-row in PG, so two concurrent debits on the same
       // address cannot over-spend.
@@ -370,6 +374,33 @@ export async function payGameFromBalance(
         prizeLedgerId,
       };
     });
+
+    // Post-commit: annonce Telegram du lobby pour les parties multi.
+    // Fait hors-transaction pour ne pas bloquer la DB sur une requete HTTP,
+    // et pour ne pas annoncer une partie qui aurait ete rollback. Mirror du
+    // comportement de scanGamePayments pour le flow on-chain. No-op si
+    // TELEGRAM_LOBBY_CHAT_ID n'est pas configure (jamais throw).
+    if (txResult.ok && txResult.family === "multi") {
+      const gameRow = txResult.gameRow;
+      if (txResult.role === "player1") {
+        await announceNewLobbyGame({
+          gameKey: params.gameKey,
+          slug: params.slug,
+          betCrc: gameRow.betCrc,
+          creatorAddress: addr,
+          isPrivate: gameRow.isPrivate,
+        });
+      } else {
+        await markLobbyGameStarted({
+          gameKey: params.gameKey,
+          slug: params.slug,
+          betCrc: gameRow.betCrc,
+          creatorAddress: gameRow.player1Address,
+        });
+      }
+    }
+
+    return txResult;
   } catch (err: any) {
     const msg = String(err?.message || err);
     // Normalize "multi:wrong_bet" → "wrong_bet" etc.
