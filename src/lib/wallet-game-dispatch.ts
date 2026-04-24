@@ -30,6 +30,7 @@ import {
   coinFlipTables, coinFlipResults,
   lootboxes, lootboxOpens,
   lotteries, participants,
+  crcRacesGames,
 } from "@/lib/db/schema";
 
 import { createInitialState as rouletteInitState } from "@/lib/roulette";
@@ -42,6 +43,14 @@ import { createInitialState as kenoInitState } from "@/lib/keno";
 import { createDeck as blackjackCreateDeck, dealInitialHands as blackjackDealInitial } from "@/lib/blackjack";
 import { resolveCoinFlip, isValidChoice as isValidCoinChoice, type CoinSide } from "@/lib/coin-flip";
 import { getRandomReward as getLootboxReward } from "@/lib/lootbox";
+import {
+  createInitialState as racesInitState,
+  horseEmojiForIndex,
+  resetPlayerForRace,
+  type RacePlayer,
+  type RaceState,
+  type RaceStatus,
+} from "@/lib/crc-races";
 
 // drizzle's tx type — use any to avoid dragging in full schema relations.
 type Tx = any;
@@ -151,6 +160,68 @@ export async function assignMultiPlayer(
   }
 
   return { error: "already_full" };
+}
+
+export type AssignCrcRacesResult =
+  | { role: "racer"; gameRow: any }
+  | { error: "not_found" | "wrong_bet" | "already_joined" | "already_full" | "invalid_state" };
+
+/**
+ * Assign an address to a CRC Races slot (N-player game — racers stored in a
+ * JSONB `players` array). Mirrors the logic of scanCrcRacePayments in
+ * crc-races-server.ts: append to the array, and when the last slot is taken
+ * transition status from "waiting" to "countdown" with a fresh countdownStartAt.
+ *
+ * Runs inside a transaction. Uses a fetch-then-update pattern (not
+ * UPDATE...WHERE on a JSONB array), so the outer transaction's row lock
+ * (via SELECT...FOR UPDATE would be ideal; here we rely on the surrounding
+ * transaction isolation level + idempotency: a duplicate call from the
+ * same address hits the `already_joined` check).
+ */
+export async function assignCrcRacesPlayer(
+  tx: Tx,
+  slug: string,
+  address: string,
+  playerToken: string,
+  amount: number,
+  syntheticTxHash: string,
+): Promise<AssignCrcRacesResult> {
+  const addr = address.toLowerCase();
+
+  const [game] = await tx.select().from(crcRacesGames).where(eq(crcRacesGames.slug, slug)).limit(1);
+  if (!game) return { error: "not_found" };
+  if (game.betCrc !== amount) return { error: "wrong_bet" };
+  if (game.status !== "waiting") return { error: "invalid_state" };
+
+  const players: RacePlayer[] = Array.isArray(game.players) ? [...game.players] : [];
+  if (players.some((p) => p.address.toLowerCase() === addr)) return { error: "already_joined" };
+  if (players.length >= game.maxPlayers) return { error: "already_full" };
+
+  players.push(
+    resetPlayerForRace({
+      address: addr,
+      token: playerToken,
+      txHash: syntheticTxHash,
+      circlesName: null,
+      circlesAvatar: null,
+      horseEmoji: horseEmojiForIndex(players.length),
+    }),
+  );
+
+  let newStatus: RaceStatus = game.status;
+  let newState: RaceState = (game.gameState as RaceState) || racesInitState();
+  if (players.length >= game.maxPlayers) {
+    newStatus = "countdown";
+    newState = { ...newState, countdownStartAt: Date.now() };
+  }
+
+  const [updated] = await tx
+    .update(crcRacesGames)
+    .set({ players, status: newStatus, gameState: newState, updatedAt: new Date() })
+    .where(eq(crcRacesGames.id, game.id))
+    .returning();
+
+  return { role: "racer", gameRow: updated };
 }
 
 export type CreateChanceRoundOpts = {

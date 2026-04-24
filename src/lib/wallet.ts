@@ -19,6 +19,7 @@ import {
   CHANCE_BALANCE_SUPPORTED,
   MULTI_BALANCE_SUPPORTED,
   assignMultiPlayer,
+  assignCrcRacesPlayer,
   createChanceRound,
   type CreateChanceRoundOpts,
 } from "./wallet-game-dispatch";
@@ -175,7 +176,7 @@ export type PayGameFromBalanceResult =
       balanceAfter: number;
       ledgerId: number;
       family: "multi";
-      role: "player1" | "player2";
+      role: "player1" | "player2" | "racer";
       gameRow: any;
     }
   | {
@@ -282,15 +283,26 @@ export async function payGameFromBalance(
 
       // Step 3: game-side write.
       if (isMulti) {
-        const result = await assignMultiPlayer(
-          tx,
-          params.gameKey,
-          params.slug,
-          addr,
-          params.playerToken,
-          params.amount,
-          syntheticTxHash,
-        );
+        // crc-races uses an N-player JSONB array instead of player1/player2
+        // slots, so it needs its own assignment helper.
+        const result = params.gameKey === "crc-races"
+          ? await assignCrcRacesPlayer(
+              tx,
+              params.slug,
+              addr,
+              params.playerToken,
+              params.amount,
+              syntheticTxHash,
+            )
+          : await assignMultiPlayer(
+              tx,
+              params.gameKey,
+              params.slug,
+              addr,
+              params.playerToken,
+              params.amount,
+              syntheticTxHash,
+            );
         if ("error" in result) {
           // Abort the transaction so debit + ledger are rolled back.
           throw new Error(`multi:${result.error}`);
@@ -380,7 +392,10 @@ export async function payGameFromBalance(
     // et pour ne pas annoncer une partie qui aurait ete rollback. Mirror du
     // comportement de scanGamePayments pour le flow on-chain. No-op si
     // TELEGRAM_LOBBY_CHAT_ID n'est pas configure (jamais throw).
-    if (txResult.ok && txResult.family === "multi") {
+    // crc-races: on-chain scan skipt les annonces Telegram du lobby (role
+    // "racer" n'a pas de mapping clair 1→announce / 2→start). Mirror ce
+    // comportement en skippant aussi le flow balance-pay.
+    if (txResult.ok && txResult.family === "multi" && params.gameKey !== "crc-races") {
       const gameRow = txResult.gameRow;
       if (txResult.role === "player1") {
         await announceNewLobbyGame({
@@ -390,7 +405,7 @@ export async function payGameFromBalance(
           creatorAddress: addr,
           isPrivate: gameRow.isPrivate,
         });
-      } else {
+      } else if (txResult.role === "player2") {
         await markLobbyGameStarted({
           gameKey: params.gameKey,
           slug: params.slug,
