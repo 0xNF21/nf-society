@@ -13,6 +13,7 @@ import { createInitialState, applyMove, getBotMove, GRID_SIZE } from '@/lib/dame
 import type { DamesState, Move, Player, Board } from '@/lib/dames'
 import { DamesBoard } from '@/components/dames-board'
 import { GamePayment } from '@/components/game-payment'
+import { TicketRecovery } from '@/components/ticket-recovery'
 import { PlayerBanner } from '@/components/player-banner'
 import { RematchButton, RematchBanner } from '@/components/rematch-button'
 import { PnlCard } from '@/components/pnl-card'
@@ -418,10 +419,11 @@ function RealGame({ id }: { id: string }) {
         {/* Spectator notice */}
         {game.status === 'playing' && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
-            <CardContent className="p-5 text-center">
+            <CardContent className="p-5 text-center space-y-3">
               <p className="text-sm text-ink/60 dark:text-white/60">
                 {t.spectatorMode[locale]}
               </p>
+              <TicketRecovery gameKey="dames" slug={game.slug} />
             </CardContent>
           </Card>
         )}

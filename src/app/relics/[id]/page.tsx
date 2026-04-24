@@ -8,6 +8,7 @@ import { useDemo } from "@/components/demo-provider"
 import { useLocale } from "@/components/language-provider"
 import { useTheme } from "@/components/theme-provider"
 import { GamePayment } from "@/components/game-payment"
+import { TicketRecovery } from "@/components/ticket-recovery"
 import { PlayerBanner } from "@/components/player-banner"
 import { RematchButton, RematchBanner } from "@/components/rematch-button"
 import { PnlCard } from "@/components/pnl-card"
@@ -753,10 +754,11 @@ function RealRelicsGame({ id }: { id: string }) {
         {/* Spectator notice */}
         {(isPlacing || isPlaying) && !addressConfirmed && (
           <Card className="mb-4 bg-white/60 dark:bg-white/5 backdrop-blur-sm border-ink/10 dark:border-white/10 shadow-sm rounded-2xl">
-            <CardContent className="p-4 text-center">
+            <CardContent className="p-4 text-center space-y-3">
               <p className="text-sm text-ink/60 dark:text-white/60">
                 {t.spectatorMode[locale]}
               </p>
+              <TicketRecovery gameKey="relics" slug={game.slug} />
             </CardContent>
           </Card>
         )}
