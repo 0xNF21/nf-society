@@ -1,6 +1,6 @@
 "use client";
 
-export default function LandingHeroMockup() {
+export default function LandingHeroMockup({ winLabel = "Gain : +9 CRC" }: { winLabel?: string }) {
   return (
     <div className="relative w-full max-w-4xl mx-auto aspect-[16/10] select-none pointer-events-none">
       <div
@@ -56,7 +56,7 @@ export default function LandingHeroMockup() {
             <DamesMock />
             <div className="mt-3 flex items-center justify-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400">
               <span>🏆</span>
-              <span>Gain : +9 CRC</span>
+              <span>{winLabel}</span>
             </div>
           </MockCard>
         </div>

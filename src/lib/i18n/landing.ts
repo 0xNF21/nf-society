@@ -127,6 +127,132 @@ export const landingTranslations = {
     footerCookies: { fr: "Cookies", en: "Cookies" },
     footerImprint: { fr: "Mentions legales", en: "Imprint" },
   },
+  landingMarketingXp: {
+    navPlay: { fr: "Jouer", en: "Play" },
+    navDocs: { fr: "Docs", en: "Docs" },
+    heroTagline: { fr: "Free-to-Play · 100% gratuit", en: "Free-to-Play · 100% free" },
+    heroTitle: {
+      fr: "Joue, progresse, gouverne — gagne des XP",
+      en: "Play, level up, govern — earn XP",
+    },
+    heroSubtitle: {
+      fr: "17 jeux gratuits, XP virtuels, badges a collectionner. 100% communautaire, zero argent reel.",
+      en: "17 free games, virtual XP, badges to collect. 100% community-run, zero real money.",
+    },
+    heroCtaPrimary: { fr: "Essayer sans inscription", en: "Try without signup" },
+    heroCtaPrimaryHint: {
+      fr: "Mode demo — instantane",
+      en: "Demo mode — instant",
+    },
+    heroCtaSecondary: { fr: "Je joue gratuitement", en: "Play for free" },
+    heroCtaSecondaryHint: {
+      fr: "Aucun wallet requis",
+      en: "No wallet required",
+    },
+    statsTitle: { fr: "La plateforme en chiffres", en: "Platform at a glance" },
+    statsPlayed: { fr: "Parties jouees", en: "Games played" },
+    statsPlayers: { fr: "Joueurs uniques", en: "Unique players" },
+    statsWagered: { fr: "XP mises", en: "XP wagered" },
+    statsPaidOut: { fr: "XP distribues", en: "XP distributed" },
+    statsBank: { fr: "Pot communautaire", en: "Community pool" },
+    statsLoading: { fr: "Chargement...", en: "Loading..." },
+    gamesTitle: { fr: "Nos 17 jeux", en: "Our 17 games" },
+    gamesSubtitle: {
+      fr: "Multijoueur skill-based + Chance — tous gratuits, mise en XP virtuels.",
+      en: "Skill-based multiplayer + Chance — all free, bet with virtual XP.",
+    },
+    gamesCategoryMulti: { fr: "Multijoueur", en: "Multiplayer" },
+    gamesCategoryChance: { fr: "Chance", en: "Chance" },
+    gamesViewAll: { fr: "Voir tous les jeux", en: "See all games" },
+    howTitle: { fr: "Comment ca marche", en: "How it works" },
+    howStep1Title: { fr: "1. Rejoins gratuitement", en: "1. Join for free" },
+    howStep1Desc: {
+      fr: "Aucun wallet, aucune inscription. Commence a jouer tout de suite.",
+      en: "No wallet, no signup. Start playing right away.",
+    },
+    howStep2Title: { fr: "2. Mise des XP", en: "2. Bet XP" },
+    howStep2Desc: {
+      fr: "Defie un ami ou la banque. Les XP se gagnent et se misent librement.",
+      en: "Challenge a friend or the house. XP are earned and bet freely.",
+    },
+    howStep3Title: { fr: "3. Monte de niveau", en: "3. Level up" },
+    howStep3Desc: {
+      fr: "Debloque des badges, des titres et des cosmetiques dans la boutique XP.",
+      en: "Unlock badges, titles and cosmetics in the XP shop.",
+    },
+    whyTitle: { fr: "Pourquoi NF Society ?", en: "Why NF Society?" },
+    why1: {
+      fr: "100% Free-to-Play — aucun argent reel en jeu",
+      en: "100% Free-to-Play — zero real money involved",
+    },
+    why2: {
+      fr: "XP + badges — progression satisfaisante sans gambling",
+      en: "XP + badges — rewarding progression without gambling",
+    },
+    why3: {
+      fr: "DAO communautaire — gouverne par les joueurs",
+      en: "Community DAO — governed by players",
+    },
+    why4: {
+      fr: "Open source — code lisible par tous",
+      en: "Open source — code anyone can audit",
+    },
+    why5: {
+      fr: "17 jeux varies — skill, chance, multi, solo",
+      en: "17 varied games — skill, chance, multi, solo",
+    },
+    faqTitle: { fr: "Questions frequentes", en: "Frequently asked questions" },
+    faqQ1: { fr: "C'est quoi les XP ?", en: "What is XP?" },
+    faqA1: {
+      fr: "Les XP sont la monnaie virtuelle de NF Society. Tu en gagnes en jouant, et tu peux les miser dans tous les jeux. Elles n'ont aucune valeur monetaire reelle — c'est du Free-to-Play pur.",
+      en: "XP is NF Society's virtual currency. You earn it by playing and bet it across all games. It has no real monetary value — pure Free-to-Play.",
+    },
+    faqQ2: { fr: "J'ai besoin d'un wallet crypto ?", en: "Do I need a crypto wallet?" },
+    faqA2: {
+      fr: "Non. NF Society est passe en mode Free-to-Play : aucun wallet, aucune crypto, juste du fun. Tout est gratuit et instantane.",
+      en: "No. NF Society is now in Free-to-Play mode: no wallet, no crypto, just fun. Everything is free and instant.",
+    },
+    faqQ3: { fr: "Qu'est-ce que je gagne en jouant ?", en: "What do I win by playing?" },
+    faqA3: {
+      fr: "Des XP pour monter de niveau, des badges a collectionner, des titres, des cosmetiques, et l'acces aux tournois communautaires. Pas d'argent reel — juste du plaisir et du social.",
+      en: "XP to level up, badges to collect, titles, cosmetics, and access to community tournaments. No real money — just fun and social.",
+    },
+    faqQ4: { fr: "Y a-t-il du gambling ?", en: "Is there any gambling?" },
+    faqA4: {
+      fr: "Non. NF Society est une plateforme Free-to-Play. Aucune mise reelle, aucun gain en argent reel, aucune transaction monetaire. Conforme aux regulations les plus strictes.",
+      en: "No. NF Society is a Free-to-Play platform. No real stakes, no real winnings, no monetary transactions. Compliant with the strictest regulations.",
+    },
+    faqQ5: { fr: "C'est quoi le DAO ?", en: "What is the DAO?" },
+    faqA5: {
+      fr: "Une organisation decentralisee : les joueurs votent sur les parametres (nouveaux jeux, recompenses, distribution du pot communautaire XP). Pas de patron, pas d'actionnaires — juste la communaute.",
+      en: "A decentralized organization: players vote on parameters (new games, rewards, community XP pool distribution). No boss, no shareholders — just the community.",
+    },
+    faqQ6: { fr: "J'avais des CRC avant le pivot, je les recupere comment ?", en: "I had CRC before the pivot, how do I get them back?" },
+    faqA6: {
+      fr: "Depuis ton dashboard, le bouton \"Retirer mes CRC\" reste disponible indefiniment. Les CRC existants sont renvoyes sur ton wallet Circles en quelques secondes.",
+      en: "From your dashboard, the \"Withdraw my CRC\" button remains available indefinitely. Existing CRC are sent back to your Circles wallet in seconds.",
+    },
+    finalCtaTitle: {
+      fr: "Pret a lancer ta premiere partie ?",
+      en: "Ready for your first game?",
+    },
+    finalCtaButton: { fr: "Essayer en mode demo", en: "Try in demo mode" },
+    finalCtaHint: {
+      fr: "Pas d'inscription, aucun wallet requis",
+      en: "No signup, no wallet required",
+    },
+    footerTagline: {
+      fr: "Free-to-Play · DAO communautaire",
+      en: "Free-to-Play · Community DAO",
+    },
+    footerDao: { fr: "DAO", en: "DAO" },
+    footerDocs: { fr: "Documentation", en: "Documentation" },
+    footerStats: { fr: "Statistiques", en: "Stats" },
+    footerTerms: { fr: "CGU", en: "Terms" },
+    footerPrivacy: { fr: "Confidentialite", en: "Privacy" },
+    footerCookies: { fr: "Cookies", en: "Cookies" },
+    footerImprint: { fr: "Mentions legales", en: "Imprint" },
+  },
   landing: {
     subtitle: {
       fr: "Plateforme communautaire du DAO NF Society",
@@ -173,8 +299,8 @@ export const landingTranslations = {
       en: "Multiplayer",
     },
     sectionMultiplayerDesc: {
-      fr: "Défiez vos amis en 1v1 et misez des CRC",
-      en: "Challenge your friends in 1v1 and bet CRC",
+      fr: "Défiez vos amis en 1v1 et gagnez",
+      en: "Challenge your friends in 1v1 and win",
     },
     sectionGovernance: {
       fr: "Gouvernance",
@@ -220,21 +346,21 @@ export const landingTranslations = {
   },
   landingLootbox: {
     title: { fr: "Lootboxes", en: "Lootboxes" },
-    desc: { fr: "Envoie des CRC, ouvre ta lootbox et gagne instantanément. RTP ~98%.", en: "Send CRC, open your lootbox and win instantly. ~98% RTP." },
+    desc: { fr: "Ouvre ta lootbox et gagne instantanément. RTP ~98%.", en: "Open your lootbox and win instantly. ~98% RTP." },
     action: { fr: "Accéder aux lootboxes", en: "Go to lootboxes" },
   },
   landingMorpion: {
-    title: { fr: "Morpion CRC", en: "Tic-Tac-Toe CRC" },
-    desc: { fr: "Défiez un ami en 1v1 et misez des CRC. Le gagnant remporte le pot !", en: "Challenge a friend 1v1 and bet CRC. The winner takes the pot!" },
+    title: { fr: "Morpion", en: "Tic-Tac-Toe" },
+    desc: { fr: "Défiez un ami en 1v1. Le gagnant remporte le pot !", en: "Challenge a friend 1v1. The winner takes the pot!" },
     action: { fr: "Jouer", en: "Play" },
   },
   landingMemory: {
-    title: { fr: "Memory CRC", en: "Memory CRC" },
+    title: { fr: "Memory", en: "Memory" },
     desc: { fr: "Trouvez les paires plus vite que votre adversaire. Le meilleur gagne le pot !", en: "Find pairs faster than your opponent. The best player wins the pot!" },
     action: { fr: "Jouer", en: "Play" },
   },
   landingCrcRaces: {
-    title: { fr: "Courses CRC", en: "CRC Races" },
+    title: { fr: "Courses", en: "Races" },
     desc: { fr: "Jusqu'à 8 joueurs s'affrontent dans une course idle de 60s. Tappez pour booster votre avatar !", en: "Up to 8 players race in a 60s idle course. Tap to boost your avatar!" },
     action: { fr: "Démarrer une course", en: "Start a race" },
   },
@@ -245,12 +371,12 @@ export const landingTranslations = {
   },
   landingDames: {
     title: { fr: "Jeu de Dames", en: "Checkers" },
-    desc: { fr: "Duel stratégique avec mise en CRC", en: "Strategic duel with CRC bet" },
+    desc: { fr: "Duel stratégique en 1v1", en: "Strategic 1v1 duel" },
     action: { fr: "Jouer", en: "Play" },
   },
   landingPfc: {
     title: { fr: "Pierre-Feuille-Ciseaux", en: "Rock-Paper-Scissors" },
-    desc: { fr: "Défiez un ami en best of 3 ou 5. Misez des CRC, le meilleur gagne !", en: "Challenge a friend in best of 3 or 5. Bet CRC, the best wins!" },
+    desc: { fr: "Défiez un ami en best of 3 ou 5. Le meilleur gagne !", en: "Challenge a friend in best of 3 or 5. The best wins!" },
     action: { fr: "Jouer", en: "Play" },
   },
 } as const;

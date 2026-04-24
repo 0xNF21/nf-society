@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, uniqueIndex, real, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, uniqueIndex, index, real, boolean, jsonb, bigint } from "drizzle-orm/pg-core";
 
 export const payouts = pgTable("payouts", {
   id: serial("id").primaryKey(),
@@ -146,6 +146,44 @@ export const botState = pgTable("bot_state", {
   lastNonce:  integer("last_nonce").notNull(),
   updatedAt:  timestamp("updated_at").defaultNow().notNull(),
 });
+
+// ─── Free-to-Play pivot (PR 1) ──────────────────────────────────────────
+//
+// Les commissions et mises reelles (CRC) sont gatees derriere le flag
+// `real_stakes` de `feature_flags`. Quand le flag est `hidden`, les jeux
+// tournent en mode Free-to-Play XP et remplissent les deux tables ci-dessous.
+// Les tables de jeux existantes (morpion_games, blackjack_hands, ...) ne sont
+// pas modifiees — elles continuent de stocker l'historique CRC intact.
+
+// Pot communautaire XP : commissions 5% multi + house edge chance agregees
+// pour affichage sur /dashboard-dao. Append-only, pas de cashout.
+export const daoXpPool = pgTable("dao_xp_pool", {
+  id: serial("id").primaryKey(),
+  source: text("source").notNull(),      // 'commission_multiplayer' | 'house_edge_chance' | 'other'
+  gameKey: text("game_key"),
+  amountXp: bigint("amount_xp", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  createdAtIdx: index("dao_xp_pool_created_at_idx").on(t.createdAt),
+  sourceIdx: index("dao_xp_pool_source_idx").on(t.source),
+}));
+
+// Journal des mises/gains XP (parties F2P uniquement). Alimente la nouvelle
+// page /stats en mode F2P. event_type: 'bet' | 'win' | 'loss' | 'draw'.
+export const gameXpEvents = pgTable("game_xp_events", {
+  id: serial("id").primaryKey(),
+  gameKey: text("game_key").notNull(),
+  gameSlug: text("game_slug"),
+  playerAddress: text("player_address"),
+  playerToken: text("player_token"),
+  eventType: text("event_type").notNull(),
+  amountXp: bigint("amount_xp", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  createdAtIdx: index("game_xp_events_created_at_idx").on(t.createdAt),
+  gameKeyIdx: index("game_xp_events_game_key_idx").on(t.gameKey),
+  playerIdx: index("game_xp_events_player_idx").on(t.playerAddress),
+}));
 
 // Re-exports from sub-files have moved to `./index.ts`.
 // This file holds only the tables that were defined inline before PR #9.

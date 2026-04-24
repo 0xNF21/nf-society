@@ -4,6 +4,7 @@ out
 .env
 .env.local
 .env.*.local
+.env.neon
 .DS_Store
 .local/
 .claude/worktrees/

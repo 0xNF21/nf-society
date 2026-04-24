@@ -3,8 +3,8 @@
 export const multiplayerTranslations = {
   morpion: {
     back: { fr: "Retour", en: "Back" },
-    title: { fr: "Morpion CRC", en: "Tic-Tac-Toe CRC" },
-    subtitle: { fr: "Défiez un ami et misez des CRC on-chain", en: "Challenge a friend and bet CRC on-chain" },
+    title: { fr: "Morpion", en: "Tic-Tac-Toe" },
+    subtitle: { fr: "Défiez un ami en 1v1", en: "Challenge a friend 1v1" },
     createGame: { fr: "Créer une partie", en: "Create a game" },
     betPerPlayer: { fr: "Mise par joueur", en: "Bet per player" },
     crcPerPlayer: { fr: "CRC par joueur", en: "CRC per player" },
@@ -50,7 +50,7 @@ export const multiplayerTranslations = {
     rules: { fr: "**Morpion (Tic-Tac-Toe)**\n- Chaque joueur mise des CRC\n- Le joueur 1 joue X, le joueur 2 joue O\n- Alignez 3 symboles en ligne, colonne ou diagonale pour gagner\n- Le gagnant remporte la mise des 2 joueurs (moins 5% de commission)\n- En cas d'egalite, les mises sont remboursees", en: "**Tic-Tac-Toe**\n- Each player bets CRC\n- Player 1 plays X, Player 2 plays O\n- Align 3 symbols in a row, column or diagonal to win\n- Winner takes both bets (minus 5% commission)\n- In case of draw, bets are refunded" },
   },
   memory: {
-    title: { fr: "Memory CRC", en: "Memory CRC" },
+    title: { fr: "Memory", en: "Memory" },
     subtitle: { fr: "Trouvez toutes les paires le plus vite possible !", en: "Find all pairs as fast as you can!" },
     back: { fr: "Retour", en: "Back" },
     createGame: { fr: "Créer une partie", en: "Create a game" },
@@ -113,7 +113,7 @@ export const multiplayerTranslations = {
   },
   crcRaces: {
     back: { fr: "Retour", en: "Back" },
-    title: { fr: "Courses CRC", en: "CRC Races" },
+    title: { fr: "Courses", en: "Races" },
     subtitle: { fr: "2 à 8 joueurs — course de 30-60s, tap pour booster", en: "2 to 8 players — 30-60s race, tap to boost" },
     createGame: { fr: "Créer une course", en: "Create a race" },
     tier: { fr: "Tier de mise", en: "Bet tier" },
@@ -193,7 +193,7 @@ export const multiplayerTranslations = {
   relics: {
     back: { fr: "Retour", en: "Back" },
     title: { fr: "Relics", en: "Relics" },
-    subtitle: { fr: "Guerre des Artefacts · Mise CRC obligatoire", en: "Artifact War · CRC bet required" },
+    subtitle: { fr: "Guerre des Artefacts · Mise obligatoire", en: "Artifact War · Bet required" },
     createGame: { fr: "Créer une partie", en: "Create a game" },
     betPerPlayer: { fr: "Mise par joueur", en: "Bet per player" },
     crcPerPlayer: { fr: "CRC par joueur", en: "CRC per player" },
@@ -262,7 +262,7 @@ export const multiplayerTranslations = {
   dames: {
     back: { fr: "Retour", en: "Back" },
     title: { fr: "DAMES", en: "CHECKERS" },
-    subtitle: { fr: "Duel stratégique · Mise CRC obligatoire", en: "Strategic duel · Mandatory CRC bet" },
+    subtitle: { fr: "Duel stratégique", en: "Strategic duel" },
     createGame: { fr: "Créer une partie", en: "Create a game" },
     betPerPlayer: { fr: "Mise par joueur", en: "Bet per player" },
     crcPerPlayer: { fr: "CRC par joueur", en: "CRC per player" },
@@ -308,7 +308,7 @@ export const multiplayerTranslations = {
   pfc: {
     back: { fr: "Retour", en: "Back" },
     title: { fr: "Pierre-Feuille-Ciseaux", en: "Rock-Paper-Scissors" },
-    subtitle: { fr: "Best of 3 ou 5 · Mise CRC obligatoire", en: "Best of 3 or 5 · CRC bet required" },
+    subtitle: { fr: "Best of 3 ou 5", en: "Best of 3 or 5" },
     createGame: { fr: "Créer une partie", en: "Create a game" },
     betPerPlayer: { fr: "Mise par joueur", en: "Bet per player" },
     crcPerPlayer: { fr: "CRC par joueur", en: "CRC per player" },
