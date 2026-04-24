@@ -72,30 +72,13 @@ export function GamePayment({
     ? game.status === "waiting"
     : game.status === "waiting_p1" || game.status === "waiting_p2";
 
-  // ─── Free-to-Play mode ──────────────────────────────────────────
-  // Si le flag `real_stakes` est a "hidden", on bypass completement le flow
-  // CRC (QR, Mini App, balance-pay, scan) et on utilise le composant XP.
+  // Free-to-Play mode: compute here but the early return happens AFTER all
+  // hooks below, to avoid "React Hook called conditionally" (rules-of-hooks).
   const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
   const fpAddress = connectedAddress ?? walletAddress ?? null;
   const fpAlreadyJoined = isNPlayerMode
     ? hasPaidNMode
     : isCreator || game.status === "waiting_p2";
-
-  if (realStakesDisabled) {
-    return (
-      <FreePlayStart
-        gameKey={gameKey}
-        gameSlug={game.slug}
-        address={fpAddress}
-        playerToken={playerToken}
-        betCrc={game.betCrc}
-        alreadyJoined={fpAlreadyJoined}
-        currentPlayers={isNPlayerMode ? currentCount : undefined}
-        maxPlayers={maxPlayers}
-        onStarted={() => onScanComplete()}
-      />
-    );
-  }
 
   const [scanning, setScanning] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -191,6 +174,25 @@ export function GamePayment({
     navigator.clipboard.writeText(window.location.href);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
+  }
+
+  // Free-to-Play : bypass le flow CRC (QR, Mini App, balance-pay, scan) et
+  // render l'equivalent XP. Place APRES tous les hooks pour respecter
+  // les rules-of-hooks (pas de hook conditionnel).
+  if (realStakesDisabled) {
+    return (
+      <FreePlayStart
+        gameKey={gameKey}
+        gameSlug={game.slug}
+        address={fpAddress}
+        playerToken={playerToken}
+        betCrc={game.betCrc}
+        alreadyJoined={fpAlreadyJoined}
+        currentPlayers={isNPlayerMode ? currentCount : undefined}
+        maxPlayers={maxPlayers}
+        onStarted={() => onScanComplete()}
+      />
+    );
   }
 
   if (!isActiveStatus) return null;

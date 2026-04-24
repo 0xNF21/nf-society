@@ -79,26 +79,9 @@ export function ChancePayment({
   const tm = translations.miniapp;
   const t = translations.chancePayment;
 
-  // ─── Free-to-Play mode : on remplace tout le flow paiement par FreePlayStart.
+  // Free-to-Play mode: compute here, but the early return happens AFTER
+  // all hooks below (rules-of-hooks).
   const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
-  if (realStakesDisabled) {
-    const fpAddress = connectedAddress ?? walletAddress ?? null;
-    return (
-      <FreePlayStart
-        gameKey={balanceGameKey || gameType}
-        gameSlug={balanceSlug || tableSlug || gameId}
-        address={fpAddress}
-        playerToken={playerToken || ""}
-        betCrc={amountCrc}
-        isChance
-        extraBody={balanceExtras as Record<string, unknown> | undefined}
-        onStarted={() => {
-          onPaymentInitiated?.();
-          onBalancePaid?.({ family: "chance" });
-        }}
-      />
-    );
-  }
 
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
@@ -169,6 +152,27 @@ export function ChancePayment({
   const balKey = balanceGameKey || gameType;
   const balSlug = balanceSlug || tableSlug || gameId;
   const balExtras = balanceExtras || (ballValue !== undefined ? { ballValue } : undefined);
+
+  // Free-to-Play : bypass le flow CRC (QR, Mini App, balance-pay) et render
+  // l'equivalent XP. Place APRES tous les hooks pour respecter rules-of-hooks.
+  if (realStakesDisabled) {
+    const fpAddress = connectedAddress ?? walletAddress ?? null;
+    return (
+      <FreePlayStart
+        gameKey={balKey}
+        gameSlug={balSlug}
+        address={fpAddress}
+        playerToken={playerToken || ""}
+        betCrc={amountCrc}
+        isChance
+        extraBody={balExtras as Record<string, unknown> | undefined}
+        onStarted={() => {
+          onPaymentInitiated?.();
+          onBalancePaid?.({ family: "chance" });
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
