@@ -10,7 +10,7 @@ import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { CrcRacesTrack } from "@/components/crc-races-track";
-import { CrcRacesPayment } from "@/components/crc-races-payment";
+import { GamePayment } from "@/components/game-payment";
 import { PnlCard } from "@/components/pnl-card";
 import { RematchButton, RematchBanner } from "@/components/rematch-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
@@ -395,17 +395,19 @@ function RealRace({ slug }: { slug: string }) {
 
   return (
     <RacePageFrame slug={slug} state={state} status={game.status} betCrc={game.betCrc} maxPlayers={game.maxPlayers} players={enrichedPlayers}>
-      <CrcRacesPayment
+      <GamePayment
+        gameKey="crc-races"
         game={{
           slug: game.slug,
           betCrc: game.betCrc,
           recipientAddress: game.recipientAddress,
           status: game.status,
-          maxPlayers: game.maxPlayers,
-          players: enrichedPlayers,
         }}
+        players={enrichedPlayers.map((p) => ({ token: p.token }))}
+        maxPlayers={game.maxPlayers}
         playerToken={tokenRef.current}
         onScanComplete={fetchGame}
+        onBalancePaid={fetchGame}
       />
 
       {(game.status === "racing" || game.status === "finished") && (

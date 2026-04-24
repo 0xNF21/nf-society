@@ -13,6 +13,10 @@ import { TicketRecovery } from "@/components/ticket-recovery";
 import { BalancePayButton } from "@/components/balance-pay-button";
 import { useConnectedAddress } from "@/hooks/use-connected-address";
 
+interface GamePaymentPlayer {
+  token: string | null;
+}
+
 interface GamePaymentProps {
   gameKey: string;
   game: {
@@ -22,11 +26,20 @@ interface GamePaymentProps {
     status: string;
   };
   playerToken: string;
-  isCreator: boolean;
   onScanComplete: () => void;
   scanInterval?: number;
   /** Optional callback when a balance-pay succeeds. Parent should refresh the game. */
-  onBalancePaid?: (result: any) => void;
+  onBalancePaid?: (result: unknown) => void;
+
+  // ── 2-player mode (morpion, memory, dames, pfc, relics) ──
+  /** Required in 2-player mode. Ignored when `players` is provided. */
+  isCreator?: boolean;
+
+  // ── N-player mode (crc-races) ──
+  /** When provided, switches to N-player mode. "Has paid" is `players.some(p => p.token === playerToken)`. */
+  players?: GamePaymentPlayer[];
+  /** Required in N-player mode for the slot counter. */
+  maxPlayers?: number;
 }
 
 export function GamePayment({
@@ -37,6 +50,8 @@ export function GamePayment({
   onScanComplete,
   scanInterval = 5000,
   onBalancePaid,
+  players,
+  maxPlayers,
 }: GamePaymentProps) {
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
@@ -44,6 +59,15 @@ export function GamePayment({
   const config = GAME_REGISTRY[gameKey];
   const t = translations[config.translationKey as keyof typeof translations] as Record<string, Record<string, string>>;
   const tm = translations.miniapp;
+
+  const isNPlayerMode = Array.isArray(players) && typeof maxPlayers === "number";
+  const currentCount = isNPlayerMode ? (players as GamePaymentPlayer[]).length : 0;
+  const hasPaidNMode =
+    isNPlayerMode &&
+    (players as GamePaymentPlayer[]).some((p) => p.token && p.token === playerToken);
+  const isActiveStatus = isNPlayerMode
+    ? game.status === "waiting"
+    : game.status === "waiting_p1" || game.status === "waiting_p2";
 
   const [scanning, setScanning] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -80,21 +104,22 @@ export function GamePayment({
     setScanning(false);
   }, [config.scanRoute, game.slug]);
 
-  // Auto-scan payments
+  // Auto-scan payments while payment window is open
   useEffect(() => {
-    if (game.status !== "waiting_p1" && game.status !== "waiting_p2") {
+    if (!isActiveStatus) {
       if (scanRef.current) { clearInterval(scanRef.current); scanRef.current = null; }
       return;
     }
     const id = setInterval(scanPayments, scanInterval);
     scanRef.current = id;
     return () => clearInterval(id);
-  }, [game.status, scanPayments, scanInterval]);
+  }, [isActiveStatus, scanPayments, scanInterval]);
 
-  // Generate QR code (only in standalone mode)
+  // Generate QR code (only in standalone mode, only while this player still needs to pay)
+  const needsQr = isActiveStatus && (isNPlayerMode ? !hasPaidNMode : true);
   useEffect(() => {
     if (isMiniApp) return; // Skip QR in Mini App mode
-    if (game.status !== "waiting_p1" && game.status !== "waiting_p2") return;
+    if (!needsQr) return;
     let active = true;
     setQrState("loading");
     (async () => {
@@ -107,7 +132,7 @@ export function GamePayment({
       }
     })();
     return () => { active = false; };
-  }, [game.status, paymentLink, isMiniApp]);
+  }, [needsQr, paymentLink, isMiniApp]);
 
   // Mini App: pay directly via Circles host wallet
   async function handleMiniAppPay() {
@@ -120,8 +145,9 @@ export function GamePayment({
       setMiniAppSuccess(true);
       // Trigger scan to detect the on-chain payment
       setTimeout(scanPayments, 2000);
-    } catch (err: any) {
-      setMiniAppError(typeof err === "string" ? err : err?.message || tm.rejected[locale]);
+    } catch (err: unknown) {
+      const msg = typeof err === "string" ? err : err instanceof Error ? err.message : tm.rejected[locale];
+      setMiniAppError(msg);
     } finally {
       setMiniAppPaying(false);
     }
@@ -139,10 +165,65 @@ export function GamePayment({
     setTimeout(() => setCopiedLink(false), 2000);
   }
 
-  if (game.status !== "waiting_p1" && game.status !== "waiting_p2") return null;
+  if (!isActiveStatus) return null;
 
-  // J1 has paid, waiting for J2 — show confirmation + invite
-  if (game.status === "waiting_p2" && isCreator) {
+  // ─────────────────────────────────────────────────────────────
+  // N-player mode — player already paid: show confirmation + invite
+  // ─────────────────────────────────────────────────────────────
+  if (isNPlayerMode && hasPaidNMode) {
+    return (
+      <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
+        <CardContent className="pt-4 px-4 pb-4 space-y-4">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                {t.paymentReceived[locale]}
+              </p>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">{game.betCrc} CRC</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 justify-center text-ink/50 dark:text-white/50">
+            <Users className="w-4 h-4" />
+            <span className="text-sm font-semibold">
+              {t.waitingSlots[locale]
+                .replace("{current}", String(currentCount))
+                .replace("{max}", String(maxPlayers))}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs text-ink/40 dark:text-white/40 text-center">
+              {t.shareInviteRacers[locale]}
+            </p>
+            <div className="flex gap-2">
+              <code className="flex-1 px-3 py-2.5 rounded-xl border border-ink/10 bg-white/80 dark:bg-white/5 text-xs font-mono text-ink/70 dark:text-white/70 truncate text-center">
+                {game.slug}
+              </code>
+              <Button variant="outline" size="sm" onClick={copyGameLink} className="rounded-xl border-ink/15 gap-1.5 shrink-0">
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedLink ? t.copied[locale] : t.inviteOthers[locale]}
+              </Button>
+            </div>
+          </div>
+
+          <button onClick={scanPayments} disabled={scanning}
+            className="w-full text-xs text-ink/40 hover:text-ink/60 flex items-center justify-center gap-1.5 transition-colors">
+            <RefreshCw className={`w-3 h-3 ${scanning ? "animate-spin" : ""}`} />
+            {scanning ? t.scanningPayments[locale] : t.scanPayments[locale]}
+          </button>
+
+          <TicketRecovery gameKey={gameKey} slug={game.slug} />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 2-player mode — J1 has paid, waiting for J2
+  // ─────────────────────────────────────────────────────────────
+  if (!isNPlayerMode && game.status === "waiting_p2" && isCreator) {
     return (
       <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
         <CardContent className="pt-4 px-4 pb-4 space-y-4">
@@ -197,7 +278,25 @@ export function GamePayment({
     );
   }
 
-  // Show payment form (J1 needs to pay, or J2 needs to pay)
+  // ─────────────────────────────────────────────────────────────
+  // Payment form (shared between 2-player and N-player modes)
+  // ─────────────────────────────────────────────────────────────
+  const headerLabel = isNPlayerMode
+    ? t.payToJoin[locale].replace("{bet}", String(game.betCrc))
+    : isCreator ? t.payToStart[locale] : t.payToJoin[locale];
+  const headerBadge = isNPlayerMode
+    ? `${currentCount}/${maxPlayers}`
+    : `${game.betCrc} CRC`;
+  const inviteLabel = isNPlayerMode ? t.inviteOthers[locale] : t.inviteP2[locale];
+  const scanCaption = isNPlayerMode
+    ? t.scanOpenGnosis[locale]
+    : translations.gamePayment.scanOpenGnosis[locale];
+  // N-player mode: always show the invite link (multiple joiners can share).
+  // 2-player mode: only the creator at waiting_p1 sees it.
+  const showInviteLink = isNPlayerMode
+    ? true
+    : (isCreator === true && game.status === "waiting_p1");
+
   return (
     <Card className="mb-4 bg-white/60 backdrop-blur-sm border-ink/10 shadow-sm rounded-2xl">
       <CardContent className="pt-2 px-4 pb-4 space-y-3">
@@ -209,7 +308,7 @@ export function GamePayment({
           slug={game.slug}
           amountCrc={game.betCrc}
           playerToken={playerToken}
-          address={connectedAddress || undefined}
+          address={walletAddress || connectedAddress || undefined}
           onSuccess={(result) => {
             onBalancePaid?.(result);
             // Trigger parent refresh so the game state reflects the new slot.
@@ -220,10 +319,10 @@ export function GamePayment({
         {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-3">
           <span className="text-xs font-semibold text-ink/40 uppercase tracking-widest">
-            {isCreator ? t.payToStart[locale] : t.payToJoin[locale]}
+            {headerLabel}
           </span>
           <span className="text-xs font-bold text-marine bg-marine/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
-            {game.betCrc} CRC
+            {headerBadge}
           </span>
         </div>
 
@@ -269,10 +368,10 @@ export function GamePayment({
             )}
 
             {/* Copy / invite buttons (still useful for sharing) */}
-            {isCreator && game.status === "waiting_p1" && (
+            {showInviteLink && (
               <Button variant="outline" size="sm" onClick={copyGameLink} className="w-full rounded-xl text-xs border-ink/15 gap-1.5">
                 {copiedLink ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedLink ? t.copied[locale] : t.inviteP2[locale]}
+                {copiedLink ? t.copied[locale] : inviteLabel}
               </Button>
             )}
           </div>
@@ -294,15 +393,15 @@ export function GamePayment({
             )}
 
             {/* Copy buttons */}
-            <div className={`grid gap-2 ${isCreator && game.status === "waiting_p1" ? "grid-cols-2" : "grid-cols-1"}`}>
+            <div className={`grid gap-2 ${showInviteLink ? "grid-cols-2" : "grid-cols-1"}`}>
               <Button variant="outline" size="sm" onClick={copyPaymentLink} className="rounded-xl text-xs border-ink/15 gap-1.5">
                 {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                 {copied ? t.copied[locale] : t.copyPayLink[locale]}
               </Button>
-              {isCreator && game.status === "waiting_p1" && (
+              {showInviteLink && (
                 <Button variant="outline" size="sm" onClick={copyGameLink} className="rounded-xl text-xs border-ink/15 gap-1.5">
                   {copiedLink ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedLink ? t.copied[locale] : t.inviteP2[locale]}
+                  {copiedLink ? t.copied[locale] : inviteLabel}
                 </Button>
               )}
             </div>
@@ -320,7 +419,7 @@ export function GamePayment({
                   <div className="w-[220px] h-[220px] flex items-center justify-center text-xs text-red-400">QR Error</div>
                 )}
                 <p className="text-xs text-ink/40 mt-2 text-center">
-                  {translations.gamePayment.scanOpenGnosis[locale]}
+                  {scanCaption}
                 </p>
               </div>
             </div>
