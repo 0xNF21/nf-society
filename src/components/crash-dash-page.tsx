@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -313,6 +314,7 @@ function ResultPanel({
 
 function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -469,7 +471,7 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
             className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 disabled:opacity-30"
             style={{ backgroundColor: accentColor }}
           >
-            {t.plant[locale]} — {selectedBet} CRC
+            {t.plant[locale]} — {stake.format(selectedBet)}
           </button>
         </div>
       )}
@@ -626,6 +628,7 @@ export default function CrashDashPageClient({ table }: { table: CrashDashTable }
 
 function RealCrashDashGame({ table }: { table: CrashDashTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -855,7 +858,7 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
             gameType="crash_dash"
             gameId={table.slug}
             accentColor={accentColor}
-            payLabel={`Demurrage Dash — ${selectedBet} CRC`}
+            payLabel={`Demurrage Dash — ${stake.format(selectedBet)}`}
             onPaymentInitiated={async () => {
               await scanForRound();
               setWatchingPayment(true);
@@ -956,7 +959,7 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
           gameType="crash_dash"
           gameId={table.slug}
           accentColor={accentColor}
-          payLabel={`Demurrage Dash — ${selectedBet} CRC`}
+          payLabel={`Demurrage Dash — ${stake.format(selectedBet)}`}
           onPaymentInitiated={async () => {
             setShowReplay(false);
             resetGame();

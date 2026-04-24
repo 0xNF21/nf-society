@@ -12,6 +12,7 @@ import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY } from "@/lib/game-registry";
 import { GameRulesModal } from "@/components/game-rules-modal";
 import { TIER_LIST, TIER_BETS, MIN_PLAYERS, MAX_PLAYERS, type RaceTier } from "@/lib/crc-races";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type LobbyRoom = {
   slug: string;
@@ -26,6 +27,7 @@ export default function CrcRacesLobbyPage() {
   const router = useRouter();
   const { locale } = useLocale();
   const { isDemo } = useDemo();
+  const stake = useStakeLabel();
   const t = translations.crcRaces;
   const te = translations.errors;
   const config = GAME_REGISTRY["crc-races"];
@@ -118,7 +120,8 @@ export default function CrcRacesLobbyPage() {
               <div className="grid grid-cols-2 gap-2">
                 {TIER_LIST.map((ti) => {
                   const key = `tier${ti.charAt(0).toUpperCase()}${ti.slice(1)}` as keyof typeof t;
-                  const label = (t[key] as { fr: string; en: string } | undefined)?.[locale] || ti;
+                  const rawLabel = (t[key] as { fr: string; en: string } | undefined)?.[locale] || ti;
+                  const label = stake.t(rawLabel);
                   return (
                     <button key={ti} onClick={() => setTier(ti)}
                       className={`min-h-[44px] py-2.5 rounded-xl text-sm font-bold border transition-all active:scale-95 ${
@@ -170,7 +173,7 @@ export default function CrcRacesLobbyPage() {
 
             {/* Pot info */}
             <div className="p-3 rounded-xl bg-ink/[0.03] border border-ink/5 text-xs text-ink/50">
-              🏆 {t.potTotal[locale]}: <span className="font-bold text-ink">{TIER_BETS[tier] * maxPlayers} CRC</span>
+              🏆 {t.potTotal[locale]}: <span className="font-bold text-ink">{stake.format(TIER_BETS[tier] * maxPlayers)}</span>
               <span className="ml-1">{t.commission[locale]}</span>
             </div>
 
@@ -180,7 +183,7 @@ export default function CrcRacesLobbyPage() {
               style={{ background: config.accentColor }}>
               {loading
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> {t.creating[locale]}</>
-                : `${t.createBtn[locale]} — ${TIER_BETS[tier]} CRC`}
+                : `${t.createBtn[locale]} — ${stake.format(TIER_BETS[tier])}`}
             </Button>
           </CardContent>
         </Card>
@@ -202,7 +205,7 @@ export default function CrcRacesLobbyPage() {
                     className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-white/80 border border-ink/10 hover:border-marine/40 transition-colors">
                     <span className="text-sm font-mono font-bold text-ink">{r.slug}</span>
                     <span className="text-xs text-ink/50">
-                      {r.betCrc} CRC · <Users className="inline w-3 h-3" /> {count}/{r.maxPlayers}
+                      {stake.format(r.betCrc)} · <Users className="inline w-3 h-3" /> {count}/{r.maxPlayers}
                     </span>
                   </button>
                 );

@@ -6,11 +6,13 @@ import { useLocale } from "@/components/language-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 export default function ChancePage() {
   const { locale } = useLocale();
   const { isVisible, flagStatus } = useFeatureFlags();
   const { isDemo } = useDemo();
+  const stake = useStakeLabel();
   const t = translations.chance;
 
   const games = [
@@ -23,7 +25,7 @@ export default function ChancePage() {
       title: t.dailyTitle[locale],
       desc: t.dailyDesc[locale],
       color: "text-amber-500",
-      badge: "1 CRC",
+      badge: stake.format(1),
     },
     {
       type: "link" as const,

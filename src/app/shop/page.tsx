@@ -7,6 +7,8 @@ import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { useFeatureFlags } from "@/components/feature-flag-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type ShopItem = {
   id: number;
@@ -86,6 +88,9 @@ export default function ShopPage() {
   const { locale } = useLocale();
   const { isDemo, demoPlayer, spendXp } = useDemo();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
+  const { flagStatus, loading: flagsLoading } = useFeatureFlags();
+  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  const stake = useStakeLabel();
   const t = translations.shop;
   const tm = translations.miniapp;
 
@@ -287,7 +292,9 @@ export default function ShopPage() {
     }
   };
 
-  const categories = ["all", "game", "boost", "protection", "cosmetic", "crc"];
+  const categories = realStakesDisabled
+    ? ["all", "boost", "protection", "cosmetic"]
+    : ["all", "game", "boost", "protection", "cosmetic", "crc"];
   const catLabels: Record<string, string> = {
     all: t.allCategories[locale],
     game: t.catGame[locale],
@@ -297,9 +304,17 @@ export default function ShopPage() {
     crc: t.catCrc[locale],
   };
 
+  // En mode Free-to-Play :
+  //   - la categorie "crc" (echange XP→CRC) est masquee (plus d'emission CRC)
+  //   - les items "refund" (dont le nom/desc mentionne un paiement CRC) sont filtres
+  //     car les jeux ne coutent plus de CRC
+  const visibleItems = realStakesDisabled
+    ? items.filter((i) => i.category !== "crc" && !i.refundType)
+    : items;
+
   const filtered = category === "all"
-    ? items
-    : items.filter(i => i.category === category);
+    ? visibleItems
+    : visibleItems.filter(i => i.category === category);
 
   const getStatusButton = (item: ShopItem) => {
     const status = item.status || "available";

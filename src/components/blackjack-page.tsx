@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -145,6 +146,7 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
+  const stake = useStakeLabel();
   const t = translations.blackjack;
   const [selectedBet, setSelectedBet] = useState<number>(table.betOptions[0] || 5);
   const [gameState, setGameState] = useState<BlackjackState | null>(null);
@@ -219,13 +221,13 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
                 <button key={bet} onClick={() => setSelectedBet(bet)}
                   className={`py-3 rounded-xl text-sm font-bold transition-all ${selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"}`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
           </div>
           <button onClick={() => startGame()} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{ backgroundColor: accentColor }}>
-            🧪 {t.betBtn[locale]} {selectedBet} CRC (Demo)
+            🧪 {t.betBtn[locale]} {stake.format(selectedBet)} (Demo)
           </button>
         </div>
       )}
@@ -338,6 +340,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
+  const stake = useStakeLabel();
   const t = translations.blackjack;
   const tokenRef = usePlayerToken("blackjack", table.slug);
 
@@ -602,7 +605,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}
                 >
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>

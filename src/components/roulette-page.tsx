@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, RotateCcw, X, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -64,7 +65,7 @@ function BetBadge({ amount }: { amount: number }) {
 function ZoneBadge({ amount }: { amount: number }) {
   return (
     <span className="inline-flex items-center gap-1 bg-yellow-400 text-xs font-black text-amber-900 px-2 py-0.5 rounded-full shadow-md shadow-yellow-400/40 ml-1.5">
-      {amount} CRC
+      {amount}
     </span>
   );
 }
@@ -313,7 +314,7 @@ function BettingTable({
       {/* ── Live bet recap ── */}
       <div className="rounded-xl bg-white/10 p-3 space-y-2">
         <div className="flex items-center justify-between text-xs text-white/70 mb-1">
-          <span className="font-bold">{totalPlaced} / {betCrc} CRC</span>
+          <span className="font-bold">{totalPlaced} / {betCrc}</span>
           <button onClick={onClear} disabled={bets.length === 0}
             className="text-red-400 hover:text-red-300 disabled:opacity-30 flex items-center gap-1 font-bold">
             <X className="w-3 h-3" /> {t.clear[locale]}
@@ -573,7 +574,7 @@ function ResultPanel({
             {winningBets.map((b, i) => (
               <p key={i} className="text-sm text-ink/60">
                 {b.type === "straight" ? `#${b.number}` : t[b.type as keyof typeof t]?.[locale] || b.type}
-                {" "}&mdash; {b.amount} CRC &times; {BET_PAYOUTS[b.type]}
+                {" "}&mdash; {b.amount} &times; {BET_PAYOUTS[b.type]}
               </p>
             ))}
           </div>
@@ -734,6 +735,7 @@ function GameUI({
 
 function DemoRouletteGame({ table }: { table: RouletteTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -828,7 +830,7 @@ function DemoRouletteGame({ table }: { table: RouletteTable }) {
                       selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                     }`}
                     style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                    {bet} CRC
+                    {stake.format(bet)}
                   </button>
                 ))}
               </div>
@@ -907,6 +909,7 @@ export default function RoulettePageClient({ table }: { table: RouletteTable }) 
 
 function RealRouletteGame({ table }: { table: RouletteTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -1059,7 +1062,7 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -1083,7 +1086,7 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
             gameType="roulette"
             gameId={table.slug}
             accentColor={accentColor}
-            payLabel={`Roulette — ${selectedBet} CRC`}
+            payLabel={`Roulette — ${stake.format(selectedBet)}`}
             onPaymentInitiated={async () => { await scanForRound(); setWatchingPayment(true); }}
             onScan={scanForRound}
             scanning={scanning}

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -312,7 +313,7 @@ function ResultPanel({
           {won ? t.youWin[locale] : cashedOut ? t.cashedOut[locale] : t.youLose[locale]}
         </p>
         <p className="text-sm text-ink/60 mt-1">
-          {round.balls.length}/{round.ballCount} {t.balls[locale]} ({round.ballValue} CRC {t.perBall[locale]})
+          {round.balls.length}/{round.ballCount} {t.balls[locale]} ({round.ballValue} {t.perBall[locale]})
         </p>
         <p className={`text-sm font-bold mt-1 ${net >= 0 ? "text-emerald-600" : "text-red-500"}`}>
           {net >= 0 ? "+" : ""}{net.toFixed(2)} CRC net
@@ -438,6 +439,7 @@ function DropModeSelector({
 
 function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -649,7 +651,7 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
           <button onClick={() => handleStart()} disabled={!validCombo}
             className="w-full py-4 rounded-xl font-bold text-base text-white transition-all hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2"
             style={{ backgroundColor: accentColor }}>
-            📌 {selectedTotal} CRC (Demo)
+            📌 {stake.format(selectedTotal)} (Demo)
           </button>
         </div>
       )}
@@ -770,6 +772,7 @@ export default function PlinkoPageClient({ table }: { table: PlinkoTable }) {
 
 function RealPlinkoGame({ table }: { table: PlinkoTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -1014,7 +1017,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
               gameType="plinko"
               gameId={table.slug}
               accentColor={accentColor}
-              payLabel={`Plinko — ${ballCount} ${ballCount === 1 ? t.ball[locale] : t.balls[locale]} × ${selectedBallValue} CRC`}
+              payLabel={`Plinko — ${ballCount} ${ballCount === 1 ? t.ball[locale] : t.balls[locale]} × ${stake.format(selectedBallValue)}`}
               onPaymentInitiated={async () => { await scanForRound(); setWatchingPayment(true); }}
               onScan={scanForRound} scanning={scanning}
               paymentStatus={watchingPayment ? "watching" : "idle"}
@@ -1130,7 +1133,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
             gameType="plinko"
             gameId={table.slug}
             accentColor={accentColor}
-            payLabel={`Plinko — ${ballCount} ${ballCount === 1 ? t.ball[locale] : t.balls[locale]} × ${selectedBallValue} CRC`}
+            payLabel={`Plinko — ${ballCount} ${ballCount === 1 ? t.ball[locale] : t.balls[locale]} × ${stake.format(selectedBallValue)}`}
             onPaymentInitiated={async () => {
               setShowReplay(false);
               resetGame();

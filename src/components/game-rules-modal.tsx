@@ -5,6 +5,7 @@ import { HelpCircle, X } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY } from "@/lib/game-registry";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 interface GameRulesModalProps {
   gameKey: string;
@@ -13,13 +14,14 @@ interface GameRulesModalProps {
 export function GameRulesModal({ gameKey }: GameRulesModalProps) {
   const [open, setOpen] = useState(false);
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const config = GAME_REGISTRY[gameKey];
   if (!config) return null;
 
   const t = translations[config.translationKey as keyof typeof translations] as Record<string, Record<string, string>> | undefined;
   if (!t?.rules) return null;
 
-  const rules = t.rules[locale];
+  const rules = stake.t(t.rules[locale]);
   if (!rules) return null;
 
   // Parse rules: split by newline, support "**bold**" and "- bullet"

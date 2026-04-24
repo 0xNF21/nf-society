@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+import { isRealStakesEnabled } from "@/lib/stakes";
+import { formatStake } from "@/lib/stakes-utils";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -12,10 +14,13 @@ export const metadata: Metadata = {
 };
 
 export default async function RouletteLobbyPage() {
-  const tables = await db
+  const [tables, realStakesEnabled] = await Promise.all([
+    db
     .select()
     .from(rouletteTables)
-    .where(eq(rouletteTables.status, "active"));
+    .where(eq(rouletteTables.status, "active")),
+    isRealStakesEnabled(),
+  ]);
 
   return (
     <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto">
@@ -67,7 +72,7 @@ export default async function RouletteLobbyPage() {
                           className="text-xs font-bold px-2 py-0.5 rounded-full"
                           style={{ backgroundColor: table.accentColor + "15", color: table.accentColor }}
                         >
-                          {b} CRC
+                          {formatStake(b, { realStakesEnabled, locale: "fr" })}
                         </span>
                       ))}
                     </div>
