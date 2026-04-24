@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Dices, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -329,6 +330,7 @@ function RollingAnimation({ accentColor }: { accentColor: string }) {
 
 function DemoDiceGame({ table }: { table: DiceTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -429,7 +431,7 @@ function DemoDiceGame({ table }: { table: DiceTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -543,6 +545,7 @@ export default function DicePageClient({ table }: { table: DiceTable }) {
 
 function RealDiceGame({ table }: { table: DiceTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -708,7 +711,7 @@ function RealDiceGame({ table }: { table: DiceTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -721,7 +724,7 @@ function RealDiceGame({ table }: { table: DiceTable }) {
             gameType="dice"
             gameId={table.slug}
             accentColor={accentColor}
-            payLabel={`Dice — ${selectedBet} CRC`}
+            payLabel={`Dice — ${stake.format(selectedBet)}`}
             onPaymentInitiated={async () => {
               await scanForRound();
               setWatchingPayment(true);
@@ -826,7 +829,7 @@ function RealDiceGame({ table }: { table: DiceTable }) {
           gameType="dice"
           gameId={table.slug}
           accentColor={accentColor}
-          payLabel={`Dice — ${selectedBet} CRC`}
+          payLabel={`Dice — ${stake.format(selectedBet)}`}
           onPaymentInitiated={async () => {
             setShowReplay(false);
             resetGame();

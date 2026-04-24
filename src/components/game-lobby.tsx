@@ -11,6 +11,7 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY } from "@/lib/game-registry";
 import { GameRulesModal } from "@/components/game-rules-modal";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 interface GameLobbyProps {
   gameKey: string;
@@ -34,6 +35,7 @@ export function GameLobby({
   const router = useRouter();
   const { locale } = useLocale();
   const { isDemo } = useDemo();
+  const stake = useStakeLabel();
   const config = GAME_REGISTRY[gameKey];
   const t = translations[config.translationKey as keyof typeof translations] as Record<string, Record<string, string>>;
   const te = translations.errors;
@@ -123,16 +125,23 @@ export function GameLobby({
                         ? "bg-marine text-white border-marine"
                         : "bg-white/80 text-ink/60 border-ink/10 hover:border-marine/40"
                     }`}>
-                    {v}
+                    {stake.value(v)}
                   </button>
                 ))}
               </div>
               <div className="mt-2 flex items-center gap-2">
-                <input type="number" min={1} value={betCrc}
-                  onChange={(e) => setBetCrc(Math.max(1, parseInt(e.target.value) || 1))}
+                <input type="number" min={1} value={stake.value(betCrc)}
+                  onChange={(e) => {
+                    const raw = Math.max(1, parseInt(e.target.value) || 1);
+                    setBetCrc(stake.realStakesEnabled ? raw : Math.max(1, Math.round(raw / 10)));
+                  }}
                   className="w-24 px-3 py-2 rounded-xl border border-ink/10 bg-white/80 text-ink text-sm font-bold focus:outline-none focus:border-marine/40"
                 />
-                <span className="text-sm text-ink/50 leading-none">{t.crcPerPlayer[locale]}</span>
+                <span className="text-sm text-ink/50 leading-none">
+                  {stake.realStakesEnabled
+                    ? t.crcPerPlayer[locale]
+                    : (locale === "fr" ? "XP par joueur" : "XP per player")}
+                </span>
               </div>
             </div>
 
@@ -157,7 +166,7 @@ export function GameLobby({
 
             {/* Winner gets */}
             <div className="p-3 rounded-xl bg-ink/[0.03] border border-ink/5 text-xs text-ink/50">
-              🏆 {t.winnerGets[locale]} <span className="font-bold text-ink">{betCrc * 2 * 0.95} CRC</span>
+              🏆 {t.winnerGets[locale]} <span className="font-bold text-ink">{stake.format(betCrc * 2 * 0.95)}</span>
               <span className="ml-1">{t.commission[locale]}</span>
             </div>
 
@@ -167,7 +176,7 @@ export function GameLobby({
               style={{ background: config.accentColor }}>
               {loading
                 ? <><Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" /> {t.creating[locale]}</>
-                : `${t.createBtn[locale]} — ${betCrc} CRC`}
+                : `${t.createBtn[locale]} — ${stake.format(betCrc)}`}
             </Button>
           </CardContent>
         </Card>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Gem, Bomb, Banknote, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -254,6 +255,7 @@ function ResultPanel({
 
 function DemoMinesGame({ table }: { table: MinesTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -348,7 +350,7 @@ function DemoMinesGame({ table }: { table: MinesTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -379,7 +381,7 @@ function DemoMinesGame({ table }: { table: MinesTable }) {
             className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"
             style={{ backgroundColor: accentColor }}
           >
-            💣 Mines — {selectedBet} CRC / {selectedMines} mines (Demo)
+            💣 Mines — {stake.format(selectedBet)} / {selectedMines} mines (Demo)
           </button>
         </div>
       )}
@@ -464,6 +466,7 @@ export default function MinesPageClient({ table }: { table: MinesTable }) {
 
 function RealMinesGame({ table }: { table: MinesTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -660,7 +663,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -694,7 +697,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
             gameId={gameId}
             tableSlug={table.slug}
             accentColor={accentColor}
-            payLabel={`Mines — ${selectedBet} CRC / ${selectedMines} mines`}
+            payLabel={`Mines — ${stake.format(selectedBet)} / ${selectedMines} mines`}
             onPaymentInitiated={async () => {
               await scanForRound();
               setWatchingPayment(true);
@@ -772,7 +775,7 @@ function RealMinesGame({ table }: { table: MinesTable }) {
           gameId={gameId}
           tableSlug={table.slug}
           accentColor={accentColor}
-          payLabel={`Mines — ${selectedBet} CRC / ${selectedMines} mines`}
+          payLabel={`Mines — ${stake.format(selectedBet)} / ${selectedMines} mines`}
           onPaymentInitiated={async () => {
             setShowReplay(false);
             resetGame();

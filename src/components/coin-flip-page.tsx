@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -75,6 +76,7 @@ function CoinDisplay({ side, flipping, size = "lg" }: { side: CoinSide | null; f
 
 function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -159,7 +161,7 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -208,7 +210,7 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
             disabled={!selectedChoice}
             className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 disabled:opacity-40"
             style={{ backgroundColor: accentColor }}>
-            🧪 {t.heads[locale]} / {t.tails[locale]} — {selectedBet} CRC (Demo)
+            🧪 {t.heads[locale]} / {t.tails[locale]} — {stake.format(selectedBet)} (Demo)
           </button>
         </div>
       )}
@@ -331,6 +333,7 @@ export default function CoinFlipPageClient({ table }: { table: CoinFlipTable }) 
 
 function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -495,7 +498,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -547,7 +550,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
               gameId={gameId}
               tableSlug={table.slug}
               accentColor={accentColor}
-              payLabel={`${t.heads[locale]} / ${t.tails[locale]} — ${selectedBet} CRC`}
+              payLabel={`${t.heads[locale]} / ${t.tails[locale]} — ${stake.format(selectedBet)}`}
               onPaymentInitiated={async () => {
                 await scanForFlip();
                 setWatchingPayment(true);
@@ -685,7 +688,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
             gameId={gameId}
             tableSlug={table.slug}
             accentColor={accentColor}
-            payLabel={`${t.heads[locale]} / ${t.tails[locale]} — ${selectedBet} CRC`}
+            payLabel={`${t.heads[locale]} / ${t.tails[locale]} — ${stake.format(selectedBet)}`}
             onPaymentInitiated={async () => {
               setShowReplay(false);
               setResult(null);

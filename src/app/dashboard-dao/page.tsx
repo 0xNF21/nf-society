@@ -27,6 +27,8 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale } from "@/components/language-provider";
 import { translations, localeBcp47 } from "@/lib/i18n";
+import { DaoPoolXpCard } from "@/components/dao-pool-xp-card";
+import { useFeatureFlags } from "@/components/feature-flag-provider";
 
 type DaoData = {
   groupAddress: string;
@@ -211,6 +213,8 @@ function InactiveFilter({
 export default function DashboardDaoPage() {
   const { locale } = useLocale();
   const t = translations.dao;
+  const { flagStatus, loading: flagsLoading } = useFeatureFlags();
+  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
 
   const [data, setData] = useState<DaoData | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
@@ -415,6 +419,8 @@ export default function DashboardDaoPage() {
           <p className="text-ink/50 mt-2">{t.subtitle[locale]}</p>
         </header>
 
+        <DaoPoolXpCard />
+
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="h-8 w-8 text-emerald-500 animate-spin" />
@@ -480,8 +486,8 @@ export default function DashboardDaoPage() {
               </div>
             )}
 
-            {/* Platform Treasury */}
-            <PlatformTreasury locale={locale} />
+            {/* Platform Treasury — masquee en mode Free-to-Play (ne reflete que l'activite CRC legacy) */}
+            {!realStakesDisabled && <PlatformTreasury locale={locale} />}
 
             {(() => {
               const crcValueUsd = crcPrice ? totalCRC * crcPrice : 0;

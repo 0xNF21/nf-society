@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, TrendingUp, TrendingDown, Banknote, Check, X, RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { useTheme } from "@/components/theme-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
@@ -305,6 +306,7 @@ function ResultPanel({
 
 function DemoHiLoGame({ table }: { table: HiLoTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -384,7 +386,7 @@ function DemoHiLoGame({ table }: { table: HiLoTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -395,7 +397,7 @@ function DemoHiLoGame({ table }: { table: HiLoTable }) {
             className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"
             style={{ backgroundColor: accentColor }}
           >
-            🎴 Hi-Lo — {selectedBet} CRC (Demo)
+            🎴 Hi-Lo — {stake.format(selectedBet)} (Demo)
           </button>
         </div>
       )}
@@ -457,6 +459,7 @@ export default function HiLoPageClient({ table }: { table: HiLoTable }) {
 
 function RealHiLoGame({ table }: { table: HiLoTable }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -625,7 +628,7 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet} CRC
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -638,7 +641,7 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
             gameType="hilo"
             gameId={gameId}
             accentColor={accentColor}
-            payLabel={`Hi-Lo — ${selectedBet} CRC`}
+            payLabel={`Hi-Lo — ${stake.format(selectedBet)}`}
             onPaymentInitiated={async () => {
               await scanForRound();
               setWatchingPayment(true);
@@ -690,7 +693,7 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
           gameType="hilo"
           gameId={gameId}
           accentColor={accentColor}
-          payLabel={`Hi-Lo — ${selectedBet} CRC`}
+          payLabel={`Hi-Lo — ${stake.format(selectedBet)}`}
           onPaymentInitiated={async () => {
             setShowReplay(false);
             resetGame();
