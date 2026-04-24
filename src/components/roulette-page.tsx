@@ -9,8 +9,6 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
-import { QuickReplayModal } from "@/components/quick-replay-modal";
-import { DemoBalancePayButton } from "@/components/demo-balance-pay-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
 import { darkSafeColor } from "@/lib/utils";
 import {
@@ -741,8 +739,6 @@ function DemoRouletteGame({ table }: { table: RouletteTable }) {
   const [result, setResult] = useState<RoundResponse | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [resultNumber, setResultNumber] = useState<number | null>(null);
-  const [showReplay, setShowReplay] = useState(false);
-
   const betOptions = table.betOptions as number[];
 
   const performSpin = useCallback((bet: number, spinBets: RouletteBet[]) => {
@@ -849,31 +845,8 @@ function DemoRouletteGame({ table }: { table: RouletteTable }) {
       )}
 
       {result && !spinning && (
-        <ResultPanel round={result} locale={locale} accentColor={accentColor} onPlayAgain={() => setShowReplay(true)} />
+        <ResultPanel round={result} locale={locale} accentColor={accentColor} onPlayAgain={resetGame} />
       )}
-
-      {/* Quick replay modal (demo) */}
-      <QuickReplayModal
-        open={showReplay}
-        onClose={() => setShowReplay(false)}
-        betOptions={betOptions}
-        currentBet={selectedBet}
-        onBetChange={(bet) => { setSelectedBet(bet); setBets([]); }}
-        accentColor={accentColor}
-        onChangeConfig={() => {
-          setShowReplay(false);
-          resetGame();
-        }}
-      >
-        <DemoBalancePayButton
-          amountCrc={selectedBet}
-          accentColor={accentColor}
-          onPaid={() => {
-            setShowReplay(false);
-            performSpin(selectedBet, bets);
-          }}
-        />
-      </QuickReplayModal>
     </div>
   );
 }
@@ -944,7 +917,6 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
   const [resultNumber, setResultNumber] = useState<number | null>(null);
   const [playerProfile, setPlayerProfile] = useState<{ name?: string; imageUrl?: string | null } | null>(null);
   const [restoring, setRestoring] = useState(true);
-  const [showReplay, setShowReplay] = useState(false);
 
   const betOptions = table.betOptions as number[];
 
@@ -1125,42 +1097,9 @@ function RealRouletteGame({ table }: { table: RouletteTable }) {
           accentColor={accentColor}
           playerName={playerProfile?.name || (round.playerAddress ? shortenAddress(round.playerAddress) : undefined)}
           playerAvatar={playerProfile?.imageUrl || undefined}
-          onPlayAgain={() => setShowReplay(true)}
+          onPlayAgain={resetGame}
         />
       )}
-
-      {/* Quick replay modal */}
-      <QuickReplayModal
-        open={showReplay}
-        onClose={() => setShowReplay(false)}
-        betOptions={betOptions}
-        currentBet={selectedBet}
-        onBetChange={setSelectedBet}
-        accentColor={accentColor}
-        onChangeConfig={() => {
-          setShowReplay(false);
-          resetGame();
-        }}
-      >
-        <ChancePayment
-          recipientAddress={table.recipientAddress}
-          amountCrc={selectedBet}
-          gameType="roulette"
-          gameId={table.slug}
-          accentColor={accentColor}
-          payLabel={`Roulette — ${selectedBet} CRC`}
-          onPaymentInitiated={async () => {
-            setShowReplay(false);
-            resetGame();
-            setWatchingPayment(true);
-            await scanForRound();
-          }}
-          onScan={scanForRound}
-          scanning={scanning}
-          paymentStatus={watchingPayment ? "watching" : "idle"}
-          playerToken={tokenRef.current}
-        />
-      </QuickReplayModal>
     </div>
   );
 }
