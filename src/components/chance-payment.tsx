@@ -10,6 +10,8 @@ import { useMiniApp } from "@/components/miniapp-provider";
 import { TicketRecovery } from "@/components/ticket-recovery";
 import { BalancePayButton } from "@/components/balance-pay-button";
 import { useConnectedAddress } from "@/hooks/use-connected-address";
+import { useFeatureFlags } from "@/components/feature-flag-provider";
+import { FreePlayStart } from "@/components/free-play-start";
 
 interface ChancePaymentProps {
   /** Recipient address for the payment */
@@ -73,8 +75,30 @@ export function ChancePayment({
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const connectedAddress = useConnectedAddress();
+  const { flagStatus, loading: flagsLoading } = useFeatureFlags();
   const tm = translations.miniapp;
   const t = translations.chancePayment;
+
+  // ─── Free-to-Play mode : on remplace tout le flow paiement par FreePlayStart.
+  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  if (realStakesDisabled) {
+    const fpAddress = connectedAddress ?? walletAddress ?? null;
+    return (
+      <FreePlayStart
+        gameKey={balanceGameKey || gameType}
+        gameSlug={balanceSlug || tableSlug || gameId}
+        address={fpAddress}
+        playerToken={playerToken || ""}
+        betCrc={amountCrc}
+        isChance
+        extraBody={balanceExtras as Record<string, unknown> | undefined}
+        onStarted={() => {
+          onPaymentInitiated?.();
+          onBalancePaid?.({ family: "chance" });
+        }}
+      />
+    );
+  }
 
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);

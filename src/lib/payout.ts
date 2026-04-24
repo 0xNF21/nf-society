@@ -1,7 +1,8 @@
 import { ethers } from "ethers";
 import { db } from "./db";
-import { payouts, botState } from "./db/schema";
-import { eq, sql } from "drizzle-orm";
+import { payouts, botState, gameXpEvents, daoXpPool, players } from "./db/schema";
+import { and, eq, sql } from "drizzle-orm";
+import { isRealStakesEnabled } from "./stakes";
 
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 const CIRCLES_HUB_V2 = "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8";
@@ -185,6 +186,130 @@ async function transferErc1155(recipient: string, amountWei: bigint): Promise<st
   return hash;
 }
 
+/**
+ * Version Free-to-Play de `executePayout` — credite le winner en XP virtuels
+ * au lieu d'executer un transfert on-chain depuis la Safe.
+ *
+ * Idempotent via la table `payouts` : si un row existe deja pour ce gameId
+ * avec un statut terminal, on retourne `already_paid` sans re-crediter.
+ *
+ * Commission DAO : on somme les `bet` events pour ce gameType en mode F2P ;
+ * la difference entre pot et amountCrc est creditee dans `dao_xp_pool`.
+ * Si aucun bet event n'est trouve (jeux historiques, tests), on saute cette
+ * etape sans casser le payout principal.
+ */
+async function executeXpPayout(request: PayoutRequest): Promise<PayoutResult> {
+  if (request.amountCrc <= 0) {
+    return { success: false, status: "failed", error: "Amount must be greater than 0" };
+  }
+  const addr = request.recipientAddress.toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(addr)) {
+    return { success: false, status: "failed", error: "Invalid recipient address" };
+  }
+
+  // Idempotency : if a payout row already exists for this gameId with a
+  // terminal status, we don't re-credit. The `payouts` table is shared with
+  // the CRC flow, so a gameId collision between the two modes is impossible
+  // (F2P is exclusive — flag acts as a mode switch).
+  const existing = await db.select().from(payouts).where(eq(payouts.gameId, request.gameId)).limit(1);
+  if (existing.length > 0 && (existing[0].status === "success" || existing[0].status === "completed")) {
+    return {
+      success: false,
+      status: "already_paid",
+      error: `XP payout already credited for gameId ${request.gameId}`,
+      payoutId: existing[0].id,
+    };
+  }
+
+  let payoutId: number;
+  if (existing.length === 0) {
+    const [inserted] = await db.insert(payouts).values({
+      gameType: request.gameType,
+      gameId: request.gameId,
+      recipientAddress: addr,
+      amountCrc: request.amountCrc,
+      reason: request.reason ? `[XP] ${request.reason}` : "[XP] payout",
+      status: "completed",
+      transferTxHash: `xp:${request.gameId}`,
+    }).returning({ id: payouts.id });
+    payoutId = inserted.id;
+  } else {
+    payoutId = existing[0].id;
+    await db.update(payouts).set({
+      status: "completed",
+      transferTxHash: `xp:${request.gameId}`,
+      updatedAt: new Date(),
+    }).where(eq(payouts.id, payoutId));
+  }
+
+  // Derive the game slug from the gameId convention `{gameKey}-{slug}-{suffix}`.
+  // If we can't parse it, we still log the win (gameSlug=null) — the dispatch
+  // doesn't break, the stats just lose that grouping axis.
+  const gameKey = request.gameType;
+  let gameSlug: string | null = null;
+  const match = request.gameId.match(new RegExp(`^${gameKey}-(.+?)(?:-(?:winner|refund|payout|prize))?$`));
+  if (match) gameSlug = match[1];
+
+  try {
+    await db.transaction(async (tx) => {
+      // Credit the recipient.
+      await tx.execute(
+        sql`UPDATE players
+            SET xp = xp + ${Math.round(request.amountCrc)}, last_seen = NOW()
+            WHERE address = ${addr}`,
+      );
+
+      // If the player row doesn't exist yet, create it with the prize as
+      // initial XP so we don't lose the reward.
+      const upserted = await tx.execute<{ address: string }>(
+        sql`INSERT INTO players (address, xp, level, streak, last_seen, created_at)
+            VALUES (${addr}, ${Math.round(request.amountCrc)}, 1, 0, NOW(), NOW())
+            ON CONFLICT (address) DO NOTHING
+            RETURNING address`,
+      );
+      void upserted;
+
+      await tx.insert(gameXpEvents).values({
+        gameKey,
+        gameSlug,
+        playerAddress: addr,
+        eventType: "win",
+        amountXp: Math.round(request.amountCrc),
+      });
+
+      // Commission : somme les bet events pour (gameKey, gameSlug). Si la
+      // somme > amountCrc, la difference va au pot DAO.
+      if (gameSlug) {
+        const potRows = await tx
+          .select({ total: sql<string>`COALESCE(SUM(${gameXpEvents.amountXp}), 0)` })
+          .from(gameXpEvents)
+          .where(and(eq(gameXpEvents.gameKey, gameKey), eq(gameXpEvents.gameSlug, gameSlug), eq(gameXpEvents.eventType, "bet")));
+        const pot = Number(potRows[0]?.total ?? 0);
+        const commission = pot - Math.round(request.amountCrc);
+        if (commission > 0) {
+          await tx.insert(daoXpPool).values({
+            source: gameKey.includes("-") || ["morpion", "memory", "dames", "relics", "pfc"].includes(gameKey)
+              ? "commission_multiplayer"
+              : "house_edge_chance",
+            gameKey,
+            amountXp: commission,
+          });
+        }
+      }
+    });
+  } catch (err) {
+    console.error("[executeXpPayout] credit tx error:", err);
+    return { success: false, status: "failed", error: "xp_credit_failed", payoutId };
+  }
+
+  return {
+    success: true,
+    status: "completed",
+    payoutId,
+    transferTxHash: `xp:${request.gameId}`,
+  };
+}
+
 export type PayoutRequest = {
   gameType: string;
   gameId: string;
@@ -203,6 +328,15 @@ export type PayoutResult = {
 };
 
 export async function executePayout(request: PayoutRequest): Promise<PayoutResult> {
+  // ─── Free-to-Play dispatch ─────────────────────────────────────
+  // En mode F2P, on court-circuite le transfert Safe/Roles et on credite
+  // le joueur en XP via `game_xp_events`. Exception : le cashout (gameType
+  // = "cashout") doit rester on-chain pour permettre aux anciens joueurs de
+  // recuperer leurs CRC de la Safe meme apres le pivot.
+  if (request.gameType !== "cashout" && !(await isRealStakesEnabled())) {
+    return await executeXpPayout(request);
+  }
+
   const config = getPayoutConfig();
   if (!config.configured) {
     return { success: false, status: "failed", error: `Payout not configured. Missing: ${config.missingVars.join(", ")}` };

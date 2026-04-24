@@ -12,6 +12,8 @@ import { useMiniApp } from "@/components/miniapp-provider";
 import { TicketRecovery } from "@/components/ticket-recovery";
 import { BalancePayButton } from "@/components/balance-pay-button";
 import { useConnectedAddress } from "@/hooks/use-connected-address";
+import { useFeatureFlags } from "@/components/feature-flag-provider";
+import { FreePlayStart } from "@/components/free-play-start";
 
 interface GamePaymentPlayer {
   token: string | null;
@@ -56,6 +58,7 @@ export function GamePayment({
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const connectedAddress = useConnectedAddress();
+  const { flagStatus, loading: flagsLoading } = useFeatureFlags();
   const config = GAME_REGISTRY[gameKey];
   const t = translations[config.translationKey as keyof typeof translations] as Record<string, Record<string, string>>;
   const tm = translations.miniapp;
@@ -68,6 +71,31 @@ export function GamePayment({
   const isActiveStatus = isNPlayerMode
     ? game.status === "waiting"
     : game.status === "waiting_p1" || game.status === "waiting_p2";
+
+  // ─── Free-to-Play mode ──────────────────────────────────────────
+  // Si le flag `real_stakes` est a "hidden", on bypass completement le flow
+  // CRC (QR, Mini App, balance-pay, scan) et on utilise le composant XP.
+  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  const fpAddress = connectedAddress ?? walletAddress ?? null;
+  const fpAlreadyJoined = isNPlayerMode
+    ? hasPaidNMode
+    : isCreator || game.status === "waiting_p2";
+
+  if (realStakesDisabled) {
+    return (
+      <FreePlayStart
+        gameKey={gameKey}
+        gameSlug={game.slug}
+        address={fpAddress}
+        playerToken={playerToken}
+        betCrc={game.betCrc}
+        alreadyJoined={fpAlreadyJoined}
+        currentPlayers={isNPlayerMode ? currentCount : undefined}
+        maxPlayers={maxPlayers}
+        onStarted={() => onScanComplete()}
+      />
+    );
+  }
 
   const [scanning, setScanning] = useState(false);
   const [copied, setCopied] = useState(false);
