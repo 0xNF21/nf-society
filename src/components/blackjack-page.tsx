@@ -622,6 +622,12 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
               scanning={scanning}
               paymentStatus={watchingPayment ? "watching" : "idle"}
               playerToken={tokenRef.current}
+              onBalancePaid={(result) => {
+                // Natural blackjack resolves instantly — /active would hide it,
+                // so grab the id from pay-game and let the main fetch effect
+                // pull the full visible state.
+                if (result?.gameRow?.id) setHandId(result.gameRow.id);
+              }}
             />
           </div>
         </div>
@@ -890,6 +896,11 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
           scanning={scanning}
           paymentStatus={watchingPayment ? "watching" : "idle"}
           playerToken={tokenRef.current}
+          onBalancePaid={(result) => {
+            setShowReplay(false);
+            resetGame();
+            if (result?.gameRow?.id) setHandId(result.gameRow.id);
+          }}
         />
       </QuickReplayModal>
     </div>
