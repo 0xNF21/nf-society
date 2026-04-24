@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { respondIfStakesDisabled } from "@/lib/stakes";
 import { db } from "@/lib/db";
 import { hiloTables, hiloRounds, claimedPayments } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -14,6 +15,9 @@ const HILO_START_BLOCK = "0x2B7DE5C";
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "hilo-scan", 10, 60000);
   if (limited) return limited;
+
+  const disabled = await respondIfStakesDisabled();
+  if (disabled) return disabled;
 
   try {
     const tableSlug = req.nextUrl.searchParams.get("tableSlug");

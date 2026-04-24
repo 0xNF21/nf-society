@@ -1,11 +1,15 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { respondIfStakesDisabled } from "@/lib/stakes";
 import { scanCrcRacePayments } from "@/lib/crc-races-server";
 
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "crc-races-scan", 10, 60000);
   if (limited) return limited;
+
+  const disabled = await respondIfStakesDisabled();
+  if (disabled) return disabled;
 
   try {
     const slug = req.nextUrl.searchParams.get("gameSlug");

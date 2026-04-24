@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { scanWalletTopups, getBalance } from "@/lib/wallet";
+import { respondIfStakesDisabled } from "@/lib/stakes";
 
 /**
  * POST /api/wallet/topup-scan { address? }
@@ -16,6 +17,9 @@ import { scanWalletTopups, getBalance } from "@/lib/wallet";
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "wallet-topup-scan", 10, 60000);
   if (limited) return limited;
+
+  const disabled = await respondIfStakesDisabled();
+  if (disabled) return disabled;
 
   try {
     const body = await req.json().catch(() => ({}));
