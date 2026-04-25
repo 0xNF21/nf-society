@@ -76,7 +76,7 @@ function CoinDisplay({ side, flipping, size = "lg" }: { side: CoinSide | null; f
 
 function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("coin_flip");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -333,7 +333,7 @@ export default function CoinFlipPageClient({ table }: { table: CoinFlipTable }) 
 
 function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("coin_flip");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);

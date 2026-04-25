@@ -146,7 +146,7 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("blackjack");
   const t = translations.blackjack;
   const [selectedBet, setSelectedBet] = useState<number>(table.betOptions[0] || 5);
   const [gameState, setGameState] = useState<BlackjackState | null>(null);
@@ -340,7 +340,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("blackjack");
   const t = translations.blackjack;
   const tokenRef = usePlayerToken("blackjack", table.slug);
 

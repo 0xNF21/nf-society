@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "crash-dash-scan", 10, 60000);
   if (limited) return limited;
 
-  const disabled = await respondIfStakesDisabled();
+  const disabled = await respondIfStakesDisabled("crash_dash");
   if (disabled) return disabled;
 
   try {

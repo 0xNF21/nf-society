@@ -306,7 +306,7 @@ function ResultPanel({
 
 function DemoHiLoGame({ table }: { table: HiLoTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("hilo");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -459,7 +459,7 @@ export default function HiLoPageClient({ table }: { table: HiLoTable }) {
 
 function RealHiLoGame({ table }: { table: HiLoTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("hilo");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);

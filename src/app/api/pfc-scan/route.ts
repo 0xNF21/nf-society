@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "pfc-scan", 10, 60000);
   if (limited) return limited;
 
-  const disabled = await respondIfStakesDisabled();
+  const disabled = await respondIfStakesDisabled("pfc");
   if (disabled) return disabled;
 
   try {

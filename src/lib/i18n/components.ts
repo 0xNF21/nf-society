@@ -239,6 +239,11 @@ export const componentsTranslations = {
       fr: "NF Society est passé en mode Free-to-Play. Les jeux utilisent des XP virtuels, plus de mises en CRC.",
       en: "NF Society is now in Free-to-Play mode. Games use virtual XP, no more CRC stakes.",
     },
+    chanceOnlyTitle: { fr: "Jeux de chance en XP", en: "Chance games in XP" },
+    chanceOnlyMessage: {
+      fr: "Les jeux de chance (roulette, blackjack, dice…) utilisent des XP virtuels. Le multijoueur skill reste en CRC.",
+      en: "Chance games (roulette, blackjack, dice…) use virtual XP. Skill multiplayer stays on CRC.",
+    },
     cashoutCta: { fr: "Retirer mes CRC", en: "Withdraw my CRC" },
     dismiss: { fr: "Masquer", en: "Dismiss" },
   },

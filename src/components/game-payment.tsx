@@ -12,7 +12,7 @@ import { useMiniApp } from "@/components/miniapp-provider";
 import { TicketRecovery } from "@/components/ticket-recovery";
 import { BalancePayButton } from "@/components/balance-pay-button";
 import { useConnectedAddress } from "@/hooks/use-connected-address";
-import { useFeatureFlags } from "@/components/feature-flag-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { FreePlayStart } from "@/components/free-play-start";
 
 interface GamePaymentPlayer {
@@ -58,7 +58,7 @@ export function GamePayment({
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const connectedAddress = useConnectedAddress();
-  const { flagStatus, loading: flagsLoading } = useFeatureFlags();
+  const stake = useStakeLabel(gameKey);
   const config = GAME_REGISTRY[gameKey];
   const t = translations[config.translationKey as keyof typeof translations] as Record<string, Record<string, string>>;
   const tm = translations.miniapp;
@@ -74,7 +74,7 @@ export function GamePayment({
 
   // Free-to-Play mode: compute here but the early return happens AFTER all
   // hooks below, to avoid "React Hook called conditionally" (rules-of-hooks).
-  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  const realStakesDisabled = !stake.realStakesEnabled;
   const fpAddress = connectedAddress ?? walletAddress ?? null;
   const fpAlreadyJoined = isNPlayerMode
     ? hasPaidNMode

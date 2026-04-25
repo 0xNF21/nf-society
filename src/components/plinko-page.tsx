@@ -439,7 +439,7 @@ function DropModeSelector({
 
 function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("plinko");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -772,7 +772,7 @@ export default function PlinkoPageClient({ table }: { table: PlinkoTable }) {
 
 function RealPlinkoGame({ table }: { table: PlinkoTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("plinko");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);

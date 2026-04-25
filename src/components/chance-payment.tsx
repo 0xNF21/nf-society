@@ -10,7 +10,7 @@ import { useMiniApp } from "@/components/miniapp-provider";
 import { TicketRecovery } from "@/components/ticket-recovery";
 import { BalancePayButton } from "@/components/balance-pay-button";
 import { useConnectedAddress } from "@/hooks/use-connected-address";
-import { useFeatureFlags } from "@/components/feature-flag-provider";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { FreePlayStart } from "@/components/free-play-start";
 
 interface ChancePaymentProps {
@@ -75,13 +75,13 @@ export function ChancePayment({
   const { locale } = useLocale();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const connectedAddress = useConnectedAddress();
-  const { flagStatus, loading: flagsLoading } = useFeatureFlags();
+  const stake = useStakeLabel(balanceGameKey || gameType);
   const tm = translations.miniapp;
   const t = translations.chancePayment;
 
   // Free-to-Play mode: compute here, but the early return happens AFTER
   // all hooks below (rules-of-hooks).
-  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  const realStakesDisabled = !stake.realStakesEnabled;
 
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);

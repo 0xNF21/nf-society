@@ -314,7 +314,7 @@ function ResultPanel({
 
 function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("crash_dash");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -628,7 +628,7 @@ export default function CrashDashPageClient({ table }: { table: CrashDashTable }
 
 function RealCrashDashGame({ table }: { table: CrashDashTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("crash_dash");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
