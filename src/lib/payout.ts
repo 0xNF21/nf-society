@@ -333,7 +333,7 @@ export async function executePayout(request: PayoutRequest): Promise<PayoutResul
   // le joueur en XP via `game_xp_events`. Exception : le cashout (gameType
   // = "cashout") doit rester on-chain pour permettre aux anciens joueurs de
   // recuperer leurs CRC de la Safe meme apres le pivot.
-  if (request.gameType !== "cashout" && !(await isRealStakesEnabled())) {
+  if (request.gameType !== "cashout" && !(await isRealStakesEnabled(request.gameType))) {
     return await executeXpPayout(request);
   }
 

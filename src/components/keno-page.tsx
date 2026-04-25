@@ -325,7 +325,7 @@ function ResultPanel({
 
 function DemoKenoGame({ table }: { table: KenoTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("keno");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -563,7 +563,7 @@ export default function KenoPageClient({ table }: { table: KenoTable }) {
 
 function RealKenoGame({ table }: { table: KenoTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("keno");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);

@@ -38,9 +38,6 @@ export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "wallet-pay-game", 30, 60000);
   if (limited) return limited;
 
-  const disabled = await respondIfStakesDisabled();
-  if (disabled) return disabled;
-
   try {
     const body = await req.json().catch(() => ({}));
     const { gameKey, slug, address, playerToken, amount, ballValue, mineCount, pickCount, choice } = body || {};
@@ -48,6 +45,11 @@ export async function POST(req: NextRequest) {
     if (!gameKey || !slug || !address || !playerToken || typeof amount !== "number") {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
+
+    // Gate APRES la lecture du body : on a besoin de `gameKey` pour appliquer
+    // l'override par categorie (chance_games_xp_only).
+    const disabled = await respondIfStakesDisabled(String(gameKey));
+    if (disabled) return disabled;
 
     const result = await payGameFromBalance({
       address: String(address),

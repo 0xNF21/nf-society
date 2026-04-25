@@ -8,9 +8,38 @@
  */
 
 export const REAL_STAKES_FLAG_KEY = "real_stakes";
+/** Force XP-only on chance games even when real_stakes=enabled. */
+export const CHANCE_XP_ONLY_FLAG_KEY = "chance_games_xp_only";
 
 /** 1 CRC = 10 XP en mode F2P. Conversion appliquee pour les mises et les gains. */
 export const CRC_TO_XP_RATIO = 10;
+
+/**
+ * Game keys classified as "chance" (gambling-shaped, vs skill 1v1 multi).
+ * Mirrors `CHANCE_BALANCE_SUPPORTED` from `wallet-game-dispatch.ts` but lives
+ * here so client components can import it without dragging the server bundle.
+ * Keep the two lists in sync.
+ */
+export const CHANCE_GAME_KEYS: ReadonlySet<string> = new Set([
+  "blackjack",
+  "coin_flip",
+  "coin-flip",
+  "crash_dash",
+  "crash-dash",
+  "dice",
+  "hilo",
+  "keno",
+  "lootbox",
+  "lottery",
+  "mines",
+  "plinko",
+  "roulette",
+]);
+
+export function isChanceGameKey(gameKey: string | null | undefined): boolean {
+  if (!gameKey) return false;
+  return CHANCE_GAME_KEYS.has(gameKey);
+}
 
 /** Convertit un montant CRC vers son equivalent XP en mode F2P. */
 export function crcToXp(crc: number): number {

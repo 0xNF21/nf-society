@@ -735,7 +735,7 @@ function GameUI({
 
 function DemoRouletteGame({ table }: { table: RouletteTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("roulette");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -909,7 +909,7 @@ export default function RoulettePageClient({ table }: { table: RouletteTable }) 
 
 function RealRouletteGame({ table }: { table: RouletteTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("roulette");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);

@@ -255,7 +255,7 @@ function ResultPanel({
 
 function DemoMinesGame({ table }: { table: MinesTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("mines");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -466,7 +466,7 @@ export default function MinesPageClient({ table }: { table: MinesTable }) {
 
 function RealMinesGame({ table }: { table: MinesTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("mines");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);

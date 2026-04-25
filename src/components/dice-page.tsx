@@ -330,7 +330,7 @@ function RollingAnimation({ accentColor }: { accentColor: string }) {
 
 function DemoDiceGame({ table }: { table: DiceTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("dice");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
@@ -545,7 +545,7 @@ export default function DicePageClient({ table }: { table: DiceTable }) {
 
 function RealDiceGame({ table }: { table: DiceTable }) {
   const { locale } = useLocale();
-  const stake = useStakeLabel();
+  const stake = useStakeLabel("dice");
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accentColor = darkSafeColor(table.accentColor, isDark);
