@@ -46,8 +46,9 @@ Risque résiduel : un attaquant qui connaît `playerToken` (ex: l'a vu dans une 
 
 ### Nouveau
 
-- **`src/app/api/cron/auth-reconcile/route.ts`** — cron route protégé par `CRON_SECRET`, scan les `refund_pending` et reconcile depuis `payouts`.
-- **`vercel.json`** — ajout d'un 2e cron entry, schedule `0 */6 * * *` (toutes les 6h, conservateur, ajustable selon le plan Vercel).
+- **`src/lib/auth/reconcile-refunds.ts`** — helper partagé qui scan les `refund_pending` et reconcile depuis `payouts`.
+- **`src/app/api/cron/auth-reconcile/route.ts`** — endpoint manuel protégé par `CRON_SECRET` pour smoke/ops.
+- **`src/app/api/cron/payouts-monitor/route.ts`** — exécute le reconcile auth dans le cron existant pour garder une seule entrée Vercel cron.
 
 ### Modifié
 
@@ -88,7 +89,7 @@ Ne PAS supprimer le `playerToken` — il joue toujours son rôle anti-cheat (ide
 
 ## 5. Questions Codex
 
-1. La cadence cron `0 */6 * * *` (6h) est-elle OK, ou faut-il plus fréquent ? Vercel free tier limite à daily, Pro permet plus.
+1. La cadence du cron existant `payouts-monitor` est-elle OK pour l'audit auth, ou faut-il déplacer vers une vraie queue/cron dédié plus tard ?
 2. Le pattern `address + playerToken` combined dans les moves est-il robuste ?
 3. Le cron reconcile devrait-il aussi gérer les `refund_pending` orphelins (sans `payouts` row) ? Ils ne devraient pas exister grâce à PR #52, mais en defense in depth ?
 4. Routes oubliées dans la liste des moves multi ?
@@ -117,8 +118,8 @@ Ou tout en 2-3 commits si le founder préfère moins de commits :
 ## 7. Smoke plan
 
 ### Reconcile cron
-- Local : `curl POST http://localhost:3000/api/cron/auth-reconcile -H "Authorization: Bearer <CRON_SECRET>"` → 200 + summary
-- Prod : Vercel cron logs après le premier run (6h post-merge)
+- Local : `curl GET http://localhost:3000/api/cron/auth-reconcile -H "Authorization: Bearer <CRON_SECRET>"` → 200 + summary
+- Prod : Vercel cron logs après le premier run du `payouts-monitor`
 
 ### Routes moves
 - En navigateur, créer une partie morpion en F2P
