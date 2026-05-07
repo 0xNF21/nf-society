@@ -5,6 +5,7 @@ import { shopItems, shopPurchases, shopCoupons, players } from "@/lib/db/schema"
 import { eq, and, sql, gt } from "drizzle-orm";
 import { getAvailableXp, computeLevel } from "@/lib/xp";
 import { executePayout } from "@/lib/payout";
+import { isF2POnlyMode } from "@/lib/legal-mode";
 
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "shop-buy", 10, 60000);
@@ -28,6 +29,20 @@ export async function POST(req: NextRequest) {
 
     if (!item) {
       return NextResponse.json({ error: "Article introuvable" }, { status: 404 });
+    }
+
+    // Pivot legal F2P : la conversion XP → CRC est desactivee.
+    // Ce flux donnait une valeur monetaire a l'XP, qui devient incompatible
+    // avec un modele "XP non convertible, sans valeur monetaire". Les autres
+    // categories (cosmetiques, badges, refunds non-CRC) restent disponibles.
+    if (item.category === "crc" && isF2POnlyMode()) {
+      return NextResponse.json(
+        {
+          error: "XP_TO_CRC_DISABLED",
+          message: "CRC purchases via XP are disabled. The shop offers cosmetics and badges only.",
+        },
+        { status: 410 },
+      );
     }
 
     // Fetch player

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { scanWalletTopups, getBalance } from "@/lib/wallet";
-import { respondIfStakesDisabled } from "@/lib/stakes";
+import { areTopupsEnabled } from "@/lib/legal-mode";
 
 /**
  * POST /api/wallet/topup-scan { address? }
@@ -13,13 +13,24 @@ import { respondIfStakesDisabled } from "@/lib/stakes";
  *
  * `address` in the body is optional — if supplied, we also return the
  * caller's post-scan balance. If omitted, we just return the scan result.
+ *
+ * En mode F2P_ONLY (defaut), cette route renvoie 410 Gone — le flux n'existe
+ * plus, les top-ups CRC sont desactives. Les soldes legacy restent retirables
+ * via /api/wallet/cashout-init.
  */
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "wallet-topup-scan", 10, 60000);
   if (limited) return limited;
 
-  const disabled = await respondIfStakesDisabled();
-  if (disabled) return disabled;
+  if (!areTopupsEnabled()) {
+    return NextResponse.json(
+      {
+        error: "TOPUPS_DISABLED_LEGAL_PIVOT",
+        message: "CRC top-ups are disabled. Existing legacy balances remain withdrawable via cashout.",
+      },
+      { status: 410 },
+    );
+  }
 
   try {
     const body = await req.json().catch(() => ({}));
