@@ -37,6 +37,60 @@ type Step =
   | { kind: "success" }
   | { kind: "error"; message: string };
 
+/**
+ * sessionStorage key for the pending standalone challenge. Persisted across
+ * page reloads so the user doesn't lose their verifyToken (and therefore
+ * their ability to claim the session + trigger the 1 CRC refund) if they
+ * navigate away while their wallet processes the tx.
+ *
+ * Tab-scoped (sessionStorage), so the secret never leaks to other tabs/
+ * users on shared devices. Cleared on success / explicit close / expiry.
+ */
+const PENDING_AUTH_KEY = "nfs_auth_pending_challenge";
+
+type PendingChallenge = {
+  challengeId: number;
+  nonce: string;
+  verifyToken: string;
+  paymentLink: string;
+  qrCode: string;
+  expiresAt: number;
+};
+
+function loadPendingChallenge(): PendingChallenge | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(PENDING_AUTH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingChallenge;
+    if (!parsed || typeof parsed.challengeId !== "number" || !parsed.verifyToken) return null;
+    if (Date.now() >= parsed.expiresAt) {
+      sessionStorage.removeItem(PENDING_AUTH_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingChallenge(p: PendingChallenge): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(PENDING_AUTH_KEY, JSON.stringify(p));
+  } catch {
+    // sessionStorage might be disabled (private mode etc.) — degrade
+    // silently. The user just loses persistence across reloads.
+  }
+}
+
+function clearPendingChallenge(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(PENDING_AUTH_KEY);
+  } catch {}
+}
+
 interface AuthConnectModalProps {
   open: boolean;
   onClose: () => void;
@@ -136,6 +190,24 @@ export function AuthConnectModal({ open, onClose }: AuthConnectModalProps) {
   }
 
   async function runStandaloneFlow() {
+    // Resume from a pending challenge if the user reloaded mid-payment.
+    // This prevents losing the verifyToken (and thus the 1 CRC) when the
+    // wallet flow takes the user away from the tab.
+    const pending = loadPendingChallenge();
+    if (pending) {
+      const resumedState: Step = {
+        kind: "standalone_waiting",
+        challengeId: pending.challengeId,
+        nonce: pending.nonce,
+        verifyToken: pending.verifyToken,
+        paymentLink: pending.paymentLink,
+        qrCode: pending.qrCode,
+      };
+      setStep(resumedState);
+      pollPayment(resumedState);
+      return;
+    }
+
     setStep({ kind: "loading_challenge" });
 
     try {
@@ -154,6 +226,19 @@ export function AuthConnectModal({ open, onClose }: AuthConnectModalProps) {
       if (!challengeData.verifyToken) {
         throw new Error("missing_verify_token");
       }
+
+      // Persist the pending challenge so a reload doesn't lose the secret.
+      const expiresAtMs = challengeData.expiresAt
+        ? new Date(challengeData.expiresAt).getTime()
+        : Date.now() + 30 * 60 * 1000;
+      savePendingChallenge({
+        challengeId: challengeData.challengeId,
+        nonce: challengeData.nonce,
+        verifyToken: challengeData.verifyToken,
+        paymentLink: challengeData.paymentLink,
+        qrCode: challengeData.qrCode,
+        expiresAt: expiresAtMs,
+      });
 
       const initialState: Step = {
         kind: "standalone_waiting",
@@ -195,6 +280,7 @@ export function AuthConnectModal({ open, onClose }: AuthConnectModalProps) {
         if (cancelledRef.current) return;
 
         if (data?.status === "confirmed" || data?.authenticated) {
+          clearPendingChallenge();
           await refresh();
           setStep({ kind: "success" });
           setTimeout(() => {
@@ -204,6 +290,7 @@ export function AuthConnectModal({ open, onClose }: AuthConnectModalProps) {
         }
 
         if (data?.status === "expired") {
+          clearPendingChallenge();
           setStep({ kind: "error", message: t.errExpired[locale] });
           return;
         }

@@ -150,14 +150,32 @@ export async function POST(req: NextRequest) {
       userAgent,
     });
 
-    // Queue 1 CRC auto-refund (fire-and-forget — failure here doesn't block auth).
-    queueAuthRefund({
-      address: verifyResult.address,
-      txHash: matchedTx.txHash,
-      challengeId: verifyResult.challenge.id,
-    }).catch((err) => {
-      console.error("[auth/verify-payment] refund queue error:", err);
-    });
+    // Refund 1 CRC — durable + awaited so we don't lose it if the lambda
+    // dies after the response is sent (Vercel doesn't guarantee unawaited
+    // promises complete). Latency cost ~500ms-1s for tx broadcast (no
+    // tx.wait — confirmation is a separate cron). Auth still succeeds even
+    // if the refund fails — the challenge status flips to refund_failed
+    // and the founder can manually retry via /api/payout/retry.
+    try {
+      await queueAuthRefund({
+        address: verifyResult.address,
+        txHash: matchedTx.txHash,
+        challengeId: verifyResult.challenge.id,
+      });
+    } catch (err: any) {
+      console.error("[auth/verify-payment] refund failed (auth still ok):", err?.message ?? err);
+      // Mark the challenge so we know to retry. Don't fail the response.
+      try {
+        await db
+          .update(authChallenges)
+          .set({
+            status: "refund_failed",
+            errorMessage: String(err?.message ?? err).slice(0, 500),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(authChallenges.id, verifyResult.challenge.id), eq(authChallenges.status, "confirmed")));
+      } catch { /* DB write failed too — server logs are the audit trail */ }
+    }
 
     const res = NextResponse.json({
       status: "confirmed",
@@ -216,8 +234,16 @@ async function scanForAuthPayment(nonce: string): Promise<{ txHash: string; send
 }
 
 /**
- * Mark the payment as claimed and refund 1 CRC. Out-of-band from the
- * verify response so a refund failure doesn't block authentication.
+ * Mark the payment as claimed, persist the refund intent durably, then
+ * broadcast the 1 CRC refund tx. Order of operations matters in serverless :
+ *
+ *   1. Insert claimedPayments (idempotent via tx_hash UNIQUE)
+ *   2. Mark challenge `refund_pending` (durable intent)
+ *   3. Call executePayout — itself inserts a payouts row with status="pending"
+ *      BEFORE broadcasting, so a lambda death between insert + broadcast
+ *      still leaves a durable record in the payouts table for manual retry
+ *      via /api/payout/retry
+ *   4. Update challenge to `refunded` or `refund_failed` based on outcome
  */
 async function queueAuthRefund(params: {
   address: string;
@@ -235,6 +261,18 @@ async function queueAuthRefund(params: {
     })
     .onConflictDoNothing();
 
+  // Phase 1 — durable intent : si la suite crash, le challenge porte la
+  // trace que le refund est en cours. Le founder peut filtrer
+  // `WHERE status='refund_pending'` pour relancer manuellement.
+  await db
+    .update(authChallenges)
+    .set({ status: "refund_pending", updatedAt: new Date() })
+    .where(and(eq(authChallenges.id, params.challengeId), eq(authChallenges.status, "confirmed")));
+
+  // Phase 2 — broadcast. executePayout insert d'abord un payouts row
+  // (status="pending") AVANT de tenter le broadcast. Donc meme si le
+  // broadcast crash, le row existe dans la table payouts et un retry
+  // manuel via /api/payout/retry peut le relancer.
   const result = await executePayout({
     gameType: "nf_auth_v2_refund",
     gameId: `nf-auth-v2-refund-${params.txHash}`,
@@ -244,6 +282,7 @@ async function queueAuthRefund(params: {
     payoutReason: "game_refund",
   });
 
+  // Phase 3 — finaliser le statut du challenge.
   if (!result.success) {
     await db
       .update(authChallenges)
@@ -252,7 +291,7 @@ async function queueAuthRefund(params: {
         errorMessage: result.error?.slice(0, 500) ?? "refund_failed",
         updatedAt: new Date(),
       })
-      .where(and(eq(authChallenges.id, params.challengeId), eq(authChallenges.status, "confirmed")));
+      .where(and(eq(authChallenges.id, params.challengeId), eq(authChallenges.status, "refund_pending")));
     return;
   }
 
@@ -263,5 +302,5 @@ async function queueAuthRefund(params: {
       refundTxHash: result.transferTxHash ?? null,
       updatedAt: new Date(),
     })
-    .where(and(eq(authChallenges.id, params.challengeId), eq(authChallenges.status, "confirmed")));
+    .where(and(eq(authChallenges.id, params.challengeId), eq(authChallenges.status, "refund_pending")));
 }
