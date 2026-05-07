@@ -30,6 +30,8 @@ interface GamePaymentProps {
     player2Address?: string | null;
     player1Token?: string | null;
     player2Token?: string | null;
+    player1TxHash?: string | null;
+    player2TxHash?: string | null;
   };
   playerToken: string;
   onScanComplete: () => void;
@@ -81,13 +83,16 @@ export function GamePayment({
   const realStakesDisabled = !stake.realStakesEnabled;
   const fpAddress = connectedAddress ?? walletAddress ?? null;
   const fpAddressLower = fpAddress?.toLowerCase() ?? null;
+  const player1HasJoined = !!game.player1TxHash;
+  const player2HasJoined = !!game.player2TxHash;
   const hasJoinedTwoPlayerByToken =
     !!playerToken &&
-    (game.player1Token === playerToken || game.player2Token === playerToken);
+    ((player1HasJoined && game.player1Token === playerToken) ||
+      (player2HasJoined && game.player2Token === playerToken));
   const hasJoinedTwoPlayerByAddress =
     !!fpAddressLower &&
-    (game.player1Address?.toLowerCase() === fpAddressLower ||
-      game.player2Address?.toLowerCase() === fpAddressLower);
+    ((player1HasJoined && game.player1Address?.toLowerCase() === fpAddressLower) ||
+      (player2HasJoined && game.player2Address?.toLowerCase() === fpAddressLower));
   const hasJoinedTwoPlayer = hasJoinedTwoPlayerByToken || hasJoinedTwoPlayerByAddress;
   const fpAlreadyJoined = isNPlayerMode
     ? hasPaidNMode
