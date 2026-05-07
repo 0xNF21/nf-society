@@ -15,6 +15,7 @@ import { players, walletLedger } from "./db/schema";
 import { eq, sql } from "drizzle-orm";
 import { checkAllWalletTopups } from "./circles";
 import { executePayout } from "./payout";
+import type { PayoutReason } from "./payout";
 import {
   CHANCE_BALANCE_SUPPORTED,
   MULTI_BALANCE_SUPPORTED,
@@ -600,6 +601,7 @@ export async function cashout(params: {
     recipientAddress: addr,
     amountCrc: params.amountCrc,
     reason: `Cashout #${params.cashoutTokenId} — ${params.amountCrc} CRC`,
+    payoutReason: "legacy_cashout",
   });
 
   if (payoutResult.success) {
@@ -727,12 +729,16 @@ export type PayPrizeResult = {
  *   the win is credited to the winner's NF Society balance via creditPrize.
  *   DAO commission, if any, is credited via creditCommission.
  *
- * - Otherwise (real on-chain tx hash), the win is paid on-chain via the
- *   Safe + Roles Modifier, same as before Phase 3c. Commission stays
- *   implicit in the Safe.
+ * - If the round was XP-paid (sourceTxHash starts with "xp:"), executePayout
+ *   detecte automatiquement le rail XP via priority 1 du routing.
  *
- * This mirrors user expectations: you pay on-chain, you get paid on-chain;
- * you pay from balance, you get paid on balance.
+ * - Otherwise (real on-chain tx hash), the win is paid on-chain via the
+ *   Safe + Roles Modifier. Commission stays implicit in the Safe.
+ *
+ * Le `gameRef` decide aussi du `payoutReason` transmis a `executePayout` :
+ * un ref contenant "draw" ou "refund" indique un remboursement
+ * (game_refund), tout le reste est traite comme une victoire (game_win).
+ * En F2P_ONLY, seul game_refund peut sortir du Safe — game_win est bloque.
  */
 export async function payPrize(
   recipientAddress: string,
@@ -744,6 +750,8 @@ export async function payPrize(
     sourceTxHash: string | null | undefined;
     /** Optional human-readable reason used only by the on-chain path. */
     reason?: string;
+    /** Override explicite — sinon inferee depuis gameRef. */
+    payoutReason?: PayoutReason;
   },
 ): Promise<PayPrizeResult> {
   if (amountCrc <= 0) {
@@ -763,12 +771,28 @@ export async function payPrize(
     };
   }
 
+  // Auto-classification : draws/remboursements explicites encodes dans gameRef.
+  // Convention etablie par les routes multi (morpion, memory) :
+  //   `${slug}-p1-draw`, `${slug}-p2-draw` → refund
+  //   `${slug}-p1-refund`, `${slug}-p2-refund` → refund
+  //   `${slug}-winner`                     → win
+  //
+  // Pattern strict requis (`-pN-(draw|refund)`) pour eviter de matcher
+  // accidentellement la loterie dont le `gameRef` est `draw-${id}` (tirage,
+  // pas un nul). Sans ce pattern strict, un winner loterie passerait priorite
+  // 3 comme refund autorise en F2P → drain CRC.
+  // Pour les autres cas (loterie, daily, etc.), passer `payoutReason` explicite.
+  const isRefund = /-p[12]-(draw|refund)\b/i.test(opts.gameRef);
+  const inferredReason: PayoutReason = isRefund ? "game_refund" : "game_win";
+
   const result = await executePayout({
     gameType: opts.gameType,
     gameId: `${opts.gameType}-${opts.gameRef}`,
     recipientAddress,
     amountCrc,
     reason: opts.reason || `${opts.gameType} ${opts.gameSlug} prize`,
+    sourceTxHash: opts.sourceTxHash ?? null,
+    payoutReason: opts.payoutReason ?? inferredReason,
   });
   return {
     method: "onchain",
@@ -779,11 +803,18 @@ export async function payPrize(
 }
 
 /**
- * Commission payout — asymmetric too. If the game was balance-paid, the
- * commission is credited to the DAO treasury (creditCommission). If the game
- * was on-chain, the commission stays implicit in the Safe — no on-chain tx,
- * no DAO ledger entry. This matches the pre-Phase-3c behavior for on-chain
- * games (Safe keeps the fee).
+ * Commission payout — source-aware :
+ *
+ *   sourceTxHash = "balance:..." → creditCommission (DAO treasury balance)
+ *   sourceTxHash = "xp:..."      → no-op (executeXpPayout possede deja la commission)
+ *   sourceTxHash = "0x..."       → onchain-implicit (commission reste dans la Safe)
+ *
+ * Important pour les XP-funded games : `executeXpPayout` (dans payout.ts)
+ * calcule la commission a partir de la somme des `game_xp_events` de type
+ * `bet` pour cette (gameKey, gameSlug) et l'insere dans `dao_xp_pool` en
+ * meme temps que le credit de victoire. Donc `payCommission` ne doit PAS
+ * re-inserer ici, sinon la commission est creditee deux fois (une dans
+ * executeXpPayout, une ici via le call site multi).
  */
 export async function payCommission(
   amountCrc: number,
@@ -793,10 +824,21 @@ export async function payCommission(
     gameRef: string;
     sourceTxHash: string | null | undefined;
   },
-): Promise<{ method: "balance" | "onchain-implicit"; ok: boolean; ledgerId?: number }> {
+): Promise<{ method: "balance" | "xp-handled-by-payout" | "onchain-implicit"; ok: boolean; ledgerId?: number }> {
   if (amountCrc <= 0) {
-    return { method: isBalancePaid(opts.sourceTxHash) ? "balance" : "onchain-implicit", ok: true };
+    if (isBalancePaid(opts.sourceTxHash)) return { method: "balance", ok: true };
+    if (typeof opts.sourceTxHash === "string" && opts.sourceTxHash.startsWith("xp:")) {
+      return { method: "xp-handled-by-payout", ok: true };
+    }
+    return { method: "onchain-implicit", ok: true };
   }
+
+  // XP-funded game : `executeXpPayout` a deja credite dao_xp_pool depuis la
+  // somme des bet events. Re-crediter ici doublerait le compteur DAO.
+  if (typeof opts.sourceTxHash === "string" && opts.sourceTxHash.startsWith("xp:")) {
+    return { method: "xp-handled-by-payout", ok: true };
+  }
+
   if (!isBalancePaid(opts.sourceTxHash)) {
     // On-chain game: commission stays in Safe, nothing to record.
     return { method: "onchain-implicit", ok: true };
