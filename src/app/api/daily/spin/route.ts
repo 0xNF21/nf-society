@@ -4,6 +4,7 @@ import { dailySessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { determineSpinResult, isSafeBalanceSafe } from "@/lib/daily";
 import { payPrize } from "@/lib/wallet";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -73,11 +74,10 @@ export async function POST(req: NextRequest) {
 
     // XP if won (non-blocking)
     if (result.xpValue > 0) {
-      const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      void fetch(`${base}/api/players/xp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: session.address, action: "daily_spin", xpOverride: result.xpValue }),
+      void awardPlayerXp({
+        address: session.address,
+        action: "daily_spin",
+        xpAmount: result.xpValue,
       }).catch(() => {});
     }
 
