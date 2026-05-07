@@ -102,6 +102,9 @@ Détectés automatiquement via `useMiniApp()` :
 - Paiement : bouton natif → `sendPayment(recipient, amount, data)` via `postMessage`
 - Signature 1-tap, pas de QR
 - SDK : `src/lib/miniapp-bridge.ts` + `useMiniApp()` hook
+- Auth future : utiliser `sign_message` via le host Mini App officiel quand disponible,
+  puis verification serveur de la signature pour creer la session. Voir
+  `docs/codex/AUTH-MINIAPP-SIGNMESSAGE.md`.
 
 **Règle stricte** : ne jamais générer le QR en mode Mini App. Toujours utiliser `<GamePayment>` / `<ChancePayment>` qui gèrent les deux cas.
 
