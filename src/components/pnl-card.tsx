@@ -3,6 +3,7 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import { Download, Check, Link2, Loader2 } from "lucide-react";
 import { translations } from "@/lib/i18n";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 /* ─── CONFIG ───────────────────────────────────────────── */
 
@@ -261,7 +262,9 @@ export interface PnlCardProps {
 
 /* ─── CARD CONTENT ─────────────────────────────────────── */
 
-function CardContent({ props }: { props: PnlCardProps }) {
+type StakeLabel = ReturnType<typeof useStakeLabel>;
+
+function CardContent({ props, stake }: { props: PnlCardProps; stake: StakeLabel }) {
   const locale = props.locale || "fr";
   const gameDef = GAME_LABELS[props.gameType];
   const gameName = props.gameLabel || gameDef?.[locale] || props.gameType;
@@ -282,7 +285,7 @@ function CardContent({ props }: { props: PnlCardProps }) {
     ? props.rewardCrc - props.betCrc : props.rewardCrc ?? 0);
   const isPositive = netAmount >= 0;
   const absRounded = Math.round(Math.abs(netAmount) * 1000) / 1000;
-  const displayNet = (isPositive ? "+" : "\u2212") + absRounded;
+  const displayNet = (isPositive ? "+" : "\u2212") + stake.value(absRounded).toLocaleString(locale === "fr" ? "fr-FR" : "en-US", { maximumFractionDigits: 3 });
 
   // Amount color
   const amountColor = isPositive ? (style.amount || "#10B981") : "#EF4444";
@@ -343,13 +346,13 @@ function CardContent({ props }: { props: PnlCardProps }) {
               }}>
                 {displayNet}
               </span>
-              <span style={{ fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.3)", marginLeft: 6 }}>CRC</span>
+              <span style={{ fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.3)", marginLeft: 6 }}>{stake.unit}</span>
             </div>
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginTop: 2 }}>
               {isPositive && props.betCrc ? (
-                <>{translations.pnlCard.grossLabel[locale]} <span style={{ color: "rgba(255,255,255,0.35)" }}>+{Math.round(gross * 1000) / 1000} CRC</span>{commAmt > 0 && <> · Commission <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{Math.round(commAmt * 1000) / 1000} CRC</span></>}</>
+                <>{translations.pnlCard.grossLabel[locale]} <span style={{ color: "rgba(255,255,255,0.35)" }}>+{stake.format(gross)}</span>{commAmt > 0 && <> · Commission <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{stake.format(commAmt)}</span></>}</>
               ) : props.betCrc ? (
-                <>{translations.pnlCard.betLost[locale]} · <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{props.betCrc} CRC</span></>
+                <>{translations.pnlCard.betLost[locale]} · <span style={{ color: "rgba(255,255,255,0.35)" }}>&minus;{stake.format(props.betCrc)}</span></>
               ) : null}
             </div>
           </div>
@@ -387,7 +390,7 @@ function CardContent({ props }: { props: PnlCardProps }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)" }}>{translations.pnlCard.betLabel[locale]}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>{props.betCrc ?? 0} CRC</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>{stake.format(props.betCrc ?? 0)}</span>
           </div>
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>{props.date || new Date().toLocaleDateString()}</span>
           <span style={{ fontSize: 9, color: "rgba(255,255,255,0.12)", letterSpacing: "0.04em" }}>nf-society.vercel.app</span>
@@ -414,13 +417,13 @@ function PnlStyles() {
 
 /* ─── TWITTER TEXT ──────────────────────────────────────── */
 
-function buildTweetText(props: PnlCardProps): string {
+function buildTweetText(props: PnlCardProps, formatAmount: (amount: number) => string): string {
   const locale = props.locale || "fr";
   const gameName = GAME_LABELS[props.gameType]?.[locale] || props.gameType;
   const netRaw = props.gainCrc ?? (props.rewardCrc !== undefined && props.betCrc !== undefined ? props.rewardCrc - props.betCrc : 0);
   const net = Math.round(netRaw * 1000) / 1000;
-  const sign = net >= 0 ? "+" : "";
-  const amount = `${sign}${net}`;
+  const sign = net >= 0 ? "+" : "-";
+  const amount = `${sign}${formatAmount(Math.abs(net))}`;
   if (props.result === "win") {
     return translations.pnlCard.tweetWin[locale].replace("{amount}", amount).replace("{gameName}", gameName);
   }
@@ -428,7 +431,7 @@ function buildTweetText(props: PnlCardProps): string {
     const tier = props.tier ? ` (${props.tier})` : "";
     return translations.pnlCard.tweetReward[locale].replace("{amount}", amount).replace("{tier}", tier).replace("{gameName}", gameName);
   }
-  return `${amount} CRC — ${gameName}\n\nhttps://nf-society.vercel.app`;
+  return `${amount} — ${gameName}\n\nhttps://nf-society.vercel.app`;
 }
 
 /* ─── EXPORTED COMPONENT ───────────────────────────────── */
@@ -439,6 +442,7 @@ export function PnlCard(props: PnlCardProps) {
   const [downloaded, setDownloaded] = useState(false);
   const [copied, setCopied] = useState(false);
   const locale = props.locale || "fr";
+  const stake = useStakeLabel(props.gameType);
 
   const handleDownload = useCallback(async () => {
     if (downloading || !cardRef.current) return;
@@ -463,15 +467,15 @@ export function PnlCard(props: PnlCardProps) {
   }, []);
 
   const handleTwitter = useCallback(() => {
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildTweetText(props))}`, "_blank");
-  }, [props]);
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildTweetText(props, stake.format))}`, "_blank");
+  }, [props, stake]);
 
   return (
     <div className="flex flex-col items-center gap-3 my-4">
       <PnlStyles />
       <div className="w-full overflow-x-auto flex justify-center">
         <div ref={cardRef} style={{ display: "inline-block", flexShrink: 0 }}>
-          <CardContent props={props} />
+          <CardContent props={props} stake={stake} />
         </div>
       </div>
 

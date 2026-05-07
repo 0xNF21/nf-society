@@ -60,22 +60,22 @@ export default function DocsPage() {
         {/* What is NF Society */}
         <Section title={fr ? "Qu'est-ce que NF Society ?" : "What is NF Society?"} icon={<HelpCircle className="w-5 h-5 text-marine" />} defaultOpen={true}>
           <P>{fr
-            ? "NF Society est une plateforme communautaire de jeux on-chain sur Gnosis Chain. Tous les paiements se font en CRC (Circles Protocol). Jouez, pariez, gagnez des CRC et montez dans le classement !"
-            : "NF Society is a community gaming platform on Gnosis Chain. All payments use CRC (Circles Protocol). Play, bet, win CRC and climb the leaderboard!"
+            ? "NF Society est une plateforme communautaire Arcade & XP sur Gnosis Chain. Les jeux quotidiens sont Free-to-Play : jouez, gagnez de l'XP et montez dans le classement."
+            : "NF Society is a community Arcade & XP platform on Gnosis Chain. Everyday games are Free-to-Play: play, earn XP and climb the leaderboard."
           }</P>
           <Bullet>{fr ? <><B>Blockchain</B> : Gnosis Chain</> : <><B>Blockchain</B>: Gnosis Chain</>}</Bullet>
           <Bullet>{fr ? <><B>Token</B> : CRC (Circles Protocol)</> : <><B>Token</B>: CRC (Circles Protocol)</>}</Bullet>
-          <Bullet>{fr ? <><B>Paiements</B> : via l&apos;app Gnosis (QR code ou lien)</> : <><B>Payments</B>: via Gnosis app (QR code or link)</>}</Bullet>
+          <Bullet>{fr ? <><B>Legacy</B> : les anciens soldes CRC restent retirables</> : <><B>Legacy</B>: existing CRC balances remain withdrawable</>}</Bullet>
         </Section>
 
         {/* How to play */}
         <Section title={fr ? "Comment jouer ?" : "How to play?"} icon={<Gamepad2 className="w-5 h-5 text-marine" />}>
-          <P>{fr ? "1. Choisissez un jeu et une mise en CRC" : "1. Choose a game and bet amount in CRC"}</P>
-          <P>{fr ? "2. Payez via l'app Gnosis (scannez le QR code ou cliquez le lien)" : "2. Pay via Gnosis app (scan QR code or click the link)"}</P>
+          <P>{fr ? "1. Choisissez un jeu Arcade" : "1. Choose an Arcade game"}</P>
+          <P>{fr ? "2. Utilisez vos XP virtuels pour participer" : "2. Use virtual XP to join"}</P>
           <P>{fr ? "3. Partagez le code de la partie a votre adversaire" : "3. Share the game code with your opponent"}</P>
-          <P>{fr ? "4. Jouez ! Le gagnant recoit les mises des 2 joueurs (moins la commission)" : "4. Play! Winner takes both bets (minus commission)"}</P>
+          <P>{fr ? "4. Jouez ! Le gagnant recoit l'XP de recompense de la partie" : "4. Play! Winner receives the game's XP reward"}</P>
           <div className="rounded-xl bg-marine/5 dark:bg-marine/10 p-3 border border-marine/10">
-            <P><B>{fr ? "Commission" : "Commission"}</B> : {fr ? "5% sur les jeux multijoueur. Le gagnant recoit 95% du pot." : "5% on multiplayer games. Winner gets 95% of the pot."}</P>
+            <P><B>{fr ? "Pot XP" : "XP pool"}</B> : {fr ? "Les participations alimentent le pool XP communautaire." : "Entries feed the community XP pool."}</P>
           </div>
         </Section>
 
@@ -120,12 +120,12 @@ export default function DocsPage() {
 
         {/* Daily */}
         <Section title={fr ? "Tirage Quotidien" : "Daily Draw"} icon={<Gift className="w-5 h-5 text-marine" />}>
-          <P>{fr ? "Chaque jour, payez 1 CRC pour jouer au scratch card et a la roue !" : "Every day, pay 1 CRC to play the scratch card and spin wheel!"}</P>
+          <P>{fr ? "Chaque jour, reclamez gratuitement le scratch card et la roue." : "Every day, claim the scratch card and spin wheel for free."}</P>
           <P><B>{fr ? "Scratch Card" : "Scratch Card"}</B></P>
-          <Bullet>{fr ? "33% de chance d'etre rembourse (1 CRC)" : "33% chance of refund (1 CRC)"}</Bullet>
-          <Bullet>{fr ? "Gagnez jusqu'a 5 CRC ou du XP" : "Win up to 5 CRC or XP"}</Bullet>
+          <Bullet>{fr ? "Gagnez de l'XP ou des bonus de progression" : "Earn XP or progression bonuses"}</Bullet>
+          <Bullet>{fr ? "Aucun CRC n'est debite" : "No CRC is debited"}</Bullet>
           <P><B>{fr ? "Roue" : "Spin Wheel"}</B></P>
-          <Bullet>{fr ? "Gagnez des CRC, du XP ou des bonus" : "Win CRC, XP or bonuses"}</Bullet>
+          <Bullet>{fr ? "Gagnez de l'XP ou des bonus" : "Earn XP or bonuses"}</Bullet>
           <Bullet>{fr ? "7 segments avec des gains differents" : "7 segments with different rewards"}</Bullet>
         </Section>
 
@@ -145,7 +145,7 @@ export default function DocsPage() {
           <Bullet>{fr ? "Boosts XP (x2 pendant 24h)" : "XP boosts (x2 for 24h)"}</Bullet>
           <Bullet>{fr ? "Coupons de remboursement" : "Refund coupons"}</Bullet>
           <Bullet>{fr ? "Badges cosmetiques" : "Cosmetic badges"}</Bullet>
-          <Bullet>{fr ? "Echange XP contre CRC" : "Exchange XP for CRC"}</Bullet>
+          <Bullet>{fr ? "Cosmetiques, badges et avantages XP" : "Cosmetics, badges and XP perks"}</Bullet>
           <P>{fr ? "Certains articles necessitent un niveau minimum." : "Some items require a minimum level."}</P>
         </Section>
 
@@ -155,7 +155,7 @@ export default function DocsPage() {
           <Bullet>{fr ? "Top XP — par experience totale" : "Top XP — by total experience"}</Bullet>
           <Bullet>{fr ? "Top Victoires — nombre de wins" : "Top Wins — number of victories"}</Bullet>
           <Bullet>{fr ? "Win Rate — pourcentage de victoires (min 5 parties)" : "Win Rate — win percentage (min 5 games)"}</Bullet>
-          <Bullet>{fr ? "CRC Gagnes — total CRC gagnes en jeux" : "CRC Won — total CRC won in games"}</Bullet>
+          <Bullet>{fr ? "Recompenses — total de recompenses en jeux" : "Rewards — total game rewards"}</Bullet>
           <P>{fr ? "Filtrez par periode (tout, ce mois, cette semaine) et par jeu." : "Filter by period (all time, this month, this week) and by game."}</P>
         </Section>
       </div>

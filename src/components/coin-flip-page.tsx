@@ -198,7 +198,7 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
           {selectedChoice && (
             <div className="rounded-xl bg-ink/5 dark:bg-white/5 p-4 text-center">
               <p className="text-sm text-ink/60">
-                {t.payout[locale]} : <span className="font-bold text-ink">{calculatePayout(selectedBet)} CRC</span>
+                {t.payout[locale]} : <span className="font-bold text-ink">{stake.format(calculatePayout(selectedBet))}</span>
                 <span className="text-ink/40"> (x{PAYOUT_MULTIPLIER})</span>
               </p>
             </div>
@@ -243,7 +243,7 @@ function DemoCoinFlipGame({ table }: { table: CoinFlipTable }) {
               {result.outcome === "win" ? t.youWin[locale] : t.youLose[locale]}
             </p>
             {result.payoutCrc > 0 && (
-              <p className="text-sm text-emerald-600 font-bold mt-1">+{Math.round(result.payoutCrc * 1000) / 1000} CRC</p>
+              <p className="text-sm text-emerald-600 font-bold mt-1">+{stake.format(result.payoutCrc)}</p>
             )}
           </div>
 
@@ -535,7 +535,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
           {selectedChoice && (
             <div className="rounded-xl bg-ink/5 dark:bg-white/5 p-4 text-center">
               <p className="text-sm text-ink/60">
-                {t.payout[locale]} : <span className="font-bold text-ink">{calculatePayout(selectedBet)} CRC</span>
+                {t.payout[locale]} : <span className="font-bold text-ink">{stake.format(calculatePayout(selectedBet))}</span>
                 <span className="text-ink/40"> (x{PAYOUT_MULTIPLIER})</span>
               </p>
             </div>
@@ -616,7 +616,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
               {result.outcome === "win" ? t.youWin[locale] : t.youLose[locale]}
             </p>
             {result.outcome === "win" && result.payoutCrc && (
-              <p className="text-sm text-emerald-600 font-bold mt-1">+{Math.round(result.payoutCrc * 1000) / 1000} CRC</p>
+              <p className="text-sm text-emerald-600 font-bold mt-1">+{stake.format(result.payoutCrc)}</p>
             )}
           </div>
 

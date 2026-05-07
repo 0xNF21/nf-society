@@ -293,6 +293,7 @@ function ResultPanel({
   playerName?: string; playerAvatar?: string; onPlayAgain: () => void;
 }) {
   const t = translations.plinko;
+  const stake = useStakeLabel("plinko");
   const payout = round.finalPayout;
   const won = payout > round.totalBet;
   const cashedOut = round.status === "cashed_out";
@@ -307,7 +308,7 @@ function ResultPanel({
       }`}>
         <p className="text-4xl mb-2">{won ? "🎉" : cashedOut ? "🏁" : "😔"}</p>
         <p className={`text-4xl font-black mb-2 ${won ? "text-emerald-600" : cashedOut ? "text-sky-600" : "text-red-500"}`}>
-          {payout.toFixed(2)} CRC
+          {stake.format(payout)}
         </p>
         <p className="font-bold text-lg text-ink">
           {won ? t.youWin[locale] : cashedOut ? t.cashedOut[locale] : t.youLose[locale]}
@@ -316,7 +317,7 @@ function ResultPanel({
           {round.balls.length}/{round.ballCount} {t.balls[locale]} ({round.ballValue} {t.perBall[locale]})
         </p>
         <p className={`text-sm font-bold mt-1 ${net >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-          {net >= 0 ? "+" : ""}{net.toFixed(2)} CRC net
+          {net >= 0 ? "+" : ""}{stake.format(Math.abs(net))} net
         </p>
       </div>
 
@@ -329,7 +330,7 @@ function ResultPanel({
 
       <PnlCard gameType="plinko" result={won ? "win" : "loss"} betCrc={round.totalBet}
         gainCrc={Math.round(net)} playerName={playerName || "Player"} playerAvatar={playerAvatar}
-        stats={`${round.balls.length}/${round.ballCount} ${t.balls[locale]} | ${payout.toFixed(2)} CRC`}
+        stats={`${round.balls.length}/${round.ballCount} ${t.balls[locale]} | ${stake.format(payout)}`}
         date={new Date().toLocaleDateString()} locale={locale} />
     </div>
   );
@@ -671,7 +672,7 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
             </div>
             <div>
               <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.accumulated[locale]}</p>
-              <p className="text-xl font-bold" style={{ color: accentColor }}>{state.accumulatedPayout.toFixed(2)} CRC</p>
+              <p className="text-xl font-bold" style={{ color: accentColor }}>{stake.format(state.accumulatedPayout)}</p>
             </div>
           </div>
 
@@ -692,7 +693,7 @@ function DemoPlinkoGame({ table }: { table: PlinkoTable }) {
               <>
                 <button onClick={handleCashout} disabled={inFlightCount > 0}
                   className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
-                  {t.cashout[locale]} {cashoutAmount.toFixed(2)}
+                  {t.cashout[locale]} {stake.format(cashoutAmount)}
                 </button>
                 <button onClick={handleDrop} disabled={ballsAvailable === 0}
                   className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"
@@ -1043,7 +1044,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
             </div>
             <div>
               <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.accumulated[locale]}</p>
-              <p className="text-xl font-bold" style={{ color: accentColor }}>{round.accumulatedPayout.toFixed(2)} CRC</p>
+              <p className="text-xl font-bold" style={{ color: accentColor }}>{stake.format(round.accumulatedPayout)}</p>
             </div>
           </div>
 
@@ -1064,7 +1065,7 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
               <>
                 <button onClick={handleCashout} disabled={serverInFlight || pendingBalls.length > 0 || anim.running}
                   className="py-4 rounded-xl font-bold text-base bg-ink/5 dark:bg-white/10 text-ink hover:bg-ink/10 disabled:opacity-30">
-                  {t.cashout[locale]} {round.cashoutAmount.toFixed(2)}
+                  {t.cashout[locale]} {stake.format(round.cashoutAmount)}
                 </button>
                 <button onClick={handleDrop} disabled={serverInFlight || (round.ballsRemaining - pendingBalls.length) <= 0}
                   className="py-4 rounded-xl font-bold text-base text-white hover:opacity-90 disabled:opacity-30"

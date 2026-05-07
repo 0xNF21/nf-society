@@ -16,7 +16,7 @@ import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
-import { formatCrc } from "@/lib/format";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type GameStatus = "waiting_p1" | "waiting_p2" | "playing" | "finished" | "cancelled";
 
@@ -298,6 +298,7 @@ export default function MemoryGamePage() {
 
 function RealMemoryGame({ slug }: { slug: string }) {
   const { locale } = useLocale();
+  const stake = useStakeLabel("memory");
   const t = translations.memory;
   const playerTokenRef = usePlayerToken("memory", slug);
   const { game, loading, fetchGame } = useGamePolling<MemoryGame>("memory", slug);
@@ -470,7 +471,7 @@ function RealMemoryGame({ slug }: { slug: string }) {
                   <span className="font-bold text-ink">{iWon ? t.youWon[locale] : iLost ? t.youLost[locale] : t.gameOver[locale]}</span>
                 </div>
                 <p className="text-xs text-ink/50">
-                  {t.betWon[locale]} <span className="font-bold text-ink/60">{formatCrc(winAmount)} CRC</span>
+                  {t.betWon[locale]} <span className="font-bold text-ink/60">{stake.format(winAmount)}</span>
                 </p>
               </div>
             )}

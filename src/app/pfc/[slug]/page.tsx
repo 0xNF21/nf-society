@@ -16,7 +16,7 @@ import { useGamePolling } from "@/hooks/use-game-polling";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
-import { formatCrc } from "@/lib/format";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import { resolveRound, getScore, getWinner, isGameOver, getBotMove, createInitialState, MOVE_EMOJI } from "@/lib/pfc";
 import type { Move, PfcState, RoundResult } from "@/lib/pfc";
 import type { PfcGameRow } from "@/lib/db/schema/pfc";
@@ -271,6 +271,7 @@ function DemoPfcGame({ slug }: { slug: string }) {
 function RealPfcGame({ slug }: { slug: string }) {
   const { locale } = useLocale();
   const t = translations.pfc;
+  const stake = useStakeLabel("pfc");
   const { game, loading, fetchGame } = useGamePolling<PfcGameRow>("pfc", slug);
   const playerTokenRef = usePlayerToken("pfc", slug);
   const [myAddress, setMyAddress] = useState("");
@@ -379,7 +380,7 @@ function RealPfcGame({ slug }: { slug: string }) {
           <div className="flex items-center gap-2">
             <span className="text-xs text-ink/40">{t.gameLabel[locale]}</span>
             <span className="font-mono font-bold text-marine text-sm bg-marine/10 px-2.5 py-1 rounded-lg">{game.slug}</span>
-            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg font-bold">{game.betCrc} CRC</span>
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg font-bold">{stake.format(game.betCrc)}</span>
           </div>
         </div>
 
@@ -441,7 +442,7 @@ function RealPfcGame({ slug }: { slug: string }) {
                 </span>
               </div>
               {myRole && game.winnerAddress?.toLowerCase() === myAddress.toLowerCase() && (
-                <p className="text-xs text-ink/50">{formatCrc(winAmount)} CRC {t.onTheWay[locale]}</p>
+                <p className="text-xs text-ink/50">{stake.format(winAmount)} {t.onTheWay[locale]}</p>
               )}
             </CardContent>
           </Card>

@@ -136,6 +136,7 @@ function PayTableDisplay({
   locale: "fr" | "en";
 }) {
   const t = translations.keno;
+  const stake = useStakeLabel("keno");
   const [open, setOpen] = useState(false);
   const rows = getPayTableRow(pickCount);
   const winRows = rows.filter((r) => r.multiplier > 0);
@@ -159,7 +160,7 @@ function PayTableDisplay({
                 {row.hits} {t.hits[locale]}
               </span>
               <span className="font-bold" style={{ color: accentColor }}>
-                x{row.multiplier.toFixed(2)} → {Math.round(betCrc * row.multiplier * 1000) / 1000} CRC
+                x{row.multiplier.toFixed(2)} → {stake.format(Math.round(betCrc * row.multiplier * 1000) / 1000)}
               </span>
             </div>
           ))}
@@ -260,6 +261,7 @@ function ResultPanel({
   onPlayAgain: () => void;
 }) {
   const t = translations.keno;
+  const stake = useStakeLabel("keno");
   const won = visible.status === "won";
   const payout = visible.payoutCrc || 0;
   const multiplier = visible.multiplier || 0;
@@ -281,7 +283,7 @@ function ResultPanel({
           {multiplier > 0 && ` — x${multiplier.toFixed(2)}`}
         </p>
         {won && payout > 0 && (
-          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(payout * 1000) / 1000} CRC</p>
+          <p className="text-lg text-emerald-600 font-bold mt-2">+{stake.format(payout)}</p>
         )}
       </div>
 

@@ -134,6 +134,7 @@ function HiLoBoard({
   animating: boolean;
 }) {
   const t = translations.hiLo;
+  const stake = useStakeLabel("hilo");
 
   return (
     <div className="space-y-5">
@@ -214,7 +215,7 @@ function HiLoBoard({
               className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2 bg-amber-500 text-white"
             >
               <Banknote className="w-5 h-5" />
-              {t.cashoutAmount[locale].replace("{amount}", String(Math.round(visible.potentialPayout * 1000) / 1000))}
+              {stake.t(t.cashoutAmount[locale].replace("{amount}", String(Math.round(visible.potentialPayout * 1000) / 1000)))}
             </button>
           )}
         </div>
@@ -241,6 +242,7 @@ function ResultPanel({
   onPlayAgain: () => void;
 }) {
   const t = translations.hiLo;
+  const stake = useStakeLabel("hilo");
   const won = visible.status === "cashed_out";
   const payout = calculatePayout({ status: visible.status, betCrc: visible.betCrc, currentMultiplier: visible.currentMultiplier, streak: visible.streak } as HiLoState);
 
@@ -274,7 +276,7 @@ function ResultPanel({
           {t.streak[locale]}: {visible.streak} | x{visible.currentMultiplier.toFixed(2)}
         </p>
         {won && payout > 0 && (
-          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(payout * 1000) / 1000} CRC</p>
+          <p className="text-lg text-emerald-600 font-bold mt-2">+{stake.format(payout)}</p>
         )}
       </div>
 

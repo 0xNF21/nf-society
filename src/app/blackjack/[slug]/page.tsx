@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!table) return { title: "Blackjack — NF Society" };
   return {
     title: `${table.title} — NF Society Blackjack`,
-    description: table.description || "Blackjack classique avec CRC",
+    description: table.description || "Blackjack classique en mode Arcade XP",
   };
 }
 

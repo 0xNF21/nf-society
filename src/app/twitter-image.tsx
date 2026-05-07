@@ -99,7 +99,7 @@ export default async function TwitterImage() {
               maxWidth: 1000,
             }}
           >
-            Joue, mise, gouverne — en CRC sur Gnosis
+            Joue, progresse, gouverne — en mode Arcade
           </div>
           <div
             style={{
@@ -110,7 +110,7 @@ export default async function TwitterImage() {
               marginTop: 8,
             }}
           >
-            17 jeux on-chain · Payouts automatiques · 100% communautaire
+            17 jeux Free-to-Play · XP virtuels · 100% communautaire
           </div>
         </div>
 

@@ -26,11 +26,11 @@ const body = Sora({
 
 export const metadata: Metadata = {
   title: "NF Society — Community Gaming Platform",
-  description: "Multiplayer games, lotteries & gambling with CRC on Gnosis Chain. Play, earn XP, collect badges.",
+  description: "Arcade Free-to-Play, XP progression, badges and community rewards on NF Society.",
   metadataBase: new URL("https://nf-society.vercel.app"),
   openGraph: {
     title: "NF Society",
-    description: "Multiplayer games, lotteries & gambling with CRC on Gnosis Chain.",
+    description: "Arcade Free-to-Play, XP progression, badges and community rewards on NF Society.",
     url: "https://nf-society.vercel.app",
     siteName: "NF Society",
     locale: "fr_FR",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "NF Society",
-    description: "Multiplayer games, lotteries & gambling with CRC on Gnosis Chain.",
+    description: "Arcade Free-to-Play, XP progression, badges and community rewards on NF Society.",
   },
   icons: {
     icon: "/nf-society-logo.png",

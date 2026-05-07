@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Ticket } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations, localeBcp47 } from "@/lib/i18n";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 export type ParticipantEntry = {
   address: string;
@@ -45,6 +46,7 @@ export function TicketHistory({
   const [profilesLoaded, setProfilesLoaded] = useState(false);
   const { locale } = useLocale();
   const tk = translations.tickets;
+  const stake = useStakeLabel("lottery");
 
   function formatDate(dateStr: string): string {
     try {
@@ -166,7 +168,7 @@ export function TicketHistory({
                   </p>
                   <p className="text-ink/40 text-[10px]">{formatDate(p.paidAt)}</p>
                 </div>
-                <span className="text-ink/60 font-semibold whitespace-nowrap">{ticketPrice ?? 5} CRC</span>
+                <span className="text-ink/60 font-semibold whitespace-nowrap">{stake.format(ticketPrice ?? 5)}</span>
               </div>
             );
           })}

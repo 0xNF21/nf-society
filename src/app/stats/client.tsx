@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { useLocale } from "@/components/language-provider";
 import { translations, localeBcp47 } from "@/lib/i18n";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import type { PlatformStats, PeriodStats, GameStatLine, DailyVolumePoint, TopGameMeta } from "@/lib/platform-stats";
 import type { RecentGameRow } from "@/lib/recent-games";
 
@@ -60,6 +61,7 @@ function formatPct(n: number | null): string {
 export default function StatsClient({ stats }: { stats: PlatformStats }) {
   const { locale } = useLocale();
   const t = translations.stats;
+  const stake = useStakeLabel();
 
   const { casinoBank, period24h, period7d, period30d, allTime, games, daily30d, chartGames, recentGames } = stats;
 
@@ -81,27 +83,27 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
           <p className="text-sm text-ink/60 dark:text-white/60">{t.subtitle[locale]}</p>
         </header>
 
-        {/* Banque casino — hero (vert dollar) */}
+        {/* Pool arcade — hero */}
         <div className="rounded-3xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-green-800 text-white p-8 shadow-lg ring-1 ring-emerald-400/30">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/70 mb-2">
             <Coins className="h-4 w-4" />
             {t.casinoBank[locale]}
           </div>
           <div className="text-5xl font-black font-display">
-            {formatCrc(casinoBank.totalCrc, 2)} <span className="text-2xl text-white/70">CRC</span>
+            {stake.value(Number(casinoBank.totalCrc)).toLocaleString(localeBcp47(locale))} <span className="text-2xl text-white/70">{stake.unit}</span>
           </div>
           <p className="mt-2 text-xs text-white/60">
             {t.casinoBankDesc[locale]}
           </p>
           <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/70">
             <span>
-              {t.innerCrc[locale]} : <b>{formatCrc(casinoBank.innerCrc, 2)}</b>
+              {t.innerCrc[locale]} : <b>{stake.format(Number(casinoBank.innerCrc))}</b>
             </span>
             <span>
-              xCRC : <b>{formatCrc(casinoBank.wrappedCrc, 2)}</b>
+              xCRC : <b>{stake.format(Number(casinoBank.wrappedCrc))}</b>
             </span>
             <span>
-              {t.playerBalances[locale]} : <b>{formatCrc(casinoBank.playerBalancesCrc, 2)}</b>
+              {t.playerBalances[locale]} : <b>{stake.format(Number(casinoBank.playerBalancesCrc))}</b>
             </span>
           </div>
         </div>
@@ -120,11 +122,11 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
             {t.allTime[locale]}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Metric label={t.wagered[locale]} value={formatCrc(allTime.wagered, 0) + " CRC"} />
-            <Metric label={t.paidOut[locale]} value={formatCrc(allTime.paidOut, 0) + " CRC"} />
+            <Metric label={t.wagered[locale]} value={stake.format(allTime.wagered)} />
+            <Metric label={t.paidOut[locale]} value={stake.format(allTime.paidOut)} />
             <Metric
               label={t.profit[locale]}
-              value={formatCrc(allTime.profit, 0) + " CRC"}
+              value={stake.format(allTime.profit)}
               accent={allTime.profit >= 0 ? "green" : "red"}
               sub={
                 allTime.wagered > 0
@@ -177,7 +179,7 @@ export default function StatsClient({ stats }: { stats: PlatformStats }) {
                         </span>
                       </td>
                       <td className="py-3 text-right font-mono text-ink dark:text-white">
-                        {formatCrc(g.wagered, 0)}
+                        {stake.format(g.wagered)}
                       </td>
                       <td className="py-3 text-right font-mono text-ink/60 dark:text-white/60">
                         {formatCrc(g.rounds, 0)}
@@ -214,6 +216,7 @@ function PeriodCard({
   locale: "fr" | "en";
 }) {
   const t = translations.stats;
+  const stake = useStakeLabel();
   return (
     <div className="rounded-2xl bg-white/70 dark:bg-white/5 backdrop-blur-sm border border-ink/10 dark:border-white/10 shadow-sm p-5">
       <div className="text-xs font-bold uppercase tracking-widest text-ink/40 dark:text-white/40">
@@ -225,7 +228,7 @@ function PeriodCard({
             {t.wagered[locale]}
           </div>
           <div className="text-xl font-bold font-mono text-ink dark:text-white">
-            {formatCrc(stats.wagered, 0)} <span className="text-xs text-ink/40 dark:text-white/40">CRC</span>
+            {stake.format(stats.wagered)}
           </div>
         </div>
         <div>
@@ -238,7 +241,7 @@ function PeriodCard({
             }`}
           >
             {stats.profit >= 0 ? "+" : ""}
-            {formatCrc(stats.profit, 0)} <span className="text-xs opacity-60">CRC</span>
+            {stake.format(stats.profit)}
           </div>
         </div>
         <div className="flex justify-between text-xs text-ink/50 dark:text-white/50 pt-1">
@@ -287,6 +290,7 @@ function Metric({
 // Tooltip compact : filtre les jeux a 0 CRC ce jour-la, trie par volume decroissant,
 // met le Total en tete. Evite le debordement vertical quand beaucoup de jeux.
 function VolumeTooltip({ active, payload, label }: any) {
+  const stake = useStakeLabel();
   if (!active || !payload || payload.length === 0) return null;
   const total = payload.find((p: any) => p.dataKey === "total");
   const games = payload
@@ -308,12 +312,12 @@ function VolumeTooltip({ active, payload, label }: any) {
       <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
       {total && (
         <div style={{ fontWeight: 600, marginBottom: 4 }}>
-          Total : {formatCrc(Number(total.value ?? 0), 0)} CRC
+          Total : {stake.format(Number(total.value ?? 0))}
         </div>
       )}
       {games.map((g: any) => (
         <div key={g.dataKey} style={{ color: g.color }}>
-          {g.name} : {formatCrc(Number(g.value ?? 0), 0)} CRC
+          {g.name} : {stake.format(Number(g.value ?? 0))}
         </div>
       ))}
     </div>
@@ -468,6 +472,7 @@ function RecentHistorySection({
 
 function RecentHistoryRow({ row, locale }: { row: RecentGameRow; locale: "fr" | "en" }) {
   const t = translations.stats;
+  const stake = useStakeLabel();
   const bet = row.betCrc;
   const payout = row.payoutCrc;
   const net = payout - bet;
@@ -501,14 +506,14 @@ function RecentHistoryRow({ row, locale }: { row: RecentGameRow; locale: "fr" | 
         )}
       </td>
       <td className="py-3 text-right font-mono text-ink dark:text-white">
-        {formatCrc(bet, 0)}
+        {stake.format(bet)}
       </td>
       <td className={`py-3 text-right font-mono ${resultColor}`}>
         <div className="flex items-center justify-end gap-1">
           <span className="text-[11px] uppercase opacity-70">{resultLabel}</span>
           <span>
             {net >= 0 ? "+" : ""}
-            {formatCrc(net, 0)}
+            {stake.format(net)}
           </span>
           {row.txHash && (
             <a

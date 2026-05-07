@@ -101,7 +101,7 @@ export default async function OpengraphImage() {
               maxWidth: 1000,
             }}
           >
-            Joue, mise, gouverne — en CRC sur Gnosis
+            Joue, progresse, gouverne — en mode Arcade
           </div>
           <div
             style={{

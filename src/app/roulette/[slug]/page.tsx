@@ -11,7 +11,7 @@ const DEMO_TABLE = {
   id: 0,
   slug: "DEMO-classic",
   title: "Roulette Classic",
-  description: "Placez vos mises sur le tapis, lancez la roue.",
+  description: "Placez vos jetons sur le tapis, lancez la roue.",
   betOptions: [1, 5, 10, 25],
   recipientAddress: "",
   primaryColor: "#DC2626",
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!table) return { title: "Roulette — NF Society" };
   return {
     title: `${table.title} — NF Society Roulette`,
-    description: table.description || "Roulette avec CRC",
+    description: table.description || "Roulette en mode Arcade XP",
   };
 }
 

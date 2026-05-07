@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Roulette — NF Society",
-  description: "Placez vos mises sur le tapis, lancez la roue. RTP ~99%.",
+  description: "Placez vos jetons sur le tapis, lancez la roue. RTP ~99%.",
 };
 
 export default async function RouletteLobbyPage() {
@@ -35,7 +35,7 @@ export default async function RouletteLobbyPage() {
         <div className="text-5xl mb-3">🎰</div>
         <h1 className="text-3xl font-bold text-ink mb-2">Roulette</h1>
         <p className="text-sm text-ink/50 max-w-md mx-auto">
-          Placez vos mises sur le tapis, lancez la roue. RTP ~99%.
+          Placez vos jetons sur le tapis, lancez la roue. RTP ~99%.
         </p>
       </div>
 

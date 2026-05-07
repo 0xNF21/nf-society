@@ -261,6 +261,7 @@ function ResultPanel({
   onPlayAgain: () => void;
 }) {
   const t = translations.crashDash;
+  const stake = useStakeLabel("crash_dash");
   const profit = won ? payoutCrc - betCrc : -betCrc;
 
   return (
@@ -282,7 +283,7 @@ function ResultPanel({
           {won && cashoutMultiplier && ` | ${t.harvest[locale]}: ${cashoutMultiplier.toFixed(2)}x`}
         </p>
         {won && payoutCrc > 0 && (
-          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(profit * 1000) / 1000} CRC</p>
+          <p className="text-lg text-emerald-600 font-bold mt-2">+{stake.format(Math.round(profit * 1000) / 1000)}</p>
         )}
       </div>
 
@@ -412,7 +413,7 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet}
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>
@@ -460,7 +461,7 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
           {autoHarvest && (
             <div className="text-center rounded-xl border border-ink/10 dark:border-white/10 py-3 bg-white/60 dark:bg-white/5">
               <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.potentialPayout[locale]}</p>
-              <p className="text-lg font-bold text-emerald-600">{Math.floor(selectedBet * autoHarvest * 100) / 100} CRC</p>
+              <p className="text-lg font-bold text-emerald-600">{stake.format(Math.floor(selectedBet * autoHarvest * 100) / 100)}</p>
             </div>
           )}
 
@@ -562,7 +563,7 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
               {translations.quickReplay.demoBalance[locale]}
             </div>
             <span className="text-emerald-700 dark:text-emerald-400 tabular-nums font-medium">
-              {demoBalance.toFixed(2)} CRC
+              {stake.format(demoBalance)}
             </span>
           </div>
           <button
@@ -575,7 +576,7 @@ function DemoCrashDashGame({ table }: { table: CrashDashTable }) {
             className="w-full h-11 rounded-xl font-bold text-white transition-all disabled:opacity-40 hover:opacity-90"
             style={{ backgroundColor: accentColor }}
           >
-            🧪 {translations.quickReplay.demoPay[locale].replace("{amount}", String(selectedBet))}
+            🧪 {translations.quickReplay.demoPay[locale].replace("{amount}", stake.format(selectedBet))}
           </button>
           {selectedBet > demoBalance && (
             <p className="text-xs text-red-500 text-center font-semibold">
@@ -807,7 +808,7 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
                     selectedBet === bet ? "text-white shadow-lg scale-105" : "bg-ink/5 dark:bg-white/5 text-ink/60 hover:bg-ink/10"
                   }`}
                   style={selectedBet === bet ? { backgroundColor: accentColor } : {}}>
-                  {bet}
+                  {stake.format(bet)}
                 </button>
               ))}
             </div>

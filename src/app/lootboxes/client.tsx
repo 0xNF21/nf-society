@@ -7,6 +7,7 @@ import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
 import { darkSafeColor } from "@/lib/utils";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 interface LootboxData {
   id: number;
@@ -24,6 +25,7 @@ export default function LootboxesClient({ lootboxes }: { lootboxes: LootboxData[
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const t = translations.lootboxes;
+  const stake = useStakeLabel("lootbox");
 
   return (
     <main className="px-4 py-10 md:py-16">
@@ -81,7 +83,7 @@ export default function LootboxesClient({ lootboxes }: { lootboxes: LootboxData[
                         {lb.title}
                       </h3>
                       <p className="text-xs text-ink/40 mt-0.5 line-clamp-2">
-                        {translations.lootbox.autoDesc[locale].replace("{price}", String(lb.pricePerOpenCrc)).replace("{max}", String(lb.pricePerOpenCrc * 7))}
+                        {translations.lootbox.autoDesc[locale].replace("{price}", stake.format(lb.pricePerOpenCrc)).replace("{max}", stake.format(lb.pricePerOpenCrc * 7))}
                       </p>
                     </div>
                   </div>
@@ -90,11 +92,11 @@ export default function LootboxesClient({ lootboxes }: { lootboxes: LootboxData[
                     <div className="flex items-center gap-4">
                       <div>
                         <p className="text-xs text-ink/40">{t.price[locale]}</p>
-                        <p className="text-lg font-bold" style={{ color: darkSafeColor(lb.accentColor, isDark) }}>{lb.pricePerOpenCrc} CRC</p>
+                        <p className="text-lg font-bold" style={{ color: darkSafeColor(lb.accentColor, isDark) }}>{stake.format(lb.pricePerOpenCrc)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-ink/40">{t.maxGain[locale]}</p>
-                        <p className="text-lg font-bold text-ink">{lb.pricePerOpenCrc * 7} CRC</p>
+                        <p className="text-lg font-bold text-ink">{stake.format(lb.pricePerOpenCrc * 7)}</p>
                       </div>
                     </div>
                     <div

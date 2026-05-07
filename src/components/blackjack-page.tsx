@@ -296,7 +296,7 @@ function DemoBlackjackGame({ table }: { table: BlackjackTable }) {
                    gameState.totalPayout === selectedBet ? t.push[locale] :
                    t.youLose[locale]}
                 </p>
-                {gameState.totalPayout > 0 && <p className="text-sm text-emerald-600 font-bold mt-1">+{Math.round(gameState.totalPayout * 1000) / 1000} CRC</p>}
+                {gameState.totalPayout > 0 && <p className="text-sm text-emerald-600 font-bold mt-1">+{stake.format(gameState.totalPayout)}</p>}
               </div>
               <button onClick={() => setShowReplay(true)} className="w-full py-3 rounded-xl font-bold text-sm text-white hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: accentColor }}><RefreshCw className="w-4 h-4" />{t.playAgain[locale]}</button>
               <PnlCard gameType="blackjack" result={gameState.totalPayout > selectedBet ? "win" : gameState.totalPayout === selectedBet ? "draw" : "loss"} betCrc={selectedBet} gainCrc={gameState.totalPayout - selectedBet} playerName="Demo Player" stats={gameState.playerHands[0]?.outcome === "blackjack" ? "Blackjack 3:2" : undefined} date={new Date().toLocaleDateString()} locale={locale} />
@@ -619,7 +619,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
               gameType="blackjack"
               gameId={table.slug}
               accentColor={accentColor}
-              payLabel={`${t.betBtn[locale]} ${selectedBet} CRC`}
+              payLabel={`${t.betBtn[locale]} ${stake.format(selectedBet)}`}
               onPaymentInitiated={async () => { await scanForHand(); setWatchingPayment(true); }}
               onScan={scanForHand}
               scanning={scanning}
@@ -718,7 +718,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   disabled={actionLoading}
                   className="py-3 rounded-xl font-bold text-sm bg-amber-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >
-                  {t.double[locale]} (+{hand.baseBet} CRC)
+                  {t.double[locale]} (+{stake.format(hand.baseBet)})
                 </button>
               )}
               {hand.availableActions.includes("split") && !pendingPaidAction && (
@@ -735,7 +735,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   disabled={actionLoading}
                   className="py-3 rounded-xl font-bold text-sm bg-violet-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >
-                  {t.split[locale]} (+{hand.baseBet} CRC)
+                  {t.split[locale]} (+{stake.format(hand.baseBet)})
                 </button>
               )}
               {hand.availableActions.includes("insurance") && !pendingPaidAction && (
@@ -744,7 +744,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   disabled={actionLoading}
                   className="col-span-2 py-3 rounded-xl font-bold text-sm bg-sky-500 text-white transition-all hover:opacity-90 disabled:opacity-50"
                 >
-                  Insurance ({Math.round(hand.baseBet / 2 * 1000) / 1000} CRC)
+                  Insurance ({stake.format(Math.round(hand.baseBet / 2 * 1000) / 1000)})
                 </button>
               )}
             </div>
@@ -791,7 +791,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                   gameType="blackjack"
                   gameId={`${table.slug}-${pendingPaidAction}-${handId}`}
                   accentColor={pendingPaidAction === "double" ? "#F59E0B" : "#8B5CF6"}
-                  payLabel={`${t.pay[locale]} ${hand.baseBet} CRC`}
+                  payLabel={`${t.pay[locale]} ${stake.format(hand.baseBet)}`}
                   onPaymentInitiated={() => setWatchingActionPayment(true)}
                   scanning={false}
                   paymentStatus={watchingActionPayment ? "watching" : "idle"}
@@ -840,7 +840,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
                 </p>
                 {hand.payoutCrc !== null && hand.payoutCrc > 0 && (
                   <p className="text-sm text-emerald-600 dark:text-emerald-400 font-bold mt-1">
-                    +{Math.round(hand.payoutCrc * 1000) / 1000} CRC
+                    +{stake.format(hand.payoutCrc)}
                   </p>
                 )}
               </div>
@@ -888,7 +888,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
           gameType="blackjack"
           gameId={table.slug}
           accentColor={accentColor}
-          payLabel={`${t.betBtn[locale]} ${selectedBet} CRC`}
+          payLabel={`${t.betBtn[locale]} ${stake.format(selectedBet)}`}
           onPaymentInitiated={async () => {
             setShowReplay(false);
             resetGame();
