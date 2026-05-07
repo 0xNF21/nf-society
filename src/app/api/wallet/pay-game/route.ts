@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { payGameFromBalance } from "@/lib/wallet";
 import { respondIfStakesDisabled } from "@/lib/stakes";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/wallet/pay-game
@@ -38,11 +39,16 @@ export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "wallet-pay-game", 30, 60000);
   if (limited) return limited;
 
+  // Auth-gated : address vient de la session pour empecher le spoofing.
+  const addressOr401 = await requireAuthenticatedAddress(req);
+  if (addressOr401 instanceof NextResponse) return addressOr401;
+  const address = addressOr401;
+
   try {
     const body = await req.json().catch(() => ({}));
-    const { gameKey, slug, address, playerToken, amount, ballValue, mineCount, pickCount, choice } = body || {};
+    const { gameKey, slug, playerToken, amount, ballValue, mineCount, pickCount, choice } = body || {};
 
-    if (!gameKey || !slug || !address || !playerToken || typeof amount !== "number") {
+    if (!gameKey || !slug || !playerToken || typeof amount !== "number") {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
 
@@ -52,7 +58,7 @@ export async function POST(req: NextRequest) {
     if (disabled) return disabled;
 
     const result = await payGameFromBalance({
-      address: String(address),
+      address,
       gameKey: String(gameKey),
       slug: String(slug),
       amount: Number(amount),

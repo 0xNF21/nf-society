@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { payGameFromXp } from "@/lib/wallet-xp";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/hilo/start-free
@@ -12,10 +13,15 @@ export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "hilo-start-free", 20, 60000);
   if (limited) return limited;
 
+  const addressOr401 = await requireAuthenticatedAddress(req);
+  if (addressOr401 instanceof NextResponse) return addressOr401;
+  const address = addressOr401;
+
+
   try {
     const body = await req.json().catch(() => ({}));
-    const { tableSlug, address, playerToken, amount, ballValue, mineCount, pickCount, choice } = body || {};
-    if (!tableSlug || !address || !playerToken || typeof amount !== "number") {
+    const { tableSlug, playerToken, amount, ballValue, mineCount, pickCount, choice } = body || {};
+    if (!tableSlug || !playerToken || typeof amount !== "number") {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
 
@@ -30,7 +36,7 @@ export async function POST(req: NextRequest) {
     const result = await payGameFromXp({
       gameKey,
       slug: String(tableSlug),
-      address: String(address),
+      address,
       playerToken: String(playerToken),
       amount: Number(amount),
       extras,
