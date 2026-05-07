@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { payGameFromXp } from "@/lib/wallet-xp";
 import { isRealStakesEnabled } from "@/lib/stakes";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/morpion/start-free
@@ -39,17 +40,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Auth-gated : address vient EXCLUSIVEMENT de la session (jamais du body).
+  // Empeche un attaquant de faire perdre l'XP de la victime en spoofant son
+  // address dans le body.
+  const addressOr401 = await requireAuthenticatedAddress(req);
+  if (addressOr401 instanceof NextResponse) return addressOr401;
+  const address = addressOr401;
+
   try {
     const body = await req.json().catch(() => ({}));
-    const { slug, address, playerToken, amount } = body || {};
-    if (!slug || !address || !playerToken || typeof amount !== "number") {
+    const { slug, playerToken, amount } = body || {};
+    if (!slug || !playerToken || typeof amount !== "number") {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
 
     const result = await payGameFromXp({
       gameKey: "morpion",
       slug: String(slug),
-      address: String(address),
+      address,
       playerToken: String(playerToken),
       amount: Number(amount),
     });

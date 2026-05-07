@@ -2,37 +2,33 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { payGameFromXp } from "@/lib/wallet-xp";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/blackjack/start-free
  *
  * Equivalent XP du flow CRC pour une main de blackjack.
- * Le dispatcher createChanceRound gere la creation du row dans
- * `blackjack_hands` (meme comportement qu'en mode balance CRC — y compris
- * natural blackjack instant-resolve).
- *
- * Body: {
- *   tableSlug: string,     // slug de la table blackjack (ex: "classic")
- *   address: string,
- *   playerToken: string,
- *   amount: number,        // mise XP (doit matcher un betOptions de la table)
- * }
+ * Address verifiee server-side via la session auth (jamais depuis le body).
  */
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "blackjack-start-free", 20, 60000);
   if (limited) return limited;
 
+  const addressOr401 = await requireAuthenticatedAddress(req);
+  if (addressOr401 instanceof NextResponse) return addressOr401;
+  const address = addressOr401;
+
   try {
     const body = await req.json().catch(() => ({}));
-    const { tableSlug, address, playerToken, amount } = body || {};
-    if (!tableSlug || !address || !playerToken || typeof amount !== "number") {
+    const { tableSlug, playerToken, amount } = body || {};
+    if (!tableSlug || !playerToken || typeof amount !== "number") {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
 
     const result = await payGameFromXp({
       gameKey: "blackjack",
       slug: String(tableSlug),
-      address: String(address),
+      address,
       playerToken: String(playerToken),
       amount: Number(amount),
     });

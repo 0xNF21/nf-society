@@ -7,6 +7,7 @@ import { rouletteTables, rouletteRounds, claimedPayments } from "@/lib/db/schema
 import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { createInitialState } from "@/lib/roulette";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 const ROULETTE_START_BLOCK = "0x2B7DE5C";
@@ -126,12 +127,7 @@ export async function POST(req: NextRequest) {
         // never block the scan response (caused scan hangs when
         // NEXT_PUBLIC_APP_URL pointed at a non-listening port).
         {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          void fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: playerAddress, action: "roulette_play" }),
-          }).catch(() => {});
+          void awardPlayerXp({ address: playerAddress, action: "roulette_play" }).catch(() => {});
         }
 
       } catch (err: any) {

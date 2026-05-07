@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { dailySessions, players } from "@/lib/db/schema";
 import { eq, and, isNull, desc, isNotNull } from "drizzle-orm";
 import { generateDailyToken, todayString } from "@/lib/daily";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 /**
  * POST /api/daily/claim-from-balance  { address }
@@ -112,12 +113,7 @@ export async function POST(req: NextRequest) {
     // Award XP — fire-and-forget. The previous try/await/catch still
     // blocked on the fetch; void+.catch is the real non-blocking pattern.
     {
-      const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      void fetch(`${base}/api/players/xp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: addr, action: "daily_checkin" }),
-      }).catch(() => {});
+      void awardPlayerXp({ address: addr, action: "daily_checkin" }).catch(() => {});
     }
 
     return NextResponse.json({

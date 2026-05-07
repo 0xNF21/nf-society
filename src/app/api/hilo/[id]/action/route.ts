@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculatePayout, isValidAction } from "@/lib/hilo";
 import type { HiLoState, HiLoAction } from "@/lib/hilo";
 import { payPrize } from "@/lib/wallet";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 export async function POST(
   req: NextRequest,
@@ -101,12 +102,7 @@ export async function POST(
         }
 
         // XP for win — fire and forget (don't block the response).
-        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        void fetch(`${base}/api/players/xp`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: round.playerAddress, action: "hilo_win" }),
-        }).catch(() => {});
+        void awardPlayerXp({ address: round.playerAddress, action: "hilo_win" }).catch(() => {});
       }
     }
 

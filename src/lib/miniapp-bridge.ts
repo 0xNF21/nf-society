@@ -16,10 +16,17 @@ export type MiniAppMessage =
   | { type: "wallet_disconnected" }
   | { type: "tx_success"; hashes: string[]; requestId: string }
   | { type: "tx_rejected"; reason?: string; requestId: string }
+  | { type: "sign_success"; signature: string; verified?: boolean; requestId: string }
+  | { type: "sign_rejected"; reason?: string; requestId: string }
   | { type: "app_data"; data: unknown };
 
 type PendingTx = {
   resolve: (hashes: string[]) => void;
+  reject: (reason: string) => void;
+};
+
+type PendingSig = {
+  resolve: (result: { signature: string; verified?: boolean }) => void;
   reject: (reason: string) => void;
 };
 
@@ -29,6 +36,7 @@ let walletAddress: string | null = null;
 let walletListeners: Array<(address: string | null) => void> = [];
 let appDataListeners: Array<(data: string) => void> = [];
 let pendingTxs = new Map<string, PendingTx>();
+let pendingSigs = new Map<string, PendingSig>();
 let messageListenerAttached = false;
 
 // ── Detection ──────────────────────────────────────────────────────
@@ -74,6 +82,22 @@ function handleMessage(event: MessageEvent) {
       if (pending) {
         pending.reject(data.reason ?? "Transaction rejected");
         pendingTxs.delete(data.requestId);
+      }
+      break;
+    }
+    case "sign_success": {
+      const pending = pendingSigs.get(data.requestId);
+      if (pending) {
+        pending.resolve({ signature: data.signature, verified: data.verified });
+        pendingSigs.delete(data.requestId);
+      }
+      break;
+    }
+    case "sign_rejected": {
+      const pending = pendingSigs.get(data.requestId);
+      if (pending) {
+        pending.reject(data.reason ?? "Signature rejected");
+        pendingSigs.delete(data.requestId);
       }
       break;
     }
@@ -168,6 +192,48 @@ export function sendCrcTransfer(
   });
 }
 
+/**
+ * Ask the Circles host to sign a message via passkey. Used by the auth
+ * flow to prove wallet ownership without paying 1 CRC.
+ *
+ * The host returns `{ signature, verified }`. The server still re-verifies
+ * the signature against the wallet (EIP-1271 for Safes) — never trust
+ * `verified` blindly.
+ *
+ * @param message Plain text to sign (typically the challenge message)
+ * @param signatureType "raw" by default — let the Safe handle EIP-191 wrapping
+ */
+export function signMessage(
+  message: string,
+  signatureType: "raw" | "erc1271" = "raw",
+): Promise<{ signature: string; verified?: boolean }> {
+  ensureListener();
+
+  const requestId = crypto.randomUUID();
+
+  return new Promise((resolve, reject) => {
+    pendingSigs.set(requestId, { resolve, reject });
+
+    window.parent.postMessage(
+      {
+        type: "sign_message",
+        message,
+        signatureType,
+        requestId,
+      },
+      "*",
+    );
+
+    // Timeout after 2 minutes — same as tx.
+    setTimeout(() => {
+      if (pendingSigs.has(requestId)) {
+        pendingSigs.delete(requestId);
+        reject("Signature timed out");
+      }
+    }, 120_000);
+  });
+}
+
 /** Clean up all listeners (call on unmount) */
 export function cleanup() {
   if (typeof window === "undefined") return;
@@ -176,5 +242,6 @@ export function cleanup() {
   walletListeners = [];
   appDataListeners = [];
   pendingTxs.clear();
+  pendingSigs.clear();
   walletAddress = null;
 }

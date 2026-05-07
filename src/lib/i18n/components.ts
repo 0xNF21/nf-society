@@ -1,6 +1,51 @@
 // Auto-split from src/lib/i18n.ts — components domain sections
 
 export const componentsTranslations = {
+  authBanner: {
+    notice: {
+      fr: "Connectez votre wallet pour jouer et gagner de l'XP.",
+      en: "Sign in to play and earn XP.",
+    },
+    connect: { fr: "Se connecter", en: "Sign in" },
+  },
+  auth: {
+    title: { fr: "Connexion sécurisée", en: "Secure sign-in" },
+    close: { fr: "Fermer", en: "Close" },
+    preparing: { fr: "Préparation...", en: "Preparing..." },
+    miniappSigning: { fr: "Approuvez la signature dans Circles", en: "Approve the signature in Circles" },
+    miniappSigningHint: {
+      fr: "Aucune transaction, juste une preuve passkey.",
+      en: "No transaction, just a passkey proof.",
+    },
+    verifying: { fr: "Vérification...", en: "Verifying..." },
+    standaloneInstruction: {
+      fr: "Pour vous identifier, payez 1 CRC à la NF Society — il vous sera automatiquement remboursé.",
+      en: "To sign in, send 1 CRC to NF Society — it will be auto-refunded.",
+    },
+    qrAlt: { fr: "QR code de paiement", en: "Payment QR code" },
+    openWallet: { fr: "Ouvrir le wallet", en: "Open wallet" },
+    copyLink: { fr: "Copier", en: "Copy" },
+    copied: { fr: "Copié !", en: "Copied!" },
+    refundNote: {
+      fr: "Le 1 CRC est remboursé dès la confirmation on-chain.",
+      en: "The 1 CRC is refunded as soon as the tx confirms.",
+    },
+    success: { fr: "Connecté !", en: "Signed in!" },
+    errTitle: { fr: "Échec de la connexion", en: "Sign-in failed" },
+    errGeneric: {
+      fr: "Une erreur est survenue. Réessayez.",
+      en: "Something went wrong. Please retry.",
+    },
+    errExpired: {
+      fr: "Le challenge a expiré. Recommencez.",
+      en: "The challenge expired. Please retry.",
+    },
+    errMiniAppNoWallet: {
+      fr: "Wallet Circles non détecté. Reconnectez-vous depuis l'app Circles.",
+      en: "Circles wallet not detected. Reconnect from the Circles app.",
+    },
+    retry: { fr: "Réessayer", en: "Retry" },
+  },
   gamePayment: {
     paymentReceived: { fr: "Paiement reçu !", en: "Payment received!" },
     waitingP2: { fr: "En attente de l'autre joueur...", en: "Waiting for the other player..." },

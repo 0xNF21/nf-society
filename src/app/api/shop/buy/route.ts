@@ -6,19 +6,23 @@ import { eq, and, sql, gt } from "drizzle-orm";
 import { getAvailableXp, computeLevel } from "@/lib/xp";
 import { executePayout } from "@/lib/payout";
 import { isF2POnlyMode } from "@/lib/legal-mode";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "shop-buy", 10, 60000);
   if (limited) return limited;
 
+  // Auth-gated : address vient de la session, jamais du body.
+  const addressOr401 = await requireAuthenticatedAddress(req);
+  if (addressOr401 instanceof NextResponse) return addressOr401;
+  const addr = addressOr401;
+
   try {
-    const { address, item_slug } = await req.json();
+    const { item_slug } = await req.json();
 
-    if (!address || !item_slug) {
-      return NextResponse.json({ error: "address and item_slug required" }, { status: 400 });
+    if (!item_slug) {
+      return NextResponse.json({ error: "item_slug required" }, { status: 400 });
     }
-
-    const addr = address.toLowerCase();
 
     // Fetch item
     const [item] = await db

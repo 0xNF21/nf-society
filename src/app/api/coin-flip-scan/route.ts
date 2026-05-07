@@ -8,6 +8,7 @@ import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { resolveCoinFlip, isValidChoice } from "@/lib/coin-flip";
 import type { CoinSide } from "@/lib/coin-flip";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 // Start block — set to a recent block, only scan recent payments
@@ -152,21 +153,11 @@ export async function POST(req: NextRequest) {
           }).where(eq(coinFlipResults.id, inserted[0].id));
         }
 
-        // XP
+        // XP — direct call to xp-server (no HTTP roundtrip, no auth).
         try {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          // Fire-and-forget — never block the scan response on XP.
-          void fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: playerAddress, action: "coin_flip_play" }),
-          }).catch(() => {});
+          void awardPlayerXp({ address: playerAddress, action: "coin_flip_play" }).catch(() => {});
           if (result.outcome === "win") {
-            void fetch(`${base}/api/players/xp`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ address: playerAddress, action: "coin_flip_win" }),
-            }).catch(() => {});
+            void awardPlayerXp({ address: playerAddress, action: "coin_flip_win" }).catch(() => {});
           }
         } catch {}
 

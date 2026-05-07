@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { User, X, Search, Loader2, ChevronRight, LogOut } from "lucide-react";
+import { User, X, Search, Loader2, ChevronRight, LogOut, LogIn } from "lucide-react";
 import { LanguageSwitcher, useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { useAuthSession } from "@/components/auth-provider";
 import { translations } from "@/lib/i18n";
 import { getLevelName, xpToNextLevel } from "@/lib/xp";
 import { WalletBalanceCard } from "@/components/wallet-balance-card";
@@ -43,7 +44,15 @@ export default function ProfileModal() {
   const { locale } = useLocale();
   const { isDemo, demoPlayer } = useDemo();
   const { isMiniApp, walletAddress } = useMiniApp();
+  const {
+    isAuthenticated,
+    address: sessionAddress,
+    loading: authLoading,
+    openLogin,
+    logout,
+  } = useAuthSession();
   const tp = translations.profile;
+  const ta = translations.authBanner;
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState<SavedProfile | null>(null);
   const [player, setPlayer] = useState<PlayerData | null>(null);
@@ -74,36 +83,47 @@ export default function ProfileModal() {
       });
       return;
     }
-    // Mini App: auto-connect avec le wallet Circles
-    if (isMiniApp && walletAddress) {
+    // Session auth : source serveur de verite pour le profil courant.
+    if (sessionAddress) {
       fetch(`/api/profiles`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addresses: [walletAddress] }),
+        body: JSON.stringify({ addresses: [sessionAddress] }),
       })
         .then(r => r.json())
         .then(data => {
-          const p = data.profiles?.[walletAddress.toLowerCase()];
+          const p = data.profiles?.[sessionAddress.toLowerCase()];
           setSaved({
-            address: walletAddress,
-            name: p?.name || `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+            address: sessionAddress,
+            name: p?.name || `${sessionAddress.slice(0, 6)}...${sessionAddress.slice(-4)}`,
             imageUrl: p?.imageUrl || null,
           });
         })
         .catch(() => {
           setSaved({
-            address: walletAddress,
-            name: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+            address: sessionAddress,
+            name: `${sessionAddress.slice(0, 6)}...${sessionAddress.slice(-4)}`,
             imageUrl: null,
           });
         });
+      return;
+    }
+    // Mini App avant auth : walletAddress reste un hint de profil, mais le
+    // bouton principal reste "Se connecter" tant que la session serveur
+    // n'existe pas.
+    if (isMiniApp && walletAddress) {
+      setSaved({
+        address: walletAddress,
+        name: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+        imageUrl: null,
+      });
       return;
     }
     try {
       const raw = localStorage.getItem("nfs_profile");
       if (raw) setSaved(JSON.parse(raw));
     } catch {}
-  }, [isDemo, demoPlayer, isMiniApp, walletAddress]);
+  }, [isDemo, demoPlayer, isMiniApp, walletAddress, sessionAddress]);
 
   // Charger données XP quand profil connu
   useEffect(() => {
@@ -138,8 +158,9 @@ export default function ProfileModal() {
     setResults([]);
   }
 
-  function disconnect() {
+  async function disconnect() {
     localStorage.removeItem("nfs_profile");
+    await logout();
     setSaved(null);
     setPlayer(null);
     setQuery("");
@@ -148,6 +169,15 @@ export default function ProfileModal() {
   const progressPct = player
     ? Math.min(Math.round(((player.xp - getXpForLevel(player.level)) / (getXpForLevel(player.level + 1) - getXpForLevel(player.level) || 1)) * 100), 100)
     : 0;
+  const needsAuth = !isDemo && !authLoading && !isAuthenticated;
+
+  function handleProfileButtonClick() {
+    if (needsAuth) {
+      openLogin();
+      return;
+    }
+    setOpen(true);
+  }
 
   return (
     <>
@@ -165,18 +195,25 @@ export default function ProfileModal() {
           <span className="text-xs font-bold text-amber-700 dark:text-amber-300 hidden sm:inline">Daily</span>
         </button>
         <button
-          onClick={() => setOpen(true)}
+          onClick={handleProfileButtonClick}
           className="flex items-center gap-1.5 rounded-full shadow-md border border-ink/10 bg-white/90 dark:bg-white/10 backdrop-blur-sm px-2.5 py-2 hover:bg-white dark:hover:bg-white/15 transition-all hover:shadow-lg"
         >
-          {saved?.imageUrl ? (
+          {needsAuth ? (
+            <LogIn className="h-4 w-4 text-marine dark:text-blue-400" />
+          ) : saved?.imageUrl ? (
             <img src={saved.imageUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
           ) : (
             <User className="h-4 w-4 text-marine dark:text-blue-400" />
           )}
-          <span className="text-sm font-semibold text-ink hidden sm:inline">
+          {needsAuth && (
+            <span className="text-sm font-semibold text-ink hidden sm:inline">
+              {ta.connect[locale]}
+            </span>
+          )}
+          <span className={`text-sm font-semibold text-ink ${needsAuth ? "hidden" : "hidden sm:inline"}`}>
             {saved ? saved.name || `${saved.address.slice(0, 6)}…${saved.address.slice(-4)}` : tp.button[locale]}
           </span>
-          {player && (
+          {!needsAuth && player && (
             <span className="text-xs font-bold text-marine dark:text-blue-400 bg-marine/10 dark:bg-blue-400/20 px-1.5 py-0.5 rounded-full">
               Lv.{player.level}
             </span>

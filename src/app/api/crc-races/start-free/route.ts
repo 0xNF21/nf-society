@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { payGameFromXp } from "@/lib/wallet-xp";
 import { isRealStakesEnabled } from "@/lib/stakes";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/crc-races/start-free
@@ -21,10 +22,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Auth-gated : address vient de la session, pas du body.
+  const addressOr401 = await requireAuthenticatedAddress(req);
+  if (addressOr401 instanceof NextResponse) return addressOr401;
+  const address = addressOr401;
+
   try {
     const body = await req.json().catch(() => ({}));
-    const { slug, address, playerToken, amount, ballValue, mineCount, pickCount, choice } = body || {};
-    if (!slug || !address || !playerToken || typeof amount !== "number") {
+    const { slug, playerToken, amount, ballValue, mineCount, pickCount, choice } = body || {};
+    if (!slug || !playerToken || typeof amount !== "number") {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
 
@@ -39,7 +45,7 @@ export async function POST(req: NextRequest) {
     const result = await payGameFromXp({
       gameKey,
       slug: String(slug),
-      address: String(address),
+      address,
       playerToken: String(playerToken),
       amount: Number(amount),
       extras,

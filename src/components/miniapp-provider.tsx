@@ -8,6 +8,7 @@ import {
   onWalletChange,
   onAppData,
   sendCrcTransfer,
+  signMessage as bridgeSignMessage,
   cleanup,
 } from "@/lib/miniapp-bridge";
 
@@ -22,12 +23,18 @@ interface MiniAppContextValue {
    * @returns transaction hashes
    */
   sendPayment: (to: string, amountCrc: number, data?: string) => Promise<string[]>;
+  /**
+   * Ask the Circles host to sign a message via passkey. Used by auth.
+   * The signature is server-verified — `verified` is just a UX hint.
+   */
+  signMessage: (message: string) => Promise<{ signature: string; verified?: boolean }>;
 }
 
 const MiniAppContext = createContext<MiniAppContextValue>({
   isMiniApp: false,
   walletAddress: null,
   sendPayment: () => Promise.reject("Not in Mini App mode"),
+  signMessage: () => Promise.reject("Not in Mini App mode"),
 });
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
@@ -81,8 +88,16 @@ export function MiniAppProvider({ children }: { children: React.ReactNode }) {
     [miniApp]
   );
 
+  const signMessage = useCallback(
+    async (message: string): Promise<{ signature: string; verified?: boolean }> => {
+      if (!miniApp) throw new Error("Not in Mini App mode");
+      return bridgeSignMessage(message, "raw");
+    },
+    [miniApp]
+  );
+
   return (
-    <MiniAppContext.Provider value={{ isMiniApp: miniApp, walletAddress, sendPayment }}>
+    <MiniAppContext.Provider value={{ isMiniApp: miniApp, walletAddress, sendPayment, signMessage }}>
       {children}
     </MiniAppContext.Provider>
   );

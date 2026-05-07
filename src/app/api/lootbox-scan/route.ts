@@ -9,6 +9,7 @@ import { checkAllNewPayments } from "@/lib/circles";
 import { executePayout } from "@/lib/payout";
 import { getRandomReward } from "@/lib/lootbox";
 import { getLootboxXpAction } from "@/lib/xp";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
@@ -175,19 +176,10 @@ export async function POST(req: NextRequest) {
         // scan while the XP route is being called). void + .catch is the
         // real non-blocking pattern.
         {
-          const base = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}`;
-          void fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: playerAddress, action: "lootbox_open" }),
-          }).catch(() => {});
+          void awardPlayerXp({ address: playerAddress, action: "lootbox_open" }).catch(() => {});
           const bonusAction = getLootboxXpAction(rewardCrc, priceCrc);
           if (bonusAction) {
-            void fetch(`${base}/api/players/xp`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ address: playerAddress, action: bonusAction }),
-            }).catch(() => {});
+            void awardPlayerXp({ address: playerAddress, action: bonusAction }).catch(() => {});
           }
         }
       } catch (err: any) {

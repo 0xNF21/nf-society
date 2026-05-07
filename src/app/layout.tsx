@@ -6,6 +6,7 @@ import { LanguageProvider } from "@/components/language-provider";
 import { DemoProvider } from "@/components/demo-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MiniAppProvider } from "@/components/miniapp-provider";
+import { AuthProvider } from "@/components/auth-provider";
 import { FeatureFlagProvider } from "@/components/feature-flag-provider";
 import DemoBanner from "@/components/demo-banner";
 import StakesDisabledBanner from "@/components/stakes-disabled-banner";
@@ -68,15 +69,17 @@ export default function RootLayout({
           <DemoProvider>
             <LanguageProvider>
               <MiniAppProvider>
-                <FeatureFlagProvider>
-                  <StakesDisabledBanner />
-                  <DemoBanner />
-                  {children}
-                  <ProfileModal />
-                  <DailyModal />
-                  <BottomNav />
-                  <SupportButton />
-                </FeatureFlagProvider>
+                <AuthProvider>
+                  <FeatureFlagProvider>
+                    <StakesDisabledBanner />
+                    <DemoBanner />
+                    {children}
+                    <ProfileModal />
+                    <DailyModal />
+                    <BottomNav />
+                    <SupportButton />
+                  </FeatureFlagProvider>
+                </AuthProvider>
               </MiniAppProvider>
             </LanguageProvider>
           </DemoProvider>
