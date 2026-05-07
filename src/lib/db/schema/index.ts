@@ -15,6 +15,7 @@
  */
 
 export * from "./core";
+export * from "./auth";
 export * from "./blackjack";
 export * from "./cashout";
 export * from "./coin-flip";
