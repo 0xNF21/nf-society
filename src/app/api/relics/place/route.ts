@@ -4,11 +4,17 @@ import { relicsGames } from '@/lib/db/schema/relics'
 import { eq } from 'drizzle-orm'
 import { allRelicsPlaced } from '@/lib/relics'
 import type { PlayerGrid } from '@/lib/relics'
+import { requireAuthenticatedAddress } from '@/lib/auth/session'
 
 export async function POST(req: NextRequest) {
+  // Auth-gated : address vient de la session, pas du body.
+  const addressOr401 = await requireAuthenticatedAddress(req)
+  if (addressOr401 instanceof NextResponse) return addressOr401
+  const player = addressOr401
+
   try {
-    const { id, player, grid, playerToken } = await req.json() as { id: string; player: string; grid: PlayerGrid; playerToken?: string }
-    if (!id || !player || !grid) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    const { id, grid, playerToken } = await req.json() as { id: string; grid: PlayerGrid; playerToken?: string }
+    if (!id || !grid) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     const [game] = await db.select().from(relicsGames).where(eq(relicsGames.slug, id))
     if (!game) return NextResponse.json({ error: 'Game not found' }, { status: 404 })
     if (game.status !== 'placing') return NextResponse.json({ error: 'Wrong phase' }, { status: 400 })
