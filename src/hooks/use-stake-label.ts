@@ -32,23 +32,19 @@ import {
  *   - `t(text)` : traduit un texte i18n contenant "CRC" → "XP" en F2P
  */
 export function useStakeLabel(gameKey?: string | null) {
-  const { flagStatus, loading } = useFeatureFlags();
+  const { flagStatus } = useFeatureFlags();
   const { locale } = useLocale();
 
-  // While flags load on the client, default to CRC mode (status quo) to avoid
-  // a flash of XP labels on first render before the API answer comes back.
-  let realStakesEnabled = true;
-  if (!loading) {
-    if (flagStatus(REAL_STAKES_FLAG_KEY) === "hidden") {
-      realStakesEnabled = false;
-    } else if (
+  // Fail-closed: the provider returns "hidden" for legal flags while loading,
+  // when /api/flags fails, or when the key is missing. CRC mode only appears
+  // after real_stakes is explicitly enabled, with the chance-game override.
+  const realStakesEnabled =
+    flagStatus(REAL_STAKES_FLAG_KEY) === "enabled" &&
+    !(
       gameKey &&
       isChanceGameKey(gameKey) &&
       flagStatus(CHANCE_XP_ONLY_FLAG_KEY) === "hidden"
-    ) {
-      realStakesEnabled = false;
-    }
-  }
+    );
 
   return {
     realStakesEnabled,
