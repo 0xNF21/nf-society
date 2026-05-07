@@ -36,6 +36,7 @@ import {
   CHANCE_XP_ONLY_FLAG_KEY,
   isChanceGameKey,
 } from "./stakes-utils";
+import { isF2POnlyMode } from "./legal-mode";
 
 export {
   REAL_STAKES_FLAG_KEY,
@@ -76,9 +77,11 @@ async function readFlags(): Promise<FlagsSnapshot> {
       .where(inArray(featureFlags.key, [REAL_STAKES_FLAG_KEY, CHANCE_XP_ONLY_FLAG_KEY]));
 
     const map = new Map(rows.map((r) => [r.key, r.status] as const));
-    // Both flags default to 'enabled' on missing rows (fail-open / status-quo).
-    const realStatus = map.get(REAL_STAKES_FLAG_KEY) ?? "enabled";
-    const chanceStatus = map.get(CHANCE_XP_ONLY_FLAG_KEY) ?? "enabled";
+    // Defaults fail-closed : flag absent = mode F2P. Pour reactiver le mode
+    // CRC il faut explicitement poser real_stakes='enabled' en DB ET
+    // LEGAL_MODE='REAL_STAKES_ALLOWED' en env.
+    const realStatus = map.get(REAL_STAKES_FLAG_KEY) ?? "hidden";
+    const chanceStatus = map.get(CHANCE_XP_ONLY_FLAG_KEY) ?? "hidden";
 
     const value: FlagsSnapshot = {
       realStakes: realStatus === "enabled",
@@ -86,9 +89,12 @@ async function readFlags(): Promise<FlagsSnapshot> {
     };
     cached = { value, expiresAt: now + CACHE_TTL_MS };
     return value;
-  } catch {
-    // Fail-open : DB inaccessible → preserve le comportement CRC actuel.
-    return { realStakes: true, chanceXpOnly: true };
+  } catch (error) {
+    // Fail-closed : toute erreur de lecture (DB down, flag corrompu, etc.)
+    // retombe en mode F2P. C'est le comportement attendu pour un kill switch
+    // legal — un panne d'infrastructure ne doit jamais reactiver les mises CRC.
+    console.error("[stakes] readFlags failed; defaulting to F2P", error);
+    return { realStakes: false, chanceXpOnly: true };
   }
 }
 
@@ -101,6 +107,10 @@ async function readFlags(): Promise<FlagsSnapshot> {
  * specifique, ex: topup-scan).
  */
 export async function isRealStakesEnabled(gameKey?: string | null): Promise<boolean> {
+  // Filet env-level prioritaire sur tout. Tant que LEGAL_MODE n'est pas
+  // explicitement REAL_STAKES_ALLOWED, on saute meme la lecture DB et on
+  // retourne false. Un oubli d'env var en prod = F2P par defaut.
+  if (isF2POnlyMode()) return false;
   const flags = await readFlags();
   if (!flags.realStakes) return false; // global kill switch
   if (gameKey && isChanceGameKey(gameKey) && !flags.chanceXpOnly) return false;
