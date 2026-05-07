@@ -26,6 +26,10 @@ interface GamePaymentProps {
     betCrc: number;
     slug: string;
     status: string;
+    player1Address?: string | null;
+    player2Address?: string | null;
+    player1Token?: string | null;
+    player2Token?: string | null;
   };
   playerToken: string;
   onScanComplete: () => void;
@@ -76,9 +80,18 @@ export function GamePayment({
   // hooks below, to avoid "React Hook called conditionally" (rules-of-hooks).
   const realStakesDisabled = !stake.realStakesEnabled;
   const fpAddress = connectedAddress ?? walletAddress ?? null;
+  const fpAddressLower = fpAddress?.toLowerCase() ?? null;
+  const hasJoinedTwoPlayerByToken =
+    !!playerToken &&
+    (game.player1Token === playerToken || game.player2Token === playerToken);
+  const hasJoinedTwoPlayerByAddress =
+    !!fpAddressLower &&
+    (game.player1Address?.toLowerCase() === fpAddressLower ||
+      game.player2Address?.toLowerCase() === fpAddressLower);
+  const hasJoinedTwoPlayer = hasJoinedTwoPlayerByToken || hasJoinedTwoPlayerByAddress;
   const fpAlreadyJoined = isNPlayerMode
     ? hasPaidNMode
-    : isCreator || game.status === "waiting_p2";
+    : hasJoinedTwoPlayer;
 
   const [scanning, setScanning] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -180,6 +193,7 @@ export function GamePayment({
   // render l'equivalent XP. Place APRES tous les hooks pour respecter
   // les rules-of-hooks (pas de hook conditionnel).
   if (realStakesDisabled) {
+    if (!isActiveStatus) return null;
     return (
       <FreePlayStart
         gameKey={gameKey}

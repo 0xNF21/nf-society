@@ -57,7 +57,9 @@ export function GameLobby({
     setLoading(true);
     setError("");
     try {
+      const creatorToken = stake.realStakesEnabled ? null : crypto.randomUUID().slice(0, 8);
       const body: Record<string, unknown> = { betCrc, isPrivate };
+      if (creatorToken) body.creatorToken = creatorToken;
       if (getExtraBody) Object.assign(body, getExtraBody());
 
       const res = await fetch(config.apiRoute, {
@@ -70,6 +72,7 @@ export function GameLobby({
 
       // Normalize: some APIs return { slug }, others { id: slug }
       const slug = data.slug || data.id;
+      if (creatorToken) localStorage.setItem(`${gameKey}-${slug}-token`, creatorToken);
       sessionStorage.setItem(`${gameKey}_creator_${slug}`, "1");
       router.push(`/${gameKey}/${slug}`);
     } catch {
