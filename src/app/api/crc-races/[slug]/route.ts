@@ -52,7 +52,18 @@ export async function POST(
         target,
         sessionAddress,
       );
-      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      if (!result.ok) {
+        // 403 si la session est valide mais ne correspond pas au slot du
+        // racer ou au token. Sinon 400 pour les erreurs metier (race
+        // pas active, action invalide, etc.).
+        const isAuthMismatch =
+          result.error === "Session address does not match racer slot" ||
+          result.error === "Player not in race";
+        return NextResponse.json(
+          { error: result.error },
+          { status: isAuthMismatch ? 403 : 400 },
+        );
+      }
       return NextResponse.json({ game: result.game });
     }
 
