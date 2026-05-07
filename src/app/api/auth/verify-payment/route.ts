@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, inArray, and, desc } from "drizzle-orm";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
-import { authChallenges, authSessions, claimedPayments } from "@/lib/db/schema";
+import { authChallenges, authSessions, claimedPayments, payouts } from "@/lib/db/schema";
 import { checkAllNewPayments } from "@/lib/circles";
 import { executePayout } from "@/lib/payout";
 import {
@@ -234,22 +234,39 @@ async function scanForAuthPayment(nonce: string): Promise<{ txHash: string; send
 }
 
 /**
- * Mark the payment as claimed, persist the refund intent durably, then
- * broadcast the 1 CRC refund tx. Order of operations matters in serverless :
+ * Mark the payment as claimed, persist a durable retryable payout row, mark
+ * the challenge intent, then broadcast the 1 CRC refund. Order matters for
+ * serverless durability :
  *
- *   1. Insert claimedPayments (idempotent via tx_hash UNIQUE)
- *   2. Mark challenge `refund_pending` (durable intent)
- *   3. Call executePayout — itself inserts a payouts row with status="pending"
- *      BEFORE broadcasting, so a lambda death between insert + broadcast
- *      still leaves a durable record in the payouts table for manual retry
- *      via /api/payout/retry
- *   4. Update challenge to `refunded` or `refund_failed` based on outcome
+ *   1. INSERT claimedPayments (idempotent via tx_hash UNIQUE)
+ *   2. INSERT payouts row with status="pending" (durable + retryable via
+ *      /api/payout/retry). Cle UNIQUE par gameId — re-run idempotent.
+ *   3. UPDATE challenge.status = 'refund_pending' (link audit, le payouts
+ *      row existe deja a ce moment-la).
+ *   4. await executePayout — qui detecte le row existant (status=pending),
+ *      le bumpe en attempts++ et broadcasts. Si le lambda meurt apres,
+ *      le row reste en pending/sending et est retryable.
+ *   5. Statut final du challenge depend du resultat ON-CHAIN, pas juste
+ *      du broadcast :
+ *        result.status === "success"           → challenge "refunded"
+ *        result.status === "sending" + tx hash → challenge stays "refund_pending"
+ *                                                avec refundTxHash set (cron
+ *                                                verifiePending peut reconcilier)
+ *        result failed                         → challenge "refund_failed"
+ *
+ *   Le statut "refunded" definitif est fonction de payouts.status='success'
+ *   (mis a jour par verifyPendingPayout cron). Tant que ce n'est pas confirme
+ *   on-chain, le challenge reste "refund_pending" avec le refundTxHash en
+ *   transit.
  */
 async function queueAuthRefund(params: {
   address: string;
   txHash: string;
   challengeId: number;
 }): Promise<void> {
+  const payoutGameId = `nf-auth-v2-refund-${params.txHash}`;
+
+  // Phase 1 — claim payment (idempotent).
   await db
     .insert(claimedPayments)
     .values({
@@ -261,28 +278,41 @@ async function queueAuthRefund(params: {
     })
     .onConflictDoNothing();
 
-  // Phase 1 — durable intent : si la suite crash, le challenge porte la
-  // trace que le refund est en cours. Le founder peut filtrer
-  // `WHERE status='refund_pending'` pour relancer manuellement.
+  // Phase 2 — pre-insert durable payout row BEFORE updating the challenge.
+  // Garantit qu'un challenge `refund_pending` a TOUJOURS un payouts row
+  // associe par gameId, donc retryable via /api/payout/retry meme si le
+  // lambda crash entre ce point et le broadcast.
+  await db
+    .insert(payouts)
+    .values({
+      gameType: "nf_auth_v2_refund",
+      gameId: payoutGameId,
+      recipientAddress: params.address,
+      amountCrc: 1,
+      reason: "NF Society — connexion securisee (rembourse)",
+      status: "pending",
+    })
+    .onConflictDoNothing();
+
+  // Phase 3 — durable intent sur le challenge. Maintenant lie au payouts
+  // row par gameId : audit trail complet.
   await db
     .update(authChallenges)
     .set({ status: "refund_pending", updatedAt: new Date() })
     .where(and(eq(authChallenges.id, params.challengeId), eq(authChallenges.status, "confirmed")));
 
-  // Phase 2 — broadcast. executePayout insert d'abord un payouts row
-  // (status="pending") AVANT de tenter le broadcast. Donc meme si le
-  // broadcast crash, le row existe dans la table payouts et un retry
-  // manuel via /api/payout/retry peut le relancer.
+  // Phase 4 — broadcast. executePayout detecte le payouts row existant
+  // (status=pending), reset attempts a +1, broadcasts, update vers sending.
   const result = await executePayout({
     gameType: "nf_auth_v2_refund",
-    gameId: `nf-auth-v2-refund-${params.txHash}`,
+    gameId: payoutGameId,
     recipientAddress: params.address,
     amountCrc: 1,
     reason: "NF Society — connexion securisee (rembourse)",
     payoutReason: "game_refund",
   });
 
-  // Phase 3 — finaliser le statut du challenge.
+  // Phase 5 — reconcilier le statut du challenge avec le resultat reel.
   if (!result.success) {
     await db
       .update(authChallenges)
@@ -295,12 +325,28 @@ async function queueAuthRefund(params: {
     return;
   }
 
-  await db
-    .update(authChallenges)
-    .set({
-      status: "refunded",
-      refundTxHash: result.transferTxHash ?? null,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(authChallenges.id, params.challengeId), eq(authChallenges.status, "refund_pending")));
+  // Broadcast OK. Si payouts.status est deja "success" (rare — cron
+  // ultra-rapide), on flip a "refunded" definitif. Sinon (cas commun :
+  // status="sending"), on reste "refund_pending" avec refundTxHash set —
+  // le cron verifyPendingPayout reconcilira plus tard.
+  if (result.status === "success") {
+    await db
+      .update(authChallenges)
+      .set({
+        status: "refunded",
+        refundTxHash: result.transferTxHash ?? null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(authChallenges.id, params.challengeId), eq(authChallenges.status, "refund_pending")));
+  } else {
+    // status "sending" — on garde refund_pending mais on memorise la tx hash
+    // pour qu'un audit / cron puisse retrouver et confirmer plus tard.
+    await db
+      .update(authChallenges)
+      .set({
+        refundTxHash: result.transferTxHash ?? null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(authChallenges.id, params.challengeId), eq(authChallenges.status, "refund_pending")));
+  }
 }
