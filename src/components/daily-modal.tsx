@@ -9,6 +9,7 @@ import SpinWheel from "@/components/spin-wheel";
 import { X, Copy, Check, Loader2, Sparkles, ChevronDown, Wallet } from "lucide-react";
 import { useMiniApp } from "@/components/miniapp-provider";
 import { useConnectedAddress } from "@/hooks/use-connected-address";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type Phase = "init" | "payment" | "scratch" | "spin" | "complete";
 
@@ -20,6 +21,9 @@ export default function DailyModal() {
   const t = translations.daily;
   const tm = translations.miniapp;
   const tw = translations.wallet;
+  const stake = useStakeLabel();
+  const arcadeLabel = (label: unknown) =>
+    stake.t(String(label ?? "")).replace(/\bJACKPOT\b/g, "DOTATION");
 
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("init");
@@ -361,7 +365,7 @@ export default function DailyModal() {
     // Fake spin result
     setSpinResult({
       type: "crc_1",
-      label: "+1 CRC",
+      label: "+10 XP",
       crcValue: 1,
       xpValue: 5,
       segmentIndex: 2,
@@ -462,10 +466,10 @@ export default function DailyModal() {
                               { emoji: "⭐", label: "+50 XP", prob: "15%" },
                               { emoji: "🪙", label: t.refundOneCrc[locale], prob: "33%" },
                               { emoji: "🌟", label: "+100 XP", prob: "13.2%" },
-                              { emoji: "💰", label: "+2 CRC", prob: "10.8%" },
+                              { emoji: "💰", label: `+${stake.format(2)}`, prob: "10.8%" },
                               { emoji: "🔥", label: "Streak x2", prob: "4%" },
-                              { emoji: "💎", label: "+5 CRC", prob: "3.2%" },
-                              { emoji: "👑", label: "+20 CRC", prob: "0.8%" },
+                              { emoji: "💎", label: `+${stake.format(5)}`, prob: "3.2%" },
+                              { emoji: "👑", label: `+${stake.format(20)}`, prob: "0.8%" },
                             ].map((row) => (
                               <div key={row.label} className="flex items-center justify-between py-0.5">
                                 <span className="text-ink/60">{row.emoji} {row.label}</span>
@@ -482,12 +486,12 @@ export default function DailyModal() {
                             {[
                               { color: "#6B7280", label: t.nothing[locale], prob: "20%" },
                               { color: "#8B5CF6", label: "+50 XP", prob: "15%" },
-                              { color: "#10B981", label: "+1 CRC", prob: "30%" },
+                              { color: "#10B981", label: `+${stake.format(1)}`, prob: "30%" },
                               { color: "#6366F1", label: "+100 XP", prob: "13%" },
-                              { color: "#F59E0B", label: "+3 CRC", prob: "13%" },
+                              { color: "#F59E0B", label: `+${stake.format(3)}`, prob: "13%" },
                               { color: "#EF4444", label: "Streak x2", prob: "5%" },
-                              { color: "#EC4899", label: "+10 CRC", prob: "3%" },
-                              { color: "#FFD700", label: "JACKPOT", prob: "1%" },
+                              { color: "#EC4899", label: `+${stake.format(10)}`, prob: "3%" },
+                              { color: "#FFD700", label: "DOTATION", prob: "1%" },
                             ].map((row) => (
                               <div key={row.label} className="flex items-center justify-between py-0.5">
                                 <div className="flex items-center gap-1.5">
@@ -521,7 +525,7 @@ export default function DailyModal() {
                           {tw.payWithBalance[locale]}
                         </span>
                         <span className="text-xs text-ink/50 tabular-nums">
-                          {walletBalance.toFixed(2)} CRC {tw.available[locale]}
+                          {stake.format(walletBalance)} {tw.available[locale]}
                         </span>
                       </div>
                       <button
@@ -655,9 +659,9 @@ export default function DailyModal() {
                             <span className="text-sm font-medium">{t.scratchResult[locale]}</span>
                           </div>
                           <div className="text-right">
-                            <span className="text-sm font-bold">{scratchResult.label}</span>
+                            <span className="text-sm font-bold">{arcadeLabel(scratchResult.label)}</span>
                             {scratchResult.crcValue > 0 && (
-                              <span className="text-xs text-amber-600 ml-1">+{scratchResult.crcValue} CRC</span>
+                              <span className="text-xs text-amber-600 ml-1">+{stake.format(scratchResult.crcValue)}</span>
                             )}
                           </div>
                         </div>
@@ -672,9 +676,9 @@ export default function DailyModal() {
                             <span className="text-sm font-medium">{t.spinResult[locale]}</span>
                           </div>
                           <div className="text-right">
-                            <span className="text-sm font-bold">{spinResult.label}</span>
+                            <span className="text-sm font-bold">{arcadeLabel(spinResult.label)}</span>
                             {spinResult.crcValue > 0 && (
-                              <span className="text-xs text-amber-600 ml-1">+{spinResult.crcValue} CRC</span>
+                              <span className="text-xs text-amber-600 ml-1">+{stake.format(spinResult.crcValue)}</span>
                             )}
                           </div>
                         </div>

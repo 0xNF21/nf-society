@@ -1,6 +1,6 @@
 "use client";
 
-export default function LandingHeroMockup({ winLabel = "Gain : +9 CRC" }: { winLabel?: string }) {
+export default function LandingHeroMockup({ winLabel = "Recompense : +90 XP" }: { winLabel?: string }) {
   return (
     <div className="relative w-full max-w-4xl mx-auto aspect-[16/10] select-none pointer-events-none">
       <div

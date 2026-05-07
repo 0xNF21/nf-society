@@ -19,6 +19,7 @@ import { RematchButton, RematchBanner } from '@/components/rematch-button'
 import { PnlCard } from '@/components/pnl-card'
 import { usePlayerToken } from '@/hooks/use-player-token'
 import { useGamePolling } from '@/hooks/use-game-polling'
+import { useStakeLabel } from '@/hooks/use-stake-label'
 import type { DamesGameRow } from '@/lib/db/schema/dames'
 
 // ─── Scoreboard ──────────────────────────────────────────────────────────────
@@ -242,6 +243,7 @@ function RealGame({ id }: { id: string }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const t = translations.dames
+  const stake = useStakeLabel("dames")
   const { game, loading, fetchGame, setGame } = useGamePolling<DamesGameRow>('dames', id)
   const playerTokenRef = usePlayerToken('dames', id)
   const [address, setAddress] = useState('')
@@ -330,7 +332,7 @@ function RealGame({ id }: { id: string }) {
           <div className="flex items-center gap-2">
             <span className="text-xs text-ink/40">{t.gameLabel[locale]}</span>
             <span className="font-mono font-bold text-marine text-sm bg-marine/10 px-2.5 py-1 rounded-lg">{id}</span>
-            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg font-bold">{game.betCrc} CRC</span>
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg font-bold">{stake.format(game.betCrc)}</span>
           </div>
         </div>
 
@@ -448,7 +450,7 @@ function RealGame({ id }: { id: string }) {
             </div>
 
             <p className="text-center text-xs text-ink/40 dark:text-white/40 mb-4">
-              Pot: {game.betCrc * 2} CRC · {t.moves[locale]}: {state.moveCount}
+              Pot: {stake.format(game.betCrc * 2)} · {t.moves[locale]}: {state.moveCount}
             </p>
           </>
         )}

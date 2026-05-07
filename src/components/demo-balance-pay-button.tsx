@@ -4,6 +4,7 @@ import { Wallet } from "lucide-react";
 import { useDemo } from "@/components/demo-provider";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 interface DemoBalancePayButtonProps {
   amountCrc: number;
@@ -18,6 +19,7 @@ export function DemoBalancePayButton({
 }: DemoBalancePayButtonProps) {
   const { demoPlayer, debitDemoBalance } = useDemo();
   const { locale } = useLocale();
+  const stake = useStakeLabel();
   const t = translations.quickReplay;
 
   const canPay = demoPlayer.balanceCrc >= amountCrc;
@@ -36,7 +38,7 @@ export function DemoBalancePayButton({
           {t.demoBalance[locale]}
         </div>
         <span className="text-emerald-700 dark:text-emerald-400 tabular-nums font-medium">
-          {demoPlayer.balanceCrc.toFixed(2)} CRC
+          {stake.format(demoPlayer.balanceCrc)}
         </span>
       </div>
       <button
@@ -45,7 +47,7 @@ export function DemoBalancePayButton({
         className="w-full h-11 rounded-xl font-bold text-white transition-all disabled:opacity-40 hover:opacity-90"
         style={{ backgroundColor: accentColor }}
       >
-        🧪 {t.demoPay[locale].replace("{amount}", String(amountCrc))}
+        🧪 {t.demoPay[locale].replace("{amount}", stake.format(amountCrc))}
       </button>
       {!canPay && (
         <p className="text-xs text-red-500 text-center font-semibold">

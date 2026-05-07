@@ -6,7 +6,7 @@ import LootboxesClient from "./client";
 
 export const metadata: Metadata = {
   title: "NF Society — Lootboxes",
-  description: "Ouvre des lootboxes et gagne des CRC instantanément sur Gnosis Chain.",
+  description: "Ouvre des lootboxes en mode Arcade XP sur NF Society.",
 };
 
 export const dynamic = "force-dynamic";

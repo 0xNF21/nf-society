@@ -163,7 +163,7 @@ export const GAME_LABELS: Record<string, string> = {
   relics: "Relics",
   dames: "Dames",
   pfc: "Pierre-Feuille-Ciseaux",
-  "crc-races": "Courses CRC",
+  "crc-races": "Courses Arcade",
 };
 
 /** Game icons for stats display */

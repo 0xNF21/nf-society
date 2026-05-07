@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X, ArrowLeft, Settings2 } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 interface QuickReplayModalProps {
   open: boolean;
@@ -34,6 +35,7 @@ export function QuickReplayModal({
 }: QuickReplayModalProps) {
   const { locale } = useLocale();
   const t = translations.quickReplay;
+  const stake = useStakeLabel();
 
   const [view, setView] = useState<"pay" | "config">("pay");
 
@@ -130,7 +132,7 @@ export function QuickReplayModal({
                       }`}
                       style={currentBet === bet ? { backgroundColor: accentColor } : {}}
                     >
-                      {bet} CRC
+                      {stake.format(bet)}
                     </button>
                   ))}
                 </div>

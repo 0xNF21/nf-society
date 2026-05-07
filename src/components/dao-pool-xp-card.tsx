@@ -15,7 +15,7 @@ type DaoPoolSummary = {
 /**
  * Carte affichee sur `/dashboard-dao` quand le flag `real_stakes` est sur
  * "hidden" — montre le pot communautaire XP accumule via les commissions
- * des parties F2P (5% multi + house edge chance).
+ * des parties F2P (5% multi + commission chance).
  */
 export function DaoPoolXpCard() {
   const { locale } = useLocale();

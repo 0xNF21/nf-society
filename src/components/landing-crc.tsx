@@ -37,7 +37,7 @@ const MULTI_LABEL: Record<string, { fr: string; en: string }> = {
   relics: { fr: "Relics", en: "Relics" },
   dames: { fr: "Dames", en: "Checkers" },
   pfc: { fr: "Pierre-Feuille-Ciseaux", en: "Rock-Paper-Scissors" },
-  "crc-races": { fr: "Courses CRC", en: "CRC Races" },
+  "crc-races": { fr: "Courses Arcade", en: "Arcade Races" },
 };
 
 const CHANCE_LABEL: Record<string, { fr: string; en: string }> = {

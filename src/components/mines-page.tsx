@@ -116,6 +116,7 @@ function MinesBoard({
   locale: "fr" | "en";
 }) {
   const t = translations.mines;
+  const stake = useStakeLabel("mines");
   const gameOver = visible.status !== "playing";
 
   return (
@@ -160,7 +161,7 @@ function MinesBoard({
           className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2 bg-amber-500 text-white"
         >
           <Banknote className="w-5 h-5" />
-          {t.cashoutAmount[locale].replace("{amount}", String(Math.round(visible.potentialPayout * 1000) / 1000))}
+          {stake.t(t.cashoutAmount[locale].replace("{amount}", String(Math.round(visible.potentialPayout * 1000) / 1000)))}
         </button>
       )}
 
@@ -190,6 +191,7 @@ function ResultPanel({
   onPlayAgain: () => void;
 }) {
   const t = translations.mines;
+  const stake = useStakeLabel("mines");
   const won = visible.status === "cashed_out";
   const payout = won ? visible.potentialPayout : 0;
 
@@ -223,7 +225,7 @@ function ResultPanel({
           {t.gemsFound[locale]}: {visible.gemsRevealed} | x{visible.currentMultiplier.toFixed(2)}
         </p>
         {won && payout > 0 && (
-          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(payout * 1000) / 1000} CRC</p>
+          <p className="text-lg text-emerald-600 font-bold mt-2">+{stake.format(payout)}</p>
         )}
       </div>
 

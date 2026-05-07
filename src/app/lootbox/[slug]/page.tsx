@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!lootbox) return { title: "Lootbox — NF Society" };
   return {
     title: `${lootbox.title} — NF Society Lootbox`,
-    description: lootbox.description || `Ouvre une lootbox pour ${lootbox.pricePerOpenCrc} CRC et gagne jusqu'à ${lootbox.pricePerOpenCrc * 7} CRC !`,
+    description: lootbox.description || "Ouvre une lootbox en mode Arcade XP et progresse dans NF Society.",
   };
 }
 

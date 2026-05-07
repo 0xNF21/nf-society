@@ -233,6 +233,7 @@ function BettingTable({
   locale: "fr" | "en";
 }) {
   const t = translations.roulette;
+  const stake = useStakeLabel("roulette");
 
   const chipCount = useCallback((type: BetType, number?: number, numbers?: number[]): number => {
     try {
@@ -314,7 +315,7 @@ function BettingTable({
       {/* ── Live bet recap ── */}
       <div className="rounded-xl bg-white/10 p-3 space-y-2">
         <div className="flex items-center justify-between text-xs text-white/70 mb-1">
-          <span className="font-bold">{totalPlaced} / {betCrc}</span>
+          <span className="font-bold">{stake.format(totalPlaced)} / {stake.format(betCrc)}</span>
           <button onClick={onClear} disabled={bets.length === 0}
             className="text-red-400 hover:text-red-300 disabled:opacity-30 flex items-center gap-1 font-bold">
             <X className="w-3 h-3" /> {t.clear[locale]}
@@ -547,6 +548,7 @@ function ResultPanel({
   onPlayAgain: () => void;
 }) {
   const t = translations.roulette;
+  const stake = useStakeLabel("roulette");
   const won = round.status === "won";
   const payout = round.payoutCrc || 0;
   const resultNum = round.result ?? 0;
@@ -580,7 +582,7 @@ function ResultPanel({
           </div>
         )}
         {won && payout > 0 && (
-          <p className="text-xl text-emerald-600 font-black mt-3">+{Math.round(payout * 1000) / 1000} CRC</p>
+          <p className="text-xl text-emerald-600 font-black mt-3">+{stake.format(payout)}</p>
         )}
       </div>
 

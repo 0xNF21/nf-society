@@ -5,6 +5,7 @@ import type { SpinResult } from "@/lib/daily-shared";
 import { SPIN_SEGMENTS } from "@/lib/daily-shared";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type Props = {
   result: SpinResult | null;
@@ -19,6 +20,7 @@ const SEGMENT_ANGLE = 360 / SEGMENT_COUNT;
 
 export default function SpinWheel({ result, onSpin, onComplete, spinning, locale }: Props) {
   const { theme } = useTheme();
+  const stake = useStakeLabel("daily");
   const isDark = theme === "dark";
   const [rotation, setRotation] = useState(0);
   const [showResult, setShowResult] = useState(false);
@@ -73,7 +75,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
       ctx.textBaseline = "middle";
       ctx.shadowColor = "rgba(0,0,0,0.5)";
       ctx.shadowBlur = 2;
-      ctx.fillText(segment.label, 0, 0);
+      ctx.fillText(stake.t(segment.label).replace(/\bJACKPOT\b/g, "DOTATION"), 0, 0);
       ctx.restore();
     });
 
@@ -85,7 +87,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
     ctx.strokeStyle = isDark ? "#333" : "#ffffff";
     ctx.lineWidth = 3;
     ctx.stroke();
-  }, [isDark]);
+  }, [isDark, stake]);
 
   // Trigger spin animation
   useEffect(() => {
@@ -161,9 +163,9 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
               ? "bg-gradient-to-r from-yellow-200 to-amber-200 text-amber-900"
               : "bg-ink/5 text-ink/60"
         }`}>
-          <p className="text-xl font-bold">{result.label}</p>
+          <p className="text-xl font-bold">{stake.t(result.label).replace(/\bJACKPOT\b/g, "DOTATION")}</p>
           {result.crcValue > 0 && (
-            <p className="text-sm mt-1">💰 +{result.crcValue} CRC</p>
+            <p className="text-sm mt-1">💰 +{stake.format(result.crcValue)}</p>
           )}
           {result.xpValue > 0 && (
             <p className="text-sm mt-1">⭐ +{result.xpValue} XP</p>

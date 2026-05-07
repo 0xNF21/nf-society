@@ -17,6 +17,7 @@ import { translations, localeBcp47 } from "@/lib/i18n";
 import { darkSafeColor } from "@/lib/utils";
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 export type LotteryConfig = {
   id: number;
@@ -79,6 +80,8 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   const displayColor = darkSafeColor(lottery.primaryColor, isDark);
   const displayAccent = darkSafeColor(lottery.accentColor, isDark);
   const l = translations.lottery;
+  const stake = useStakeLabel("lottery");
+  const ticketLabel = stake.format(lottery.ticketPriceCrc);
   const tokenRef = usePlayerToken("lottery", lottery.slug);
 
   const [ticketCount, setTicketCount] = useState<number>(initialCount ?? 0);
@@ -379,7 +382,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
               {(() => {
                 const frDefault = `Achetez un ticket pour ${lottery.ticketPriceCrc} CRC et tentez de gagner le gros lot !`;
                 if (!currentDescription || currentDescription === frDefault) {
-                  return l.defaultDesc[locale](lottery.ticketPriceCrc);
+                  return l.defaultDesc[locale](ticketLabel);
                 }
                 return currentDescription;
               })()}
@@ -409,13 +412,13 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
               <CardHeader>
                 <CardTitle>{l.participateTitle[locale]}</CardTitle>
                 <CardDescription>
-                  {l.participateDesc[locale](lottery.ticketPriceCrc)}
+                  {l.participateDesc[locale](ticketLabel)}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="bg-sand/30 rounded-2xl p-6 text-center border border-ink/5">
-                  <span className="text-5xl font-bold text-ink">{lottery.ticketPriceCrc}</span>
-                  <span className="text-xl font-semibold text-ink/60 ml-2">CRC</span>
+                  <span className="text-5xl font-bold text-ink">{stake.value(lottery.ticketPriceCrc).toLocaleString(localeBcp47(locale))}</span>
+                  <span className="text-xl font-semibold text-ink/60 ml-2">{stake.unit}</span>
                   <p className="text-xs text-ink/40 mt-2 uppercase tracking-widest">{l.ticketPrice[locale]}</p>
                 </div>
 
@@ -555,7 +558,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
               <div className="px-6 md:px-8 pb-6 md:pb-8 bg-white animate-in fade-in slide-in-from-top-2 duration-300">
                 <div className="divide-y divide-ink/5">
                   <FaqItem question={l.faq.howToParticipateQ[locale]}>
-                    <p>{l.faq.howToParticipateA[locale](lottery.ticketPriceCrc)}</p>
+                    <p>{l.faq.howToParticipateA[locale](ticketLabel)}</p>
                   </FaqItem>
 
                   <FaqItem question={l.faq.howWinnerQ[locale]}>

@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!table) return { title: "Demurrage Dash — NF Society" };
   return {
     title: `${table.title} — NF Society`,
-    description: table.description || "Demurrage Dash avec CRC",
+    description: table.description || "Demurrage Dash en mode Arcade XP",
   };
 }
 

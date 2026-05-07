@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GAME_REGISTRY, GAME_LABELS } from "@/lib/game-registry";
 import { translations } from "@/lib/i18n";
-import { formatCrc } from "@/lib/format";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 interface Room {
   slug: string;
@@ -35,6 +35,7 @@ export default function LobbyPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const t = translations.lobby;
+  const stake = useStakeLabel();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
@@ -168,10 +169,10 @@ export default function LobbyPage() {
                           </div>
                           <div className="flex items-center gap-3 mt-0.5">
                             <span className="text-xs text-ink/50 dark:text-white/50">
-                              {t.betLabel[locale]}: <span className="font-bold text-ink dark:text-white">{room.betCrc} CRC</span>
+                              {t.betLabel[locale]}: <span className="font-bold text-ink dark:text-white">{stake.format(room.betCrc)}</span>
                             </span>
                             <span className="text-[10px] text-ink/30 dark:text-white/30">
-                              → {formatCrc(winAmount)} CRC
+                              → {stake.format(winAmount)}
                             </span>
                           </div>
                         </div>

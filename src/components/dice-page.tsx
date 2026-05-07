@@ -66,6 +66,7 @@ function DiceControls({
   locale: "fr" | "en";
 }) {
   const t = translations.dice;
+  const stake = useStakeLabel("dice");
   const multiplier = calculateMultiplier(target, direction);
   const winChance = calculateWinChance(target, direction);
   const payout = Math.floor(betCrc * multiplier * 100) / 100;
@@ -154,7 +155,7 @@ function DiceControls({
         </div>
         <div className="text-center rounded-xl border border-ink/10 dark:border-white/10 py-3 bg-white/60 dark:bg-white/5">
           <p className="text-[10px] text-ink/40 uppercase tracking-widest">{t.potentialPayout[locale]}</p>
-          <p className="text-lg font-bold text-emerald-600">{payout.toFixed(2)}</p>
+          <p className="text-lg font-bold text-emerald-600">{stake.format(payout)}</p>
         </div>
       </div>
 
@@ -242,6 +243,7 @@ function ResultPanel({
   onPlayAgain: () => void;
 }) {
   const t = translations.dice;
+  const stake = useStakeLabel("dice");
   const won = round.status === "won";
   const payout = round.payoutCrc || 0;
   const multiplier = round.multiplier || 0;
@@ -276,7 +278,7 @@ function ResultPanel({
           {t.target[locale]}: {round.target?.toFixed(2)} | {round.direction === "over" ? t.rollOver[locale] : t.rollUnder[locale]} | x{multiplier.toFixed(4)}
         </p>
         {won && payout > 0 && (
-          <p className="text-lg text-emerald-600 font-bold mt-2">+{Math.round(payout * 1000) / 1000} CRC</p>
+          <p className="text-lg text-emerald-600 font-bold mt-2">+{stake.format(payout)}</p>
         )}
       </div>
 

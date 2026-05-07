@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { ScratchResult } from "@/lib/daily-shared";
 import { translations } from "@/lib/i18n";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type Props = {
   result: ScratchResult;
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export default function ScratchCard({ result, onComplete, locale }: Props) {
+  const stake = useStakeLabel("daily");
   const [revealed, setRevealed] = useState<boolean[]>([false, false, false]);
   const [scratching, setScratching] = useState<number | null>(null);
   const [complete, setComplete] = useState(false);
@@ -174,9 +176,9 @@ export default function ScratchCard({ result, onComplete, locale }: Props) {
             ? "bg-amber-100 text-amber-800"
             : "bg-ink/5 text-ink/60"
         }`}>
-          <p className="text-lg font-bold">{result.label}</p>
+          <p className="text-lg font-bold">{stake.t(result.label).replace(/\bJACKPOT\b/g, "DOTATION")}</p>
           {result.crcValue > 0 && (
-            <p className="text-sm">💰 +{result.crcValue} CRC</p>
+            <p className="text-sm">💰 +{stake.format(result.crcValue)}</p>
           )}
           {result.xpValue > 0 && (
             <p className="text-sm">⭐ +{result.xpValue} XP</p>

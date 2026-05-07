@@ -29,23 +29,23 @@ function TermsContentFr({ t, locale }: { t: T; locale: Locale }) {
 
       <h2>3. Description du service</h2>
       <p>
-        NF Society propose des jeux multijoueurs et des jeux de chance utilisant la monnaie CRC du protocole Circles.
-        Les paiements et payouts sont executes on-chain via des smart contracts Safe + Roles Modifier,
-        sans custody des fonds par l'editeur.
+        NF Society propose des jeux multijoueurs et des modes arcade en Free-to-Play.
+        Les jeux quotidiens utilisent des XP virtuels sans valeur monetaire. Les anciens soldes CRC
+        restent retirables via le flux legacy prevu a cet effet.
       </p>
 
       <h2>4. Conditions d'acces</h2>
       <ul>
         <li>Etre majeur selon la legislation de sa juridiction de residence</li>
-        <li>Disposer d'un wallet Circles verifie pour participer aux jeux avec mise reelle</li>
-        <li>Respecter les lois locales en matiere de jeux d'argent en ligne</li>
+        <li>Utiliser les jeux Arcade en XP virtuels, sans mise reelle</li>
+        <li>Disposer d'un wallet Circles uniquement pour retirer un solde CRC legacy</li>
         <li>Le mode demo ne necessite ni wallet ni inscription et reste accessible a tous</li>
       </ul>
 
       <h2>5. Responsabilite de l'utilisateur</h2>
       <p>
-        L'utilisateur joue sous sa propre responsabilite. Il lui appartient de verifier la legalite des jeux
-        d'argent en ligne dans sa juridiction avant toute mise en CRC.
+        L'utilisateur joue sous sa propre responsabilite. Les jeux quotidiens ne proposent ni depot CRC,
+        ni mise reelle, ni gain monetaire. Les retraits legacy restent disponibles pour les soldes existants.
       </p>
 
       <h2>6. Limitation de responsabilite</h2>
@@ -57,7 +57,7 @@ function TermsContentFr({ t, locale }: { t: T; locale: Locale }) {
 
       <h2>7. Gouvernance</h2>
       <p>
-        Les parametres economiques (house edge, commissions, distribution de la tresorerie) sont fixes par vote
+        Les parametres communautaires (nouveaux jeux, saisons, recompenses, distribution de la tresorerie) sont fixes par vote
         du DAO. Les utilisateurs peuvent participer aux votes selon les modalites decrites dans la documentation
         de gouvernance.
       </p>
@@ -104,23 +104,23 @@ function TermsContentEn({ t, locale }: { t: T; locale: Locale }) {
 
       <h2>3. Service description</h2>
       <p>
-        NF Society offers multiplayer games and chance games using the CRC currency of the Circles protocol.
-        Payments and payouts are executed on-chain via Safe + Roles Modifier smart contracts, without fund custody
-        by the operator.
+        NF Society offers multiplayer games and arcade modes in Free-to-Play.
+        Everyday games use virtual XP with no monetary value. Existing CRC balances remain withdrawable
+        through the dedicated legacy flow.
       </p>
 
       <h2>4. Access conditions</h2>
       <ul>
         <li>Be of legal age under the legislation of the user's jurisdiction</li>
-        <li>Have a verified Circles wallet to participate in real-money games</li>
-        <li>Comply with local laws regarding online gambling</li>
+        <li>Use Arcade games with virtual XP, without real-money stakes</li>
+        <li>Have a verified Circles wallet only to withdraw a legacy CRC balance</li>
         <li>Demo mode requires neither wallet nor signup and stays accessible to anyone</li>
       </ul>
 
       <h2>5. User responsibility</h2>
       <p>
-        Users play at their own risk. It is their responsibility to verify the legality of online gambling
-        in their jurisdiction before any CRC bet.
+        Users play at their own risk. Everyday games do not offer CRC deposits, real-money stakes,
+        or monetary winnings. Legacy withdrawals remain available for existing balances.
       </p>
 
       <h2>6. Limitation of liability</h2>
@@ -131,7 +131,7 @@ function TermsContentEn({ t, locale }: { t: T; locale: Locale }) {
 
       <h2>7. Governance</h2>
       <p>
-        Economic parameters (house edge, commissions, treasury distribution) are set by DAO vote.
+        Community parameters (new games, seasons, rewards, treasury distribution) are set by DAO vote.
         Users can participate in votes according to the procedures described in the governance documentation.
       </p>
 

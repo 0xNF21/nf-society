@@ -7,6 +7,7 @@ import { useLocale } from "@/components/language-provider";
 import { translations, localeBcp47 } from "@/lib/i18n";
 import { formatCrc } from "@/lib/format";
 import BadgeIcon from "@/components/ui/badge-icon";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 interface LevelDef {
   level: number;
@@ -144,6 +145,7 @@ export default function PlayerProfileClient({
   const { locale } = useLocale();
   const t = translations.playerProfile;
   const tp = translations.privacy;
+  const stake = useStakeLabel();
   const hidePnl = privacy?.hidePnl ?? false;
   const hideTotalBet = privacy?.hideTotalBet ?? false;
   const hideGameHistory = privacy?.hideGameHistory ?? false;
@@ -289,7 +291,7 @@ export default function PlayerProfileClient({
                   {hideTotalBet ? (
                     <p className="text-sm font-black text-ink/40">🔒 {tp.private[locale]}</p>
                   ) : (
-                    <p className="text-sm font-black text-ink dark:text-white">{stats.totalBet} CRC</p>
+                    <p className="text-sm font-black text-ink dark:text-white">{stake.format(stats.totalBet)}</p>
                   )}
                   <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.crcBet[locale]}</p>
                 </div>
@@ -298,7 +300,7 @@ export default function PlayerProfileClient({
                   {hidePnl ? (
                     <p className="text-sm font-black text-ink/40">🔒 {tp.private[locale]}</p>
                   ) : (
-                    <p className={`text-sm font-black ${stats.totalWon >= stats.totalBet ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>{stats.totalWon} CRC</p>
+                    <p className={`text-sm font-black ${stats.totalWon >= stats.totalBet ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>{stake.format(stats.totalWon)}</p>
                   )}
                   <p className="text-[10px] font-bold text-ink/40 uppercase tracking-widest">{t.crcWon[locale]}</p>
                 </div>
@@ -327,7 +329,7 @@ export default function PlayerProfileClient({
                           </>
                         ) : (
                           <span className={`font-bold font-mono ${g.net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                            {g.net >= 0 ? "+" : ""}{formatCrc(g.net)} CRC
+                            {g.net >= 0 ? "+" : ""}{stake.format(g.net)}
                           </span>
                         )}
                       </div>
@@ -357,7 +359,7 @@ export default function PlayerProfileClient({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-ink/40">{h.betCrc} CRC</span>
+                          <span className="text-[10px] text-ink/40">{stake.format(h.betCrc)}</span>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${RESULT_COLORS[h.result]}`}>
                             {t[h.result][locale]}
                           </span>

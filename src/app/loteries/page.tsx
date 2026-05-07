@@ -8,6 +8,7 @@ import { useLocale } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
 import { darkSafeColor } from "@/lib/utils";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type LotteryCard = {
   id: number;
@@ -30,6 +31,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const { locale } = useLocale();
   const { theme } = useTheme();
+  const stake = useStakeLabel("lottery");
   const isDark = theme === "dark";
   const h = translations.home;
 
@@ -144,9 +146,9 @@ export default function HomePage() {
                 className="text-lg font-bold"
                 style={{ color: displayColor }}
               >
-                {lottery.ticketPriceCrc}
+                {stake.value(lottery.ticketPriceCrc).toLocaleString(locale === "fr" ? "fr-FR" : "en-US")}
               </span>
-              <span className="text-xs text-ink/40 font-medium">CRC</span>
+              <span className="text-xs text-ink/40 font-medium">{stake.unit}</span>
             </div>
             <div className="flex items-center gap-1 text-ink/40">
               <Users className="h-3.5 w-3.5" />

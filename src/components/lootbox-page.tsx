@@ -15,6 +15,7 @@ import { playRollingSound, playRevealSound, setSoundMuted, isSoundMuted } from "
 import { ChancePayment } from "@/components/chance-payment";
 import { PnlCard } from "@/components/pnl-card";
 import { QuickReplayModal } from "@/components/quick-replay-modal";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type LootboxData = {
   id: number;
@@ -46,7 +47,7 @@ function shortenAddress(addr: string): string {
 
 function getRewardTier(reward: number, price: number): { label: string; color: string; isJackpot: boolean; isMega: boolean; isLegendary: boolean; isRare: boolean } {
   const ratio = reward / price;
-  if (ratio >= 7)    return { label: "JACKPOT 🔥",    color: "#F59E0B", isJackpot: true,  isMega: false, isLegendary: false, isRare: false };
+  if (ratio >= 7)    return { label: "DOTATION 🔥",   color: "#F59E0B", isJackpot: true,  isMega: false, isLegendary: false, isRare: false };
   if (ratio >= 3)    return { label: "LEGENDARY ⚡",  color: "#EF4444", isJackpot: false, isMega: false, isLegendary: true,  isRare: false };
   if (ratio >= 1.4)  return { label: "MEGA ✨",        color: "#7C3AED", isJackpot: false, isMega: true,  isLegendary: false, isRare: false };
   if (ratio >= 0.85) return { label: "RARE 😐",        color: "#2563EB", isJackpot: false, isMega: false, isLegendary: false, isRare: true  };
@@ -59,6 +60,7 @@ const TIER_COLORS  = ["#6B7280", "#2563EB", "#7C3AED", "#EF4444", "#F59E0B"];
 function RewardTable({ priceCrc, accentColor }: { priceCrc: number; accentColor: string }) {
   const t = translations.lootbox;
   const { locale } = useLocale();
+  const stake = useStakeLabel("lootbox");
   const table = getRewardTable(priceCrc);
   const rows = table.map((e, i) => ({
     prob: `${Math.round(e.probability * 100)}%`,
@@ -75,7 +77,7 @@ function RewardTable({ priceCrc, accentColor }: { priceCrc: number; accentColor:
       {rows.map((row, i) => (
         <div key={i} className="flex items-center justify-between px-4 py-3 border-t border-ink/5">
           <span className="text-sm font-semibold text-ink/50">{row.prob}</span>
-          <span className="text-sm font-bold" style={{ color: row.color }}>{row.emoji} {row.reward} CRC</span>
+          <span className="text-sm font-bold" style={{ color: row.color }}>{row.emoji} {stake.format(row.reward)}</span>
         </div>
       ))}
     </div>
@@ -121,6 +123,7 @@ function BoxImage({ card, isWinner, isRevealing, isDark }: {
   card: SlotCard; isWinner?: boolean; isRevealing?: boolean; isDark?: boolean;
 }) {
   const { tier } = card;
+  const stake = useStakeLabel("lootbox");
   const [imgError, setImgError] = useState(false);
   const emoji = tier.isJackpot ? "🔥" : tier.isLegendary ? "⚡" : tier.isMega ? "✨" : tier.isRare ? "😐" : "😢";
   const imgSrc = tier.isJackpot ? "/lootbox/jackpot.png"
@@ -162,8 +165,8 @@ function BoxImage({ card, isWinner, isRevealing, isDark }: {
         )}
       </div>
       <div style={{ textAlign: "center", lineHeight: 1.2 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: tier.color || (isDark ? "#e5e7eb" : "#374151") }}>{card.reward}</span>
-        <span style={{ fontSize: 10, fontWeight: 600, color: tier.color || (isDark ? "#9CA3AF" : "#9CA3AF"), marginLeft: 2 }}>CRC</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: tier.color || (isDark ? "#e5e7eb" : "#374151") }}>{stake.value(card.reward)}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: tier.color || (isDark ? "#9CA3AF" : "#9CA3AF"), marginLeft: 2 }}>{stake.unit}</span>
       </div>
     </div>
   );
@@ -188,6 +191,7 @@ function SlotMachine({
   animTrigger: number;
   isDark?: boolean;
 }) {
+  const stake = useStakeLabel("lootbox");
   const isJackpotOrMega = tier?.isJackpot || tier?.isMega;
   const isRolling = phase === "rolling";
   const isRevealing = phase === "revealing";
@@ -385,7 +389,7 @@ function SlotMachine({
             className="rounded-2xl px-6 py-3 text-center shadow-xl"
           >
             <p className="text-3xl font-black" style={{ color: tier?.color || accentColor }}>
-              +{Math.round(rewardCrc * 1000) / 1000} CRC
+              +{stake.format(rewardCrc)}
             </p>
             {tier?.label && (
               <p className="text-sm font-bold" style={{ color: tier.color }}>{tier.label}</p>
@@ -402,6 +406,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const t = translations.lootbox;
+  const stake = useStakeLabel("lootbox");
   const tokenRef = usePlayerToken("lootbox", lootbox.slug);
 
   const [opens, setOpens] = useState<LootboxOpen[]>([]);
@@ -629,12 +634,12 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
             <h1 className="font-display text-4xl font-bold text-ink sm:text-5xl">{lootbox.title}</h1>
             <p className="text-ink/50 text-sm max-w-md mx-auto">
               {t.autoDesc[locale]
-                .replace("{price}", String(lootbox.pricePerOpenCrc))
-                .replace("{max}", String(getRewardTable(lootbox.pricePerOpenCrc).at(-1)!.reward))}
+                .replace("{price}", stake.format(lootbox.pricePerOpenCrc))
+                .replace("{max}", stake.format(getRewardTable(lootbox.pricePerOpenCrc).at(-1)!.reward))}
             </p>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/70 backdrop-blur-sm border border-ink/10 px-4 py-1.5 shadow-sm">
               <span className="text-xs text-ink/40 font-medium">{t.price[locale]}:</span>
-              <span className="text-sm font-bold text-ink">{lootbox.pricePerOpenCrc} CRC</span>
+              <span className="text-sm font-bold text-ink">{stake.format(lootbox.pricePerOpenCrc)}</span>
             </div>
           </header>
 
@@ -695,7 +700,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                   <ol className="space-y-3 text-sm text-ink/70">
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">1</span>
-                      <span>{t.rulesStep1[locale].replace("{price}", String(lootbox.pricePerOpenCrc))}</span>
+                      <span>{t.rulesStep1[locale].replace("{price}", stake.format(lootbox.pricePerOpenCrc))}</span>
                     </li>
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">2</span>
@@ -703,7 +708,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                     </li>
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">3</span>
-                      <span>{t.rulesStep3[locale].replace("{min}", String(getRewardTable(lootbox.pricePerOpenCrc)[0].reward)).replace("{max}", String(getRewardTable(lootbox.pricePerOpenCrc).at(-1)!.reward))}</span>
+                      <span>{t.rulesStep3[locale].replace("{min}", stake.format(getRewardTable(lootbox.pricePerOpenCrc)[0].reward)).replace("{max}", stake.format(getRewardTable(lootbox.pricePerOpenCrc).at(-1)!.reward))}</span>
                     </li>
                     <li className="flex gap-3">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-marine/10 text-marine text-xs font-bold flex items-center justify-center">4</span>
@@ -718,7 +723,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                       { label: "😐 Rare",        mult: "×0.85–1.4", color: "#2563EB" },
                       { label: "✨ Mega",        mult: "×1.4–3",    color: "#7C3AED" },
                       { label: "⚡ Legendary",   mult: "×3–7",      color: "#EF4444" },
-                      { label: "🔥 Jackpot",     mult: "×7+",       color: "#F59E0B" },
+                      { label: "🔥 Dotation",    mult: "×7+",       color: "#F59E0B" },
                     ].map((tier) => (
                       <div key={tier.label} className="flex items-center justify-between text-xs">
                         <span className="font-semibold" style={{ color: tier.color }}>{tier.label}</span>
@@ -766,7 +771,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                         return (
                           <div key={i} className="flex items-center justify-between text-xs">
                             <span className="font-semibold" style={{ color: tier.color || (isDark ? "#e5e7eb" : "#6B7280") }}>
-                              {TIER_EMOJIS[i]} {Math.round(e.probability * 100)}% × {e.reward} CRC
+                              {TIER_EMOJIS[i]} {Math.round(e.probability * 100)}% × {stake.format(e.reward)}
                             </span>
                             <span className="font-bold text-ink/50">= {contrib}%</span>
                           </div>
@@ -794,7 +799,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                       onClick={() => runAnimation({ id: 0, playerAddress: "0x0000000000000000000000000000000000000000", transactionHash: "0xtest", playerToken: tokenRef.current, rewardCrc: reward, payoutStatus: "pending", openedAt: new Date().toISOString() })}
                       className="text-xs px-3 py-1 rounded-lg border border-dashed border-ink/20 text-ink/40 hover:text-ink/70 hover:border-ink/40 transition-colors"
                     >
-                      Test {reward} CRC
+                      Test {stake.format(reward)}
                     </button>
                   );
                 })}
@@ -808,7 +813,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                 )}
                 <p className="text-lg font-bold text-ink">
                   {t.youWon[locale]}{" "}
-                  <span style={{ color: accentColor }}>{latestOpen.rewardCrc} CRC</span>
+                  <span style={{ color: accentColor }}>{stake.format(latestOpen.rewardCrc)}</span>
                 </p>
                 {tier && tier.label && !tier.isJackpot && (
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: tier.color + "15", color: tier.color }}>
@@ -946,7 +951,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
                             <p className="text-xs text-ink/30">{new Date(o.openedAt).toLocaleDateString()}</p>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className="text-sm font-black" style={{ color: t2.isJackpot ? t2.color : accentColor }}>{o.rewardCrc} CRC</p>
+                            <p className="text-sm font-black" style={{ color: t2.isJackpot ? t2.color : accentColor }}>{stake.format(o.rewardCrc)}</p>
                             {t2.label && (
                               <span className="text-[10px] font-bold" style={{ color: t2.color }}>{t2.label}</span>
                             )}

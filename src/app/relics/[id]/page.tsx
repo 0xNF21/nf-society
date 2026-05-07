@@ -14,8 +14,8 @@ import { RematchButton, RematchBanner } from "@/components/rematch-button"
 import { PnlCard } from "@/components/pnl-card"
 import { usePlayerToken } from "@/hooks/use-player-token"
 import { useGamePolling } from "@/hooks/use-game-polling"
+import { useStakeLabel } from "@/hooks/use-stake-label"
 import { translations } from "@/lib/i18n"
-import { formatCrc } from "@/lib/format"
 import Link from "next/link"
 import { ArrowLeft, RotateCcw, Trophy, Clock, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -424,6 +424,7 @@ function RealRelicsGame({ id }: { id: string }) {
   const { theme } = useTheme()
   const isDark = theme === "dark"
   const t = translations.relics
+  const stake = useStakeLabel("relics")
 
   const { game, loading, fetchGame, setGame } = useGamePolling<RelicsGameRow>("relics", id)
   const playerTokenRef = usePlayerToken("relics", id)
@@ -691,7 +692,7 @@ function RealRelicsGame({ id }: { id: string }) {
                     {game.winnerAddress?.toLowerCase() === myAddress.toLowerCase() ? t.victory[locale] : t.defeat[locale]}
                   </span>
                 </div>
-                <p className="text-xs text-ink/50 dark:text-white/50">{formatCrc(winAmount)} CRC</p>
+                <p className="text-xs text-ink/50 dark:text-white/50">{stake.format(winAmount)}</p>
               </div>
             )}
           </CardContent>

@@ -14,6 +14,7 @@ import { GamePayment } from "@/components/game-payment";
 import { PnlCard } from "@/components/pnl-card";
 import { RematchButton, RematchBanner } from "@/components/rematch-button";
 import { usePlayerToken } from "@/hooks/use-player-token";
+import { useStakeLabel } from "@/hooks/use-stake-label";
 import {
   ACTION_COST,
   CHOICE_PHASE_MS,
@@ -482,6 +483,7 @@ function RacePageFrame({
 }) {
   const { locale } = useLocale();
   const t = translations.crcRaces;
+  const stake = useStakeLabel("crc-races");
 
   const [choiceSec, setChoiceSec] = useState(0);
   useEffect(() => {
@@ -522,7 +524,7 @@ function RacePageFrame({
 
         <div className="flex flex-wrap items-center justify-center gap-2 mb-3 text-xs">
           <span className="font-semibold text-ink/50 uppercase tracking-widest">
-            {betCrc} CRC · {maxPlayers} {t.players[locale]}
+            {stake.format(betCrc)} · {maxPlayers} {t.players[locale]}
           </span>
           {status === "racing" && (
             <>
@@ -641,6 +643,7 @@ function ResultsCard({
 }) {
   const { locale } = useLocale();
   const t = translations.crcRaces;
+  const stake = useStakeLabel("crc-races");
 
   const leaderboard = [...players].sort((a, b) => {
     if (a.finishRank !== null && b.finishRank !== null) return a.finishRank - b.finishRank;
@@ -680,7 +683,7 @@ function ResultsCard({
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-ink/60">{rankLabel}</span>
                     {won && p.finishRank && (
-                      <span className="text-xs font-bold text-emerald-600">+{shares[p.finishRank - 1]} CRC</span>
+                      <span className="text-xs font-bold text-emerald-600">+{stake.format(shares[p.finishRank - 1])}</span>
                     )}
                   </div>
                 </div>
