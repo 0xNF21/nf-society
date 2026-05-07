@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { payGameFromXp } from "@/lib/wallet-xp";
+import { isRealStakesEnabled } from "@/lib/stakes";
 
 /**
  * POST /api/morpion/start-free
@@ -26,6 +27,17 @@ import { payGameFromXp } from "@/lib/wallet-xp";
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "morpion-start-free", 20, 60000);
   if (limited) return limited;
+
+  // Gate F2P — si le mode CRC reel est actif pour ce jeu, le client doit
+  // utiliser /api/wallet/pay-game (balance) ou le scan on-chain (paiement
+  // direct), pas la route XP gratuite. Bloque la fuite "start-free + payout
+  // CRC" identifiee dans l'audit PR1.
+  if (await isRealStakesEnabled("morpion")) {
+    return NextResponse.json(
+      { error: "USE_PAID_PATH", message: "Real-stakes mode is active for this game. Use the paid flow." },
+      { status: 403 },
+    );
+  }
 
   try {
     const body = await req.json().catch(() => ({}));

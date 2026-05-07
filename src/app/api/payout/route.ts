@@ -3,9 +3,16 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { payouts } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { executePayout } from "@/lib/payout";
+import { executePayout, type PayoutReason } from "@/lib/payout";
 
 export const dynamic = "force-dynamic";
+
+const ALLOWED_REASONS: ReadonlySet<PayoutReason> = new Set([
+  "legacy_cashout",
+  "game_refund",
+  "dao_reward",
+  "admin_correction",
+]);
 
 export async function POST(request: NextRequest) {
   const limited = await enforceRateLimit(request, "payout", 10, 60000);
@@ -13,7 +20,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { gameType, gameId, recipientAddress, amountCrc, reason, password } = body;
+    const { gameType, gameId, recipientAddress, amountCrc, reason, password, payoutReason, sourceTxHash } = body;
 
     if (password !== process.env.ADMIN_PASSWORD) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -34,12 +41,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid recipient address" }, { status: 400 });
     }
 
+    // L'endpoint admin etait un trou potentiel : pre-PR1, n'importe quel
+    // gameType pouvait sortir de la Safe avec juste ADMIN_PASSWORD. Maintenant
+    // on whitelist explicitement les categories autorisees. game_win, shop_crc,
+    // lottery_win, daily_random_crc sont rejetees ici meme si admin auth est OK.
+    const effectiveReason: PayoutReason = (payoutReason as PayoutReason) ?? "admin_correction";
+    if (!ALLOWED_REASONS.has(effectiveReason)) {
+      return NextResponse.json(
+        {
+          error: "PAYOUT_REASON_NOT_ALLOWED",
+          message: `Admin payout reason must be one of: ${[...ALLOWED_REASONS].join(", ")}`,
+        },
+        { status: 403 },
+      );
+    }
+
     const result = await executePayout({
       gameType,
       gameId,
       recipientAddress: recipientAddress.toLowerCase(),
       amountCrc,
       reason,
+      payoutReason: effectiveReason,
+      sourceTxHash: sourceTxHash ?? null,
     });
 
     return NextResponse.json(result, { status: result.success ? 200 : 400 });
