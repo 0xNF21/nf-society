@@ -1,9 +1,9 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, desc } from "drizzle-orm";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
-import { authChallenges, claimedPayments } from "@/lib/db/schema";
+import { authChallenges, authSessions, claimedPayments } from "@/lib/db/schema";
 import { checkAllNewPayments } from "@/lib/circles";
 import { executePayout } from "@/lib/payout";
 import {
@@ -55,9 +55,42 @@ export async function POST(req: NextRequest) {
     if (challenge.method !== "payment_1crc") {
       return NextResponse.json({ error: "wrong_method" }, { status: 400 });
     }
-    if (challenge.usedAt && challenge.status === "confirmed") {
-      // Idempotent — already verified, just confirm.
-      return NextResponse.json({ status: "already_confirmed" });
+    if (challenge.usedAt && (challenge.status === "confirmed" || challenge.status === "refunded" || challenge.status === "refund_pending" || challenge.status === "refund_failed")) {
+      // Idempotent recovery : si le client a perdu le cookie pendant la
+      // premiere reponse confirmed (network error apres set-cookie), on
+      // re-mint une nouvelle session pour la meme address + nouveau cookie.
+      // L'ancienne session reste vivante (orphelin) jusqu'a son expiration —
+      // pas grave, le user ne s'en sert plus.
+      const [existing] = await db
+        .select({ address: authSessions.address })
+        .from(authSessions)
+        .where(eq(authSessions.lastAuthChallengeId, challenge.id))
+        .orderBy(desc(authSessions.createdAt))
+        .limit(1);
+
+      if (!existing?.address) {
+        // Edge case : challenge confirme mais aucune session retrouvee — etat
+        // incoherent, on demande un nouveau challenge plutot que de bricoler.
+        return NextResponse.json({ status: "stale_challenge" }, { status: 409 });
+      }
+
+      const userAgent = req.headers.get("user-agent");
+      const newSession = await createAuthSession({
+        address: existing.address,
+        origin,
+        challengeId: challenge.id,
+        userAgent,
+      });
+
+      const res = NextResponse.json({
+        status: "confirmed",
+        authenticated: true,
+        address: existing.address,
+        expiresAt: newSession.expiresAt.toISOString(),
+        recovered: true,
+      });
+      setAuthCookie(res, newSession.token, { expiresAt: newSession.expiresAt });
+      return res;
     }
     if (challenge.expiresAt.getTime() < Date.now()) {
       return NextResponse.json({ status: "expired" });

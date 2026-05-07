@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { resolveRoll, getVisibleState, calculatePayout, isValidAction } from "@/lib/roulette";
 import type { RouletteState, RouletteAction } from "@/lib/roulette";
 import { payPrize } from "@/lib/wallet";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 export async function POST(
   req: NextRequest,
@@ -104,12 +105,7 @@ export async function POST(
         // XP for win — fire and forget so a slow / unreachable XP endpoint
         // never blocks the spin response (caused the post-win freeze when
         // NEXT_PUBLIC_APP_URL pointed at a non-listening port).
-        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        void fetch(`${base}/api/players/xp`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: round.playerAddress, action: "roulette_win" }),
-        }).catch(() => {});
+        void awardPlayerXp({ address: round.playerAddress, action: "roulette_win" }).catch(() => {});
       }
     }
 

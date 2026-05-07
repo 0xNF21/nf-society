@@ -7,6 +7,7 @@ import { applyAction, getVisibleState, calculateTotalBet } from "@/lib/blackjack
 import type { BlackjackState, Action } from "@/lib/blackjack";
 import { payPrize, debitForSecondaryBet, isBalancePaid } from "@/lib/wallet";
 import { checkAllNewPayments } from "@/lib/circles";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 const VALID_ACTIONS: Action[] = ["hit", "stand", "double", "split", "insurance"];
 const PAID_ACTIONS: Action[] = ["double", "split"];
@@ -177,12 +178,7 @@ export async function POST(
 
       // XP for win — fire and forget (don't block the response).
       if (updateData.outcome === "win" || updateData.outcome === "blackjack") {
-        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        void fetch(`${base}/api/players/xp`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: hand.playerAddress, action: "blackjack_win" }),
-        }).catch(() => {});
+        void awardPlayerXp({ address: hand.playerAddress, action: "blackjack_win" }).catch(() => {});
       }
     }
 

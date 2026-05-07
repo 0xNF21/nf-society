@@ -7,6 +7,7 @@ import { DemoProvider } from "@/components/demo-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MiniAppProvider } from "@/components/miniapp-provider";
 import { AuthProvider } from "@/components/auth-provider";
+import { AuthBanner } from "@/components/auth-banner";
 import { FeatureFlagProvider } from "@/components/feature-flag-provider";
 import DemoBanner from "@/components/demo-banner";
 import StakesDisabledBanner from "@/components/stakes-disabled-banner";
@@ -71,6 +72,7 @@ export default function RootLayout({
               <MiniAppProvider>
                 <AuthProvider>
                   <FeatureFlagProvider>
+                    <AuthBanner />
                     <StakesDisabledBanner />
                     <DemoBanner />
                     {children}

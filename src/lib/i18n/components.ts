@@ -1,6 +1,13 @@
 // Auto-split from src/lib/i18n.ts — components domain sections
 
 export const componentsTranslations = {
+  authBanner: {
+    notice: {
+      fr: "Connectez votre wallet pour jouer et gagner de l'XP.",
+      en: "Sign in to play and earn XP.",
+    },
+    connect: { fr: "Se connecter", en: "Sign in" },
+  },
   auth: {
     title: { fr: "Connexion sécurisée", en: "Secure sign-in" },
     close: { fr: "Fermer", en: "Close" },

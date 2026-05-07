@@ -25,7 +25,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import { createHash, randomBytes } from "crypto";
-import { eq, and, sql, gt } from "drizzle-orm";
+import { createPublicClient, http, hashMessage as viemHashMessage } from "viem";
+import { gnosis } from "viem/chains";
+import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { authChallenges, authSessions } from "@/lib/db/schema";
 import type { AuthChallengeRow, AuthSessionRow } from "@/lib/db/schema";
@@ -164,11 +166,29 @@ const ERC1271_ABI = [
   "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",
 ];
 
+// Viem public client — supports EIP-191 + ERC-1271 + ERC-6492 in a single
+// `verifyMessage` call (handles Safe/smart contract wallets correctly).
+const viemClient = createPublicClient({
+  chain: gnosis,
+  transport: http(GNOSIS_RPC),
+});
+
 /**
- * Verify a signature for a given message + address. Tries EIP-191 (EOA)
- * first, then falls back to ERC-1271 (smart contract wallet, e.g. Safe).
+ * Verify a signature for a given message + address. Three layers tried in
+ * order :
  *
- * Circles wallets are Safes, so the ERC-1271 path is the common case.
+ *   1. viem `verifyMessage` — handles EIP-191 + ERC-1271 + ERC-6492 with
+ *      proper SafeMessage hashing for Safes. This is the canonical path
+ *      for Circles wallets (which are Gnosis Safes).
+ *
+ *   2. Manual EIP-191 ecrecover (ethers) — defense-in-depth fallback for
+ *      the EOA case if viem chokes on a malformed signature.
+ *
+ *   3. Manual ERC-1271 with raw EIP-191 hash — last resort for hosts that
+ *      return a signature already adapted to `isValidSignature(bytes32,bytes)`.
+ *
+ * Returns `true` only if at least one path validates. Logs the failed
+ * paths for debugging without leaking the signature material.
  */
 async function verifySignature(
   address: string,
@@ -176,26 +196,41 @@ async function verifySignature(
   signature: string,
 ): Promise<boolean> {
   const lower = address.toLowerCase();
+  const sig = signature.startsWith("0x") ? (signature as `0x${string}`) : (`0x${signature}` as `0x${string}`);
+  const addr = lower as `0x${string}`;
 
-  // Try EOA first (cheap, no RPC).
+  // Layer 1 — viem verifyMessage (canonical for Safes).
+  try {
+    const valid = await viemClient.verifyMessage({
+      address: addr,
+      message,
+      signature: sig,
+    });
+    if (valid) return true;
+  } catch (err) {
+    console.warn("[auth] viem verifyMessage threw, trying fallbacks:", err);
+  }
+
+  // Layer 2 — ethers EOA ecrecover.
   try {
     const recovered = ethers.verifyMessage(message, signature);
     if (recovered.toLowerCase() === lower) return true;
   } catch {
-    // Fall through to ERC-1271
+    // continue
   }
 
-  // Try ERC-1271 — Safe / smart contract wallet.
+  // Layer 3 — manual ERC-1271 with EIP-191 hash.
   try {
     const provider = new ethers.JsonRpcProvider(GNOSIS_RPC);
     const contract = new ethers.Contract(address, ERC1271_ABI, provider);
-    const messageHash = ethers.hashMessage(message);
-    const result = await contract.isValidSignature(messageHash, signature);
-    return result === ERC1271_MAGIC_VALUE;
+    const messageHash = viemHashMessage(message);
+    const result = await contract.isValidSignature(messageHash, sig);
+    if (result === ERC1271_MAGIC_VALUE) return true;
   } catch (err) {
-    console.error("[auth] ERC-1271 check failed:", err);
-    return false;
+    console.warn("[auth] manual ERC-1271 threw:", err);
   }
+
+  return false;
 }
 
 export type VerifySignatureResult =

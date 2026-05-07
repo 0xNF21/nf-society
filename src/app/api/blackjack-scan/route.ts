@@ -8,6 +8,7 @@ import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { createDeck, dealInitialHands, getVisibleState } from "@/lib/blackjack";
 import type { BlackjackState } from "@/lib/blackjack";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 // Blackjack-specific start block — reset after cleanup, only scan recent payments
@@ -150,12 +151,7 @@ export async function POST(req: NextRequest) {
 
         // XP — fire-and-forget. Never block the scan response on XP.
         {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          void fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: playerAddress, action: "blackjack_play" }),
-          }).catch(() => {});
+          void awardPlayerXp({ address: playerAddress, action: "blackjack_play" }).catch(() => {});
         }
 
       } catch (err: any) {

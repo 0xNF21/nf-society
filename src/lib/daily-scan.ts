@@ -4,6 +4,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { todayString } from "@/lib/daily";
 import { executePayout } from "@/lib/payout";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 const SAFE_ADDRESS = process.env.SAFE_ADDRESS || "";
 const WEI_PER_CRC = BigInt("1000000000000000000");
@@ -120,14 +121,9 @@ export async function runDailyScan(): Promise<number> {
         });
       } catch { /* refund fail silencieux — sera retry manuellement */ }
 
-      // XP non-bloquant
+      // XP non-bloquant via le helper serveur (evite 401 sur la route gatee).
       try {
-        const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        await fetch(`${base}/api/players/xp`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: playerAddress, action: "daily_checkin" }),
-        });
+        await awardPlayerXp({ address: playerAddress, action: "daily_checkin" });
       } catch { /* XP fail silencieux */ }
     } catch (err: any) {
       console.error("[DailyScan] Error processing payment:", err.message);

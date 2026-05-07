@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { AuthConnectModal } from "@/components/auth-connect-modal";
 
 /**
  * Auth session state for the client. The actual proof token lives in an
@@ -10,6 +11,10 @@ import { useMiniApp } from "@/components/miniapp-provider";
  *
  * The provider hydrates on mount via GET /api/auth/session, and exposes
  * helpers to start a login flow (Mini App or Standalone) and to log out.
+ *
+ * The connect modal is rendered inline by the provider so any component
+ * that has access to `useAuthSession()` can call `openLogin()` to trigger
+ * the auth flow.
  *
  * Wallet switch detection (Mini App only) : when `walletAddress` from the
  * Circles bridge changes and no longer matches `address`, we auto-logout
@@ -31,6 +36,10 @@ interface AuthContextValue {
   refresh: () => Promise<void>;
   /** Revoke the session and clear the cookie. */
   logout: () => Promise<void>;
+  /** Open the auth modal — used as the recovery path when a route returns 401. */
+  openLogin: () => void;
+  /** Close the auth modal manually. */
+  closeLogin: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -41,6 +50,8 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   refresh: async () => {},
   logout: async () => {},
+  openLogin: () => {},
+  closeLogin: () => {},
 });
 
 type SessionInfo = {
@@ -61,6 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { walletAddress: miniAppAddress, isMiniApp } = useMiniApp();
   const [session, setSession] = useState<SessionInfo>(EMPTY);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const openLogin = useCallback(() => setModalOpen(true), []);
+  const closeLogin = useCallback(() => setModalOpen(false), []);
 
   const fetchSession = useCallback(async (): Promise<void> => {
     try {
@@ -134,9 +149,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         refresh: fetchSession,
         logout,
+        openLogin,
+        closeLogin,
       }}
     >
       {children}
+      <AuthConnectModal open={modalOpen} onClose={closeLogin} />
     </AuthContext.Provider>
   );
 }

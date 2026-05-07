@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { dropBalls, cashout, getVisibleState, calculatePayout, isValidAction } from "@/lib/plinko";
 import type { PlinkoState, PlinkoAction } from "@/lib/plinko";
 import { payPrize } from "@/lib/wallet";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 export async function POST(
   req: NextRequest,
@@ -112,12 +113,7 @@ export async function POST(
 
         // XP for any positive outcome
         if (payoutAmount >= newState.totalBet) {
-          const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          void fetch(`${base}/api/players/xp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ address: round.playerAddress, action: "plinko_win" }),
-          }).catch(() => {});
+          void awardPlayerXp({ address: round.playerAddress, action: "plinko_win" }).catch(() => {});
         }
       } else {
         await db.update(plinkoRounds).set({ payoutStatus: "none" }).where(eq(plinkoRounds.id, roundId));
