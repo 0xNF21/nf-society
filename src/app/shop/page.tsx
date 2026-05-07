@@ -89,7 +89,9 @@ export default function ShopPage() {
   const { isDemo, demoPlayer, spendXp } = useDemo();
   const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
   const { flagStatus, loading: flagsLoading } = useFeatureFlags();
-  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  // Fail-closed : F2P par defaut sauf si real_stakes explicitement "enabled".
+  // Voir wallet-balance-card.tsx pour le contexte (PR #45 + UI fail-closed).
+  const realStakesDisabled = flagsLoading || flagStatus("real_stakes") !== "enabled";
   const stake = useStakeLabel();
   const t = translations.shop;
   const tm = translations.miniapp;

@@ -20,7 +20,9 @@ type DaoPoolSummary = {
 export function DaoPoolXpCard() {
   const { locale } = useLocale();
   const { flagStatus, loading: flagsLoading } = useFeatureFlags();
-  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  // Fail-closed : F2P par defaut sauf si real_stakes explicitement "enabled".
+  // Voir wallet-balance-card.tsx pour le contexte (PR #45 + UI fail-closed).
+  const realStakesDisabled = flagsLoading || flagStatus("real_stakes") !== "enabled";
   const t = translations.statsXp;
 
   const [data, setData] = useState<DaoPoolSummary | null>(null);

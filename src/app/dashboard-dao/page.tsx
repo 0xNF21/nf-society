@@ -214,7 +214,9 @@ export default function DashboardDaoPage() {
   const { locale } = useLocale();
   const t = translations.dao;
   const { flagStatus, loading: flagsLoading } = useFeatureFlags();
-  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  // Fail-closed : F2P par defaut sauf si real_stakes explicitement "enabled".
+  // Voir wallet-balance-card.tsx pour le contexte (PR #45 + UI fail-closed).
+  const realStakesDisabled = flagsLoading || flagStatus("real_stakes") !== "enabled";
 
   const [data, setData] = useState<DaoData | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});

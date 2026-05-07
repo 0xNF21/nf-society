@@ -26,7 +26,12 @@ export function WalletBalanceCard({ address }: WalletBalanceCardProps) {
   const { locale } = useLocale();
   const { isDemo, demoPlayer } = useDemo();
   const { flagStatus, loading: flagsLoading } = useFeatureFlags();
-  const realStakesDisabled = !flagsLoading && flagStatus("real_stakes") === "hidden";
+  // Fail-closed : on n'affiche le bouton "Top up" que si on est CERTAIN que
+  // real_stakes est explicitement "enabled". Pendant le loading, ou si la
+  // route /api/flags throw, on assume F2P → cashout-only UI. Miroir de la
+  // logique env-level LEGAL_MODE=F2P_ONLY cote backend (PR #45).
+  const realStakesEnabled = !flagsLoading && flagStatus("real_stakes") === "enabled";
+  const realStakesDisabled = !realStakesEnabled;
   const t = translations.wallet;
   const [realBalance, setRealBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(!isDemo);
