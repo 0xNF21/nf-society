@@ -38,7 +38,10 @@ PR #45 a verrouille le backend, PR #46 a finalise les refunds, PR #47 a verrouil
 
 - **Finding A** (important) - `src/lib/i18n/*`, pages `tsx` - textes visibles encore centres sur casino/mise/bet/jackpot/payout.
 - **Finding B** (important) - `src/app/twitter-image.tsx` et pages marketing/docs - promesses "Joue, mise, gouverne" / "Payouts automatiques" obsoletes post-pivot.
-- **Finding C** (hors scope, a decider separement) - `/exchange` et `ExchangeSection` restent un ancien flux d'echange CRC si le flag `exchange` est visible. Cette PR ne le modifie pas car ce serait un changement de comportement/paiement, pas du wording. A traiter en hotfix separe si le flag n'est pas hidden en prod.
+
+### Note de cadrage `/exchange`
+
+`/exchange` reste volontairement hors pivot jeux d'argent : c'est un flux commercial/deterministe de change CRC, sans hasard ni gain aleatoire. Cette PR ne le desactive pas et ne le renomme pas.
 
 ---
 
@@ -74,7 +77,7 @@ Ne propose pas :
 - Schema competitions/seasons/reward_allocations - PR5.
 - Season Zero MVP - PR6.
 - Changement de logique de paiement, flags, API, DB, scripts admin.
-- Desactivation ou refonte de `/exchange` / `ExchangeSection` - a traiter en hotfix separe si le flag `exchange` est visible en prod.
+- Desactivation ou refonte de `/exchange` / `ExchangeSection` - flux commercial deterministe volontairement conserve.
 - Renommage de noms internes : `betCrc`, `payoutCrc`, `payoutReason`, `WalletBalanceCard`, routes `/api/wallet/cashout-*`.
 - Renommage du retrait legacy : `cashout`, `Withdraw`, `Retirer` doivent rester clairs pour les users.
 
