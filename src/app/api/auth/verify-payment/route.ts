@@ -37,10 +37,19 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const challengeId = Number(body?.challengeId);
+    const verifyToken = typeof body?.verifyToken === "string" ? body.verifyToken : "";
     const origin = body?.origin === "miniapp" ? "miniapp" : "standalone";
 
     if (!Number.isInteger(challengeId) || challengeId <= 0) {
       return NextResponse.json({ error: "invalid_challenge_id" }, { status: 400 });
+    }
+
+    // The verifyToken is required EVERYWHERE (pending, confirmed recovery,
+    // etc.) so an attacker who only knows the public challenge ID + on-chain
+    // tx can't claim the session. The token was returned at challenge
+    // creation and only the originating browser holds it.
+    if (!verifyToken || verifyToken.length < 32) {
+      return NextResponse.json({ error: "missing_verify_token" }, { status: 400 });
     }
 
     const [challenge] = await db
@@ -55,12 +64,23 @@ export async function POST(req: NextRequest) {
     if (challenge.method !== "payment_1crc") {
       return NextResponse.json({ error: "wrong_method" }, { status: 400 });
     }
+
+    // Validate verifyToken hash against the stored hash. Done BEFORE any
+    // session minting so a wrong token always returns the same shape of
+    // response (constant-time considerations are not strictly relevant
+    // since we compare hashes, not raw secrets).
+    const { createHash: _ch } = await import("crypto");
+    const providedHash = _ch("sha256").update(verifyToken).digest("hex");
+    if (!challenge.verifyTokenHash || providedHash !== challenge.verifyTokenHash) {
+      return NextResponse.json({ error: "verify_token_mismatch" }, { status: 401 });
+    }
+
     if (challenge.usedAt && (challenge.status === "confirmed" || challenge.status === "refunded" || challenge.status === "refund_pending" || challenge.status === "refund_failed")) {
       // Idempotent recovery : si le client a perdu le cookie pendant la
       // premiere reponse confirmed (network error apres set-cookie), on
       // re-mint une nouvelle session pour la meme address + nouveau cookie.
-      // L'ancienne session reste vivante (orphelin) jusqu'a son expiration —
-      // pas grave, le user ne s'en sert plus.
+      // SAFE car le verifyToken vient d'etre valide ci-dessus -> seul le
+      // browser legitime peut atteindre ce branch.
       const [existing] = await db
         .select({ address: authSessions.address })
         .from(authSessions)
@@ -108,11 +128,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "waiting" });
     }
 
-    // Verify + atomically claim challenge.
+    // Verify + atomically claim challenge. verifyToken is re-checked here
+    // (defense in depth — the early check above protects the recovery branch).
     const verifyResult = await verifyPaymentChallenge({
       challengeId: challenge.id,
       txHash: matchedTx.txHash,
       senderAddress: matchedTx.sender,
+      verifyToken,
     });
 
     if (!verifyResult.ok) {

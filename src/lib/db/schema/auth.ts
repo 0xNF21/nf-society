@@ -47,6 +47,18 @@ export const authChallenges = pgTable(
     /** Refund tx hash (payment_1crc only) — Safe → user 1 CRC reimbursement. */
     refundTxHash: text("refund_tx_hash"),
     /**
+     * SHA-256 hash of the verify token (payment_1crc only).
+     *
+     * Two secrets per challenge :
+     *   - `nonce`        : embedded in `nf_auth:<nonce>` data, becomes public on-chain.
+     *   - `verifyToken`  : returned to the originating browser, never broadcast.
+     *
+     * `verify-payment` requires `verifyToken` matching this hash. Without it,
+     * an attacker who watches the chain can't claim the session : they have
+     * the public nonce + tx hash but not the secret token.
+     */
+    verifyTokenHash: text("verify_token_hash"),
+    /**
      * Lifecycle marker. See module doc for state machine.
      * Values : pending | confirmed | expired | rejected | refund_pending
      *        | refunded | refund_failed

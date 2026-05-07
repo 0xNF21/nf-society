@@ -120,6 +120,17 @@ export type CreatedChallenge = {
   nonce: string;
   message: string;
   expiresAt: Date;
+  /**
+   * Secret returned ONLY for `payment_1crc`. Required as a request parameter
+   * on `verify-payment` to claim the session. Never broadcast on-chain — the
+   * front holds it in memory until verification succeeds (or the challenge
+   * expires).
+   *
+   * Without this, an attacker watching the chain for `nf_auth:<nonce>` txs
+   * could iterate sequential challenge IDs and steal the session of the
+   * legitimate payer.
+   */
+  verifyToken?: string;
 };
 
 /**
@@ -136,6 +147,11 @@ export async function createAuthChallenge(opts: CreateChallengeOpts): Promise<Cr
       ? buildSignInMessage(nonce, expiresAt, opts.expectedAddress)
       : buildPaymentData(nonce);
 
+  // Generate a verify token only for payment_1crc — sign_message proofs are
+  // already self-authenticating (the signature ties the requester to the wallet).
+  const verifyToken = opts.method === "payment_1crc" ? generateToken() : undefined;
+  const verifyTokenHash = verifyToken ? hashToken(verifyToken) : null;
+
   const [row] = await db
     .insert(authChallenges)
     .values({
@@ -146,6 +162,7 @@ export async function createAuthChallenge(opts: CreateChallengeOpts): Promise<Cr
       origin: opts.origin ?? null,
       expiresAt,
       status: "pending",
+      verifyTokenHash,
     })
     .returning({ id: authChallenges.id });
 
@@ -155,6 +172,7 @@ export async function createAuthChallenge(opts: CreateChallengeOpts): Promise<Cr
     nonce,
     message,
     expiresAt,
+    verifyToken,
   };
 }
 
@@ -304,17 +322,26 @@ export type VerifyPaymentResult =
   | { ok: false; error: string };
 
 /**
- * Verify a 1-CRC payment proof. The verifier should already have detected
- * the on-chain tx and matched it to the challenge nonce. This helper
- * atomically marks the challenge as confirmed and returns the sender.
+ * Verify a 1-CRC payment proof. The caller must already have :
  *
- * The caller is responsible for queuing the 1 CRC refund (separate flow,
- * via `executePayout({ payoutReason: "game_refund" })`).
+ *   1. Detected the on-chain tx and matched it to the challenge nonce.
+ *   2. Captured the verifyToken from the originating browser request body.
+ *
+ * This helper :
+ *   - Validates the verifyToken against the stored hash (anti-replay).
+ *   - Atomically marks the challenge as confirmed.
+ *   - Returns the sender for session creation.
+ *
+ * The verifyToken check is what prevents an attacker who watches the chain
+ * for `nf_auth:<nonce>` payments from claiming the session : they have the
+ * public nonce + tx hash but not the secret token returned to the original
+ * browser at challenge creation.
  */
 export async function verifyPaymentChallenge(params: {
   challengeId: number;
   txHash: string;
   senderAddress: string;
+  verifyToken: string;
 }): Promise<VerifyPaymentResult> {
   const sender = params.senderAddress.toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(sender)) {
@@ -322,6 +349,9 @@ export async function verifyPaymentChallenge(params: {
   }
   if (!/^0x[a-f0-9]{64}$/.test(params.txHash.toLowerCase())) {
     return { ok: false, error: "invalid_tx_hash" };
+  }
+  if (typeof params.verifyToken !== "string" || params.verifyToken.length < 32) {
+    return { ok: false, error: "invalid_verify_token" };
   }
 
   const [challenge] = await db
@@ -337,6 +367,19 @@ export async function verifyPaymentChallenge(params: {
   if (challenge.status !== "pending") return { ok: false, error: "challenge_not_pending" };
   if (challenge.expectedAddress && challenge.expectedAddress !== sender) {
     return { ok: false, error: "address_mismatch" };
+  }
+
+  // Verify token check — the attacker who only watched the chain doesn't
+  // have this secret, so they can't claim the session even with a known
+  // challenge ID + tx hash.
+  if (!challenge.verifyTokenHash) {
+    // Pre-PR challenge without a token : reject (legacy challenges should
+    // never reach this code path since old challenges are 30 min TTL).
+    return { ok: false, error: "verify_token_missing_in_challenge" };
+  }
+  const providedHash = hashToken(params.verifyToken);
+  if (providedHash !== challenge.verifyTokenHash) {
+    return { ok: false, error: "verify_token_mismatch" };
   }
 
   const claimed = await db

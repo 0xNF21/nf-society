@@ -70,6 +70,10 @@ export async function POST(req: NextRequest) {
       challengeId: challenge.id,
       method,
       nonce: challenge.nonce,
+      // verifyToken is the secret the front must keep and send back to
+      // verify-payment. NEVER store it server-side except as a hash, and
+      // never broadcast it on-chain.
+      verifyToken: challenge.verifyToken,
       paymentLink,
       qrCode,
       recipientAddress: SAFE_ADDRESS,

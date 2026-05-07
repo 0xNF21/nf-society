@@ -32,8 +32,8 @@ type Step =
   | { kind: "loading_challenge" }
   | { kind: "miniapp_signing" }
   | { kind: "miniapp_verifying" }
-  | { kind: "standalone_waiting"; challengeId: number; nonce: string; paymentLink: string; qrCode: string }
-  | { kind: "standalone_polling"; challengeId: number; nonce: string; paymentLink: string; qrCode: string }
+  | { kind: "standalone_waiting"; challengeId: number; nonce: string; verifyToken: string; paymentLink: string; qrCode: string }
+  | { kind: "standalone_polling"; challengeId: number; nonce: string; verifyToken: string; paymentLink: string; qrCode: string }
   | { kind: "success" }
   | { kind: "error"; message: string };
 
@@ -151,10 +151,15 @@ export function AuthConnectModal({ open, onClose }: AuthConnectModalProps) {
 
       if (cancelledRef.current) return;
 
+      if (!challengeData.verifyToken) {
+        throw new Error("missing_verify_token");
+      }
+
       const initialState: Step = {
         kind: "standalone_waiting",
         challengeId: challengeData.challengeId,
         nonce: challengeData.nonce,
+        verifyToken: challengeData.verifyToken,
         paymentLink: challengeData.paymentLink,
         qrCode: challengeData.qrCode,
       };
@@ -180,7 +185,11 @@ export function AuthConnectModal({ open, onClose }: AuthConnectModalProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ challengeId: prev.challengeId, origin: "standalone" }),
+          body: JSON.stringify({
+            challengeId: prev.challengeId,
+            verifyToken: prev.verifyToken,
+            origin: "standalone",
+          }),
         });
         const data = await res.json();
         if (cancelledRef.current) return;

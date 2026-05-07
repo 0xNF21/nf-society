@@ -2,22 +2,28 @@
 
 import { useState, useEffect } from "react";
 import { useMiniApp } from "@/components/miniapp-provider";
+import { useAuthSession } from "@/components/auth-provider";
 
 /**
- * Returns the best-known player address for the current session:
- * - In the Circles Mini App: the wallet address pushed by the host.
- * - In standalone: the address the user "claimed" via ProfileModal
- *   search + save (persisted in localStorage under "nfs_profile").
+ * Returns the best-known player address for the current session, with auth
+ * priority :
  *
- * Returns `null` until the address resolves (avoids SSR flash and lets
- * callers skip rendering balance-related UI until the identity is known).
+ *   1. Auth session (server-trusted)        → highest priority, set after a
+ *                                              successful login (Mini App
+ *                                              sign_message or 1 CRC payment)
+ *   2. Mini App `walletAddress`             → host iframe context (UX hint
+ *                                              when no session yet)
+ *   3. Standalone `nfs_profile` localStorage → legacy "claimed" profile
  *
- * Note: in standalone, this is NOT a cryptographic proof of ownership —
- * the user could have saved someone else's profile. Phase 3d will layer
- * a payment-proof (NF Auth pattern) on top of cashout / balance debits.
+ * Returns `null` until at least one source resolves.
+ *
+ * Once a user logs in via the AuthConnectModal, the session address takes
+ * over so the rest of the app picks up the verified identity even if the
+ * Mini App walletAddress is still pending or the user has no local profile.
  */
 export function useConnectedAddress(): string | null {
   const { isMiniApp, walletAddress } = useMiniApp();
+  const { address: sessionAddress } = useAuthSession();
   const [standaloneAddr, setStandaloneAddr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,5 +56,10 @@ export function useConnectedAddress(): string | null {
     return () => window.removeEventListener("storage", handler);
   }, [isMiniApp]);
 
-  return isMiniApp ? (walletAddress || null) : standaloneAddr;
+  // 1. Server-trusted session wins.
+  if (sessionAddress) return sessionAddress;
+  // 2. Mini App context (UX hint).
+  if (isMiniApp && walletAddress) return walletAddress;
+  // 3. Standalone localStorage fallback.
+  return standaloneAddr;
 }
