@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { payouts } from "@/lib/db/schema";
 import { eq, and, lt } from "drizzle-orm";
 import { retryPayout, verifyPendingPayout } from "@/lib/payout";
+import { reconcileAuthRefunds, type AuthRefundReconcileSummary } from "@/lib/auth/reconcile-refunds";
 
 const MAX_RETRY_ATTEMPTS = 3;
 
@@ -32,6 +33,8 @@ export async function GET(req: NextRequest) {
     retrySucceeded: 0,
     retryFailed: 0,
     maxAttemptsReached: 0,
+    authReconcile: null as AuthRefundReconcileSummary | null,
+    authReconcileFailed: false,
   };
 
   try {
@@ -75,6 +78,13 @@ export async function GET(req: NextRequest) {
         console.error(`[CronMonitor] retry ${row.id} error:`, err.message);
         summary.retryFailed++;
       }
+    }
+
+    try {
+      summary.authReconcile = await reconcileAuthRefunds();
+    } catch (err: any) {
+      summary.authReconcileFailed = true;
+      console.error("[CronMonitor] auth reconcile error:", err?.message ?? err);
     }
 
     console.log("[CronMonitor]", JSON.stringify(summary));

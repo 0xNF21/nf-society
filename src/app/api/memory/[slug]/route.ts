@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { memoryGames } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { payPrize, payCommission } from "@/lib/wallet";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 const GRID_CONFIG: Record<string, { cols: number; rows: number; pairs: number }> = {
   easy:   { cols: 4, rows: 3, pairs: 6 },
@@ -83,12 +84,18 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
+
+  // Auth-gated : address vient de la session, pas du body.
+  const addressOr401 = await requireAuthenticatedAddress(req);
+  if (addressOr401 instanceof NextResponse) return addressOr401;
+  const playerAddress = addressOr401;
+
   try {
     const body = await req.json();
-    const { playerAddress, cardIndex, playerToken } = body;
+    const { cardIndex, playerToken } = body;
 
-    if (!playerAddress || typeof cardIndex !== "number") {
-      return NextResponse.json({ error: "playerAddress and cardIndex required" }, { status: 400 });
+    if (typeof cardIndex !== "number") {
+      return NextResponse.json({ error: "cardIndex required" }, { status: 400 });
     }
 
     const [game] = await db.select().from(memoryGames).where(eq(memoryGames.slug, slug)).limit(1);

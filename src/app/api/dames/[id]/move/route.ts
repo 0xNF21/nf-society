@@ -5,15 +5,21 @@ import { eq } from 'drizzle-orm'
 import { isValidMove, applyMove } from '@/lib/dames'
 import type { Move, DamesState } from '@/lib/dames'
 import { payPrize, payCommission } from '@/lib/wallet'
+import { requireAuthenticatedAddress } from '@/lib/auth/session'
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Auth-gated : address vient de la session, pas du body.
+  const addressOr401 = await requireAuthenticatedAddress(req)
+  if (addressOr401 instanceof NextResponse) return addressOr401
+  const player = addressOr401
+
   try {
     const { id: slug } = await params
-    const { player, move, playerToken }: { player: string; move: Move; playerToken?: string } = await req.json()
-    if (!player || !move) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    const { move, playerToken }: { move: Move; playerToken?: string } = await req.json()
+    if (!move) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     const [game] = await db.select().from(damesGames).where(eq(damesGames.slug, slug))
     if (!game) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (game.status !== 'playing') return NextResponse.json({ error: 'Game not in progress' }, { status: 400 })
@@ -46,7 +52,7 @@ export async function POST(
         const pot = game.betCrc * 2
         const winAmount = pot * (1 - game.commissionPct / 100)
         const commissionAmount = pot * (game.commissionPct / 100)
-        const winnerTxHash = player === game.player1Address ? game.player1TxHash : game.player2TxHash
+        const winnerTxHash = playerLC === game.player1Address?.toLowerCase() ? game.player1TxHash : game.player2TxHash
         const prize = await payPrize(player, winAmount, {
           gameType: 'dames', gameSlug: game.slug, gameRef: `${game.slug}-winner`,
           sourceTxHash: winnerTxHash,
