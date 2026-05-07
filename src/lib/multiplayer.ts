@@ -76,6 +76,13 @@ export async function createMultiplayerGame(
     Object.assign(values, config.createExtraFields(body));
   }
 
+  // In F2P, creating a room no longer debits the creator immediately.
+  // Reserving player1Token preserves the old UX contract: creator is J1.
+  const creatorToken = typeof body.creatorToken === "string" ? body.creatorToken.trim() : "";
+  if (creatorToken && creatorToken.length <= 128) {
+    values.player1Token = creatorToken;
+  }
+
   const result = await db.insert(config.table).values(values).returning();
   const game = (result as Record<string, unknown>[])[0];
   return { slug, game };
@@ -141,6 +148,11 @@ export async function scanGamePayments(gameKey: string, slug: string) {
     const playerToken = payment.gameData?.t || null;
     const p1 = game.player1Address?.toLowerCase() ?? null;
     const p2 = game.player2Address?.toLowerCase() ?? null;
+    const reservedP1Token =
+      typeof game.player1Token === "string" && game.player1Token.length > 0
+        ? game.player1Token
+        : null;
+    const isReservedP1Payment = reservedP1Token !== null && playerToken === reservedP1Token;
 
     // Overpayment detection: both slots filled, same player paid twice,
     // or game already moved past the payment phase (race condition between
@@ -148,6 +160,8 @@ export async function scanGamePayments(gameKey: string, slug: string) {
     const isOverpayment =
       (p1 !== null && p2 !== null) ||
       (p1 !== null && p1 === playerAddress) ||
+      (p2 !== null && p2 === playerAddress) ||
+      (p1 === null && p2 !== null && !isReservedP1Payment) ||
       config.skipStatuses.includes(game.status);
 
     if (isOverpayment) {
@@ -191,26 +205,67 @@ export async function scanGamePayments(gameKey: string, slug: string) {
 
     // Assign player 1 or player 2
     if (!game.player1Address) {
+      if (reservedP1Token && !isReservedP1Payment) {
+        await db.update(config.table).set({
+          player2Address: playerAddress,
+          player2TxHash: txHash,
+          player2Token: playerToken,
+          status: "waiting_p1",
+          updatedAt: new Date(),
+        }).where(eq(config.table.id, game.id));
+
+        game.player2Address = playerAddress;
+        game.player2TxHash = txHash;
+        game.player2Token = playerToken;
+        game.status = "waiting_p1";
+        continue;
+      }
+
+      const isCompletingReservedGame = !!game.player2Address;
+      const extraFields = isCompletingReservedGame && config.onBothPlayersPaid ? config.onBothPlayersPaid() : {};
+
       await db.update(config.table).set({
         player1Address: playerAddress,
         player1TxHash: txHash,
         player1Token: playerToken,
-        status: "waiting_p2",
+        status: isCompletingReservedGame ? config.activeStatus : "waiting_p2",
         updatedAt: new Date(),
+        ...extraFields,
       }).where(eq(config.table.id, game.id));
 
       game.player1Address = playerAddress;
       game.player1TxHash = txHash;
-      game.status = "waiting_p2";
+      game.player1Token = playerToken;
+      game.status = isCompletingReservedGame ? config.activeStatus : "waiting_p2";
 
-      // Annonce Telegram de la partie joinable (no-op si privee ou TG pas config).
-      await announceNewLobbyGame({
-        gameKey,
-        slug: game.slug,
-        betCrc: game.betCrc,
-        creatorAddress: playerAddress,
-        isPrivate: game.isPrivate,
-      });
+      if (!isCompletingReservedGame && game.player2Address) {
+        const completionFields = config.onBothPlayersPaid ? config.onBothPlayersPaid() : {};
+        await db.update(config.table).set({
+          status: config.activeStatus,
+          updatedAt: new Date(),
+          ...completionFields,
+        }).where(eq(config.table.id, game.id));
+        game.status = config.activeStatus;
+      }
+
+      if (isCompletingReservedGame) {
+        // Edite l'annonce TG en "Joueur trouve, partie demarree".
+        await markLobbyGameStarted({
+          gameKey,
+          slug: game.slug,
+          betCrc: game.betCrc,
+          creatorAddress: playerAddress,
+        });
+      } else {
+        // Annonce Telegram de la partie joinable (no-op si privee ou TG pas config).
+        await announceNewLobbyGame({
+          gameKey,
+          slug: game.slug,
+          betCrc: game.betCrc,
+          creatorAddress: playerAddress,
+          isPrivate: game.isPrivate,
+        });
+      }
     } else if (!game.player2Address) {
       const extraFields = config.onBothPlayersPaid ? config.onBothPlayersPaid() : {};
 

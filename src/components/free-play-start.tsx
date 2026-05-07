@@ -23,8 +23,8 @@ export type FreePlayStartProps = {
    */
   betCrc: number;
   /**
-   * Deja "paye" ? En 2-player mode : true si creator (p1 deja assigne) et partie
-   * en waiting_p2, OU si ce joueur est deja l'un des 2 joueurs.
+   * Deja "paye" ? En 2-player mode : true seulement si ce joueur est deja
+   * l'un des 2 joueurs assignes (token/adresse), pas juste le createur du lien.
    * En single-player (chance) : toujours false jusqu'a ce qu'on demarre une main.
    */
   alreadyJoined?: boolean;

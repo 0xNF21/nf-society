@@ -122,25 +122,68 @@ export async function assignMultiPlayer(
   if (!game) return { error: "not_found" };
   if (game.betCrc !== amount) return { error: "wrong_bet" };
 
+  const p1 = game.player1Address?.toLowerCase() ?? null;
+  const p2 = game.player2Address?.toLowerCase() ?? null;
+  if (p1 === addr || p2 === addr) return { error: "already_joined" };
+
+  const reservedP1Token =
+    typeof game.player1Token === "string" && game.player1Token.length > 0
+      ? game.player1Token
+      : null;
+
   // Slot 1 — only if empty
   if (!game.player1Address) {
+    if (reservedP1Token && reservedP1Token !== playerToken) {
+      if (game.player2Address) return { error: "already_full" };
+      const updated = await tx
+        .update(table)
+        .set({
+          player2Address: addr,
+          player2TxHash: syntheticTxHash,
+          player2Token: playerToken,
+          status: "waiting_p1",
+          updatedAt: new Date(),
+        })
+        .where(and(eq(table.id, game.id), isNull(table.player1Address), isNull(table.player2Address)))
+        .returning();
+      if (updated.length === 0) return { error: "already_full" };
+      return { role: "player2", gameRow: updated[0] };
+    }
+
+    const isCompletingReservedGame = !!game.player2Address;
+    const extraFields = isCompletingReservedGame && config.onBothPlayersPaid ? config.onBothPlayersPaid() : {};
     const updated = await tx
       .update(table)
       .set({
         player1Address: addr,
         player1TxHash: syntheticTxHash,
         player1Token: playerToken,
-        status: "waiting_p2",
+        status: isCompletingReservedGame ? config.activeStatus : "waiting_p2",
         updatedAt: new Date(),
+        ...extraFields,
       })
       .where(and(eq(table.id, game.id), isNull(table.player1Address)))
       .returning();
     if (updated.length === 0) return { error: "already_full" };
+
+    if (updated[0].player2Address && updated[0].status !== config.activeStatus) {
+      const completionFields = config.onBothPlayersPaid ? config.onBothPlayersPaid() : {};
+      const [completed] = await tx
+        .update(table)
+        .set({
+          status: config.activeStatus,
+          updatedAt: new Date(),
+          ...completionFields,
+        })
+        .where(eq(table.id, game.id))
+        .returning();
+      return { role: "player1", gameRow: completed ?? updated[0] };
+    }
+
     return { role: "player1", gameRow: updated[0] };
   }
 
-  // Slot 2 — only if empty and caller is not player1
-  if (game.player1Address.toLowerCase() === addr) return { error: "already_joined" };
+  // Slot 2 — only if empty
   if (!game.player2Address) {
     const extraFields = config.onBothPlayersPaid ? config.onBothPlayersPaid() : {};
     const updated = await tx

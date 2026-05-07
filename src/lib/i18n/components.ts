@@ -3,7 +3,7 @@
 export const componentsTranslations = {
   gamePayment: {
     paymentReceived: { fr: "Paiement reçu !", en: "Payment received!" },
-    waitingP2: { fr: "En attente du joueur 2...", en: "Waiting for player 2..." },
+    waitingP2: { fr: "En attente de l'autre joueur...", en: "Waiting for the other player..." },
     shareInvite: { fr: "Partage ce lien pour inviter un adversaire", en: "Share this link to invite an opponent" },
     scanOpenGnosis: { fr: "Scannez pour ouvrir dans Gnosis App", en: "Scan to open in Gnosis App" },
   },
@@ -275,7 +275,7 @@ export const componentsTranslations = {
     playBtn: { fr: "Jouer", en: "Play" },
     joinBtn: { fr: "Rejoindre", en: "Join" },
     starting: { fr: "D\u00e9marrage...", en: "Starting..." },
-    waitingP2: { fr: "En attente du joueur 2...", en: "Waiting for player 2..." },
+    waitingP2: { fr: "En attente de l'autre joueur...", en: "Waiting for the other player..." },
     waitingJoin: { fr: "Partagez le lien pour inviter", en: "Share the link to invite" },
     connectFirst: { fr: "Connecte ton adresse pour jouer", en: "Connect your address to play" },
     errInsufficientXp: { fr: "Solde XP insuffisant", en: "Insufficient XP balance" },
