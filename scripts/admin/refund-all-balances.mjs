@@ -322,12 +322,17 @@ async function main() {
             stats.alreadyDone++;
             continue;
           }
-          if (ex.status === "sending") {
+          // status='sending' AVEC tx_hash : la tx est dans le mempool, le
+          // cron monitor va la confirmer. On skip.
+          // status='sending' SANS tx_hash : un run precedent a marque sending
+          // mais a crash avant d'enregistrer le hash. L'utilisateur a ete
+          // debite mais n'a rien recu — il faut RETRY, pas skip.
+          if (ex.status === "sending" && ex.transfer_tx_hash) {
             console.log(`[SKIP] payout en cours de confirmation (tx ${ex.transfer_tx_hash})`);
             stats.alreadyDone++;
             continue;
           }
-          // status='failed' ou 'pending' → on retry
+          // status='failed', 'pending', ou 'sending' sans tx → on retry.
           payoutId = ex.id;
           await client.query(
             `UPDATE payouts SET status='pending', error_message=NULL, updated_at=NOW() WHERE id=$1`,

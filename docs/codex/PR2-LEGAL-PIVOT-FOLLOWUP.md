@@ -75,7 +75,13 @@ Caractéristiques :
 - `MIN_REFUND_CRC` configurable pour skipper le dust
 - `MAX_PAYOUT_CRC` plafond de sécurité par compte
 
-Le script utilise `payoutReason: "admin_correction"` qui passe priorité 3 du routing `executePayout` introduit en PR1, donc fonctionne même en `LEGAL_MODE=F2P_ONLY`.
+**Note d'architecture** : le script **ne passe pas par `executePayout`** de `src/lib/payout.ts`. Il accède directement à la table `payouts` (insert + status update) et appelle `safeTransferFrom` via le Roles Modifier en utilisant `ethers` directement. Raisons :
+
+- Script one-shot admin, pas une route HTTP — pas besoin du routing source-aware
+- Re-implémente l'idempotence via UNIQUE constraints DB (même garantie que `executePayout`)
+- Si on passait par `executePayout`, il faudrait soit étendre la signature (pas pour un one-shot), soit accepter que le `payoutReason` infère `game_win` et se ferait bloquer en F2P_ONLY
+
+Le `gameType: "legal_pivot_refund"` dans la row `payouts` permet à l'audit de filtrer ces opérations distinctement des cashouts utilisateur classiques.
 
 #### `scripts/admin/cleanup-dust-balances.mjs`
 Script one-shot pour absorber les balances dust dans DAO_TREASURY, **purement comptable** (pas d'on-chain).

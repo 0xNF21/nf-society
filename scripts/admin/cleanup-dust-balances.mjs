@@ -35,6 +35,25 @@ const ENV_FILE = process.env.ENV_FILE ?? ".env.local";
 const DRY_RUN = process.env.DRY_RUN !== "false";
 const DUST_MAX_CRC = parseFloat(process.env.DUST_MAX_CRC ?? "0.01");
 
+// Plafond dur de securite. Au-dela de 0.01 CRC, on parle plus de "dust" :
+// le gas (~0.001 xDAI) devient negligeable face a la valeur transferee, et
+// un refund on-chain via refund-all-balances.mjs est plus approprie.
+// Garde-fou contre une faute de frappe (ex: DUST_MAX_CRC=10 absorberait
+// des soldes utilisateur reels au lieu de les rembourser).
+const DUST_HARD_CEILING_CRC = 0.01;
+if (DUST_MAX_CRC > DUST_HARD_CEILING_CRC && process.env.ALLOW_HIGHER_DUST_THRESHOLD !== "true") {
+  console.error(
+    `[cleanup-dust] DUST_MAX_CRC=${DUST_MAX_CRC} depasse le plafond de securite ` +
+    `${DUST_HARD_CEILING_CRC}.`,
+  );
+  console.error(
+    `[cleanup-dust] Au-dela de ce seuil, utiliser refund-all-balances.mjs pour ` +
+    `un refund on-chain. Si vous etes sur de votre coup, override avec ` +
+    `ALLOW_HIGHER_DUST_THRESHOLD=true (non recommande).`,
+  );
+  process.exit(1);
+}
+
 // Pseudo-adresse comptable du DAO. Ne pas confondre avec un wallet user.
 // Source : src/lib/wallet-ledger.ts:DAO_TREASURY_ADDRESS.
 const DAO_TREASURY_ADDRESS = "0x000000000000000000000000000000000000da00";
