@@ -146,6 +146,10 @@ export async function POST(req: NextRequest) {
               gameRef: `draw-${insertedDraw.id}`,
               sourceTxHash: winner.transactionHash,
               reason: `${lottery.title} — winner draw #${insertedDraw.id}`,
+              // Defense-in-depth : meme si l'heuristique payPrize fait son
+              // travail, on pose explicitement le rail "lottery_win" pour
+              // garantir le blocage en F2P (priorite 4 du routing payout).
+              payoutReason: "lottery_win",
             });
             await payCommission(commission, {
               gameType: "lottery",

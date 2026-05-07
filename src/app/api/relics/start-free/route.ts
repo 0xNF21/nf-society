@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { payGameFromXp } from "@/lib/wallet-xp";
+import { isRealStakesEnabled } from "@/lib/stakes";
 
 /**
  * POST /api/relics/start-free
@@ -11,6 +12,14 @@ import { payGameFromXp } from "@/lib/wallet-xp";
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "relics-start-free", 20, 60000);
   if (limited) return limited;
+
+  // Gate F2P — voir morpion/start-free pour le contexte audit PR1.
+  if (await isRealStakesEnabled("relics")) {
+    return NextResponse.json(
+      { error: "USE_PAID_PATH", message: "Real-stakes mode is active for this game. Use the paid flow." },
+      { status: 403 },
+    );
+  }
 
   try {
     const body = await req.json().catch(() => ({}));

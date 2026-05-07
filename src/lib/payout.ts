@@ -3,6 +3,7 @@ import { db } from "./db";
 import { payouts, botState, gameXpEvents, daoXpPool, players } from "./db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { isRealStakesEnabled } from "./stakes";
+import { isF2POnlyMode } from "./legal-mode";
 
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 const CIRCLES_HUB_V2 = "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8";
@@ -310,12 +311,42 @@ async function executeXpPayout(request: PayoutRequest): Promise<PayoutResult> {
   };
 }
 
+/**
+ * Classification semantique d'un payout. Sert de filet legal :
+ *   - legacy_cashout, game_refund, dao_reward, admin_correction → autorises en F2P
+ *   - game_win, shop_crc, daily_random_crc, lottery_win, unknown → bloques en F2P
+ *
+ * Si absent dans la PayoutRequest, `inferPayoutReason()` derive une valeur
+ * conservative depuis `gameType`.
+ */
+export type PayoutReason =
+  | "legacy_cashout"
+  | "game_refund"
+  | "dao_reward"
+  | "admin_correction"
+  | "game_win"
+  | "shop_crc"
+  | "daily_random_crc"
+  | "lottery_win"
+  | "unknown";
+
 export type PayoutRequest = {
   gameType: string;
   gameId: string;
   recipientAddress: string;
   amountCrc: number;
   reason?: string;
+  /**
+   * Source du paiement initial. Decide du rail de payout en priorite sur
+   * tout autre signal :
+   *   "xp:..."     → executeXpPayout (jamais Safe, peu importe le mode)
+   *   "balance:..."→ blocked (creditPrize est le bon point d'entree)
+   *   "0x..."      → executeOnchainPayout
+   *   null/absent  → fallback sur classification par gameType + reason
+   */
+  sourceTxHash?: string | null;
+  /** Classification semantique. Si absente, inferee depuis gameType. */
+  payoutReason?: PayoutReason;
 };
 
 export type PayoutResult = {
@@ -327,16 +358,26 @@ export type PayoutResult = {
   error?: string;
 };
 
-export async function executePayout(request: PayoutRequest): Promise<PayoutResult> {
-  // ─── Free-to-Play dispatch ─────────────────────────────────────
-  // En mode F2P, on court-circuite le transfert Safe/Roles et on credite
-  // le joueur en XP via `game_xp_events`. Exception : le cashout (gameType
-  // = "cashout") doit rester on-chain pour permettre aux anciens joueurs de
-  // recuperer leurs CRC de la Safe meme apres le pivot.
-  if (request.gameType !== "cashout" && !(await isRealStakesEnabled(request.gameType))) {
-    return await executeXpPayout(request);
-  }
+/**
+ * Derive une PayoutReason depuis le gameType. Strategy conservatrice :
+ * tout ce qui ne tombe pas dans une categorie connue est classe `game_win`,
+ * donc bloque en F2P.
+ */
+export function inferPayoutReason(gameType: string): PayoutReason {
+  if (gameType === "cashout") return "legacy_cashout";
+  if (gameType.endsWith("-refund") || gameType.endsWith("_refund")) return "game_refund";
+  if (gameType === "shop_crc") return "shop_crc";
+  if (gameType === "lottery") return "lottery_win";
+  if (gameType.startsWith("daily-") && gameType !== "daily-refund") return "daily_random_crc";
+  return "game_win";
+}
 
+/**
+ * Logique de payout on-chain via Safe + Zodiac Roles Modifier.
+ * Prive — appele par `executePayout` apres routing. Idempotence via la
+ * contrainte UNIQUE sur `payouts.gameId`, retry via le compteur `attempts`.
+ */
+async function executeOnchainPayout(request: PayoutRequest): Promise<PayoutResult> {
   const config = getPayoutConfig();
   if (!config.configured) {
     return { success: false, status: "failed", error: `Payout not configured. Missing: ${config.missingVars.join(", ")}` };
@@ -436,6 +477,71 @@ export async function executePayout(request: PayoutRequest): Promise<PayoutResul
       error: error.message,
     };
   }
+}
+
+/**
+ * Routing central des payouts. L'ordre de priorite est volontairement strict :
+ *
+ *   1. sourceTxHash = "xp:..."     → executeXpPayout (jamais on-chain)
+ *   2. sourceTxHash = "balance:..."→ blocked (passer par creditPrize)
+ *   3. reason ∈ {legacy_cashout, game_refund, dao_reward, admin_correction}
+ *      → executeOnchainPayout (autorise meme en F2P_ONLY)
+ *   4. LEGAL_MODE = F2P_ONLY      → blocked avec code explicite
+ *   5. fallback flag-based : si !isRealStakesEnabled(gameType) → XP, sinon on-chain
+ *
+ * Cette structure garantit qu'aucune partie financee en XP ne peut payer en
+ * CRC (priority 1), qu'aucune partie financee en balance ne peut atteindre
+ * la Safe par erreur (priority 2), et que les seuls payouts CRC en F2P sont
+ * les remboursements et les rewards DAO explicites.
+ */
+export async function executePayout(request: PayoutRequest): Promise<PayoutResult> {
+  const source = request.sourceTxHash ?? "";
+  const reason = request.payoutReason ?? inferPayoutReason(request.gameType);
+
+  // Priority 1 — source XP : toujours XP, ignore mode + flags.
+  if (source.startsWith("xp:")) {
+    return executeXpPayout(request);
+  }
+
+  // Priority 2 — source balance : ne doit pas reach executePayout.
+  if (source.startsWith("balance:")) {
+    return {
+      success: false,
+      status: "blocked",
+      error: "BALANCE_SOURCE_SHOULD_USE_CREDIT_PRIZE",
+    };
+  }
+
+  // Priority 3 — flux toujours autorises on-chain : refunds, cashout legacy,
+  // rewards DAO, corrections admin. Ces categories ne sont PAS bloquees en F2P
+  // car elles representent soit un remboursement d'un CRC reel deja recu, soit
+  // une distribution explicite depuis le treasury DAO.
+  if (
+    reason === "legacy_cashout" ||
+    reason === "game_refund" ||
+    reason === "dao_reward" ||
+    reason === "admin_correction"
+  ) {
+    return executeOnchainPayout(request);
+  }
+
+  // Priority 4 — F2P_ONLY : tout payout CRC residuel est bloque.
+  // En particulier : game_win, shop_crc, daily_random_crc, lottery_win, unknown.
+  if (isF2POnlyMode()) {
+    return {
+      success: false,
+      status: "blocked",
+      error: `PAYOUT_BLOCKED_IN_F2P_MODE:${reason}`,
+    };
+  }
+
+  // Priority 5 — REAL_STAKES_ALLOWED : fallback flag-based.
+  // Si le gameKey n'est pas en mode CRC reel (par ex. chance_xp_only=hidden),
+  // on credite en XP. Sinon on-chain via la Safe.
+  if (!(await isRealStakesEnabled(request.gameType))) {
+    return executeXpPayout(request);
+  }
+  return executeOnchainPayout(request);
 }
 
 export async function retryPayout(payoutId: number): Promise<PayoutResult> {
