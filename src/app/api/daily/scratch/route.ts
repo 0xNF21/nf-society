@@ -26,25 +26,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Payment not confirmed yet" }, { status: 400 });
     }
     if (session.scratchPlayed) {
-      // Return existing result
       return NextResponse.json({
         result: session.scratchResult ? JSON.parse(session.scratchResult) : null,
         alreadyPlayed: true,
       });
     }
 
-    // Calculate result deterministically
     const seed = session.txHash + session.address;
     let result = await determineScratchResult(seed);
 
-    // Safe balance check — replace CRC with XP if low
     if (result.crcValue > 0) {
       const safe = await isSafeBalanceSafe();
       if (!safe) {
         result = {
           ...result,
           crcValue: 0,
-          xpValue: result.crcValue * 100, // Convert CRC to XP (1 CRC = 100 XP)
+          xpValue: result.crcValue * 100,
           label: `+${result.crcValue * 100} XP`,
           type: "xp_fallback",
         };
@@ -71,8 +68,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Pay the scratch reward via the same method as the daily claim
-    // (balance-claim → balance; on-chain claim → on-chain payout).
     if (result.crcValue > 0) {
       try {
         await payPrize(session.address, result.crcValue, {
@@ -80,14 +75,13 @@ export async function POST(req: NextRequest) {
           gameSlug: String(session.id),
           gameRef: `scratch-${token}`,
           sourceTxHash: session.txHash,
-          reason: `Daily scratch card — ${result.label}`,
+          reason: `Daily scratch card - ${result.label}`,
         });
       } catch (err: any) {
         console.error("[DailyScratch] Prize error:", err.message);
       }
     }
 
-    // XP if won (non-blocking)
     if (result.xpValue > 0) {
       void awardPlayerXp({
         address: session.address,

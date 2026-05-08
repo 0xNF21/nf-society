@@ -109,9 +109,9 @@ export function DailyTab({ password }: { password: string }) {
               Total: {(total * 100).toFixed(1)}%
             </span>
             {hasChanges(tableKey) && (
-              <button onClick={() => saveTable(tableKey)} disabled={saving === tableKey || !isValid || combinedRtp < 0.97 || combinedRtp > 1.0}
+              <button onClick={() => saveTable(tableKey)} disabled={saving === tableKey || !isValid}
                 className="px-3 py-1 rounded-lg bg-marine text-white text-xs font-bold hover:opacity-90 disabled:opacity-50"
-                title={combinedRtp < 0.97 || combinedRtp > 1.0 ? "RTP doit être entre 97% et 100%" : ""}>
+                title={!isValid ? "Le total des probabilites doit etre proche de 100%" : ""}>
                 {saving === tableKey ? <Loader2 className="h-3 w-3 animate-spin" /> : "Sauvegarder"}
               </button>
             )}
@@ -179,33 +179,35 @@ export function DailyTab({ password }: { password: string }) {
     setTesting(false);
   }
 
-  // RTP calculation — exclude jackpot (pool-based, not fixed CRC)
-  const scratchRtp = editScratch.reduce((s, r) => s + r.prob * r.crcValue, 0);
-  const spinRtp = editSpin.filter(r => r.type !== "jackpot").reduce((s, r) => s + r.prob * r.crcValue, 0);
-  const jackpotProb = editSpin.find(r => r.type === "jackpot")?.prob || 0;
-  const combinedRtp = scratchRtp + spinRtp;
-  const rtpColor = combinedRtp > 1 ? "text-red-600 bg-red-100" : combinedRtp > 0.95 ? "text-amber-600 bg-amber-100" : "text-green-600 bg-green-100";
+  // Expected value preview for the configurable daily rewards.
+  const scratchCrcEv = editScratch.reduce((s, r) => s + r.prob * r.crcValue, 0);
+  const spinCrcEv = editSpin.reduce((s, r) => s + r.prob * r.crcValue, 0);
+  const scratchXpEv = editScratch.reduce((s, r) => s + r.prob * r.xpValue, 0);
+  const spinXpEv = editSpin.reduce((s, r) => s + r.prob * r.xpValue, 0);
+  const combinedCrcEv = scratchCrcEv + spinCrcEv;
+  const combinedXpEv = scratchXpEv + spinXpEv;
+  const scratchCrcChance = editScratch.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0);
+  const spinCrcChance = editSpin.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0);
+  const crcHitRate = 1 - (1 - scratchCrcChance) * (1 - spinCrcChance);
+  const crcTone = combinedCrcEv > 0.05 ? "text-red-600 bg-red-100" : combinedCrcEv > 0.02 ? "text-amber-600 bg-amber-100" : "text-green-600 bg-green-100";
 
   return (
     <div className="space-y-8">
-      {/* RTP Indicator */}
-      <div className={`p-4 rounded-xl border-2 ${combinedRtp > 1 ? "border-red-300" : combinedRtp > 0.95 ? "border-amber-300" : "border-green-300"} space-y-2`}>
+      <div className={`p-4 rounded-xl border-2 ${combinedCrcEv > 0.05 ? "border-red-300" : combinedCrcEv > 0.02 ? "border-amber-300" : "border-green-300"} space-y-2`}>
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-ink/40 uppercase tracking-widest">RTP combine (Scratch + Spin)</span>
-          <span className={`text-lg font-black px-3 py-1 rounded-lg ${rtpColor}`}>
-            {(combinedRtp * 100).toFixed(1)}%
+          <span className="text-xs font-bold text-ink/40 uppercase tracking-widest">Daily rewards attendus</span>
+          <span className={`text-lg font-black px-3 py-1 rounded-lg ${crcTone}`}>
+            {combinedCrcEv.toFixed(3)} CRC
           </span>
         </div>
         <div className="flex flex-wrap gap-3 text-xs text-ink/50">
-          <span>Scratch: {(scratchRtp * 100).toFixed(1)}%</span>
-          <span>Spin: {(spinRtp * 100).toFixed(1)}%</span>
-          <span>Mise: 1 CRC</span>
-          <span>Gain moyen: {combinedRtp.toFixed(3)} CRC</span>
-          {jackpotProb > 0 && <span>Jackpot: {(jackpotProb * 100).toFixed(2)}% (pool, hors RTP)</span>}
+          <span>Scratch: {scratchXpEv.toFixed(1)} XP / {scratchCrcEv.toFixed(3)} CRC</span>
+          <span>Roue: {spinXpEv.toFixed(1)} XP / {spinCrcEv.toFixed(3)} CRC</span>
+          <span>Total XP moyen: {combinedXpEv.toFixed(1)} XP</span>
+          <span>Chance CRC: {(crcHitRate * 100).toFixed(2)}%</span>
         </div>
-        {combinedRtp > 1 && <p className="text-xs text-red-600 font-semibold">Tu perds de l argent ! Le RTP depasse 100%. Sauvegarde bloquee.</p>}
-        {combinedRtp < 0.97 && <p className="text-xs text-red-600 font-semibold">RTP trop bas (min 97%). Sauvegarde bloquee.</p>}
-        {combinedRtp >= 0.97 && combinedRtp <= 1 && <p className="text-xs text-green-600 font-semibold">Marge plateforme : {((1 - combinedRtp) * 100).toFixed(1)}%</p>}
+        {combinedCrcEv > 0.05 && <p className="text-xs text-red-600 font-semibold">Attention: gain CRC moyen eleve pour un daily gratuit.</p>}
+        {combinedCrcEv <= 0.05 && <p className="text-xs text-green-600 font-semibold">Les CRC restent rares; l'XP porte la recompense principale.</p>}
       </div>
 
       <RewardTable title="Scratch Card — Tableau de gains" tableKey="scratch" entries={editScratch} />

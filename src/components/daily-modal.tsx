@@ -34,6 +34,12 @@ export default function DailyModal() {
   const stake = useStakeLabel();
   const arcadeLabel = (label: unknown) =>
     stake.t(String(label ?? "")).replace(/\bJACKPOT\b/g, "DOTATION");
+  const rewardLabel = (entry: DailyRewardEntry) => {
+    if (entry.crcValue > 0) return `+${stake.format(entry.crcValue)}`;
+    if (entry.xpValue > 0) return `+${entry.xpValue} XP`;
+    return arcadeLabel(entry.label || entry.type);
+  };
+  const rewardProb = (entry: DailyRewardEntry) => `${Math.round(entry.prob * 1000) / 10}%`;
 
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("init");
@@ -54,6 +60,7 @@ export default function DailyModal() {
   const [claimingFromBalance, setClaimingFromBalance] = useState(false);
   const [balanceClaimError, setBalanceClaimError] = useState<string | null>(null);
   const [claimingFree, setClaimingFree] = useState(false);
+  const [scratchRewards, setScratchRewards] = useState<DailyRewardEntry[]>([]);
   const [spinRewards, setSpinRewards] = useState<DailyRewardEntry[]>([]);
   const spinSegments: SpinSegment[] = spinRewards
     .filter((entry) => entry.color)
@@ -69,6 +76,7 @@ export default function DailyModal() {
       .then((r) => r.json())
       .then((data) => {
         if (!active) return;
+        if (Array.isArray(data?.scratch)) setScratchRewards(data.scratch);
         if (Array.isArray(data?.spin)) setSpinRewards(data.spin);
       })
       .catch(() => {});
@@ -555,19 +563,10 @@ export default function DailyModal() {
                         <div className="bg-ink/[0.02] rounded-xl p-3 border border-ink/5">
                           <h4 className="font-bold text-ink/70 mb-2">🎫 {t.scratchCardLabel[locale]}</h4>
                           <div className="space-y-1">
-                            {[
-                              { emoji: "💨", label: t.nothing[locale], prob: "20%" },
-                              { emoji: "⭐", label: "+50 XP", prob: "15%" },
-                              { emoji: "🪙", label: t.refundOneCrc[locale], prob: "33%" },
-                              { emoji: "🌟", label: "+100 XP", prob: "13.2%" },
-                              { emoji: "💰", label: `+${stake.format(2)}`, prob: "10.8%" },
-                              { emoji: "🔥", label: "Streak x2", prob: "4%" },
-                              { emoji: "💎", label: `+${stake.format(5)}`, prob: "3.2%" },
-                              { emoji: "👑", label: `+${stake.format(20)}`, prob: "0.8%" },
-                            ].map((row) => (
-                              <div key={row.label} className="flex items-center justify-between py-0.5">
-                                <span className="text-ink/60">{row.emoji} {row.label}</span>
-                                <span className="font-mono font-medium text-ink/50">{row.prob}</span>
+                            {scratchRewards.map((row) => (
+                              <div key={row.type} className="flex items-center justify-between py-0.5">
+                                <span className="text-ink/60">{row.symbol || "?"} {rewardLabel(row)}</span>
+                                <span className="font-mono font-medium text-ink/50">{rewardProb(row)}</span>
                               </div>
                             ))}
                           </div>
@@ -577,22 +576,13 @@ export default function DailyModal() {
                         <div className="bg-ink/[0.02] rounded-xl p-3 border border-ink/5">
                           <h4 className="font-bold text-ink/70 mb-2">🎰 {t.wheelLabel[locale]}</h4>
                           <div className="space-y-1">
-                            {[
-                              { color: "#6B7280", label: t.nothing[locale], prob: "20%" },
-                              { color: "#8B5CF6", label: "+50 XP", prob: "15%" },
-                              { color: "#10B981", label: `+${stake.format(1)}`, prob: "30%" },
-                              { color: "#6366F1", label: "+100 XP", prob: "13%" },
-                              { color: "#F59E0B", label: `+${stake.format(3)}`, prob: "13%" },
-                              { color: "#EF4444", label: "Streak x2", prob: "5%" },
-                              { color: "#EC4899", label: `+${stake.format(10)}`, prob: "3%" },
-                              { color: "#FFD700", label: "DOTATION", prob: "1%" },
-                            ].map((row) => (
-                              <div key={row.label} className="flex items-center justify-between py-0.5">
+                            {spinRewards.map((row) => (
+                              <div key={row.type} className="flex items-center justify-between py-0.5">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: row.color }} />
-                                  <span className="text-ink/60">{row.label}</span>
+                                  <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: row.color || "#6B7280" }} />
+                                  <span className="text-ink/60">{rewardLabel(row)}</span>
                                 </div>
-                                <span className="font-mono font-medium text-ink/50">{row.prob}</span>
+                                <span className="font-mono font-medium text-ink/50">{rewardProb(row)}</span>
                               </div>
                             ))}
                           </div>

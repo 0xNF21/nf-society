@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { dailyRewardsConfig } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { invalidateDailyCache } from "@/lib/daily";
+import { getScratchProbs, getSpinProbs, invalidateDailyCache } from "@/lib/daily";
 import { checkAdminAuth } from "@/lib/admin-auth";
 
 // GET — get scratch and spin reward tables
@@ -12,12 +11,8 @@ export async function GET(req: NextRequest) {
   if (limited) return limited;
 
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const rows = await db.select().from(dailyRewardsConfig);
-  const result: Record<string, unknown> = {};
-  for (const row of rows) {
-    result[row.key] = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards;
-  }
-  return NextResponse.json(result);
+  const [scratch, spin] = await Promise.all([getScratchProbs(), getSpinProbs()]);
+  return NextResponse.json({ scratch, spin });
 }
 
 // PATCH — update a reward table (scratch or spin)
@@ -38,10 +33,17 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: `Probabilities sum to ${totalProb.toFixed(3)}, should be 1.0` }, { status: 400 });
     }
 
-    await db.update(dailyRewardsConfig).set({
+    await db.insert(dailyRewardsConfig).values({
+      key,
       rewards: JSON.stringify(rewards),
       updatedAt: new Date(),
-    }).where(eq(dailyRewardsConfig.key, key));
+    }).onConflictDoUpdate({
+      target: dailyRewardsConfig.key,
+      set: {
+        rewards: JSON.stringify(rewards),
+        updatedAt: new Date(),
+      },
+    });
 
     invalidateDailyCache();
     return NextResponse.json({ ok: true });
