@@ -15,8 +15,8 @@ type AdminDailyReward = {
 };
 
 const MAX_REWARD_ROWS = 20;
-const MAX_DAILY_XP_REWARD = 500;
-const MAX_DAILY_EXPECTED_XP = 500;
+const MAX_DAILY_XP_REWARD = 10_000;
+const MAX_DAILY_EXPECTED_XP = 10_000;
 const MAX_DAILY_CRC_REWARD = 100;
 const MAX_DAILY_EXPECTED_CRC = 10;
 const MAX_REWARD_TEXT_LENGTH = 48;
@@ -54,7 +54,7 @@ function normalizeAdminRewards(rewards: unknown[]): { rewards?: AdminDailyReward
       return { error: `Reward ${i + 1}: choose either XP or CRC, not both` };
     }
     if (crcValue > MAX_DAILY_CRC_REWARD) return { error: `Reward ${i + 1}: CRC value must be <= ${MAX_DAILY_CRC_REWARD}` };
-    if (xpValue > MAX_DAILY_XP_REWARD) return { error: `Reward ${i + 1}: XP value must be <= ${MAX_DAILY_XP_REWARD}` };
+    if (xpValue > MAX_DAILY_XP_REWARD) return { error: `Reward ${i + 1}: XP balance value must be <= ${MAX_DAILY_XP_REWARD}` };
     if (color && !HEX_COLOR_RE.test(color)) return { error: `Reward ${i + 1}: color must be #RRGGBB` };
 
     seenTypes.add(type);

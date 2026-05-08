@@ -50,6 +50,9 @@ const DEFAULT_ROWS: RewardRow[] = [
   { id: "crc-10", kind: "crc", label: "+10 CRC", probability: "0.2", xpValue: "0", crcValue: "10", color: "#EC4899" },
 ];
 
+const MAX_DAILY_XP_REWARD = 10_000;
+const MAX_DAILY_EXPECTED_XP = 10_000;
+
 function parseNumber(value: string): number {
   const normalized = value.replace(",", ".").trim();
   if (normalized === "") return 0;
@@ -295,6 +298,9 @@ export function DailyTab({ password }: { password: string }) {
             <h3 className="mt-2 text-lg font-black text-ink dark:text-white">Roue daily solde XP / CRC</h3>
             <p className="mt-1 max-w-3xl text-sm font-semibold text-ink/65 dark:text-white/65">
               Configure les gains de la roue quotidienne. Chaque tirage donne soit du solde XP jouable, soit un gain CRC rare.
+            </p>
+            <p className="mt-2 text-xs font-bold text-ink/45 dark:text-white/45">
+              Garde-fou XP: {formatNumber(MAX_DAILY_XP_REWARD)} XP max par ligne, {formatNumber(MAX_DAILY_EXPECTED_XP)} XP moyen max par daily.
             </p>
           </div>
           <button
