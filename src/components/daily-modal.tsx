@@ -40,6 +40,7 @@ export default function DailyModal() {
     openLogin,
   } = useAuthSession();
   const t = translations.daily;
+  const wheelFailedMessage = t.failedTryAgain[locale];
 
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("init");
@@ -47,6 +48,7 @@ export default function DailyModal() {
   const [address, setAddress] = useState<string | null>(null);
   const [wheelResult, setWheelResult] = useState<DailyWheelResult | null>(null);
   const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [wheelError, setWheelError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showProbs, setShowProbs] = useState(false);
   const [wheelRewards, setWheelRewards] = useState<DailyRewardEntry[]>([]);
@@ -104,6 +106,7 @@ export default function DailyModal() {
     const result = session.wheelResult ?? null;
     setWheelResult(result);
     setWheelSpinning(false);
+    setWheelError(null);
     setPhase(session.wheelPlayed || result ? "complete" : "wheel");
   }, [saveDailySession]);
 
@@ -225,6 +228,7 @@ export default function DailyModal() {
     setAddress(null);
     setWheelResult(null);
     setWheelSpinning(false);
+    setWheelError(null);
     setPhase("init");
     clearDailySession();
     await handleInit();
@@ -233,6 +237,7 @@ export default function DailyModal() {
   const handleWheel = useCallback(async () => {
     if (!token || wheelSpinning) return;
     setWheelResult(null);
+    setWheelError(null);
     setWheelSpinning(true);
     try {
       const res = await fetch("/api/daily/wheel", {
@@ -247,12 +252,17 @@ export default function DailyModal() {
         setPhase("complete");
         return;
       }
-      if (!res.ok || !data?.result) throw new Error(data?.error || "Wheel failed");
+      if (!res.ok || !data?.result) {
+        setWheelError(data?.error || wheelFailedMessage);
+        setWheelSpinning(false);
+        return;
+      }
       setWheelResult(data.result);
     } catch {
+      setWheelError(wheelFailedMessage);
       setWheelSpinning(false);
     }
-  }, [token, wheelSpinning]);
+  }, [token, wheelFailedMessage, wheelSpinning]);
 
   const handleDemo = useCallback(() => {
     const configuredWin = wheelRewards.find((entry) => entry.xpValue > 0 || entry.crcValue > 0);
@@ -362,6 +372,11 @@ export default function DailyModal() {
                   locale={locale}
                   segments={wheelSegments.length > 0 ? wheelSegments : undefined}
                 />
+                {wheelError && (
+                  <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-center text-sm font-bold text-red-600 dark:text-red-300">
+                    {wheelError}
+                  </p>
+                )}
               </div>
             )}
 

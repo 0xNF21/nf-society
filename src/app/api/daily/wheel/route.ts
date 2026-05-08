@@ -87,10 +87,10 @@ export async function POST(req: NextRequest) {
       if (rows.length > 0 && result.xpValue > 0) {
         const xpCredit = Math.floor(result.xpValue);
         await tx.execute(sql`
-          INSERT INTO ${players} (address, xp, xp_balance, level, streak, last_seen, created_at)
-          VALUES (${sessionAddress}, 0, ${xpCredit}, 1, 0, NOW(), NOW())
+          INSERT INTO ${players} (address, xp, level, streak, last_seen, created_at)
+          VALUES (${sessionAddress}, ${xpCredit}, 1, 0, NOW(), NOW())
           ON CONFLICT (address) DO UPDATE
-          SET xp_balance = players.xp_balance + ${xpCredit},
+          SET xp = players.xp + ${xpCredit},
               last_seen = NOW()
         `);
       }
