@@ -23,6 +23,28 @@ interface DailyRewardEntry {
   color?: string;
 }
 
+interface DailyRewardMetrics {
+  crcEv: number;
+  xpEv: number;
+  crcChance: number;
+  specialChance: number;
+  nothingChance: number;
+}
+
+interface DailyBudgetProposal {
+  scratch: DailyRewardEntry[];
+  spin: DailyRewardEntry[];
+  combinedCrcEv: number;
+  combinedXpEv: number;
+  combinedSpecialChance: number;
+  scratchNothingChance: number;
+  spinNothingChance: number;
+  maxNothingChance: number;
+  optimizedSmallWins: boolean;
+  warnings: string[];
+  blockers: string[];
+}
+
 export function DailyTab({ password }: { password: string }) {
   const [scratch, setScratch] = useState<DailyRewardEntry[]>([]);
   const [spin, setSpin] = useState<DailyRewardEntry[]>([]);
@@ -38,6 +60,7 @@ export function DailyTab({ password }: { password: string }) {
   const [budgetMaxNothingChance, setBudgetMaxNothingChance] = useState("");
   const [budgetError, setBudgetError] = useState<string | null>(null);
   const [budgetMessage, setBudgetMessage] = useState<string | null>(null);
+  const [budgetProposal, setBudgetProposal] = useState<DailyBudgetProposal | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -48,6 +71,7 @@ export function DailyTab({ password }: { password: string }) {
       setEditScratch(data.scratch || []);
       setEditSpin(data.spin || []);
       setDraftVersion(v => v + 1);
+      setBudgetProposal(null);
     } catch {}
     setLoading(false);
   }, [password]);
@@ -77,7 +101,19 @@ export function DailyTab({ password }: { password: string }) {
     return Math.round(Math.max(0, prob) * 1_000_000_000) / 1_000_000_000;
   }
 
+  function clearBudgetOutcome() {
+    setBudgetError(null);
+    setBudgetMessage(null);
+    setBudgetProposal(null);
+  }
+
+  function updateBudgetInput(setter: (value: string) => void, value: string) {
+    setter(value);
+    clearBudgetOutcome();
+  }
+
   function updateEntry(table: "scratch" | "spin", index: number, field: string, value: unknown) {
+    clearBudgetOutcome();
     const setter = table === "scratch" ? setEditScratch : setEditSpin;
     setter(prev => {
       const updated = prev.map((e, i) => i === index ? { ...e, [field]: value } : e);
@@ -135,11 +171,13 @@ export function DailyTab({ password }: { password: string }) {
   }
 
   function addEntry(table: "scratch" | "spin", kind: "xp" | "crc" | "nothing") {
+    clearBudgetOutcome();
     const setter = table === "scratch" ? setEditScratch : setEditSpin;
     setter(prev => [...prev, createEntry(table, kind)]);
   }
 
   function removeEntry(table: "scratch" | "spin", index: number) {
+    clearBudgetOutcome();
     const setter = table === "scratch" ? setEditScratch : setEditSpin;
     setter(prev => prev.filter((_, i) => i !== index));
   }
@@ -170,6 +208,16 @@ export function DailyTab({ password }: { password: string }) {
     return entries.reduce((s, e) => s + e.prob, 0);
   }
 
+  function getRewardMetrics(entries: DailyRewardEntry[]): DailyRewardMetrics {
+    return {
+      crcEv: entries.reduce((s, r) => s + r.prob * r.crcValue, 0),
+      xpEv: entries.reduce((s, r) => s + r.prob * r.xpValue, 0),
+      crcChance: entries.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0),
+      specialChance: entries.filter(isSpecialReward).reduce((s, r) => s + r.prob, 0),
+      nothingChance: entries.filter(isEmptyReward).reduce((s, r) => s + r.prob, 0),
+    };
+  }
+
   function formatExpected(value: number, decimals = 3) {
     if (decimals === 0) return Math.round(value).toLocaleString("fr-FR");
     const fixed = value.toFixed(decimals);
@@ -185,7 +233,7 @@ export function DailyTab({ password }: { password: string }) {
     return formatExpected(pct, 3);
   }
 
-  function rebalanceEntries(table: "scratch" | "spin", entries: DailyRewardEntry[], maxNothingProb: number | null) {
+  function rebalanceEntries(table: "scratch" | "spin", entries: DailyRewardEntry[]) {
     const balanced: DailyRewardEntry[] = [];
     for (const entry of entries.map(entry => ({ ...entry, prob: roundProb(entry.prob) }))) {
       if (isEmptyReward(entry) && balanced.some(isEmptyReward)) continue;
@@ -207,20 +255,85 @@ export function DailyTab({ password }: { password: string }) {
     }
 
     const emptyProb = roundProb(1 - positiveTotal);
-    if (maxNothingProb !== null && emptyProb > maxNothingProb + 0.000000001) {
-      return {
-        error: `${table === "scratch" ? "Scratch" : "Roue"} mettrait ${formatProbabilityPercent(emptyProb)}% sur "Rien", au-dessus du max ${formatProbabilityPercent(maxNothingProb)}%. Augmente le budget, baisse les montants de gains, ou augmente les bonus speciaux.`,
-        entries: balanced,
-      };
-    }
-
     balanced[emptyIdx] = { ...balanced[emptyIdx], prob: emptyProb };
     return { entries: balanced };
   }
 
-  function applyBudgetCalculator() {
+  function createSmallXpEntry(table: "scratch" | "spin"): DailyRewardEntry {
+    const entry = createEntry(table, "xp");
+    return {
+      ...entry,
+      prob: 0,
+      type: `xp_small_${entry.type.replace(/^xp_/, "")}`,
+      label: "+1 XP",
+      xpValue: 1,
+      symbol: table === "scratch" ? "+" : entry.symbol,
+      color: table === "spin" ? "#22C55E" : entry.color,
+    };
+  }
+
+  function isSmallXpEntry(entry: DailyRewardEntry) {
+    return entry.crcValue <= 0 && entry.xpValue === 1 && (
+      entry.type.startsWith("xp_small_") ||
+      entry.label.trim().toLowerCase() === "+1 xp"
+    );
+  }
+
+  function fitNothingLimitWithSmallXp(table: "scratch" | "spin", entries: DailyRewardEntry[], maxNothingProb: number | null) {
+    if (maxNothingProb === null) return { entries, changed: false, remainingGap: 0 };
+
+    const balanced = rebalanceEntries(table, entries);
+    if (balanced.error) return { entries, changed: false, remainingGap: 0, error: balanced.error };
+
+    const working = balanced.entries.map(entry => ({ ...entry }));
+    const emptyIdx = working.findIndex(isEmptyReward);
+    if (emptyIdx < 0) return { entries: working, changed: false, remainingGap: 0 };
+
+    let remainingGap = working[emptyIdx].prob - maxNothingProb;
+    if (remainingGap <= 0.000000001) return { entries: working, changed: false, remainingGap: 0 };
+
+    let fillerIdx = working.findIndex(isSmallXpEntry);
+    if (fillerIdx < 0) {
+      working.push(createSmallXpEntry(table));
+      fillerIdx = working.length - 1;
+    }
+
+    const donorIndexes = working
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry, index }) => index !== fillerIdx && entry.xpValue > 1 && entry.prob > 0)
+      .sort((a, b) => b.entry.xpValue - a.entry.xpValue)
+      .map(({ index }) => index);
+
+    for (const donorIdx of donorIndexes) {
+      if (remainingGap <= 0.000000001) break;
+
+      const donor = working[donorIdx];
+      const netProbPerXp = 1 - (1 / donor.xpValue);
+      if (netProbPerXp <= 0) continue;
+
+      const donorXpEv = donor.prob * donor.xpValue;
+      const xpToMove = Math.min(donorXpEv, remainingGap / netProbPerXp);
+      if (xpToMove <= 0) continue;
+
+      working[donorIdx] = { ...donor, prob: roundProb(donor.prob - (xpToMove / donor.xpValue)) };
+      working[fillerIdx] = { ...working[fillerIdx], prob: roundProb(working[fillerIdx].prob + xpToMove) };
+      remainingGap -= xpToMove * netProbPerXp;
+    }
+
+    const finalBalance = rebalanceEntries(table, working);
+    if (finalBalance.error) return { entries: working, changed: true, remainingGap, error: finalBalance.error };
+
+    return {
+      entries: finalBalance.entries,
+      changed: true,
+      remainingGap: Math.max(0, remainingGap),
+    };
+  }
+
+  function previewBudgetCalculator(optimizeSmallWins = false) {
     setBudgetError(null);
     setBudgetMessage(null);
+    setBudgetProposal(null);
 
     const hasCrcBudget = budgetCrc.trim() !== "";
     const hasXpBudget = budgetXp.trim() !== "";
@@ -287,22 +400,89 @@ export function DailyTab({ password }: { password: string }) {
       return { ...entry, prob: roundProb(entry.prob * factor) };
     });
 
-    const nextScratch = rebalanceEntries("scratch", scaleEntries(editScratch), maxNothingProb);
-    if (nextScratch.error) {
-      setBudgetError(nextScratch.error);
+    const blockers: string[] = [];
+    const warnings: string[] = [];
+
+    let nextScratch = rebalanceEntries("scratch", scaleEntries(editScratch));
+    if (nextScratch.error) blockers.push(nextScratch.error);
+
+    let nextSpin = rebalanceEntries("spin", scaleEntries(editSpin));
+    if (nextSpin.error) blockers.push(nextSpin.error);
+
+    if (blockers.length > 0) {
+      setBudgetProposal({
+        scratch: nextScratch.entries,
+        spin: nextSpin.entries,
+        combinedCrcEv,
+        combinedXpEv,
+        combinedSpecialChance,
+        scratchNothingChance,
+        spinNothingChance,
+        maxNothingChance,
+        optimizedSmallWins: optimizeSmallWins,
+        warnings,
+        blockers,
+      });
       return;
     }
 
-    const nextSpin = rebalanceEntries("spin", scaleEntries(editSpin), maxNothingProb);
-    if (nextSpin.error) {
-      setBudgetError(nextSpin.error);
-      return;
+    let scratchEntries = nextScratch.entries;
+    let spinEntries = nextSpin.entries;
+
+    if (optimizeSmallWins && maxNothingProb !== null) {
+      const fittedScratch = fitNothingLimitWithSmallXp("scratch", scratchEntries, maxNothingProb);
+      const fittedSpin = fitNothingLimitWithSmallXp("spin", spinEntries, maxNothingProb);
+
+      scratchEntries = fittedScratch.entries;
+      spinEntries = fittedSpin.entries;
+
+      if (fittedScratch.error) blockers.push(fittedScratch.error);
+      if (fittedSpin.error) blockers.push(fittedSpin.error);
+      if (fittedScratch.remainingGap > 0.000000001 || fittedSpin.remainingGap > 0.000000001) {
+        warnings.push("Les petits gains +1 XP ne suffisent pas a respecter totalement le max gagne rien avec cette structure de gains.");
+      }
     }
 
-    setEditScratch(nextScratch.entries);
-    setEditSpin(nextSpin.entries);
+    const nextScratchMetrics = getRewardMetrics(scratchEntries);
+    const nextSpinMetrics = getRewardMetrics(spinEntries);
+    const proposalMaxNothingChance = Math.max(nextScratchMetrics.nothingChance, nextSpinMetrics.nothingChance);
+
+    if (maxNothingProb !== null && proposalMaxNothingChance > maxNothingProb + 0.000000001) {
+      warnings.push(`Cette proposition met ${formatProbabilityPercent(proposalMaxNothingChance)}% max sur "Rien", au-dessus de ta limite ${formatProbabilityPercent(maxNothingProb)}%.`);
+    }
+
+    setBudgetProposal({
+      scratch: scratchEntries,
+      spin: spinEntries,
+      combinedCrcEv: nextScratchMetrics.crcEv + nextSpinMetrics.crcEv,
+      combinedXpEv: nextScratchMetrics.xpEv + nextSpinMetrics.xpEv,
+      combinedSpecialChance: nextScratchMetrics.specialChance + nextSpinMetrics.specialChance,
+      scratchNothingChance: nextScratchMetrics.nothingChance,
+      spinNothingChance: nextSpinMetrics.nothingChance,
+      maxNothingChance: proposalMaxNothingChance,
+      optimizedSmallWins: optimizeSmallWins,
+      warnings,
+      blockers,
+    });
+
+    setBudgetMessage("Proposition calculee. Regarde les chiffres, puis applique au brouillon si ca te va.");
+  }
+
+  function applyBudgetProposal() {
+    if (!budgetProposal || budgetProposal.blockers.length > 0) return;
+
+    setEditScratch(budgetProposal.scratch);
+    setEditSpin(budgetProposal.spin);
     setDraftVersion(v => v + 1);
-    setBudgetMessage("Probas recalculees. Verifie le resultat puis sauvegarde Scratch et Roue pour publier.");
+    setBudgetProposal(null);
+    setBudgetError(null);
+    setBudgetMessage("Proposition appliquee au brouillon. Sauvegarde Scratch et Roue pour publier.");
+  }
+
+  function acceptProposalNothingLimitAndApply() {
+    if (!budgetProposal) return;
+    setBudgetMaxNothingChance(formatProbabilityPercent(budgetProposal.maxNothingChance));
+    applyBudgetProposal();
   }
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-ink/30" /></div>;
@@ -479,6 +659,13 @@ export function DailyTab({ password }: { password: string }) {
   const budgetTargetSpecialChance = budgetPreviewValid ? budgetSpecialNumber : 0;
   const budgetTargetMaxNothingChance = budgetPreviewValid ? budgetMaxNothingNumber : 0;
   const budgetProjectionCount = Number.isFinite(budgetDailyNumber) && budgetDailyNumber > 0 ? budgetDailyNumber : 100;
+  const proposalCanApply = Boolean(budgetProposal && budgetProposal.blockers.length === 0);
+  const proposalNeedsHigherNothingLimit = Boolean(
+    budgetProposal &&
+    hasMaxNothingBudgetInput &&
+    budgetPreviewValid &&
+    budgetProposal.maxNothingChance > (budgetTargetMaxNothingChance / 100) + 0.000000001
+  );
 
   return (
     <div className="space-y-8">
@@ -544,15 +731,15 @@ export function DailyTab({ password }: { password: string }) {
               Bonus speciaux = lignes sans CRC/XP mais avec un effet, comme daily streak x2.
             </p>
             <p className="mt-1 text-xs font-semibold text-ink/55 dark:text-white/55">
-              Max gagne rien limite le "Rien" par table. Si le budget est trop bas pour ce plafond, le calculateur te bloque au lieu de produire une UX vide.
+              Max gagne rien limite le "Rien" par table. Si le budget est trop bas, l'assistant propose quoi changer au lieu de te laisser tester a tatons.
             </p>
           </div>
           <button
-            onClick={applyBudgetCalculator}
+            onClick={() => previewBudgetCalculator(false)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-marine px-3 py-2 text-xs font-bold text-white hover:opacity-90"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Appliquer aux probas
+            Previsualiser
           </button>
         </div>
 
@@ -564,7 +751,7 @@ export function DailyTab({ password }: { password: string }) {
               min={1}
               step={1}
               value={budgetDailyCount}
-              onChange={e => setBudgetDailyCount(e.target.value)}
+              onChange={e => updateBudgetInput(setBudgetDailyCount, e.target.value)}
               className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
           </div>
@@ -575,7 +762,7 @@ export function DailyTab({ password }: { password: string }) {
               min={0}
               step="0.001"
               value={budgetCrc}
-              onChange={e => setBudgetCrc(e.target.value)}
+              onChange={e => updateBudgetInput(setBudgetCrc, e.target.value)}
               placeholder={formatExpected(combinedCrcEv * budgetProjectionCount)}
               className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
@@ -587,7 +774,7 @@ export function DailyTab({ password }: { password: string }) {
               min={0}
               step={1}
               value={budgetXp}
-              onChange={e => setBudgetXp(e.target.value)}
+              onChange={e => updateBudgetInput(setBudgetXp, e.target.value)}
               placeholder={formatExpected(combinedXpEv * budgetProjectionCount, 0)}
               className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
@@ -600,7 +787,7 @@ export function DailyTab({ password }: { password: string }) {
               max={100}
               step="0.001"
               value={budgetSpecialChance}
-              onChange={e => setBudgetSpecialChance(e.target.value)}
+              onChange={e => updateBudgetInput(setBudgetSpecialChance, e.target.value)}
               placeholder={formatProbabilityPercent(combinedSpecialChance)}
               className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
@@ -613,7 +800,7 @@ export function DailyTab({ password }: { password: string }) {
               max={100}
               step="0.001"
               value={budgetMaxNothingChance}
-              onChange={e => setBudgetMaxNothingChance(e.target.value)}
+              onChange={e => updateBudgetInput(setBudgetMaxNothingChance, e.target.value)}
               placeholder={formatProbabilityPercent(maxNothingChance)}
               className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
@@ -636,6 +823,96 @@ export function DailyTab({ password }: { password: string }) {
             <span>Entre des valeurs valides pour voir la cible moyenne par daily.</span>
           )}
         </div>
+        {budgetProposal && (
+          <div className="mt-3 rounded-xl border border-marine/15 bg-sky-50/70 p-4 shadow-sm dark:border-cyan-400/20 dark:bg-cyan-950/20">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-marine dark:text-cyan-200">
+                  Proposition recommandee
+                </p>
+                <p className="mt-1 text-sm font-semibold text-ink dark:text-white">
+                  {formatExpected(budgetProposal.combinedXpEv, 2)} XP et {formatExpected(budgetProposal.combinedCrcEv)} CRC en moyenne par daily complet.
+                </p>
+                <p className="mt-1 text-xs font-semibold text-ink/70 dark:text-white/75">
+                  Rien: scratch {formatProbabilityPercent(budgetProposal.scratchNothingChance)}% / roue {formatProbabilityPercent(budgetProposal.spinNothingChance)}%. Bonus speciaux: {formatProbabilityPercent(budgetProposal.combinedSpecialChance)}%.
+                </p>
+              </div>
+              <div className="grid min-w-[220px] grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg border border-ink/10 bg-white p-2 dark:border-white/10 dark:bg-zinc-950/80">
+                  <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">100 daily</p>
+                  <p className="font-bold text-ink dark:text-white">~{formatExpected(budgetProposal.combinedXpEv * 100, 0)} XP</p>
+                  <p className="font-bold text-emerald-700 dark:text-emerald-300">~{formatExpected(budgetProposal.combinedCrcEv * 100)} CRC</p>
+                </div>
+                <div className="rounded-lg border border-ink/10 bg-white p-2 dark:border-white/10 dark:bg-zinc-950/80">
+                  <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">1 000 daily</p>
+                  <p className="font-bold text-ink dark:text-white">~{formatExpected(budgetProposal.combinedXpEv * 1000, 0)} XP</p>
+                  <p className="font-bold text-emerald-700 dark:text-emerald-300">~{formatExpected(budgetProposal.combinedCrcEv * 1000)} CRC</p>
+                </div>
+              </div>
+            </div>
+
+            {budgetProposal.optimizedSmallWins && (
+              <p className="mt-3 rounded-lg bg-green-50 p-3 text-xs font-semibold text-green-800 dark:bg-green-500/10 dark:text-green-200">
+                Petits gains +1 XP ajoutes dans la proposition pour baisser le taux de "Rien" sans exploser le budget.
+              </p>
+            )}
+
+            {budgetProposal.blockers.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {budgetProposal.blockers.map((blocker, index) => (
+                  <p key={index} className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {blocker}
+                  </p>
+                ))}
+                <p className="text-xs font-semibold text-ink/75 dark:text-white/75">
+                  Pour debloquer: baisse le budget demande, augmente les montants des lots, ou ajoute des gains plus gros pour distribuer la meme valeur avec moins de probabilite.
+                </p>
+              </div>
+            )}
+
+            {budgetProposal.warnings.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {budgetProposal.warnings.map((warning, index) => (
+                  <p key={index} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {warning}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={applyBudgetProposal}
+                disabled={!proposalCanApply}
+                className="inline-flex items-center gap-2 rounded-lg bg-marine px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <CheckCircle className="h-3.5 w-3.5" />
+                Appliquer cette config
+              </button>
+              {proposalNeedsHigherNothingLimit && (
+                <button
+                  onClick={acceptProposalNothingLimitAndApply}
+                  disabled={!proposalCanApply}
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Accepter {formatProbabilityPercent(budgetProposal.maxNothingChance)}% et appliquer
+                </button>
+              )}
+              {proposalNeedsHigherNothingLimit && !budgetProposal.optimizedSmallWins && (
+                <button
+                  onClick={() => previewBudgetCalculator(true)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:opacity-90"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Optimiser avec +1 XP
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         {budgetError && (
           <p className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
             <AlertCircle className="h-4 w-4 shrink-0" />
