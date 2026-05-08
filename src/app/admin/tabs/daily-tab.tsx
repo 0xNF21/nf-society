@@ -51,8 +51,9 @@ interface DailyBudgetTableProposal {
 }
 
 interface DailyDesignerDraft {
-  xpPerDay: string;
-  crcPerDay: string;
+  xpPerDaily: string;
+  crcPerDaily: string;
+  crcDailyCap: string;
   maxNothingChance: string;
   specialChance: string;
   scratchShare: string;
@@ -126,12 +127,20 @@ const emptyBudgetProposals = (): Record<DailyRewardTableKey, DailyBudgetTablePro
 });
 
 const emptyDesignerDraft = (): DailyDesignerDraft => ({
-  xpPerDay: "",
-  crcPerDay: "",
+  xpPerDaily: "",
+  crcPerDaily: "",
+  crcDailyCap: "",
   maxNothingChance: "35",
   specialChance: "",
   scratchShare: "50",
 });
+
+const DAILY_AUDIENCE_SCENARIOS = [
+  { label: "30 daily/jour", count: 30 },
+  { label: "100 daily/jour", count: 100 },
+  { label: "300 daily/jour", count: 300 },
+  { label: "1 000 daily/jour", count: 1000 },
+];
 
 function isEmptyReward(entry: DailyRewardEntry) {
   const type = entry.type.toLowerCase();
@@ -1058,27 +1067,33 @@ export function DailyTab({ password }: { password: string }) {
     setBudgetProposals(emptyBudgetProposals());
     setDesignerProposal(null);
 
-    const dailyCount = Number(budgetDailyCount);
-    const hasXpBudget = designerDraft.xpPerDay.trim() !== "";
-    const hasCrcBudget = designerDraft.crcPerDay.trim() !== "";
+    const scenarioDailyCount = Number(budgetDailyCount);
+    const hasXpBudget = designerDraft.xpPerDaily.trim() !== "";
+    const hasCrcBudget = designerDraft.crcPerDaily.trim() !== "";
+    const hasCrcDailyCap = designerDraft.crcDailyCap.trim() !== "";
     const hasMaxNothing = designerDraft.maxNothingChance.trim() !== "";
     const hasSpecialChance = designerDraft.specialChance.trim() !== "";
-    const xpBudget = hasXpBudget ? Number(designerDraft.xpPerDay) : null;
-    const crcBudget = hasCrcBudget ? Number(designerDraft.crcPerDay) : null;
+    const xpBudget = hasXpBudget ? Number(designerDraft.xpPerDaily) : null;
+    const crcBudget = hasCrcBudget ? Number(designerDraft.crcPerDaily) : null;
+    const crcDailyCap = hasCrcDailyCap ? Number(designerDraft.crcDailyCap) : null;
     const maxNothing = hasMaxNothing ? Number(designerDraft.maxNothingChance) : null;
     const specialChance = hasSpecialChance ? Number(designerDraft.specialChance) : null;
     const scratchSharePct = Number(designerDraft.scratchShare);
 
-    if (!Number.isFinite(dailyCount) || dailyCount <= 0) {
-      setBudgetError("Entre un nombre de daily joues superieur a 0.");
+    if (!Number.isFinite(scenarioDailyCount) || scenarioDailyCount <= 0) {
+      setBudgetError("Entre un scenario de daily joues superieur a 0.");
       return;
     }
     if (hasXpBudget && (!Number.isFinite(xpBudget) || xpBudget! < 0)) {
-      setBudgetError("Le budget XP doit etre un nombre positif.");
+      setBudgetError("La moyenne XP par daily doit etre un nombre positif.");
       return;
     }
     if (hasCrcBudget && (!Number.isFinite(crcBudget) || crcBudget! < 0)) {
-      setBudgetError("Le budget CRC doit etre un nombre positif.");
+      setBudgetError("La moyenne CRC par daily doit etre un nombre positif.");
+      return;
+    }
+    if (hasCrcDailyCap && (!Number.isFinite(crcDailyCap) || crcDailyCap! < 0)) {
+      setBudgetError("Le garde-fou CRC / jour doit etre un nombre positif.");
       return;
     }
     if (hasMaxNothing && (!Number.isFinite(maxNothing) || maxNothing! < 0 || maxNothing! > 100)) {
@@ -1095,8 +1110,8 @@ export function DailyTab({ password }: { password: string }) {
     }
 
     const scratchShare = scratchSharePct / 100;
-    const totalXpEv = hasXpBudget ? xpBudget! / dailyCount : combinedXpEv;
-    const totalCrcEv = hasCrcBudget ? crcBudget! / dailyCount : combinedCrcEv;
+    const totalXpEv = hasXpBudget ? xpBudget! : combinedXpEv;
+    const totalCrcEv = hasCrcBudget ? crcBudget! : combinedCrcEv;
     const totalSpecialChance = hasSpecialChance ? specialChance! / 100 : null;
     const maxNothingProb = hasMaxNothing ? maxNothing! / 100 : null;
 
@@ -1125,6 +1140,10 @@ export function DailyTab({ password }: { password: string }) {
 
     const blockers = [...nextScratch.blockers, ...nextSpin.blockers];
     const warnings = [...nextScratch.warnings, ...nextSpin.warnings];
+    const projectedCrcForScenario = (nextScratch.metrics.crcEv + nextSpin.metrics.crcEv) * scenarioDailyCount;
+    if (hasCrcDailyCap && projectedCrcForScenario > crcDailyCap! + 0.000000001) {
+      warnings.push(`Garde-fou CRC: le scenario ${formatExpected(scenarioDailyCount, 0)} daily/jour projette ${formatExpected(projectedCrcForScenario)} CRC/jour, au-dessus de ${formatExpected(crcDailyCap!)} CRC/jour.`);
+    }
 
     setDesignerProposal({
       scratch: nextScratch.entries,
@@ -1210,12 +1229,15 @@ export function DailyTab({ password }: { password: string }) {
     : combinedCrcEv > 0.02
       ? "text-amber-700 bg-amber-100 dark:text-amber-200 dark:bg-amber-500/20"
       : "text-green-700 bg-green-100 dark:text-green-200 dark:bg-green-500/20";
-  const dailyProjections = [
-    { label: "100 daily joues", count: 100 },
-    { label: "1 000 daily joues", count: 1000 },
-  ];
+  const dailyProjections = DAILY_AUDIENCE_SCENARIOS;
   const budgetDailyNumber = Number(budgetDailyCount);
   const budgetProjectionCount = Number.isFinite(budgetDailyNumber) && budgetDailyNumber > 0 ? budgetDailyNumber : 100;
+  const designerProposalXpEv = designerProposal
+    ? designerProposal.scratchMetrics.xpEv + designerProposal.spinMetrics.xpEv
+    : 0;
+  const designerProposalCrcEv = designerProposal
+    ? designerProposal.scratchMetrics.crcEv + designerProposal.spinMetrics.crcEv
+    : 0;
 
   function getBudgetPreview(table: DailyRewardTableKey, metrics: DailyRewardMetrics) {
     const draft = budgetDrafts[table];
@@ -1268,7 +1290,7 @@ export function DailyTab({ password }: { password: string }) {
           </span>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-lg border border-ink/10 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-zinc-950/70">
             <p className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Par 1 daily joue</p>
             <p className="mt-1 text-sm font-bold text-ink dark:text-white">{combinedXpEv.toFixed(1)} XP moyen</p>
@@ -1279,12 +1301,12 @@ export function DailyTab({ password }: { password: string }) {
             <div key={projection.count} className="rounded-lg border border-ink/10 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-zinc-950/70">
               <p className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">{projection.label}</p>
               <p className="mt-1 text-sm font-bold text-ink dark:text-white">
-                ~{formatExpected(combinedXpEv * projection.count, 0)} XP distribues
+                ~{formatExpected(combinedXpEv * projection.count, 0)} XP / jour
               </p>
               <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                ~{formatExpected(combinedCrcEv * projection.count)} CRC distribues
+                ~{formatExpected(combinedCrcEv * projection.count)} CRC / jour
               </p>
-              <p className="mt-1 text-xs text-ink/60 dark:text-white/60">Projection moyenne, les resultats reels peuvent varier.</p>
+              <p className="mt-1 text-xs text-ink/60 dark:text-white/60">Sur 30j: ~{formatExpected(combinedCrcEv * projection.count * 30)} CRC.</p>
             </div>
           ))}
         </div>
@@ -1308,14 +1330,14 @@ export function DailyTab({ password }: { password: string }) {
               <h3 className="text-sm font-black uppercase tracking-widest text-ink dark:text-white">Daily Reward Designer</h3>
             </div>
             <p className="mt-1 text-sm text-ink/70 dark:text-white/70">
-              Donne les objectifs de distribution, verrouille les lignes sensibles, puis laisse le designer ajuster les probabilites.
+              Regle le cout moyen par daily complet. Les projections montrent ensuite ce que ca donne si l'audience passe de 30 a 1 000 daily/jour.
             </p>
             <p className="mt-1 text-xs font-semibold text-ink/55 dark:text-white/55">
               Les lignes verrouillees gardent leur probabilite. Les lignes "Rien" sont recalculees a la fin.
             </p>
           </div>
           <div className="w-full max-w-[220px]">
-            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Daily estimes / jour</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Scenario daily / jour</label>
             <input
               type="number"
               min={1}
@@ -1324,30 +1346,43 @@ export function DailyTab({ password }: { password: string }) {
               onChange={e => updateDailyCount(e.target.value)}
               className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
+            <p className="mt-1 text-[11px] font-semibold text-ink/50 dark:text-white/55">Sert aux projections, pas a la proba.</p>
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget XP / jour</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">XP moyen / daily</label>
             <input
               type="number"
               min={0}
               step={1}
-              value={designerDraft.xpPerDay}
-              onChange={e => updateDesignerDraft("xpPerDay", e.target.value)}
-              placeholder={formatExpected(combinedXpEv * budgetProjectionCount, 0)}
+              value={designerDraft.xpPerDaily}
+              onChange={e => updateDesignerDraft("xpPerDaily", e.target.value)}
+              placeholder={formatExpected(combinedXpEv, 2)}
               className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget CRC / jour</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">CRC moyen / daily</label>
             <input
               type="number"
               min={0}
               step="0.001"
-              value={designerDraft.crcPerDay}
-              onChange={e => updateDesignerDraft("crcPerDay", e.target.value)}
+              value={designerDraft.crcPerDaily}
+              onChange={e => updateDesignerDraft("crcPerDaily", e.target.value)}
+              placeholder={formatExpected(combinedCrcEv)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Alerte CRC / jour</label>
+            <input
+              type="number"
+              min={0}
+              step="0.001"
+              value={designerDraft.crcDailyCap}
+              onChange={e => updateDesignerDraft("crcDailyCap", e.target.value)}
               placeholder={formatExpected(combinedCrcEv * budgetProjectionCount)}
               className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
@@ -1426,12 +1461,27 @@ export function DailyTab({ password }: { password: string }) {
               <div className="rounded-lg bg-white/80 p-3 text-xs dark:bg-zinc-950/70">
                 <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">Daily complet</p>
                 <p className="mt-1 font-bold text-ink dark:text-white">
-                  {formatExpected(designerProposal.scratchMetrics.xpEv + designerProposal.spinMetrics.xpEv, 2)} XP moyen
+                  {formatExpected(designerProposalXpEv, 2)} XP moyen
                 </p>
                 <p className="font-bold text-emerald-700 dark:text-emerald-300">
-                  {formatExpected(designerProposal.scratchMetrics.crcEv + designerProposal.spinMetrics.crcEv)} CRC moyen
+                  {formatExpected(designerProposalCrcEv)} CRC moyen
                 </p>
               </div>
+            </div>
+
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {DAILY_AUDIENCE_SCENARIOS.map((projection) => (
+                <div key={projection.count} className="rounded-lg bg-white/70 p-3 text-xs dark:bg-zinc-950/60">
+                  <p className="font-black uppercase tracking-widest text-ink/50 dark:text-white/50">{projection.label}</p>
+                  <p className="mt-1 font-bold text-ink dark:text-white">
+                    {formatExpected(designerProposalXpEv * projection.count, 0)} XP / jour
+                  </p>
+                  <p className="font-bold text-emerald-700 dark:text-emerald-300">
+                    {formatExpected(designerProposalCrcEv * projection.count)} CRC / jour
+                  </p>
+                  <p className="text-ink/55 dark:text-white/55">30j: {formatExpected(designerProposalCrcEv * projection.count * 30)} CRC</p>
+                </div>
+              ))}
             </div>
 
             {designerProposal.blockers.length > 0 && (
