@@ -114,9 +114,6 @@ export async function POST(req: NextRequest) {
         address: session.address,
         action: "daily_wheel",
         xpAmount: result.xpValue,
-        sourceType: "daily",
-        sourceId: `session:${session.id}:wheel`,
-        metadata: { token },
       }).catch(() => {});
     }
 
