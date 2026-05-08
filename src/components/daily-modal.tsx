@@ -42,6 +42,52 @@ export default function DailyModal() {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [claimingFromBalance, setClaimingFromBalance] = useState(false);
   const [balanceClaimError, setBalanceClaimError] = useState<string | null>(null);
+  const [claimingFree, setClaimingFree] = useState(false);
+
+  const routeClaimedSession = useCallback((data: any, claimedAddress: string) => {
+    setToken(data.token);
+    setAddress(data.address || claimedAddress);
+    localStorage.setItem("nf-daily", JSON.stringify({
+      token: data.token,
+      address: data.address || claimedAddress,
+      date: new Date().toISOString().slice(0, 10),
+    }));
+
+    if (data.alreadyClaimed) {
+      if (data.scratchPlayed && data.spinPlayed) {
+        setScratchResult(data.scratchResult);
+        setSpinResult(data.spinResult);
+        setPhase("complete");
+      } else if (data.scratchPlayed) {
+        setScratchResult(data.scratchResult);
+        setPhase("spin");
+      } else {
+        setPhase("scratch");
+      }
+    } else {
+      setPhase("scratch");
+    }
+  }, []);
+
+  const claimDailyFree = useCallback(async (claimAddress: string) => {
+    if (!claimAddress || claimingFree) return false;
+    setClaimingFree(true);
+    try {
+      const res = await fetch("/api/daily/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: claimAddress }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.token) return false;
+      routeClaimedSession(data, claimAddress.toLowerCase());
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setClaimingFree(false);
+    }
+  }, [claimingFree, routeClaimedSession]);
 
   // Fermer avec Escape
   useEffect(() => {
@@ -142,37 +188,10 @@ export default function DailyModal() {
   const handleInit = useCallback(async () => {
     setLoading(true);
     try {
-      // Mini App mode: free claim with wallet address
-      if (isMiniApp && walletAddress) {
-        const res = await fetch("/api/daily/claim", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: walletAddress }),
-        });
-        const data = await res.json();
-        setToken(data.token);
-        setAddress(data.address);
-        localStorage.setItem("nf-daily", JSON.stringify({
-          token: data.token,
-          address: data.address,
-          date: new Date().toISOString().slice(0, 10),
-        }));
-
-        if (data.alreadyClaimed) {
-          // Resume at right phase
-          if (data.scratchPlayed && data.spinPlayed) {
-            setScratchResult(data.scratchResult);
-            setSpinResult(data.spinResult);
-            setPhase("complete");
-          } else if (data.scratchPlayed) {
-            setScratchResult(data.scratchResult);
-            setPhase("spin");
-          } else {
-            setPhase("scratch");
-          }
-        } else {
-          setPhase("scratch");
-        }
+      // Connected users (Mini App or standalone auth session) claim the daily
+      // directly. The QR flow is only a fallback when no address is available.
+      const freeClaimAddress = connectedAddress || (isMiniApp ? walletAddress : null);
+      if (freeClaimAddress && await claimDailyFree(freeClaimAddress)) {
         setLoading(false);
         return;
       }
@@ -215,7 +234,14 @@ export default function DailyModal() {
       }
     } catch { /* error */ }
     setLoading(false);
-  }, [isMiniApp, walletAddress]);
+  }, [claimDailyFree, connectedAddress, isMiniApp, walletAddress]);
+
+  // If an old local pending QR session is restored while the user is now
+  // connected, confirm today's daily without asking for the QR payment.
+  useEffect(() => {
+    if (!open || phase !== "payment" || !connectedAddress || loading || claimingFree) return;
+    void claimDailyFree(connectedAddress);
+  }, [open, phase, connectedAddress, loading, claimingFree, claimDailyFree]);
 
   // Play scratch
   const handleScratch = useCallback(async () => {
