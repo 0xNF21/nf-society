@@ -520,10 +520,11 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
 
   // Scan for payment
   const scanForRound = useCallback(async () => {
-    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
-      await fetch(`/api/hilo-scan?tableSlug=${table.slug}`, { method: "POST" });
+      if (stake.realStakesEnabled) {
+        await fetch(`/api/hilo-scan?tableSlug=${table.slug}`, { method: "POST" });
+      }
 
       // Fetch active round by token
       const activeRes = await fetch(`/api/hilo/active?tableSlug=${table.slug}&token=${tokenRef.current}`);

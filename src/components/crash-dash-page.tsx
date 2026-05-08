@@ -687,10 +687,11 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
 
   // Scan for payment
   const scanForRound = useCallback(async () => {
-    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
-      await fetch(`/api/crash-dash-scan?tableSlug=${table.slug}`, { method: "POST" });
+      if (stake.realStakesEnabled) {
+        await fetch(`/api/crash-dash-scan?tableSlug=${table.slug}`, { method: "POST" });
+      }
       const activeRes = await fetch(`/api/crash-dash/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
       const activeData = await activeRes.json();
       if (activeData.round) {

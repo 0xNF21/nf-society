@@ -431,16 +431,26 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   }, [watchingActionPayment, pendingPaidAction, handId, tokenRef]);
 
   const scanForHand = useCallback(async () => {
-    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
-      const res = await fetch(`/api/blackjack-scan?tableSlug=${table.slug}&token=${tokenRef.current}`, { method: "POST" });
-      const data = await res.json();
+      const data = stake.realStakesEnabled
+        ? await (await fetch(`/api/blackjack-scan?tableSlug=${table.slug}&token=${tokenRef.current}`, { method: "POST" })).json()
+        : { results: [{}] };
       if (data.results && data.results.length > 0) {
-        const newest = data.results[data.results.length - 1];
-        // Skip if this is the hand we just finished (prevents ghost reappearance)
-        if (newest.id !== lastFinishedHandRef.current) {
-          setHandId(newest.id);
+        if (!stake.realStakesEnabled) {
+          const activeRes = await fetch(`/api/blackjack/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+          const activeData = await activeRes.json();
+          if (activeData.hand) {
+            setWatchingPayment(false);
+            setHandId(activeData.hand.id);
+            setHand(activeData.hand);
+          }
+        } else {
+          const newest = data.results[data.results.length - 1];
+          // Skip if this is the hand we just finished (prevents ghost reappearance)
+          if (newest.id !== lastFinishedHandRef.current) {
+            setHandId(newest.id);
+          }
         }
       }
     } catch {}

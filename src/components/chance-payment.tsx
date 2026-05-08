@@ -170,6 +170,8 @@ export function ChancePayment({
         onStarted={(result) => {
           if (onBalancePaid) {
             onBalancePaid(result);
+          } else if (onPaymentInitiated) {
+            onPaymentInitiated();
           } else {
             setTimeout(() => {
               if (typeof window !== "undefined") window.location.reload();

@@ -627,10 +627,11 @@ function RealKenoGame({ table }: { table: KenoTable }) {
 
   // Scan for payment
   const scanForRound = useCallback(async () => {
-    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
-      await fetch(`/api/keno-scan?tableSlug=${table.slug}`, { method: "POST" });
+      if (stake.realStakesEnabled) {
+        await fetch(`/api/keno-scan?tableSlug=${table.slug}`, { method: "POST" });
+      }
       const activeRes = await fetch(`/api/keno/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
       const activeData = await activeRes.json();
       if (activeData.round) {

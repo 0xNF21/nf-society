@@ -396,11 +396,11 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
 
   // Scan for payment
   const scanForFlip = useCallback(async () => {
-    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
-      const res = await fetch(`/api/coin-flip-scan?tableSlug=${table.slug}`, { method: "POST" });
-      const data = await res.json();
+      const data = stake.realStakesEnabled
+        ? await (await fetch(`/api/coin-flip-scan?tableSlug=${table.slug}`, { method: "POST" })).json()
+        : { results: [{}] };
 
       if (data.results && data.results.length > 0) {
         // Fetch the full result by token

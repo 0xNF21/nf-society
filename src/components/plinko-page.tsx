@@ -837,10 +837,11 @@ function RealPlinkoGame({ table }: { table: PlinkoTable }) {
   }, [round?.playerAddress, playerProfile]);
 
   const scanForRound = useCallback(async () => {
-    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
-      await fetch(`/api/plinko-scan?tableSlug=${table.slug}`, { method: "POST" });
+      if (stake.realStakesEnabled) {
+        await fetch(`/api/plinko-scan?tableSlug=${table.slug}`, { method: "POST" });
+      }
       const activeRes = await fetch(`/api/plinko/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
       const activeData = await activeRes.json();
       if (activeData.round) { setWatchingPayment(false); setRound(activeData.round); }

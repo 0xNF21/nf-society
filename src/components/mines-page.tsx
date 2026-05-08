@@ -529,10 +529,11 @@ function RealMinesGame({ table }: { table: MinesTable }) {
 
   // Scan for payment
   const scanForRound = useCallback(async () => {
-    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
-      await fetch(`/api/mines-scan?tableSlug=${table.slug}`, { method: "POST" });
+      if (stake.realStakesEnabled) {
+        await fetch(`/api/mines-scan?tableSlug=${table.slug}`, { method: "POST" });
+      }
 
       // Fetch active round by token
       const activeRes = await fetch(`/api/mines/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
