@@ -142,6 +142,11 @@ export function DailyTab({ password }: { password: string }) {
     return entries.reduce((s, e) => s + e.prob, 0);
   }
 
+  function formatExpected(value: number, decimals = 3) {
+    const fixed = value.toFixed(decimals);
+    return fixed.replace(/\.?0+$/, "");
+  }
+
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-ink/30" /></div>;
 
   function RewardTable({ title, tableKey, entries }: { title: string; tableKey: "scratch" | "spin"; entries: DailyRewardEntry[] }) {
@@ -280,21 +285,51 @@ export function DailyTab({ password }: { password: string }) {
   const spinCrcChance = editSpin.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0);
   const crcHitRate = 1 - (1 - scratchCrcChance) * (1 - spinCrcChance);
   const crcTone = combinedCrcEv > 0.05 ? "text-red-600 bg-red-100" : combinedCrcEv > 0.02 ? "text-amber-600 bg-amber-100" : "text-green-600 bg-green-100";
+  const dailyProjections = [
+    { label: "100 daily joues", count: 100 },
+    { label: "1 000 daily joues", count: 1000 },
+  ];
 
   return (
     <div className="space-y-8">
-      <div className={`p-4 rounded-xl border-2 ${combinedCrcEv > 0.05 ? "border-red-300" : combinedCrcEv > 0.02 ? "border-amber-300" : "border-green-300"} space-y-2`}>
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-ink/40 uppercase tracking-widest">Daily rewards attendus</span>
+      <div className={`p-4 rounded-xl border-2 ${combinedCrcEv > 0.05 ? "border-red-300" : combinedCrcEv > 0.02 ? "border-amber-300" : "border-green-300"} space-y-4`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <span className="text-xs font-bold text-ink/40 uppercase tracking-widest">Gain moyen attendu</span>
+            <p className="mt-1 text-sm text-ink/60">
+              Estimation statistique pour <strong>1 daily complet</strong> (scratch + roue). Ce n'est pas un gain garanti joueur par joueur.
+            </p>
+          </div>
           <span className={`text-lg font-black px-3 py-1 rounded-lg ${crcTone}`}>
-            {combinedCrcEv.toFixed(3)} CRC
+            {formatExpected(combinedCrcEv)} CRC / daily
           </span>
         </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border border-ink/5 bg-white/60 p-3 dark:bg-white/5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-ink/35">Par 1 daily joue</p>
+            <p className="mt-1 text-sm font-bold text-ink dark:text-white">{combinedXpEv.toFixed(1)} XP moyen</p>
+            <p className="text-sm font-bold text-emerald-600">{formatExpected(combinedCrcEv)} CRC moyen</p>
+            <p className="mt-1 text-xs text-ink/45">{(crcHitRate * 100).toFixed(2)}% de chance de toucher au moins 1 CRC</p>
+          </div>
+          {dailyProjections.map((projection) => (
+            <div key={projection.count} className="rounded-lg border border-ink/5 bg-white/60 p-3 dark:bg-white/5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-ink/35">{projection.label}</p>
+              <p className="mt-1 text-sm font-bold text-ink dark:text-white">
+                ~{formatExpected(combinedXpEv * projection.count, 0)} XP distribues
+              </p>
+              <p className="text-sm font-bold text-emerald-600">
+                ~{formatExpected(combinedCrcEv * projection.count)} CRC distribues
+              </p>
+              <p className="mt-1 text-xs text-ink/45">Projection moyenne, les resultats reels peuvent varier.</p>
+            </div>
+          ))}
+        </div>
+
         <div className="flex flex-wrap gap-3 text-xs text-ink/50">
-          <span>Scratch: {scratchXpEv.toFixed(1)} XP / {scratchCrcEv.toFixed(3)} CRC</span>
-          <span>Roue: {spinXpEv.toFixed(1)} XP / {spinCrcEv.toFixed(3)} CRC</span>
-          <span>Total XP moyen: {combinedXpEv.toFixed(1)} XP</span>
-          <span>Chance CRC: {(crcHitRate * 100).toFixed(2)}%</span>
+          <span>Detail scratch: {scratchXpEv.toFixed(1)} XP / {formatExpected(scratchCrcEv)} CRC par daily</span>
+          <span>Detail roue: {spinXpEv.toFixed(1)} XP / {formatExpected(spinCrcEv)} CRC par daily</span>
+          <span>Formule: gain moyen = gain configure x probabilite</span>
         </div>
         {combinedCrcEv > 0.05 && <p className="text-xs text-red-600 font-semibold">Attention: gain CRC moyen eleve pour un daily gratuit.</p>}
         {combinedCrcEv <= 0.05 && <p className="text-xs text-green-600 font-semibold">Les CRC restent rares; l'XP porte la recompense principale.</p>}
