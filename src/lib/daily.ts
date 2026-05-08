@@ -1,10 +1,13 @@
 import crypto from "crypto";
-import { keccakHex } from "./hash";
+import { sql } from "drizzle-orm";
+import { ethers } from "ethers";
 import { db } from "./db";
 import { jackpotPool } from "./db/schema";
-import { sql } from "drizzle-orm";
+import { keccakHex } from "./hash";
 import { getSafeCrcBalance } from "./payout";
-import { ethers } from "ethers";
+import type { DailyWheelResult } from "./daily-shared";
+
+export type { DailyWheelResult } from "./daily-shared";
 
 export function generateDailyToken(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
@@ -16,41 +19,26 @@ export function generateDailyToken(): string {
   return `DAILY-${code}`;
 }
 
-import type { ScratchResult, SpinResult } from "./daily-shared";
-export type { ScratchResult, SpinResult } from "./daily-shared";
-
 type DailyRewardConfigEntry = {
   prob: number;
   type: string;
   label: string;
   crcValue: number;
   xpValue: number;
-  symbol?: string;
   color?: string;
 };
 
-const DEFAULT_SCRATCH_PROBS: DailyRewardConfigEntry[] = [
-  { prob: 0.25, type: "nothing",    label: "Rien",    crcValue: 0, xpValue: 0,  symbol: "💨" },
-  { prob: 0.35, type: "xp_5",       label: "+5 XP",   crcValue: 0, xpValue: 5,  symbol: "✨" },
-  { prob: 0.25, type: "xp_10",      label: "+10 XP",  crcValue: 0, xpValue: 10, symbol: "⭐" },
-  { prob: 0.10, type: "xp_25",      label: "+25 XP",  crcValue: 0, xpValue: 25, symbol: "🌟" },
-  { prob: 0.04, type: "xp_50",      label: "+50 XP",  crcValue: 0, xpValue: 50, symbol: "🔥" },
-  { prob: 0.009, type: "crc_1_rare", label: "+1 CRC", crcValue: 1, xpValue: 0,  symbol: "💎" },
-  { prob: 0.001, type: "crc_5_rare", label: "+5 CRC", crcValue: 5, xpValue: 0,  symbol: "👑" },
+const DEFAULT_DAILY_WHEEL_PROBS: DailyRewardConfigEntry[] = [
+  { prob: 0.20, type: "nothing", label: "Rien", crcValue: 0, xpValue: 0, color: "#6B7280" },
+  { prob: 0.35, type: "xp_5", label: "+5 XP", crcValue: 0, xpValue: 5, color: "#10B981" },
+  { prob: 0.28, type: "xp_10", label: "+10 XP", crcValue: 0, xpValue: 10, color: "#38BDF8" },
+  { prob: 0.12, type: "xp_25", label: "+25 XP", crcValue: 0, xpValue: 25, color: "#8B5CF6" },
+  { prob: 0.04, type: "xp_50", label: "+50 XP", crcValue: 0, xpValue: 50, color: "#6366F1" },
+  { prob: 0.009, type: "crc_1_rare", label: "+1 CRC", crcValue: 1, xpValue: 0, color: "#F59E0B" },
+  { prob: 0.001, type: "crc_10_rare", label: "+10 CRC", crcValue: 10, xpValue: 0, color: "#EC4899" },
 ];
 
-const DEFAULT_SPIN_PROBS: DailyRewardConfigEntry[] = [
-  { prob: 0.20, type: "nothing",      label: "Rien",    crcValue: 0,  xpValue: 0,  color: "#6B7280" },
-  { prob: 0.35, type: "xp_5",         label: "+5 XP",   crcValue: 0,  xpValue: 5,  color: "#10B981" },
-  { prob: 0.28, type: "xp_10",        label: "+10 XP",  crcValue: 0,  xpValue: 10, color: "#38BDF8" },
-  { prob: 0.12, type: "xp_25",        label: "+25 XP",  crcValue: 0,  xpValue: 25, color: "#8B5CF6" },
-  { prob: 0.04, type: "xp_50",        label: "+50 XP",  crcValue: 0,  xpValue: 50, color: "#6366F1" },
-  { prob: 0.009, type: "crc_1_rare",  label: "+1 CRC",  crcValue: 1,  xpValue: 0,  color: "#F59E0B" },
-  { prob: 0.001, type: "crc_10_rare", label: "+10 CRC", crcValue: 10, xpValue: 0,  color: "#EC4899" },
-];
-
-let cachedScratch: DailyRewardConfigEntry[] | null = null;
-let cachedSpin: DailyRewardConfigEntry[] | null = null;
+let cachedDailyWheel: DailyRewardConfigEntry[] | null = null;
 let dailyCacheTime = 0;
 const DAILY_CACHE_TTL = 60_000;
 
@@ -63,53 +51,61 @@ function normalizeRewards(rewards: DailyRewardConfigEntry[]): DailyRewardConfigE
   }));
 }
 
-function isLegacyDailyConfig(rewards: DailyRewardConfigEntry[], table: "scratch" | "spin"): boolean {
-  if (table === "scratch") {
-    return rewards.some((r) => r.type === "refund" && r.crcValue === 1 && Math.abs(r.prob - 0.33) < 0.001)
-      || rewards.some((r) => r.type === "crc_20" && r.crcValue === 20 && Math.abs(r.prob - 0.008) < 0.001);
-  }
+function keepWheelRewardsOnly(rewards: DailyRewardConfigEntry[]): DailyRewardConfigEntry[] {
+  const filtered = rewards.filter((reward) => (
+    reward.type === "nothing" || reward.crcValue > 0 || reward.xpValue > 0
+  ));
+  if (filtered.length === 0) return DEFAULT_DAILY_WHEEL_PROBS;
+
+  const totalProb = filtered.reduce((sum, reward) => sum + reward.prob, 0);
+  if (totalProb <= 0) return DEFAULT_DAILY_WHEEL_PROBS;
+
+  return filtered.map((reward) => ({
+    ...reward,
+    prob: reward.prob / totalProb,
+  }));
+}
+
+function isLegacyDailyWheelConfig(rewards: DailyRewardConfigEntry[]): boolean {
   return rewards.some((r) => r.type === "crc_10" && r.crcValue === 10 && Math.abs(r.prob - 0.03) < 0.001)
     || rewards.some((r) => r.type === "jackpot" && Math.abs(r.prob - 0.01) < 0.001);
 }
 
-export async function getScratchProbs() {
-  if (cachedScratch && Date.now() - dailyCacheTime < DAILY_CACHE_TTL) return cachedScratch;
-  try {
-    const { dailyRewardsConfig } = await import("./db/schema");
-    const { eq } = await import("drizzle-orm");
-    const [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "scratch"));
-    if (row) {
-      const raw = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards;
-      const rewards = normalizeRewards(raw as DailyRewardConfigEntry[]);
-      cachedScratch = isLegacyDailyConfig(rewards, "scratch") ? DEFAULT_SCRATCH_PROBS : rewards;
-      dailyCacheTime = Date.now();
-      return cachedScratch;
-    }
-  } catch {}
-  return DEFAULT_SCRATCH_PROBS;
-}
+export async function getDailyWheelProbs() {
+  if (cachedDailyWheel && Date.now() - dailyCacheTime < DAILY_CACHE_TTL) return cachedDailyWheel;
 
-export async function getSpinProbs() {
-  if (cachedSpin && Date.now() - dailyCacheTime < DAILY_CACHE_TTL) return cachedSpin;
   try {
     const { dailyRewardsConfig } = await import("./db/schema");
     const { eq } = await import("drizzle-orm");
-    const [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "spin"));
+    let [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "wheel"));
+
+    if (!row) {
+      [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "spin"));
+    }
+
     if (row) {
       const raw = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards;
-      const rewards = normalizeRewards(raw as DailyRewardConfigEntry[]);
-      cachedSpin = isLegacyDailyConfig(rewards, "spin") ? DEFAULT_SPIN_PROBS : rewards;
+      const normalizedRewards = normalizeRewards(raw as DailyRewardConfigEntry[]);
+      cachedDailyWheel = isLegacyDailyWheelConfig(normalizedRewards)
+        ? DEFAULT_DAILY_WHEEL_PROBS
+        : keepWheelRewardsOnly(normalizedRewards);
       dailyCacheTime = Date.now();
-      return cachedSpin;
+      return cachedDailyWheel;
     }
   } catch {}
-  return DEFAULT_SPIN_PROBS;
+
+  return DEFAULT_DAILY_WHEEL_PROBS;
 }
 
 export function invalidateDailyCache() {
-  cachedScratch = null;
-  cachedSpin = null;
+  cachedDailyWheel = null;
   dailyCacheTime = 0;
+}
+
+export function allowDailyRepeatTests(): boolean {
+  return process.env.DAILY_ALLOW_REPEAT_TESTS === "true"
+    || process.env.VERCEL_ENV === "preview"
+    || process.env.NODE_ENV !== "production";
 }
 
 function seedToNumber(seed: string): number {
@@ -118,42 +114,9 @@ function seedToNumber(seed: string): number {
   return num / 0xFFFFFFFF;
 }
 
-export async function determineScratchResult(seed: string): Promise<ScratchResult> {
-  const probs = await getScratchProbs();
-  const roll = seedToNumber(seed);
-
-  let cumulative = 0;
-  let winner = probs[0];
-  for (const entry of probs) {
-    cumulative += entry.prob;
-    if (roll < cumulative) {
-      winner = entry;
-      break;
-    }
-  }
-
-  const allSymbols = probs.map((p) => p.symbol).filter(Boolean) as string[];
-  const winnerSymbol = winner.symbol || "⭐";
-  const otherSymbols = allSymbols.filter((s) => s !== winnerSymbol);
-  const otherRoll = seedToNumber(seed + "-other");
-  const otherSymbol = otherSymbols[Math.floor(otherRoll * otherSymbols.length)] || "💨";
-  const posRoll = seedToNumber(seed + "-pos");
-  const oddPos = Math.floor(posRoll * 3);
-  const symbols = [winnerSymbol, winnerSymbol, winnerSymbol];
-  symbols[oddPos] = otherSymbol;
-
-  return {
-    type: winner.type,
-    label: winner.label,
-    crcValue: winner.crcValue,
-    xpValue: winner.xpValue,
-    symbols,
-  };
-}
-
-export async function determineSpinResult(seed: string): Promise<SpinResult> {
-  const probs = await getSpinProbs();
-  const roll = seedToNumber(seed + "-spin");
+export async function determineDailyWheelResult(seed: string): Promise<DailyWheelResult> {
+  const probs = await getDailyWheelProbs();
+  const roll = seedToNumber(seed + "-wheel");
 
   let cumulative = 0;
   let winnerIndex = 0;

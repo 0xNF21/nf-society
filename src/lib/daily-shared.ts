@@ -1,15 +1,7 @@
 // Shared constants used by both server (daily.ts) and client (spin-wheel.tsx)
 // NO server imports here (no db, no payout, no ethers)
 
-export type ScratchResult = {
-  type: string;
-  label: string;
-  crcValue: number;
-  xpValue: number;
-  symbols: string[];
-};
-
-export type SpinResult = {
+export type DailyWheelResult = {
   type: string;
   label: string;
   crcValue: number;
@@ -18,13 +10,13 @@ export type SpinResult = {
   color?: string;
 };
 
-export type SpinSegment = {
+export type DailyWheelSegment = {
   type: string;
   label: string;
   color: string;
 };
 
-export const SPIN_SEGMENTS: SpinSegment[] = [
+export const DAILY_WHEEL_SEGMENTS: DailyWheelSegment[] = [
   { type: "nothing",   label: "Rien",       color: "#6B7280" },
   { type: "xp_5",      label: "+5 XP",      color: "#10B981" },
   { type: "xp_10",     label: "+10 XP",     color: "#38BDF8" },
@@ -33,3 +25,7 @@ export const SPIN_SEGMENTS: SpinSegment[] = [
   { type: "crc_1_rare", label: "+1 CRC",    color: "#F59E0B" },
   { type: "crc_10_rare", label: "+10 CRC",  color: "#EC4899" },
 ];
+
+export type SpinResult = DailyWheelResult;
+export type SpinSegment = DailyWheelSegment;
+export const SPIN_SEGMENTS = DAILY_WHEEL_SEGMENTS;

@@ -111,8 +111,7 @@ export default function DocsPage() {
           <P><B>{fr ? "Comment gagner de l'XP :" : "How to earn XP:"}</B></P>
           <Bullet>{fr ? "Gagner une partie : 15-20 XP" : "Win a game: 15-20 XP"}</Bullet>
           <Bullet>{fr ? "Perdre une partie : 5 XP" : "Lose a game: 5 XP"}</Bullet>
-          <Bullet>{fr ? "Check-in quotidien : 3 XP" : "Daily check-in: 3 XP"}</Bullet>
-          <Bullet>{fr ? "Scratch/Spin quotidien : 5 XP" : "Daily scratch/spin: 5 XP"}</Bullet>
+          <Bullet>{fr ? "Roue quotidienne : XP selon la configuration" : "Daily wheel: XP based on configuration"}</Bullet>
           <Bullet>{fr ? "Ouvrir une lootbox : 10-100 XP" : "Open a lootbox: 10-100 XP"}</Bullet>
           <Bullet>{fr ? "Streak 7 jours : +50 XP bonus" : "7-day streak: +50 XP bonus"}</Bullet>
           <P><B>{fr ? "10 niveaux" : "10 levels"}</B> : {fr ? "de 0 a 20,000 XP" : "from 0 to 20,000 XP"}</P>
@@ -120,13 +119,9 @@ export default function DocsPage() {
 
         {/* Daily */}
         <Section title={fr ? "Tirage Quotidien" : "Daily Draw"} icon={<Gift className="w-5 h-5 text-marine" />}>
-          <P>{fr ? "Chaque jour, reclamez gratuitement le scratch card et la roue." : "Every day, claim the scratch card and spin wheel for free."}</P>
-          <P><B>{fr ? "Scratch Card" : "Scratch Card"}</B></P>
-          <Bullet>{fr ? "Gagnez de l'XP ou des bonus de progression" : "Earn XP or progression bonuses"}</Bullet>
-          <Bullet>{fr ? "Aucun CRC n'est debite" : "No CRC is debited"}</Bullet>
-          <P><B>{fr ? "Roue" : "Spin Wheel"}</B></P>
-          <Bullet>{fr ? "Gagnez de l'XP ou des bonus" : "Earn XP or bonuses"}</Bullet>
-          <Bullet>{fr ? "7 segments avec des gains differents" : "7 segments with different rewards"}</Bullet>
+          <P>{fr ? "Chaque jour, reclamez gratuitement une roue quotidienne." : "Every day, claim one free daily wheel."}</P>
+          <Bullet>{fr ? "Gagnez de l'XP ou du CRC selon la configuration" : "Win XP or CRC based on configuration"}</Bullet>
+          <Bullet>{fr ? "Aucun CRC n'est debite pour lancer le daily" : "No CRC is debited to play the daily"}</Bullet>
         </Section>
 
         {/* Badges */}

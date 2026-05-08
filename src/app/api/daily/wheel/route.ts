@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
-import { determineScratchResult, isSafeBalanceSafe } from "@/lib/daily";
+import { allowDailyRepeatTests, determineDailyWheelResult, isSafeBalanceSafe } from "@/lib/daily";
 import { payPrize } from "@/lib/wallet";
 import { awardPlayerXp } from "@/lib/xp-server";
 
@@ -25,15 +25,42 @@ export async function POST(req: NextRequest) {
     if (!session.address || !session.txHash) {
       return NextResponse.json({ error: "Payment not confirmed yet" }, { status: 400 });
     }
-    if (session.scratchPlayed) {
+
+    if (!allowDailyRepeatTests()) {
+      const [canonical] = await db
+        .select({
+          id: dailySessions.id,
+          token: dailySessions.token,
+          wheelResult: dailySessions.spinResult,
+        })
+        .from(dailySessions)
+        .where(and(
+          eq(dailySessions.address, session.address),
+          eq(dailySessions.date, session.date),
+          sql`${dailySessions.txHash} IS NOT NULL`,
+        ))
+        .orderBy(dailySessions.id)
+        .limit(1);
+
+      if (canonical && canonical.id !== session.id) {
+        return NextResponse.json({
+          error: "daily_already_claimed",
+          alreadyClaimed: true,
+          token: canonical.token,
+          result: canonical.wheelResult ? JSON.parse(canonical.wheelResult) : null,
+        }, { status: 409 });
+      }
+    }
+
+    if (session.spinPlayed) {
       return NextResponse.json({
-        result: session.scratchResult ? JSON.parse(session.scratchResult) : null,
+        result: session.spinResult ? JSON.parse(session.spinResult) : null,
         alreadyPlayed: true,
       });
     }
 
     const seed = session.txHash + session.address;
-    let result = await determineScratchResult(seed);
+    let result = await determineDailyWheelResult(seed);
 
     if (result.crcValue > 0) {
       const safe = await isSafeBalanceSafe();
@@ -49,21 +76,21 @@ export async function POST(req: NextRequest) {
     }
 
     const updated = await db.update(dailySessions).set({
-      scratchResult: JSON.stringify(result),
-      scratchPlayed: true,
+      spinResult: JSON.stringify(result),
+      spinPlayed: true,
     }).where(and(
       eq(dailySessions.id, session.id),
-      eq(dailySessions.scratchPlayed, false),
-    )).returning({ scratchResult: dailySessions.scratchResult });
+      eq(dailySessions.spinPlayed, false),
+    )).returning({ wheelResult: dailySessions.spinResult });
 
     if (updated.length === 0) {
       const [current] = await db
-        .select({ scratchResult: dailySessions.scratchResult })
+        .select({ wheelResult: dailySessions.spinResult })
         .from(dailySessions)
         .where(eq(dailySessions.id, session.id))
         .limit(1);
       return NextResponse.json({
-        result: current?.scratchResult ? JSON.parse(current.scratchResult) : null,
+        result: current?.wheelResult ? JSON.parse(current.wheelResult) : null,
         alreadyPlayed: true,
       });
     }
@@ -71,28 +98,31 @@ export async function POST(req: NextRequest) {
     if (result.crcValue > 0) {
       try {
         await payPrize(session.address, result.crcValue, {
-          gameType: "daily-scratch",
+          gameType: "daily-wheel",
           gameSlug: String(session.id),
-          gameRef: `scratch-${token}`,
+          gameRef: `wheel-${token}`,
           sourceTxHash: session.txHash,
-          reason: `Daily scratch card - ${result.label}`,
+          reason: `Daily wheel - ${result.label}`,
         });
       } catch (err: any) {
-        console.error("[DailyScratch] Prize error:", err.message);
+        console.error("[DailyWheel] Prize error:", err.message);
       }
     }
 
     if (result.xpValue > 0) {
       void awardPlayerXp({
         address: session.address,
-        action: "daily_scratch",
+        action: "daily_wheel",
         xpAmount: result.xpValue,
+        sourceType: "daily",
+        sourceId: `session:${session.id}:wheel`,
+        metadata: { token },
       }).catch(() => {});
     }
 
     return NextResponse.json({ result });
   } catch (error: any) {
-    console.error("[DailyScratch] Error:", error.message);
-    return NextResponse.json({ error: error.message || "Scratch failed" }, { status: 500 });
+    console.error("[DailyWheel] Error:", error.message);
+    return NextResponse.json({ error: error.message || "Wheel failed" }, { status: 500 });
   }
 }

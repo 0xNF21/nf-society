@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { eq } from "drizzle-orm";
+import { checkAdminAuth } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { generateDailyToken, determineScratchResult, determineSpinResult } from "@/lib/daily";
+import { determineDailyWheelResult, generateDailyToken } from "@/lib/daily";
 import { executePayout } from "@/lib/payout";
-import { checkAdminAuth } from "@/lib/admin-auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
-// POST — create a test daily session with real scratch/spin/payout (no payment needed)
+// POST - create a test daily wheel session with real payout path (no payment needed).
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "admin-daily-test", 10, 60000);
   if (limited) return limited;
@@ -25,70 +25,39 @@ export async function POST(req: NextRequest) {
     const token = generateDailyToken();
     const fakeTxHash = `0xTEST${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`;
 
-    // Create a confirmed session directly (skip payment)
     await db.insert(dailySessions).values({
       token,
       address: addr,
       txHash: fakeTxHash,
       date: new Date().toISOString().slice(0, 10),
-      scratchPlayed: false,
       spinPlayed: false,
     });
 
-    // Run scratch
-    const scratchSeed = fakeTxHash + addr;
-    const scratchResult = await determineScratchResult(scratchSeed);
+    const wheelResult = await determineDailyWheelResult(fakeTxHash + addr);
 
     await db.update(dailySessions).set({
-      scratchResult: JSON.stringify(scratchResult),
-      scratchPlayed: true,
-    }).where(eq(dailySessions.token, token));
-
-    // Payout scratch CRC
-    let scratchPayout = null;
-    if (scratchResult.crcValue > 0) {
-      try {
-        scratchPayout = await executePayout({
-          gameType: "daily-scratch-test",
-          gameId: `daily-scratch-test-${token}`,
-          recipientAddress: addr,
-          amountCrc: scratchResult.crcValue,
-          reason: `[TEST] Daily scratch — ${scratchResult.label}`,
-        });
-      } catch (e: unknown) {
-        scratchPayout = { error: e instanceof Error ? e.message : "Payout failed" };
-      }
-    }
-
-    // Run spin
-    const spinSeed = fakeTxHash + addr;
-    const spinResult = await determineSpinResult(spinSeed);
-
-    await db.update(dailySessions).set({
-      spinResult: JSON.stringify(spinResult),
+      spinResult: JSON.stringify(wheelResult),
       spinPlayed: true,
     }).where(eq(dailySessions.token, token));
 
-    // Payout spin CRC
-    let spinPayout = null;
-    if (spinResult.crcValue > 0) {
+    let wheelPayout = null;
+    if (wheelResult.crcValue > 0) {
       try {
-        spinPayout = await executePayout({
-          gameType: "daily-spin-test",
-          gameId: `daily-spin-test-${token}`,
+        wheelPayout = await executePayout({
+          gameType: "daily-wheel-test",
+          gameId: `daily-wheel-test-${token}`,
           recipientAddress: addr,
-          amountCrc: spinResult.crcValue,
-          reason: `[TEST] Daily spin — ${spinResult.label}`,
+          amountCrc: wheelResult.crcValue,
+          reason: `[TEST] Daily wheel - ${wheelResult.label}`,
         });
       } catch (e: unknown) {
-        spinPayout = { error: e instanceof Error ? e.message : "Payout failed" };
+        wheelPayout = { error: e instanceof Error ? e.message : "Payout failed" };
       }
     }
 
     return NextResponse.json({
       token,
-      scratch: { result: scratchResult, payout: scratchPayout },
-      spin: { result: spinResult, payout: spinPayout },
+      wheel: { result: wheelResult, payout: wheelPayout },
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Test failed";

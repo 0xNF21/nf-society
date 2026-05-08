@@ -12,10 +12,8 @@ function confirmedResponse(s: typeof dailySessions.$inferSelect) {
     status: "confirmed",
     token: s.token,
     address: s.address,
-    scratchPlayed: s.scratchPlayed,
-    spinPlayed: s.spinPlayed,
-    scratchResult: s.scratchResult ? JSON.parse(s.scratchResult) : null,
-    spinResult: s.spinResult ? JSON.parse(s.spinResult) : null,
+    wheelPlayed: s.spinPlayed,
+    wheelResult: s.spinResult ? JSON.parse(s.spinResult) : null,
   });
 }
 

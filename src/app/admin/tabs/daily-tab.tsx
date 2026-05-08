@@ -18,8 +18,7 @@ type DailyPlayResult = {
 
 type DailyTestResult = {
   error?: string;
-  scratch?: DailyPlayResult;
-  spin?: DailyPlayResult;
+  wheel?: DailyPlayResult;
 };
 
 function RewardLine({ title, play }: { title: string; play?: DailyPlayResult }) {
@@ -72,11 +71,10 @@ export function DailyTab({ password }: { password: string }) {
         <p className="text-xs font-black uppercase tracking-widest text-ink/50 dark:text-white/50">Daily rewards</p>
         <h3 className="mt-2 text-lg font-black text-ink dark:text-white">Configuration a reconstruire</h3>
         <p className="mt-1 max-w-3xl text-sm font-semibold text-ink/65 dark:text-white/65">
-          Le designer, les optimiseurs et les tableaux de gains ont ete retires de cette page.
-          On repartira de zero avec un modele CRC/XP plus clair avant de remettre une configuration editable.
+          Le daily est maintenant recentre sur une seule roue XP/CRC. Le designer et les anciens tableaux ont ete retires.
         </p>
         <div className="mt-4 rounded-lg border border-dashed border-ink/15 bg-ink/[0.02] p-3 text-xs font-semibold text-ink/55 dark:border-white/15 dark:bg-white/[0.03] dark:text-white/55">
-          Aucun reglage de recompense daily n'est modifiable ici pour le moment.
+          La configuration editable sera reconstruite proprement sur cette base roue uniquement.
         </div>
       </section>
 
@@ -114,8 +112,7 @@ export function DailyTab({ password }: { password: string }) {
                   <CheckCircle className="h-4 w-4" />
                   Resultat du test
                 </p>
-                <RewardLine title="Scratch" play={testResult.scratch} />
-                <RewardLine title="Spin" play={testResult.spin} />
+                <RewardLine title="Roue" play={testResult.wheel} />
               </>
             )}
           </div>
