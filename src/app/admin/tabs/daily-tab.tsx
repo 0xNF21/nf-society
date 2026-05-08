@@ -34,6 +34,8 @@ export function DailyTab({ password }: { password: string }) {
   const [budgetDailyCount, setBudgetDailyCount] = useState("100");
   const [budgetCrc, setBudgetCrc] = useState("");
   const [budgetXp, setBudgetXp] = useState("");
+  const [budgetSpecialChance, setBudgetSpecialChance] = useState("");
+  const [budgetMaxNothingChance, setBudgetMaxNothingChance] = useState("");
   const [budgetError, setBudgetError] = useState<string | null>(null);
   const [budgetMessage, setBudgetMessage] = useState<string | null>(null);
 
@@ -65,6 +67,10 @@ export function DailyTab({ password }: { password: string }) {
       label === "rien" ||
       label === "nothing"
     );
+  }
+
+  function isSpecialReward(entry: DailyRewardEntry) {
+    return entry.crcValue <= 0 && entry.xpValue <= 0 && !isEmptyReward(entry);
   }
 
   function roundProb(prob: number) {
@@ -179,7 +185,7 @@ export function DailyTab({ password }: { password: string }) {
     return formatExpected(pct, 3);
   }
 
-  function rebalanceEntries(table: "scratch" | "spin", entries: DailyRewardEntry[]) {
+  function rebalanceEntries(table: "scratch" | "spin", entries: DailyRewardEntry[], maxNothingProb: number | null) {
     const balanced: DailyRewardEntry[] = [];
     for (const entry of entries.map(entry => ({ ...entry, prob: roundProb(entry.prob) }))) {
       if (isEmptyReward(entry) && balanced.some(isEmptyReward)) continue;
@@ -200,7 +206,15 @@ export function DailyTab({ password }: { password: string }) {
       };
     }
 
-    balanced[emptyIdx] = { ...balanced[emptyIdx], prob: roundProb(1 - positiveTotal) };
+    const emptyProb = roundProb(1 - positiveTotal);
+    if (maxNothingProb !== null && emptyProb > maxNothingProb + 0.000000001) {
+      return {
+        error: `${table === "scratch" ? "Scratch" : "Roue"} mettrait ${formatProbabilityPercent(emptyProb)}% sur "Rien", au-dessus du max ${formatProbabilityPercent(maxNothingProb)}%. Augmente le budget, baisse les montants de gains, ou augmente les bonus speciaux.`,
+        entries: balanced,
+      };
+    }
+
+    balanced[emptyIdx] = { ...balanced[emptyIdx], prob: emptyProb };
     return { entries: balanced };
   }
 
@@ -210,12 +224,16 @@ export function DailyTab({ password }: { password: string }) {
 
     const hasCrcBudget = budgetCrc.trim() !== "";
     const hasXpBudget = budgetXp.trim() !== "";
+    const hasSpecialBudget = budgetSpecialChance.trim() !== "";
+    const hasMaxNothingBudget = budgetMaxNothingChance.trim() !== "";
     const dailyCount = Number(budgetDailyCount);
     const crcBudget = hasCrcBudget ? Number(budgetCrc) : null;
     const xpBudget = hasXpBudget ? Number(budgetXp) : null;
+    const specialChanceBudget = hasSpecialBudget ? Number(budgetSpecialChance) : null;
+    const maxNothingBudget = hasMaxNothingBudget ? Number(budgetMaxNothingChance) : null;
 
-    if (!hasCrcBudget && !hasXpBudget) {
-      setBudgetError("Entre au moins un budget CRC ou XP. Pour couper les gains, mets explicitement 0.");
+    if (!hasCrcBudget && !hasXpBudget && !hasSpecialBudget && !hasMaxNothingBudget) {
+      setBudgetError("Entre au moins un budget CRC, XP, bonus special ou max rien. Pour couper une famille, mets explicitement 0.");
       return;
     }
     if (!Number.isFinite(dailyCount) || dailyCount <= 0) {
@@ -226,9 +244,19 @@ export function DailyTab({ password }: { password: string }) {
       setBudgetError("Les budgets CRC et XP doivent etre des nombres positifs.");
       return;
     }
+    if (hasSpecialBudget && (!Number.isFinite(specialChanceBudget) || specialChanceBudget! < 0 || specialChanceBudget! > 100)) {
+      setBudgetError("La chance bonus special doit etre comprise entre 0% et 100%.");
+      return;
+    }
+    if (hasMaxNothingBudget && (!Number.isFinite(maxNothingBudget) || maxNothingBudget! < 0 || maxNothingBudget! > 100)) {
+      setBudgetError("Le max gagne rien doit etre compris entre 0% et 100%.");
+      return;
+    }
 
     const targetCrcEv = hasCrcBudget ? crcBudget! / dailyCount : combinedCrcEv;
     const targetXpEv = hasXpBudget ? xpBudget! / dailyCount : combinedXpEv;
+    const targetSpecialChance = hasSpecialBudget ? specialChanceBudget! / 100 : combinedSpecialChance;
+    const maxNothingProb = hasMaxNothingBudget ? maxNothingBudget! / 100 : null;
 
     if (hasCrcBudget && targetCrcEv > 0 && combinedCrcEv <= 0) {
       setBudgetError("Ajoute au moins une ligne de gain CRC avant de calculer un budget CRC.");
@@ -238,12 +266,18 @@ export function DailyTab({ password }: { password: string }) {
       setBudgetError("Ajoute au moins une ligne de gain XP avant de calculer un budget XP.");
       return;
     }
+    if (hasSpecialBudget && targetSpecialChance > 0 && combinedSpecialChance <= 0) {
+      setBudgetError("Ajoute au moins une ligne bonus special, par exemple streak_x2, avant de calculer cette chance.");
+      return;
+    }
 
     const crcScale = hasCrcBudget ? (combinedCrcEv > 0 ? targetCrcEv / combinedCrcEv : 0) : 1;
     const xpScale = hasXpBudget ? (combinedXpEv > 0 ? targetXpEv / combinedXpEv : 0) : 1;
+    const specialScale = hasSpecialBudget ? (combinedSpecialChance > 0 ? targetSpecialChance / combinedSpecialChance : 0) : 1;
 
     const scaleEntries = (entries: DailyRewardEntry[]) => entries.map(entry => {
       if (isEmptyReward(entry)) return { ...entry, prob: 0 };
+      if (isSpecialReward(entry)) return { ...entry, prob: roundProb(entry.prob * specialScale) };
 
       const scales = [
         entry.crcValue > 0 && hasCrcBudget ? crcScale : null,
@@ -253,13 +287,13 @@ export function DailyTab({ password }: { password: string }) {
       return { ...entry, prob: roundProb(entry.prob * factor) };
     });
 
-    const nextScratch = rebalanceEntries("scratch", scaleEntries(editScratch));
+    const nextScratch = rebalanceEntries("scratch", scaleEntries(editScratch), maxNothingProb);
     if (nextScratch.error) {
       setBudgetError(nextScratch.error);
       return;
     }
 
-    const nextSpin = rebalanceEntries("spin", scaleEntries(editSpin));
+    const nextSpin = rebalanceEntries("spin", scaleEntries(editSpin), maxNothingProb);
     if (nextSpin.error) {
       setBudgetError(nextSpin.error);
       return;
@@ -409,6 +443,10 @@ export function DailyTab({ password }: { password: string }) {
   const combinedXpEv = scratchXpEv + spinXpEv;
   const scratchCrcChance = editScratch.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0);
   const spinCrcChance = editSpin.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0);
+  const combinedSpecialChance = [...editScratch, ...editSpin].filter(isSpecialReward).reduce((s, r) => s + r.prob, 0);
+  const scratchNothingChance = editScratch.filter(isEmptyReward).reduce((s, r) => s + r.prob, 0);
+  const spinNothingChance = editSpin.filter(isEmptyReward).reduce((s, r) => s + r.prob, 0);
+  const maxNothingChance = Math.max(scratchNothingChance, spinNothingChance);
   const crcHitRate = 1 - (1 - scratchCrcChance) * (1 - spinCrcChance);
   const crcTone = combinedCrcEv > 0.05
     ? "text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-500/20"
@@ -421,17 +459,25 @@ export function DailyTab({ password }: { password: string }) {
   ];
   const hasCrcBudgetInput = budgetCrc.trim() !== "";
   const hasXpBudgetInput = budgetXp.trim() !== "";
+  const hasSpecialBudgetInput = budgetSpecialChance.trim() !== "";
+  const hasMaxNothingBudgetInput = budgetMaxNothingChance.trim() !== "";
   const budgetDailyNumber = Number(budgetDailyCount);
   const budgetCrcNumber = hasCrcBudgetInput ? Number(budgetCrc) : 0;
   const budgetXpNumber = hasXpBudgetInput ? Number(budgetXp) : 0;
-  const hasBudgetInput = hasCrcBudgetInput || hasXpBudgetInput;
+  const budgetSpecialNumber = hasSpecialBudgetInput ? Number(budgetSpecialChance) : 0;
+  const budgetMaxNothingNumber = hasMaxNothingBudgetInput ? Number(budgetMaxNothingChance) : 0;
+  const hasBudgetInput = hasCrcBudgetInput || hasXpBudgetInput || hasSpecialBudgetInput || hasMaxNothingBudgetInput;
   const budgetPreviewValid =
     hasBudgetInput &&
     Number.isFinite(budgetDailyNumber) && budgetDailyNumber > 0 &&
     (!hasCrcBudgetInput || (Number.isFinite(budgetCrcNumber) && budgetCrcNumber >= 0)) &&
-    (!hasXpBudgetInput || (Number.isFinite(budgetXpNumber) && budgetXpNumber >= 0));
+    (!hasXpBudgetInput || (Number.isFinite(budgetXpNumber) && budgetXpNumber >= 0)) &&
+    (!hasSpecialBudgetInput || (Number.isFinite(budgetSpecialNumber) && budgetSpecialNumber >= 0 && budgetSpecialNumber <= 100)) &&
+    (!hasMaxNothingBudgetInput || (Number.isFinite(budgetMaxNothingNumber) && budgetMaxNothingNumber >= 0 && budgetMaxNothingNumber <= 100));
   const budgetTargetCrcEv = budgetPreviewValid ? budgetCrcNumber / budgetDailyNumber : 0;
   const budgetTargetXpEv = budgetPreviewValid ? budgetXpNumber / budgetDailyNumber : 0;
+  const budgetTargetSpecialChance = budgetPreviewValid ? budgetSpecialNumber : 0;
+  const budgetTargetMaxNothingChance = budgetPreviewValid ? budgetMaxNothingNumber : 0;
   const budgetProjectionCount = Number.isFinite(budgetDailyNumber) && budgetDailyNumber > 0 ? budgetDailyNumber : 100;
 
   return (
@@ -473,6 +519,8 @@ export function DailyTab({ password }: { password: string }) {
         <div className="flex flex-wrap gap-3 text-xs text-ink/65 dark:text-white/65">
           <span>Detail scratch: {scratchXpEv.toFixed(1)} XP / {formatExpected(scratchCrcEv)} CRC par daily</span>
           <span>Detail roue: {spinXpEv.toFixed(1)} XP / {formatExpected(spinCrcEv)} CRC par daily</span>
+          <span>Bonus speciaux: {formatProbabilityPercent(combinedSpecialChance)}%</span>
+          <span>Rien: scratch {formatProbabilityPercent(scratchNothingChance)}% / roue {formatProbabilityPercent(spinNothingChance)}%</span>
           <span>Formule: gain moyen = gain configure x probabilite</span>
         </div>
         {combinedCrcEv > 0.05 && <p className="text-xs text-red-700 font-semibold dark:text-red-300">Attention: gain CRC moyen eleve pour un daily gratuit.</p>}
@@ -492,6 +540,12 @@ export function DailyTab({ password }: { password: string }) {
             <p className="mt-1 text-xs font-semibold text-ink/55 dark:text-white/55">
               Laisse un champ budget vide pour ne pas modifier cette famille. Mets 0 pour la couper volontairement.
             </p>
+            <p className="mt-1 text-xs font-semibold text-ink/55 dark:text-white/55">
+              Bonus speciaux = lignes sans CRC/XP mais avec un effet, comme daily streak x2.
+            </p>
+            <p className="mt-1 text-xs font-semibold text-ink/55 dark:text-white/55">
+              Max gagne rien limite le "Rien" par table. Si le budget est trop bas pour ce plafond, le calculateur te bloque au lieu de produire une UX vide.
+            </p>
           </div>
           <button
             onClick={applyBudgetCalculator}
@@ -502,7 +556,7 @@ export function DailyTab({ password }: { password: string }) {
           </button>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Daily estimes / jour</label>
             <input
@@ -538,6 +592,32 @@ export function DailyTab({ password }: { password: string }) {
               className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
           </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Chance bonus speciaux (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.001"
+              value={budgetSpecialChance}
+              onChange={e => setBudgetSpecialChance(e.target.value)}
+              placeholder={formatProbabilityPercent(combinedSpecialChance)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Max gagne rien (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.001"
+              value={budgetMaxNothingChance}
+              onChange={e => setBudgetMaxNothingChance(e.target.value)}
+              placeholder={formatProbabilityPercent(maxNothingChance)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
         </div>
 
         <div className="mt-3 rounded-lg bg-ink/[0.03] p-3 text-xs text-ink/70 dark:bg-white/10 dark:text-white/70">
@@ -547,7 +627,10 @@ export function DailyTab({ password }: { password: string }) {
               <strong>{hasXpBudgetInput ? `${formatExpected(budgetTargetXpEv, 2)} XP` : "XP inchange"}</strong>
               {" "}et{" "}
               <strong>{hasCrcBudgetInput ? `${formatExpected(budgetTargetCrcEv)} CRC` : "CRC inchange"}</strong>
-              {" "}en moyenne par daily complet.
+              {" "}en moyenne par daily complet. Bonus speciaux:{" "}
+              <strong>{hasSpecialBudgetInput ? `${formatExpected(budgetTargetSpecialChance, 3)}%` : "inchanges"}</strong>.
+              {" "}Max rien:{" "}
+              <strong>{hasMaxNothingBudgetInput ? `${formatExpected(budgetTargetMaxNothingChance, 3)}%` : "non limite"}</strong>.
             </span>
           ) : (
             <span>Entre des valeurs valides pour voir la cible moyenne par daily.</span>
