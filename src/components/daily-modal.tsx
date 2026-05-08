@@ -65,6 +65,9 @@ export default function DailyModal() {
         setPhase("scratch");
       }
     } else {
+      setScratchResult(null);
+      setSpinResult(null);
+      setSpinning(false);
       setPhase("scratch");
     }
   }, []);
@@ -235,6 +238,21 @@ export default function DailyModal() {
     } catch { /* error */ }
     setLoading(false);
   }, [claimDailyFree, connectedAddress, isMiniApp, walletAddress]);
+
+  const handleReplayDaily = useCallback(async () => {
+    setToken(null);
+    setAddress(null);
+    setPaymentLink("");
+    setQrCode("");
+    setScratchResult(null);
+    setSpinResult(null);
+    setSpinning(false);
+    setPhase("init");
+    try {
+      localStorage.removeItem("nf-daily");
+    } catch { /* ignore */ }
+    await handleInit();
+  }, [handleInit]);
 
   // If an old local pending QR session is restored while the user is now
   // connected, confirm today's daily without asking for the QR payment.
@@ -712,7 +730,19 @@ export default function DailyModal() {
                     )}
                   </div>
 
-                  <p className="text-center text-ink/50 text-xs mt-4">{t.comeBack[locale]}</p>
+                  <button
+                    onClick={handleReplayDaily}
+                    disabled={loading || claimingFree}
+                    className="w-full mt-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-sm shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] disabled:opacity-50"
+                  >
+                    {loading || claimingFree ? (
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                    ) : (
+                      t.payButton[locale]
+                    )}
+                  </button>
+
+                  <p className="text-center text-ink/50 text-xs mt-3">{t.comeBack[locale]}</p>
                 </div>
               )}
             </div>
