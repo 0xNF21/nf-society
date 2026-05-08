@@ -78,6 +78,32 @@ export default function DailyModal() {
     }, [])
     .sort((a, b) => a.crcValue - b.crcValue);
   const hasXpReward = allRewards.some((entry) => entry.xpValue > 0);
+  const rewardPreview = (hasXpReward || visibleCrcRewards.length > 0) ? (
+    <div className="rounded-xl border border-amber-400/30 bg-amber-50/70 p-3 text-left dark:bg-amber-950/20">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-black uppercase tracking-widest text-amber-700">
+          {locale === "fr" ? "Gains possibles" : "Possible rewards"}
+        </span>
+        {visibleCrcRewards.length > 0 && (
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+            {locale === "fr" ? "CRC rare" : "Rare CRC"}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {hasXpReward && (
+          <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">
+            XP
+          </span>
+        )}
+        {visibleCrcRewards.map((entry) => (
+          <span key={`crc-${entry.crcValue}`} className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
+            +{stake.format(entry.crcValue)}
+          </span>
+        ))}
+      </div>
+    </div>
+  ) : null;
 
   useEffect(() => {
     let active = true;
@@ -554,32 +580,7 @@ export default function DailyModal() {
                   </button>
                   )}
 
-                  {(hasXpReward || visibleCrcRewards.length > 0) && (
-                    <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-50/70 p-3 text-left dark:bg-amber-950/20">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-black uppercase tracking-widest text-amber-700">
-                          {locale === "fr" ? "Gains possibles" : "Possible rewards"}
-                        </span>
-                        {visibleCrcRewards.length > 0 && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                            {locale === "fr" ? "CRC rare" : "Rare CRC"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {hasXpReward && (
-                          <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">
-                            XP
-                          </span>
-                        )}
-                        {visibleCrcRewards.map((entry) => (
-                          <span key={`crc-${entry.crcValue}`} className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
-                            +{stake.format(entry.crcValue)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {rewardPreview && <div className="mt-4">{rewardPreview}</div>}
 
                   {/* Probability dropdown */}
                   <div className="mt-4 text-left">
@@ -728,6 +729,8 @@ export default function DailyModal() {
               {/* ─── PHASE: SCRATCH ─── */}
               {phase === "scratch" && (
                 <div className="text-center py-2 space-y-6">
+                  {rewardPreview}
+
                   <section>
                     <h3 className="text-lg font-bold mb-1">{t.scratchTitle[locale]}</h3>
                     <p className="text-ink/60 text-sm mb-4">{t.scratchInstruction[locale]}</p>
