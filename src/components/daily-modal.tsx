@@ -1,17 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, Copy, Loader2, Sparkles, Wallet, X } from "lucide-react";
+import { ChevronDown, Loader2, LogIn, Sparkles, X } from "lucide-react";
+import { useAuthSession } from "@/components/auth-provider";
 import { useDemo } from "@/components/demo-provider";
 import { useLocale } from "@/components/language-provider";
-import { useMiniApp } from "@/components/miniapp-provider";
 import SpinWheel from "@/components/spin-wheel";
-import { useConnectedAddress } from "@/hooks/use-connected-address";
 import { useStakeLabel } from "@/hooks/use-stake-label";
 import type { DailyWheelResult, SpinSegment } from "@/lib/daily-shared";
 import { translations } from "@/lib/i18n";
 
-type Phase = "init" | "payment" | "wheel" | "complete";
+type Phase = "init" | "wheel" | "complete";
 
 type DailyRewardEntry = {
   prob: number;
@@ -26,8 +25,6 @@ type DailySessionResponse = {
   status?: string;
   token?: string;
   address?: string | null;
-  paymentLink?: string;
-  qrCode?: string;
   wheelPlayed?: boolean;
   wheelResult?: DailyWheelResult | null;
 };
@@ -37,29 +34,24 @@ const todayKey = () => new Date().toISOString().slice(0, 10);
 export default function DailyModal() {
   const { locale } = useLocale();
   const { isDemo, addXp, creditDemoBalance } = useDemo();
-  const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
-  const connectedAddress = useConnectedAddress();
+  const {
+    isAuthenticated,
+    address: connectedAddress,
+    loading: authLoading,
+    openLogin,
+  } = useAuthSession();
   const t = translations.daily;
-  const tm = translations.miniapp;
   const stake = useStakeLabel();
 
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("init");
   const [token, setToken] = useState<string | null>(null);
   const [address, setAddress] = useState<string | null>(null);
-  const [paymentLink, setPaymentLink] = useState("");
-  const [qrCode, setQrCode] = useState("");
   const [wheelResult, setWheelResult] = useState<DailyWheelResult | null>(null);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [miniAppPaying, setMiniAppPaying] = useState(false);
-  const [miniAppError, setMiniAppError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [showProbs, setShowProbs] = useState(false);
   const [wheelRewards, setWheelRewards] = useState<DailyRewardEntry[]>([]);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [claimingFromBalance, setClaimingFromBalance] = useState(false);
-  const [balanceClaimError, setBalanceClaimError] = useState<string | null>(null);
   const [claimingFree, setClaimingFree] = useState(false);
 
   const wheelSegments = useMemo<SpinSegment[]>(() => (
@@ -136,15 +128,6 @@ export default function DailyModal() {
     } catch {}
   }, []);
 
-  const makeQrCode = useCallback(async (link: string) => {
-    if (!link) return;
-    try {
-      const QRCode = await import("qrcode");
-      const url = await QRCode.toDataURL(link, { width: 300, margin: 2 });
-      setQrCode(url);
-    } catch {}
-  }, []);
-
   const routeConfirmedSession = useCallback((session: DailySessionResponse) => {
     if (session.token) setToken(session.token);
     if (session.address) setAddress(session.address);
@@ -163,11 +146,9 @@ export default function DailyModal() {
     }
 
     if (session.status === "waiting") {
-      if (session.paymentLink) {
-        setPaymentLink(session.paymentLink);
-        void makeQrCode(session.paymentLink);
-      }
-      setPhase("payment");
+      clearDailySession();
+      setToken(null);
+      setPhase("init");
       return;
     }
 
@@ -176,24 +157,28 @@ export default function DailyModal() {
       setToken(null);
       setPhase("init");
     }
-  }, [clearDailySession, makeQrCode, routeConfirmedSession]);
+  }, [clearDailySession, routeConfirmedSession]);
 
-  const claimDailyFree = useCallback(async (claimAddress: string) => {
-    if (claimingFree) return false;
+  const claimDailyFree = useCallback(async () => {
+    if (!connectedAddress || claimingFree) return false;
     setClaimingFree(true);
     try {
       const res = await fetch("/api/daily/claim", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: claimAddress }),
       });
+      if (res.status === 401) {
+        openLogin();
+        return false;
+      }
       const data = await res.json();
       if (!res.ok || !data?.token) return false;
 
       routeConfirmedSession({
         status: "confirmed",
         token: data.token,
-        address: data.address || claimAddress.toLowerCase(),
+        address: data.address || connectedAddress.toLowerCase(),
         wheelPlayed: data.wheelPlayed,
         wheelResult: data.wheelResult,
       });
@@ -203,7 +188,7 @@ export default function DailyModal() {
     } finally {
       setClaimingFree(false);
     }
-  }, [claimingFree, routeConfirmedSession]);
+  }, [claimingFree, connectedAddress, openLogin, routeConfirmedSession]);
 
   useEffect(() => {
     let active = true;
@@ -250,69 +235,26 @@ export default function DailyModal() {
     } catch {}
   }, [clearDailySession, handleSessionResponse, open]);
 
-  useEffect(() => {
-    if (phase !== "payment" || !token || !open) return;
-
-    const poll = async () => {
-      try {
-        await fetch("/api/daily/scan", { method: "POST" }).catch(() => {});
-        const res = await fetch(`/api/daily/session?token=${encodeURIComponent(token)}`, { cache: "no-store" });
-        const data = await res.json();
-        handleSessionResponse(data);
-      } catch {}
-    };
-
-    void poll();
-    const interval = setInterval(poll, 5000);
-    return () => clearInterval(interval);
-  }, [handleSessionResponse, open, phase, token]);
-
-  useEffect(() => {
-    if (!open || phase !== "payment" || !connectedAddress || loading || claimingFree) return;
-    void claimDailyFree(connectedAddress);
-  }, [claimDailyFree, claimingFree, connectedAddress, loading, open, phase]);
-
-  useEffect(() => {
-    if (isDemo || phase !== "payment" || !connectedAddress) return;
-    let active = true;
-    fetch(`/api/wallet/balance?address=${encodeURIComponent(connectedAddress)}`, { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (active && typeof data.balanceCrc === "number") setWalletBalance(data.balanceCrc);
-      })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [connectedAddress, isDemo, phase]);
-
   const handleInit = useCallback(async () => {
+    if (authLoading) return;
+    if (!isAuthenticated || !connectedAddress) {
+      openLogin();
+      return;
+    }
+
     setLoading(true);
-    setMiniAppError(null);
-    setBalanceClaimError(null);
     try {
-      const freeClaimAddress = connectedAddress || (isMiniApp ? walletAddress : null);
-      if (freeClaimAddress && await claimDailyFree(freeClaimAddress)) return;
-
-      const res = await fetch("/api/daily/init", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok || !data?.token) throw new Error(data?.error || "Init failed");
-
-      setToken(data.token);
-      setPaymentLink(data.paymentLink || "");
-      setQrCode(data.qrCode || "");
-      saveDailySession(data.token, null);
-      setPhase("payment");
+      await claimDailyFree();
     } catch {
       setPhase("init");
     } finally {
       setLoading(false);
     }
-  }, [claimDailyFree, connectedAddress, isMiniApp, saveDailySession, walletAddress]);
+  }, [authLoading, claimDailyFree, connectedAddress, isAuthenticated, openLogin]);
 
   const handleReplayDaily = useCallback(async () => {
     setToken(null);
     setAddress(null);
-    setPaymentLink("");
-    setQrCode("");
     setWheelResult(null);
     setWheelSpinning(false);
     setPhase("init");
@@ -344,57 +286,6 @@ export default function DailyModal() {
     }
   }, [token, wheelSpinning]);
 
-  const handleMiniAppPay = useCallback(async () => {
-    if (!paymentLink) return;
-    setMiniAppPaying(true);
-    setMiniAppError(null);
-    try {
-      const match = paymentLink.match(/transfer\/(0x[a-fA-F0-9]+)\//);
-      const recipient = match?.[1] || "";
-      await sendPayment(recipient, 1, `daily:${token}`);
-    } catch (err: any) {
-      setMiniAppError(typeof err === "string" ? err : err?.message || tm.rejected[locale]);
-    } finally {
-      setMiniAppPaying(false);
-    }
-  }, [locale, paymentLink, sendPayment, tm, token]);
-
-  const handleBalanceClaim = useCallback(async () => {
-    if (!connectedAddress || claimingFromBalance) return;
-    setClaimingFromBalance(true);
-    setBalanceClaimError(null);
-    try {
-      const res = await fetch("/api/daily/claim-from-balance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: connectedAddress }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        setBalanceClaimError(data?.error === "no_balance" ? t.topUpBalanceFirst[locale] : t.failedTryAgain[locale]);
-        return;
-      }
-
-      routeConfirmedSession({
-        status: "confirmed",
-        token: data.token,
-        address: connectedAddress,
-        wheelPlayed: data.session?.wheelPlayed,
-        wheelResult: data.session?.wheelResult,
-      });
-    } catch (err: any) {
-      setBalanceClaimError(err?.message || t.errorGeneric[locale]);
-    } finally {
-      setClaimingFromBalance(false);
-    }
-  }, [claimingFromBalance, connectedAddress, locale, routeConfirmedSession, t]);
-
-  const copyLink = useCallback(() => {
-    navigator.clipboard.writeText(paymentLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [paymentLink]);
-
   const handleDemo = useCallback(() => {
     const configuredWin = wheelRewards.find((entry) => entry.xpValue > 0 || entry.crcValue > 0);
     const result: DailyWheelResult = configuredWin ? {
@@ -423,6 +314,7 @@ export default function DailyModal() {
   }, [addXp, creditDemoBalance, wheelRewards]);
 
   const close = () => setOpen(false);
+  const needsAuth = !isDemo && !authLoading && !isAuthenticated;
 
   return (
     <>
@@ -456,85 +348,30 @@ export default function DailyModal() {
             {phase === "init" && (
               <div className="space-y-4 text-center">
                 {rewardPreview}
+                {needsAuth && (
+                  <div className="rounded-xl border border-violet-500/20 bg-violet-500/10 p-4 text-left">
+                    <p className="text-sm font-black text-ink dark:text-white">
+                      {locale === "fr" ? "Connexion requise" : "Sign in required"}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-ink/60 dark:text-white/60">
+                      {locale === "fr"
+                        ? "Le daily est gratuit, mais il doit etre lie a ton wallet connecte."
+                        : "The daily is free, but it must be tied to your signed-in wallet."}
+                    </p>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={isDemo ? handleDemo : handleInit}
-                  disabled={loading || claimingFree}
+                  disabled={authLoading || loading || claimingFree}
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-4 text-base font-black text-white shadow-lg shadow-amber-500/20 transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {(loading || claimingFree) && <Loader2 className="h-5 w-5 animate-spin" />}
-                  {t.claimFree[locale]}
+                  {(authLoading || loading || claimingFree) && <Loader2 className="h-5 w-5 animate-spin" />}
+                  {needsAuth && !authLoading && <LogIn className="h-5 w-5" />}
+                  {needsAuth ? (locale === "fr" ? "Se connecter pour jouer" : "Sign in to play") : t.claimFree[locale]}
                 </button>
                 {isDemo && (
                   <p className="text-xs font-bold text-ink/50">{t.testWithoutPaying[locale]}</p>
-                )}
-              </div>
-            )}
-
-            {phase === "payment" && (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-ink/10 bg-ink/[0.03] p-4 text-center">
-                  <p className="text-sm font-black uppercase tracking-widest text-ink/60">{t.waitingPayment[locale]}</p>
-                  <p className="mt-1 text-sm text-ink/60">{t.scanQr[locale]}</p>
-                </div>
-
-                {connectedAddress && (
-                  <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
-                          {locale === "fr" ? "Wallet connecte" : "Connected wallet"}
-                        </p>
-                        <p className="truncate text-sm font-bold text-ink/80">{connectedAddress}</p>
-                        {walletBalance !== null && (
-                          <p className="text-xs font-bold text-ink/50">
-                            {stake.format(walletBalance)}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleBalanceClaim}
-                        disabled={claimingFromBalance}
-                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-700 disabled:opacity-60"
-                      >
-                        {claimingFromBalance ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-                        {locale === "fr" ? "Valider" : "Claim"}
-                      </button>
-                    </div>
-                    {balanceClaimError && <p className="mt-2 text-xs font-bold text-red-500">{balanceClaimError}</p>}
-                  </div>
-                )}
-
-                {qrCode && (
-                  <div className="flex justify-center rounded-xl bg-white p-4">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={qrCode} alt="Daily payment QR code" className="h-56 w-56" />
-                  </div>
-                )}
-
-                {isMiniApp && (
-                  <button
-                    type="button"
-                    onClick={handleMiniAppPay}
-                    disabled={miniAppPaying}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-black text-white transition hover:bg-violet-700 disabled:opacity-60"
-                  >
-                    {miniAppPaying && <Loader2 className="h-5 w-5 animate-spin" />}
-                    {t.payWithCircles[locale]}
-                  </button>
-                )}
-                {miniAppError && <p className="text-sm font-bold text-red-500">{miniAppError}</p>}
-
-                {paymentLink && (
-                  <button
-                    type="button"
-                    onClick={copyLink}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-ink/10 px-4 py-3 text-sm font-bold text-ink/70 transition hover:bg-ink/5"
-                  >
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copied ? t.copied[locale] : t.orCopy[locale]}
-                  </button>
                 )}
               </div>
             )}

@@ -1,30 +1,19 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { dailySessions } from "@/lib/db/schema";
-import { generateDailyToken, todayString } from "@/lib/daily";
-import { generateGamePaymentLink } from "@/lib/circles";
-import QRCode from "qrcode";
+import { NextRequest, NextResponse } from "next/server";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
-const SAFE_ADDRESS = process.env.SAFE_ADDRESS || "";
+/**
+ * Legacy daily payment bootstrap.
+ *
+ * The daily reward is now free for authenticated users and starts through
+ * /api/daily/claim. Keep this route explicit so old clients do not create
+ * unpaid sessions or show a payment QR code.
+ */
+export async function POST(req: NextRequest) {
+  const limited = await enforceRateLimit(req, "daily-init", 30, 60000);
+  if (limited) return limited;
 
-export async function POST() {
-  try {
-    const date = todayString();
-    const token = generateDailyToken();
-
-    // TEMP TEST BYPASS: do not reuse today's confirmed or pending session.
-    await db.insert(dailySessions).values({ token, date });
-
-    const paymentLink = generateGamePaymentLink(SAFE_ADDRESS, 1, "daily", token);
-
-    let qrCode = "";
-    try {
-      qrCode = await QRCode.toDataURL(paymentLink, { width: 300, margin: 2 });
-    } catch { /* QR generation optional */ }
-
-    return NextResponse.json({ token, paymentLink, qrCode });
-  } catch (error: any) {
-    console.error("[Daily Init] Error:", error.message);
-    return NextResponse.json({ error: error.message || "Init failed" }, { status: 500 });
-  }
+  return NextResponse.json(
+    { error: "daily_payment_disabled", message: "Daily rewards are free after sign-in." },
+    { status: 410 },
+  );
 }

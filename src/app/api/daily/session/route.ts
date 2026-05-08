@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { generateGamePaymentLink } from "@/lib/circles";
 
 const SESSION_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
@@ -45,10 +44,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "expired" });
     }
 
-    // Return waiting with payment link so frontend can show QR on reload
-    const safeAddress = process.env.SAFE_ADDRESS || "";
-    const paymentLink = generateGamePaymentLink(safeAddress, 1, "daily", session.token);
-    return NextResponse.json({ status: "waiting", paymentLink });
+    // Legacy unpaid daily sessions are no longer payable. The daily flow now
+    // requires an authenticated wallet and uses /api/daily/claim directly.
+    return NextResponse.json({ status: "expired" });
   } catch (error: any) {
     console.error("[Daily Session] Error:", error.message);
     return NextResponse.json({ error: error.message || "Session check failed" }, { status: 500 });
