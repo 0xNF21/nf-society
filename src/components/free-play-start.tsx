@@ -29,7 +29,7 @@ export type FreePlayStartProps = {
    */
   alreadyJoined?: boolean;
   /** Appele apres demarrage reussi de la partie. Le parent doit rafraichir le game state. */
-  onStarted: (result: { xpAfter: number }) => void;
+  onStarted: (result: { xpAfter: number; [key: string]: unknown }) => void;
   /** Optionnel : route cote serveur (par defaut `/api/{gameKey}/start-free`). */
   endpoint?: string;
   /** Optionnel : payload additionnel envoye au endpoint (ex: extras pour chance). */
@@ -100,7 +100,10 @@ export function FreePlayStart({
         setError(msgMap[key ?? ""] ?? t.errGeneric[locale]);
         return;
       }
-      onStarted({ xpAfter: typeof data.xpAfter === "number" ? data.xpAfter : 0 });
+      onStarted({
+        ...data,
+        xpAfter: typeof data.xpAfter === "number" ? data.xpAfter : 0,
+      });
     } catch {
       setError(t.errGeneric[locale]);
     } finally {

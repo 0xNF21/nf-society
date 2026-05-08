@@ -152,6 +152,7 @@ export function ChancePayment({
   const balKey = balanceGameKey || gameType;
   const balSlug = balanceSlug || tableSlug || gameId;
   const balExtras = balanceExtras || (ballValue !== undefined ? { ballValue } : undefined);
+  const freePlayRouteGameKey = balKey.replace(/_/g, "-");
 
   // Free-to-Play : bypass le flow CRC (QR, Mini App, balance-pay) et render
   // l'equivalent XP. Place APRES tous les hooks pour respecter rules-of-hooks.
@@ -159,17 +160,14 @@ export function ChancePayment({
     const fpAddress = connectedAddress ?? walletAddress ?? null;
     return (
       <FreePlayStart
-        gameKey={balKey}
+        gameKey={freePlayRouteGameKey}
         gameSlug={balSlug}
         address={fpAddress}
         playerToken={playerToken || ""}
         betCrc={amountCrc}
         isChance
         extraBody={balExtras as Record<string, unknown> | undefined}
-        onStarted={() => {
-          onPaymentInitiated?.();
-          onBalancePaid?.({ family: "chance" });
-        }}
+        onStarted={(result) => onBalancePaid?.(result)}
       />
     );
   }
