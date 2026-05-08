@@ -5,7 +5,7 @@ import {
   Loader2, Eye, EyeOff, Clock,
   Flag, Gift, Sparkles, Trash2, RefreshCw, Send,
   ChevronDown, ExternalLink, AlertCircle, CheckCircle, XCircle,
-  Palette, Check, Archive, Calculator,
+  Palette, Check, Archive, Calculator, Lock, Unlock,
 } from "lucide-react";
 import Link from "next/link";
 import type { FlagRow, FlagStatus } from "../types";
@@ -21,6 +21,7 @@ interface DailyRewardEntry {
   xpValue: number;
   symbol?: string;
   color?: string;
+  locked?: boolean;
 }
 
 interface DailyRewardMetrics {
@@ -47,6 +48,30 @@ interface DailyBudgetTableProposal {
   optimizedSmallWins: boolean;
   warnings: string[];
   blockers: string[];
+}
+
+interface DailyDesignerDraft {
+  xpPerDay: string;
+  crcPerDay: string;
+  maxNothingChance: string;
+  specialChance: string;
+  scratchShare: string;
+}
+
+interface DailyDesignerProposal {
+  scratch: DailyRewardEntry[];
+  spin: DailyRewardEntry[];
+  scratchMetrics: DailyRewardMetrics;
+  spinMetrics: DailyRewardMetrics;
+  warnings: string[];
+  blockers: string[];
+}
+
+interface DailyOptimizerTargets {
+  xpEv: number;
+  crcEv: number;
+  specialChance: number | null;
+  maxNothingProb: number | null;
 }
 
 interface DailyBudgetPreview {
@@ -98,6 +123,14 @@ const emptyBudgetDraft = (): DailyBudgetDraft => ({
 const emptyBudgetProposals = (): Record<DailyRewardTableKey, DailyBudgetTableProposal | null> => ({
   scratch: null,
   spin: null,
+});
+
+const emptyDesignerDraft = (): DailyDesignerDraft => ({
+  xpPerDay: "",
+  crcPerDay: "",
+  maxNothingChance: "35",
+  specialChance: "",
+  scratchShare: "50",
 });
 
 function isEmptyReward(entry: DailyRewardEntry) {
@@ -417,6 +450,18 @@ function DailyRewardTable({
               onChange={e => onUpdateEntry(tableKey, i, "label", e.target.value)}
               className="flex-1 px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-semibold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
             />
+            {!isEmptyReward(entry) && (
+              <button
+                onClick={() => onUpdateEntry(tableKey, i, "locked", !entry.locked)}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs transition ${entry.locked
+                  ? "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200"
+                  : "border-ink/10 bg-white text-ink/45 hover:text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white/45 dark:hover:text-white"}`}
+                aria-label={entry.locked ? "Deverrouiller cette ligne" : "Verrouiller cette ligne"}
+                title={entry.locked ? "Ligne verrouillee: l'optimizer ne change pas sa proba" : "Verrouiller cette ligne"}
+              >
+                {entry.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+              </button>
+            )}
             <button
               onClick={() => onRemoveEntry(tableKey, i)}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/55 hover:bg-red-100 hover:text-red-600 dark:text-white/45 dark:hover:bg-red-500/15 dark:hover:text-red-300"
@@ -505,6 +550,8 @@ export function DailyTab({ password }: { password: string }) {
   const [budgetError, setBudgetError] = useState<string | null>(null);
   const [budgetMessage, setBudgetMessage] = useState<string | null>(null);
   const [budgetProposals, setBudgetProposals] = useState<Record<DailyRewardTableKey, DailyBudgetTableProposal | null>>(emptyBudgetProposals);
+  const [designerDraft, setDesignerDraft] = useState<DailyDesignerDraft>(emptyDesignerDraft);
+  const [designerProposal, setDesignerProposal] = useState<DailyDesignerProposal | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -516,6 +563,7 @@ export function DailyTab({ password }: { password: string }) {
       setEditSpin(data.spin || []);
       setDraftVersion(v => v + 1);
       setBudgetProposals(emptyBudgetProposals());
+      setDesignerProposal(null);
     } catch {}
     setLoading(false);
   }, [password]);
@@ -530,6 +578,12 @@ export function DailyTab({ password }: { password: string }) {
     setBudgetError(null);
     setBudgetMessage(null);
     setBudgetProposals(prev => table ? { ...prev, [table]: null } : emptyBudgetProposals());
+    setDesignerProposal(null);
+  }
+
+  function updateDesignerDraft(field: keyof DailyDesignerDraft, value: string) {
+    setDesignerDraft(prev => ({ ...prev, [field]: value }));
+    clearBudgetOutcome();
   }
 
   function updateBudgetDraft(table: DailyRewardTableKey, field: keyof DailyBudgetDraft, value: string) {
@@ -578,6 +632,7 @@ export function DailyTab({ password }: { password: string }) {
         label: "+1 CRC",
         crcValue: 1,
         xpValue: 0,
+        locked: false,
         ...visual,
       };
     }
@@ -589,6 +644,7 @@ export function DailyTab({ password }: { password: string }) {
         label: "+10 XP",
         crcValue: 0,
         xpValue: 10,
+        locked: false,
         ...visual,
       };
     }
@@ -599,6 +655,7 @@ export function DailyTab({ password }: { password: string }) {
       label: "Rien",
       crcValue: 0,
       xpValue: 0,
+      locked: false,
       ...visual,
     };
   }
@@ -671,6 +728,7 @@ export function DailyTab({ password }: { password: string }) {
       type: `xp_small_${entry.type.replace(/^xp_/, "")}`,
       label: "+1 XP",
       xpValue: 1,
+      locked: false,
       symbol: table === "scratch" ? "+" : entry.symbol,
       color: table === "spin" ? "#22C55E" : entry.color,
     };
@@ -704,7 +762,7 @@ export function DailyTab({ password }: { password: string }) {
 
     const donorIndexes = working
       .map((entry, index) => ({ entry, index }))
-      .filter(({ entry, index }) => index !== fillerIdx && entry.xpValue > 1 && entry.prob > 0)
+      .filter(({ entry, index }) => index !== fillerIdx && !entry.locked && entry.xpValue > 1 && entry.prob > 0)
       .sort((a, b) => b.entry.xpValue - a.entry.xpValue)
       .map(({ index }) => index);
 
@@ -863,6 +921,234 @@ export function DailyTab({ password }: { password: string }) {
     setBudgetMessage(`Proposition ${tableLabel} calculee. Regarde les chiffres, puis applique au brouillon si ca te va.`);
   }
 
+  function splitTarget(total: number, scratchShare: number, scratchCanUse: boolean, spinCanUse: boolean) {
+    if (total <= 0) return { scratch: 0, spin: 0 };
+    if (scratchCanUse && spinCanUse) {
+      return {
+        scratch: total * scratchShare,
+        spin: total * (1 - scratchShare),
+      };
+    }
+    if (scratchCanUse) return { scratch: total, spin: 0 };
+    if (spinCanUse) return { scratch: 0, spin: total };
+    return { scratch: 0, spin: 0 };
+  }
+
+  function canUseCategory(entries: DailyRewardEntry[], category: "xp" | "crc" | "special") {
+    return entries.some(entry => {
+      if (isEmptyReward(entry)) return false;
+      if (category === "xp") return entry.xpValue > 0;
+      if (category === "crc") return entry.crcValue > 0;
+      return isSpecialReward(entry);
+    });
+  }
+
+  function optimizeTableWithLocks(table: DailyRewardTableKey, sourceEntries: DailyRewardEntry[], targets: DailyOptimizerTargets) {
+    const blockers: string[] = [];
+    const warnings: string[] = [];
+    const label = table === "scratch" ? "Scratch" : "Roue";
+    const working = sourceEntries.map(entry => ({ ...entry }));
+
+    if (!working.some(isEmptyReward)) {
+      working.push({ ...createEntry(table, "nothing"), prob: 0 });
+    }
+
+    for (let i = 0; i < working.length; i++) {
+      if (!working[i].locked && !isEmptyReward(working[i])) {
+        working[i] = { ...working[i], prob: 0 };
+      }
+      if (isEmptyReward(working[i])) {
+        working[i] = { ...working[i], prob: 0, locked: false };
+      }
+    }
+
+    const distributeEv = (category: "xp" | "crc", targetEv: number) => {
+      const valueKey = category === "xp" ? "xpValue" : "crcValue";
+      const categoryLabel = category === "xp" ? "XP" : "CRC";
+      const candidates = working
+        .map((entry, index) => ({ entry, index }))
+        .filter(({ entry }) => !isEmptyReward(entry) && entry[valueKey] > 0);
+      const lockedEv = candidates
+        .filter(({ entry }) => entry.locked)
+        .reduce((sum, { entry }) => sum + entry.prob * entry[valueKey], 0);
+      const unlocked = candidates.filter(({ entry }) => !entry.locked);
+      const remainingEv = Math.max(0, targetEv - lockedEv);
+
+      if (lockedEv > targetEv + 0.000000001) {
+        warnings.push(`${label}: les lignes ${categoryLabel} verrouillees distribuent deja plus que la cible.`);
+      }
+      if (remainingEv <= 0.000000001) return;
+      if (unlocked.length === 0) {
+        blockers.push(`${label}: ajoute ou deverrouille une ligne ${categoryLabel} pour atteindre la cible.`);
+        return;
+      }
+
+      const currentWeight = unlocked.reduce((sum, { entry }) => sum + entry.prob * entry[valueKey], 0);
+      const fallbackWeight = unlocked.reduce((sum, { entry }) => sum + entry[valueKey], 0);
+      const weightTotal = currentWeight > 0 ? currentWeight : fallbackWeight;
+
+      for (const { entry, index } of unlocked) {
+        const weight = currentWeight > 0 ? entry.prob * entry[valueKey] : entry[valueKey];
+        const evShare = remainingEv * (weight / weightTotal);
+        working[index] = { ...entry, prob: roundProb(evShare / entry[valueKey]) };
+      }
+    };
+
+    const distributeSpecial = (targetChance: number | null) => {
+      if (targetChance === null) return;
+
+      const candidates = working
+        .map((entry, index) => ({ entry, index }))
+        .filter(({ entry }) => isSpecialReward(entry));
+      const lockedChance = candidates
+        .filter(({ entry }) => entry.locked)
+        .reduce((sum, { entry }) => sum + entry.prob, 0);
+      const unlocked = candidates.filter(({ entry }) => !entry.locked);
+      const remainingChance = Math.max(0, targetChance - lockedChance);
+
+      if (lockedChance > targetChance + 0.000000001) {
+        warnings.push(`${label}: les bonus verrouilles depassent deja la cible bonus.`);
+      }
+      if (remainingChance <= 0.000000001) return;
+      if (unlocked.length === 0) {
+        blockers.push(`${label}: ajoute ou deverrouille une ligne bonus pour atteindre la cible bonus.`);
+        return;
+      }
+
+      const currentWeight = unlocked.reduce((sum, { entry }) => sum + entry.prob, 0);
+      const weightTotal = currentWeight > 0 ? currentWeight : unlocked.length;
+
+      for (const { entry, index } of unlocked) {
+        const weight = currentWeight > 0 ? entry.prob : 1;
+        working[index] = { ...entry, prob: roundProb(remainingChance * (weight / weightTotal)) };
+      }
+    };
+
+    distributeEv("xp", targets.xpEv);
+    distributeEv("crc", targets.crcEv);
+    distributeSpecial(targets.specialChance);
+
+    let balanced = rebalanceEntries(table, working);
+    if (balanced.error) blockers.push(balanced.error);
+
+    if (!balanced.error && targets.maxNothingProb !== null) {
+      const emptyProb = getRewardMetrics(balanced.entries).nothingChance;
+      if (emptyProb > targets.maxNothingProb + 0.000000001) {
+        const fitted = fitNothingLimitWithSmallXp(table, balanced.entries, targets.maxNothingProb);
+        balanced = { entries: fitted.entries, error: fitted.error };
+        if (fitted.error) blockers.push(fitted.error);
+        const fittedEmpty = getRewardMetrics(fitted.entries).nothingChance;
+        if (fittedEmpty > targets.maxNothingProb + 0.000000001) {
+          warnings.push(`${label}: ${formatProbabilityPercent(fittedEmpty)}% de Rien apres optimisation, au-dessus du max ${formatProbabilityPercent(targets.maxNothingProb)}%.`);
+        }
+      }
+    }
+
+    return {
+      entries: balanced.entries,
+      metrics: getRewardMetrics(balanced.entries),
+      warnings,
+      blockers,
+    };
+  }
+
+  function optimizeDailyDesigner() {
+    setBudgetError(null);
+    setBudgetMessage(null);
+    setBudgetProposals(emptyBudgetProposals());
+    setDesignerProposal(null);
+
+    const dailyCount = Number(budgetDailyCount);
+    const hasXpBudget = designerDraft.xpPerDay.trim() !== "";
+    const hasCrcBudget = designerDraft.crcPerDay.trim() !== "";
+    const hasMaxNothing = designerDraft.maxNothingChance.trim() !== "";
+    const hasSpecialChance = designerDraft.specialChance.trim() !== "";
+    const xpBudget = hasXpBudget ? Number(designerDraft.xpPerDay) : null;
+    const crcBudget = hasCrcBudget ? Number(designerDraft.crcPerDay) : null;
+    const maxNothing = hasMaxNothing ? Number(designerDraft.maxNothingChance) : null;
+    const specialChance = hasSpecialChance ? Number(designerDraft.specialChance) : null;
+    const scratchSharePct = Number(designerDraft.scratchShare);
+
+    if (!Number.isFinite(dailyCount) || dailyCount <= 0) {
+      setBudgetError("Entre un nombre de daily joues superieur a 0.");
+      return;
+    }
+    if (hasXpBudget && (!Number.isFinite(xpBudget) || xpBudget! < 0)) {
+      setBudgetError("Le budget XP doit etre un nombre positif.");
+      return;
+    }
+    if (hasCrcBudget && (!Number.isFinite(crcBudget) || crcBudget! < 0)) {
+      setBudgetError("Le budget CRC doit etre un nombre positif.");
+      return;
+    }
+    if (hasMaxNothing && (!Number.isFinite(maxNothing) || maxNothing! < 0 || maxNothing! > 100)) {
+      setBudgetError("Le max Rien doit etre compris entre 0% et 100%.");
+      return;
+    }
+    if (hasSpecialChance && (!Number.isFinite(specialChance) || specialChance! < 0 || specialChance! > 100)) {
+      setBudgetError("La chance bonus doit etre comprise entre 0% et 100%.");
+      return;
+    }
+    if (!Number.isFinite(scratchSharePct) || scratchSharePct < 0 || scratchSharePct > 100) {
+      setBudgetError("La repartition Scratch doit etre comprise entre 0% et 100%.");
+      return;
+    }
+
+    const scratchShare = scratchSharePct / 100;
+    const totalXpEv = hasXpBudget ? xpBudget! / dailyCount : combinedXpEv;
+    const totalCrcEv = hasCrcBudget ? crcBudget! / dailyCount : combinedCrcEv;
+    const totalSpecialChance = hasSpecialChance ? specialChance! / 100 : null;
+    const maxNothingProb = hasMaxNothing ? maxNothing! / 100 : null;
+
+    const xpSplit = hasXpBudget
+      ? splitTarget(totalXpEv, scratchShare, canUseCategory(editScratch, "xp"), canUseCategory(editSpin, "xp"))
+      : { scratch: scratchMetrics.xpEv, spin: spinMetrics.xpEv };
+    const crcSplit = hasCrcBudget
+      ? splitTarget(totalCrcEv, scratchShare, canUseCategory(editScratch, "crc"), canUseCategory(editSpin, "crc"))
+      : { scratch: scratchMetrics.crcEv, spin: spinMetrics.crcEv };
+    const specialSplit = totalSpecialChance !== null
+      ? splitTarget(totalSpecialChance, scratchShare, canUseCategory(editScratch, "special"), canUseCategory(editSpin, "special"))
+      : { scratch: null, spin: null };
+
+    const nextScratch = optimizeTableWithLocks("scratch", editScratch, {
+      xpEv: xpSplit.scratch,
+      crcEv: crcSplit.scratch,
+      specialChance: specialSplit.scratch,
+      maxNothingProb,
+    });
+    const nextSpin = optimizeTableWithLocks("spin", editSpin, {
+      xpEv: xpSplit.spin,
+      crcEv: crcSplit.spin,
+      specialChance: specialSplit.spin,
+      maxNothingProb,
+    });
+
+    const blockers = [...nextScratch.blockers, ...nextSpin.blockers];
+    const warnings = [...nextScratch.warnings, ...nextSpin.warnings];
+
+    setDesignerProposal({
+      scratch: nextScratch.entries,
+      spin: nextSpin.entries,
+      scratchMetrics: nextScratch.metrics,
+      spinMetrics: nextSpin.metrics,
+      warnings,
+      blockers,
+    });
+    setBudgetMessage(blockers.length > 0
+      ? "Proposition generee avec blocages. Corrige les lignes indiquees avant d'appliquer."
+      : "Proposition generee. Verifie le resume puis applique si ca te va.");
+  }
+
+  function applyDesignerProposal() {
+    if (!designerProposal || designerProposal.blockers.length > 0) return;
+    setEditScratch(designerProposal.scratch);
+    setEditSpin(designerProposal.spin);
+    setDraftVersion(v => v + 1);
+    setBudgetError(null);
+    setDesignerProposal(null);
+    setBudgetMessage("Designer applique au brouillon. Sauvegarde Scratch et Roue pour publier.");
+  }
+
   function applyBudgetProposal(table: DailyRewardTableKey) {
     const proposal = budgetProposals[table];
     if (!proposal || proposal.blockers.length > 0) return;
@@ -1019,16 +1305,16 @@ export function DailyTab({ password }: { password: string }) {
           <div>
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-marine dark:text-cyan-300" />
-              <h3 className="text-sm font-black uppercase tracking-widest text-ink dark:text-white">Calculateur de budget daily</h3>
+              <h3 className="text-sm font-black uppercase tracking-widest text-ink dark:text-white">Daily Reward Designer</h3>
             </div>
             <p className="mt-1 text-sm text-ink/70 dark:text-white/70">
-              Scratch et roue se reglent separement. Le nombre de daily reste commun, car un daily complet lance les deux.
+              Donne les objectifs de distribution, verrouille les lignes sensibles, puis laisse le designer ajuster les probabilites.
             </p>
             <p className="mt-1 text-xs font-semibold text-ink/55 dark:text-white/55">
-              Dans chaque bloc, laisse un champ vide pour ne pas toucher a cette famille, ou mets 0 pour la couper.
+              Les lignes verrouillees gardent leur probabilite. Les lignes "Rien" sont recalculees a la fin.
             </p>
           </div>
-          <div className="w-full max-w-xs">
+          <div className="w-full max-w-[220px]">
             <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Daily estimes / jour</label>
             <input
               type="number"
@@ -1041,32 +1327,135 @@ export function DailyTab({ password }: { password: string }) {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 2xl:grid-cols-2">
-          <DailyBudgetPanel
-            tableKey="scratch"
-            title="Scratch"
-            metrics={scratchMetrics}
-            preview={scratchBudgetPreview}
-            proposal={budgetProposals.scratch}
-            budgetProjectionCount={budgetProjectionCount}
-            onPreview={previewBudgetCalculator}
-            onUpdateDraft={updateBudgetDraft}
-            onApplyProposal={applyBudgetProposal}
-            onAcceptNothingLimit={acceptProposalNothingLimitAndApply}
-          />
-          <DailyBudgetPanel
-            tableKey="spin"
-            title="Roue"
-            metrics={spinMetrics}
-            preview={spinBudgetPreview}
-            proposal={budgetProposals.spin}
-            budgetProjectionCount={budgetProjectionCount}
-            onPreview={previewBudgetCalculator}
-            onUpdateDraft={updateBudgetDraft}
-            onApplyProposal={applyBudgetProposal}
-            onAcceptNothingLimit={acceptProposalNothingLimitAndApply}
-          />
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget XP / jour</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={designerDraft.xpPerDay}
+              onChange={e => updateDesignerDraft("xpPerDay", e.target.value)}
+              placeholder={formatExpected(combinedXpEv * budgetProjectionCount, 0)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget CRC / jour</label>
+            <input
+              type="number"
+              min={0}
+              step="0.001"
+              value={designerDraft.crcPerDay}
+              onChange={e => updateDesignerDraft("crcPerDay", e.target.value)}
+              placeholder={formatExpected(combinedCrcEv * budgetProjectionCount)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Max Rien / jeu (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.001"
+              value={designerDraft.maxNothingChance}
+              onChange={e => updateDesignerDraft("maxNothingChance", e.target.value)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Bonus total (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.001"
+              value={designerDraft.specialChance}
+              onChange={e => updateDesignerDraft("specialChance", e.target.value)}
+              placeholder={formatProbabilityPercent(combinedSpecialChance)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Part Scratch (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="1"
+              value={designerDraft.scratchShare}
+              onChange={e => updateDesignerDraft("scratchShare", e.target.value)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
         </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={optimizeDailyDesigner}
+            className="inline-flex items-center gap-2 rounded-lg bg-marine px-4 py-2 text-sm font-bold text-white hover:opacity-90"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Optimiser les probas
+          </button>
+          <button
+            onClick={applyDesignerProposal}
+            disabled={!designerProposal || designerProposal.blockers.length > 0}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <CheckCircle className="h-4 w-4" />
+            Appliquer la proposition
+          </button>
+        </div>
+
+        {designerProposal && (
+          <div className="mt-4 rounded-xl border border-marine/15 bg-sky-50/70 p-4 dark:border-cyan-400/20 dark:bg-cyan-950/20">
+            <p className="text-xs font-black uppercase tracking-widest text-marine dark:text-cyan-200">Proposition</p>
+            <div className="mt-2 grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg bg-white/80 p-3 text-xs dark:bg-zinc-950/70">
+                <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">Scratch</p>
+                <p className="mt-1 font-bold text-ink dark:text-white">{formatExpected(designerProposal.scratchMetrics.xpEv, 2)} XP / {formatExpected(designerProposal.scratchMetrics.crcEv)} CRC</p>
+                <p className="text-ink/60 dark:text-white/60">Rien {formatProbabilityPercent(designerProposal.scratchMetrics.nothingChance)}%</p>
+              </div>
+              <div className="rounded-lg bg-white/80 p-3 text-xs dark:bg-zinc-950/70">
+                <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">Roue</p>
+                <p className="mt-1 font-bold text-ink dark:text-white">{formatExpected(designerProposal.spinMetrics.xpEv, 2)} XP / {formatExpected(designerProposal.spinMetrics.crcEv)} CRC</p>
+                <p className="text-ink/60 dark:text-white/60">Rien {formatProbabilityPercent(designerProposal.spinMetrics.nothingChance)}%</p>
+              </div>
+              <div className="rounded-lg bg-white/80 p-3 text-xs dark:bg-zinc-950/70">
+                <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">Daily complet</p>
+                <p className="mt-1 font-bold text-ink dark:text-white">
+                  {formatExpected(designerProposal.scratchMetrics.xpEv + designerProposal.spinMetrics.xpEv, 2)} XP moyen
+                </p>
+                <p className="font-bold text-emerald-700 dark:text-emerald-300">
+                  {formatExpected(designerProposal.scratchMetrics.crcEv + designerProposal.spinMetrics.crcEv)} CRC moyen
+                </p>
+              </div>
+            </div>
+
+            {designerProposal.blockers.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {designerProposal.blockers.map((blocker, index) => (
+                  <p key={index} className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {blocker}
+                  </p>
+                ))}
+              </div>
+            )}
+            {designerProposal.warnings.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {designerProposal.warnings.map((warning, index) => (
+                  <p key={index} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {warning}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {budgetError && (
           <p className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">

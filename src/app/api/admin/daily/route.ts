@@ -13,6 +13,7 @@ type AdminDailyReward = {
   xpValue: number;
   symbol?: string;
   color?: string;
+  locked?: boolean;
 };
 
 function normalizeAdminRewards(key: "scratch" | "spin", rewards: unknown[]): { rewards?: AdminDailyReward[]; error?: string } {
@@ -43,6 +44,7 @@ function normalizeAdminRewards(key: "scratch" | "spin", rewards: unknown[]): { r
       label,
       crcValue: Math.round(crcValue * 1_000) / 1_000,
       xpValue: Math.floor(xpValue),
+      locked: Boolean(row?.locked),
       ...(key === "scratch"
         ? { symbol: String(row?.symbol ?? "").trim() || "?" }
         : { color: String(row?.color ?? "").trim() || "#6B7280" }),
