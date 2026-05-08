@@ -47,8 +47,11 @@ function normalizeAdminRewards(rewards: unknown[]): { rewards?: AdminDailyReward
     if (!Number.isFinite(prob) || prob < 0) return { error: `Reward ${i + 1}: invalid probability` };
     if (!Number.isFinite(crcValue) || crcValue < 0) return { error: `Reward ${i + 1}: invalid CRC value` };
     if (!Number.isFinite(xpValue) || xpValue < 0) return { error: `Reward ${i + 1}: invalid XP value` };
-    if (crcValue === 0 && xpValue === 0 && type !== "nothing") {
-      return { error: `Reward ${i + 1}: only XP, CRC, or the "nothing" line are allowed` };
+    if (crcValue === 0 && xpValue === 0) {
+      return { error: `Reward ${i + 1}: every line must give XP or CRC` };
+    }
+    if (crcValue > 0 && xpValue > 0) {
+      return { error: `Reward ${i + 1}: choose either XP or CRC, not both` };
     }
     if (crcValue > MAX_DAILY_CRC_REWARD) return { error: `Reward ${i + 1}: CRC value must be <= ${MAX_DAILY_CRC_REWARD}` };
     if (xpValue > MAX_DAILY_XP_REWARD) return { error: `Reward ${i + 1}: XP value must be <= ${MAX_DAILY_XP_REWARD}` };
@@ -102,7 +105,7 @@ export async function PATCH(req: NextRequest) {
 
     const expectedXp = normalized.rewards.reduce((sum, reward) => sum + reward.prob * reward.xpValue, 0);
     if (expectedXp > MAX_DAILY_EXPECTED_XP) {
-      return NextResponse.json({ error: `Expected XP per wheel is ${expectedXp.toFixed(2)}, max is ${MAX_DAILY_EXPECTED_XP}` }, { status: 400 });
+      return NextResponse.json({ error: `Expected XP balance per wheel is ${expectedXp.toFixed(2)}, max is ${MAX_DAILY_EXPECTED_XP}` }, { status: 400 });
     }
 
     const expectedCrc = normalized.rewards.reduce((sum, reward) => sum + reward.prob * reward.crcValue, 0);

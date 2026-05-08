@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle, Loader2, Plus, Save, Trash2 } from "lucide-react";
 
-type RewardKind = "nothing" | "xp" | "crc";
+type RewardKind = "xp" | "crc";
 
 type DailyRewardResult = {
   label?: string;
@@ -43,13 +43,11 @@ type RewardRow = {
 };
 
 const DEFAULT_ROWS: RewardRow[] = [
-  { id: "nothing", kind: "nothing", label: "Rien", probability: "20", xpValue: "0", crcValue: "0", color: "#6B7280" },
-  { id: "xp-5", kind: "xp", label: "+5 XP", probability: "35", xpValue: "5", crcValue: "0", color: "#10B981" },
-  { id: "xp-10", kind: "xp", label: "+10 XP", probability: "28", xpValue: "10", crcValue: "0", color: "#38BDF8" },
-  { id: "xp-25", kind: "xp", label: "+25 XP", probability: "12", xpValue: "25", crcValue: "0", color: "#8B5CF6" },
-  { id: "xp-50", kind: "xp", label: "+50 XP", probability: "4", xpValue: "50", crcValue: "0", color: "#6366F1" },
-  { id: "crc-1", kind: "crc", label: "+1 CRC", probability: "0.9", xpValue: "0", crcValue: "1", color: "#F59E0B" },
-  { id: "crc-10", kind: "crc", label: "+10 CRC", probability: "0.1", xpValue: "0", crcValue: "10", color: "#EC4899" },
+  { id: "xp-75", kind: "xp", label: "+75 XP", probability: "45", xpValue: "75", crcValue: "0", color: "#10B981" },
+  { id: "xp-200", kind: "xp", label: "+200 XP", probability: "35", xpValue: "200", crcValue: "0", color: "#38BDF8" },
+  { id: "xp-500", kind: "xp", label: "+500 XP", probability: "17", xpValue: "500", crcValue: "0", color: "#8B5CF6" },
+  { id: "crc-1", kind: "crc", label: "+1 CRC", probability: "2.8", xpValue: "0", crcValue: "1", color: "#F59E0B" },
+  { id: "crc-10", kind: "crc", label: "+10 CRC", probability: "0.2", xpValue: "0", crcValue: "10", color: "#EC4899" },
 ];
 
 function parseNumber(value: string): number {
@@ -63,22 +61,23 @@ function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Math.round(value * 1000) / 1000);
 }
 
-function kindFromReward(reward: ApiReward): RewardKind {
+function kindFromReward(reward: ApiReward): RewardKind | null {
   if (Number(reward.crcValue) > 0) return "crc";
   if (Number(reward.xpValue) > 0) return "xp";
-  return "nothing";
+  return null;
 }
 
-function rowFromReward(reward: ApiReward, index: number): RewardRow {
+function rowFromReward(reward: ApiReward, index: number): RewardRow | null {
   const kind = kindFromReward(reward);
+  if (!kind) return null;
   return {
     id: `${kind}-${reward.type || index}-${index}`,
     kind,
-    label: reward.label || (kind === "nothing" ? "Rien" : ""),
+    label: reward.label || "",
     probability: formatNumber(Number(reward.prob || 0) * 100),
     xpValue: formatNumber(Number(reward.xpValue || 0)),
     crcValue: formatNumber(Number(reward.crcValue || 0)),
-    color: reward.color || (kind === "crc" ? "#F59E0B" : kind === "xp" ? "#10B981" : "#6B7280"),
+    color: reward.color || (kind === "crc" ? "#F59E0B" : "#10B981"),
   };
 }
 
@@ -89,7 +88,6 @@ function sanitizeTypePart(value: number): string {
 function typeForRow(row: RewardRow, index: number): string {
   const xp = Math.floor(parseNumber(row.xpValue));
   const crc = parseNumber(row.crcValue);
-  if (row.kind === "nothing") return "nothing";
   if (row.kind === "xp") return `xp_${sanitizeTypePart(xp)}_${index + 1}`;
   return `crc_${sanitizeTypePart(crc)}_${index + 1}`;
 }
@@ -97,7 +95,6 @@ function typeForRow(row: RewardRow, index: number): string {
 function labelForRow(row: RewardRow): string {
   const label = row.label.trim();
   if (label) return label;
-  if (row.kind === "nothing") return "Rien";
   if (row.kind === "xp") return `+${Math.floor(parseNumber(row.xpValue))} XP`;
   return `+${formatNumber(parseNumber(row.crcValue))} CRC`;
 }
@@ -127,7 +124,7 @@ function RewardLine({ title, play }: { title: string; play?: DailyPlayResult }) 
         <span className="text-emerald-600"> - {result?.crcValue} CRC envoye</span>
       )}
       {Number(result?.xpValue || 0) > 0 && (
-        <span className="text-violet-600"> - +{result?.xpValue} XP</span>
+        <span className="text-violet-600"> - +{result?.xpValue} XP de solde</span>
       )}
       {play?.payout?.error && (
         <span className="text-red-500"> (payout erreur: {play.payout.error})</span>
@@ -163,9 +160,6 @@ export function DailyTab({ password }: { password: string }) {
     const expectedCrc = rows.reduce((sum, row) => (
       sum + (Math.max(0, parseNumber(row.probability)) / 100) * (row.kind === "crc" ? parseNumber(row.crcValue) : 0)
     ), 0);
-    const nothingChance = rows
-      .filter((row) => row.kind === "nothing")
-      .reduce((sum, row) => sum + Math.max(0, parseNumber(row.probability)), 0);
     const crcChance = rows
       .filter((row) => row.kind === "crc")
       .reduce((sum, row) => sum + Math.max(0, parseNumber(row.probability)), 0);
@@ -174,7 +168,6 @@ export function DailyTab({ password }: { password: string }) {
       totalProbability,
       expectedXp,
       expectedCrc,
-      nothingChance,
       crcChance,
     };
   }, [rows]);
@@ -193,7 +186,10 @@ export function DailyTab({ password }: { password: string }) {
       .then((data) => {
         if (!active) return;
         if (Array.isArray(data?.wheel) && data.wheel.length > 0) {
-          setRows(data.wheel.map(rowFromReward));
+          const loadedRows = data.wheel
+            .map(rowFromReward)
+            .filter((row: RewardRow | null): row is RewardRow => row !== null);
+          setRows(loadedRows.length > 0 ? loadedRows : DEFAULT_ROWS);
         }
       })
       .catch(() => {})
@@ -209,7 +205,6 @@ export function DailyTab({ password }: { password: string }) {
     setRows((current) => current.map((row) => {
       if (row.id !== id) return row;
       const next = { ...row, ...patch };
-      if (patch.kind === "nothing") return { ...next, label: next.label || "Rien", xpValue: "0", crcValue: "0" };
       if (patch.kind === "xp") return { ...next, crcValue: "0" };
       if (patch.kind === "crc") return { ...next, xpValue: "0" };
       return next;
@@ -223,11 +218,11 @@ export function DailyTab({ password }: { password: string }) {
       {
         id,
         kind,
-        label: kind === "nothing" ? "Rien" : kind === "xp" ? "+10 XP" : "+1 CRC",
+        label: kind === "xp" ? "+100 XP" : "+1 CRC",
         probability: "1",
-        xpValue: kind === "xp" ? "10" : "0",
+        xpValue: kind === "xp" ? "100" : "0",
         crcValue: kind === "crc" ? "1" : "0",
-        color: kind === "crc" ? "#F59E0B" : kind === "xp" ? "#10B981" : "#6B7280",
+        color: kind === "crc" ? "#F59E0B" : "#10B981",
       },
     ]);
   }
@@ -236,26 +231,6 @@ export function DailyTab({ password }: { password: string }) {
     setSaveOk(false);
     setSaveError(null);
     setRows((current) => current.filter((row) => row.id !== id));
-  }
-
-  function fillNothingWithRemainder() {
-    const nonNothingTotal = rows
-      .filter((row) => row.kind !== "nothing")
-      .reduce((sum, row) => sum + Math.max(0, parseNumber(row.probability)), 0);
-    const remainder = Math.max(0, 100 - nonNothingTotal);
-    const hasNothing = rows.some((row) => row.kind === "nothing");
-
-    if (!hasNothing) {
-      setRows((current) => [
-        { id: `nothing-${Date.now()}`, kind: "nothing", label: "Rien", probability: formatNumber(remainder), xpValue: "0", crcValue: "0", color: "#6B7280" },
-        ...current,
-      ]);
-      return;
-    }
-
-    setRows((current) => current.map((row) => (
-      row.kind === "nothing" ? { ...row, probability: formatNumber(remainder) } : row
-    )));
   }
 
   async function saveConfig() {
@@ -277,7 +252,12 @@ export function DailyTab({ password }: { password: string }) {
         setSaveError(data?.error || "Sauvegarde impossible");
         return;
       }
-      if (Array.isArray(data.wheel)) setRows(data.wheel.map(rowFromReward));
+      if (Array.isArray(data.wheel)) {
+        const savedRows = data.wheel
+          .map(rowFromReward)
+          .filter((row: RewardRow | null): row is RewardRow => row !== null);
+        setRows(savedRows.length > 0 ? savedRows : DEFAULT_ROWS);
+      }
       setSaveOk(true);
     } catch {
       setSaveError("Sauvegarde impossible");
@@ -312,9 +292,9 @@ export function DailyTab({ password }: { password: string }) {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-widest text-ink/50 dark:text-white/50">Daily rewards</p>
-            <h3 className="mt-2 text-lg font-black text-ink dark:text-white">Roue daily XP / CRC</h3>
+            <h3 className="mt-2 text-lg font-black text-ink dark:text-white">Roue daily solde XP / CRC</h3>
             <p className="mt-1 max-w-3xl text-sm font-semibold text-ink/65 dark:text-white/65">
-              Configure les gains de la roue quotidienne. Le total des probabilites doit faire 100%.
+              Configure les gains de la roue quotidienne. Chaque tirage donne soit du solde XP jouable, soit un gain CRC rare.
             </p>
           </div>
           <button
@@ -327,16 +307,15 @@ export function DailyTab({ password }: { password: string }) {
           </button>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatBox
             label="Total probas"
             value={`${formatNumber(summary.totalProbability)}%`}
             accent={totalValid ? "text-emerald-600" : "text-red-500"}
           />
-          <StatBox label="XP moyen / daily" value={formatNumber(summary.expectedXp)} accent="text-violet-600" />
+          <StatBox label="Solde XP moyen / daily" value={formatNumber(summary.expectedXp)} accent="text-violet-600" />
           <StatBox label="CRC moyen / daily" value={formatNumber(summary.expectedCrc)} accent="text-emerald-600" />
           <StatBox label="Chance CRC" value={`${formatNumber(summary.crcChance)}%`} accent="text-amber-600" />
-          <StatBox label="Chance rien" value={`${formatNumber(summary.nothingChance)}%`} />
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -347,7 +326,7 @@ export function DailyTab({ password }: { password: string }) {
 
         {!totalValid && (
           <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm font-bold text-red-600 dark:text-red-300">
-            Le total est a {formatNumber(summary.totalProbability)}%. Ajuste les lignes ou utilise "Remplir Rien".
+            Le total est a {formatNumber(summary.totalProbability)}%. Ajuste les probabilites pour atteindre 100%.
           </div>
         )}
         {saveError && (
@@ -366,20 +345,11 @@ export function DailyTab({ password }: { password: string }) {
         <div className="mt-5 flex flex-wrap gap-2">
           <button onClick={() => addRow("xp")} className="inline-flex items-center gap-2 rounded-lg border border-ink/10 px-3 py-2 text-sm font-bold text-ink hover:bg-ink/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5">
             <Plus className="h-4 w-4" />
-            Gain XP
+            Gain solde XP
           </button>
           <button onClick={() => addRow("crc")} className="inline-flex items-center gap-2 rounded-lg border border-ink/10 px-3 py-2 text-sm font-bold text-ink hover:bg-ink/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5">
             <Plus className="h-4 w-4" />
             Gain CRC
-          </button>
-          {!rows.some((row) => row.kind === "nothing") && (
-            <button onClick={() => addRow("nothing")} className="inline-flex items-center gap-2 rounded-lg border border-ink/10 px-3 py-2 text-sm font-bold text-ink hover:bg-ink/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5">
-              <Plus className="h-4 w-4" />
-              Ligne Rien
-            </button>
-          )}
-          <button onClick={fillNothingWithRemainder} className="inline-flex items-center gap-2 rounded-lg bg-ink px-3 py-2 text-sm font-bold text-white hover:opacity-90 dark:bg-white dark:text-zinc-950">
-            Remplir Rien
           </button>
         </div>
 
@@ -390,7 +360,7 @@ export function DailyTab({ password }: { password: string }) {
                 <th className="px-3 py-3">Type</th>
                 <th className="px-3 py-3">Label</th>
                 <th className="px-3 py-3">Proba %</th>
-                <th className="px-3 py-3">XP</th>
+                <th className="px-3 py-3">Solde XP</th>
                 <th className="px-3 py-3">CRC</th>
                 <th className="px-3 py-3">Couleur</th>
                 <th className="px-3 py-3 text-right">Action</th>
@@ -412,7 +382,6 @@ export function DailyTab({ password }: { password: string }) {
                       onChange={(event) => updateRow(row.id, { kind: event.target.value as RewardKind })}
                       className="w-full rounded-lg border border-ink/10 bg-white px-2 py-2 font-bold text-ink dark:border-white/10 dark:bg-zinc-950 dark:text-white"
                     >
-                      <option value="nothing" disabled={row.kind !== "nothing" && rows.some((candidate) => candidate.kind === "nothing")}>Rien</option>
                       <option value="xp">XP</option>
                       <option value="crc">CRC</option>
                     </select>

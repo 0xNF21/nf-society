@@ -88,7 +88,7 @@ export default function DailyModal() {
   ), [stake]);
   const rewardLabel = useCallback((entry: DailyRewardEntry) => {
     if (entry.crcValue > 0) return `+${stake.format(entry.crcValue)}`;
-    if (entry.xpValue > 0) return `+${entry.xpValue} XP`;
+    if (entry.xpValue > 0) return `+${entry.xpValue} XP de solde`;
     return arcadeLabel(entry.label || entry.type);
   }, [arcadeLabel, stake]);
   const rewardProb = (entry: DailyRewardEntry) => `${Math.round(entry.prob * 1000) / 10}%`;
@@ -108,7 +108,7 @@ export default function DailyModal() {
       <div className="flex flex-wrap gap-2">
         {hasXpReward && (
           <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">
-            XP
+            Solde XP
           </span>
         )}
         {visibleCrcRewards.map((entry) => (
@@ -545,7 +545,7 @@ export default function DailyModal() {
                 <div className="text-center">
                   <h3 className="text-lg font-black text-ink">{t.spinTitle[locale]}</h3>
                   <p className="text-sm font-medium text-ink/60">
-                    {locale === "fr" ? "Un seul tirage daily : XP ou CRC selon la configuration." : "One daily draw: XP or CRC based on the configuration."}
+                    {locale === "fr" ? "Un seul tirage daily : solde XP jouable ou CRC selon la configuration." : "One daily draw: playable XP balance or CRC based on the configuration."}
                   </p>
                 </div>
                 <SpinWheel
@@ -573,7 +573,7 @@ export default function DailyModal() {
                     <p className="mt-1 text-sm font-black text-emerald-600">+{stake.format(wheelResult.crcValue)}</p>
                   ) : null}
                   {wheelResult?.xpValue ? (
-                    <p className="mt-1 text-sm font-black text-violet-600">+{wheelResult.xpValue} XP</p>
+                    <p className="mt-1 text-sm font-black text-violet-600">+{wheelResult.xpValue} XP de solde</p>
                   ) : null}
                   {address && <p className="mt-3 truncate text-xs font-bold text-ink/40">{address}</p>}
                 </div>

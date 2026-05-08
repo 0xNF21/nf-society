@@ -17,11 +17,9 @@ export type DailyWheelSegment = {
 };
 
 export const DAILY_WHEEL_SEGMENTS: DailyWheelSegment[] = [
-  { type: "nothing",   label: "Rien",       color: "#6B7280" },
-  { type: "xp_5",      label: "+5 XP",      color: "#10B981" },
-  { type: "xp_10",     label: "+10 XP",     color: "#38BDF8" },
-  { type: "xp_25",     label: "+25 XP",     color: "#8B5CF6" },
-  { type: "xp_50",     label: "+50 XP",     color: "#6366F1" },
+  { type: "xp_75",     label: "+75 XP",     color: "#10B981" },
+  { type: "xp_200",    label: "+200 XP",    color: "#38BDF8" },
+  { type: "xp_500",    label: "+500 XP",    color: "#8B5CF6" },
   { type: "crc_1_rare", label: "+1 CRC",    color: "#F59E0B" },
   { type: "crc_10_rare", label: "+10 CRC",  color: "#EC4899" },
 ];

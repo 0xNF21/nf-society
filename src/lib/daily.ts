@@ -29,13 +29,11 @@ type DailyRewardConfigEntry = {
 };
 
 const DEFAULT_DAILY_WHEEL_PROBS: DailyRewardConfigEntry[] = [
-  { prob: 0.20, type: "nothing", label: "Rien", crcValue: 0, xpValue: 0, color: "#6B7280" },
-  { prob: 0.35, type: "xp_5", label: "+5 XP", crcValue: 0, xpValue: 5, color: "#10B981" },
-  { prob: 0.28, type: "xp_10", label: "+10 XP", crcValue: 0, xpValue: 10, color: "#38BDF8" },
-  { prob: 0.12, type: "xp_25", label: "+25 XP", crcValue: 0, xpValue: 25, color: "#8B5CF6" },
-  { prob: 0.04, type: "xp_50", label: "+50 XP", crcValue: 0, xpValue: 50, color: "#6366F1" },
-  { prob: 0.009, type: "crc_1_rare", label: "+1 CRC", crcValue: 1, xpValue: 0, color: "#F59E0B" },
-  { prob: 0.001, type: "crc_10_rare", label: "+10 CRC", crcValue: 10, xpValue: 0, color: "#EC4899" },
+  { prob: 0.45, type: "xp_75", label: "+75 XP", crcValue: 0, xpValue: 75, color: "#10B981" },
+  { prob: 0.35, type: "xp_200", label: "+200 XP", crcValue: 0, xpValue: 200, color: "#38BDF8" },
+  { prob: 0.17, type: "xp_500", label: "+500 XP", crcValue: 0, xpValue: 500, color: "#8B5CF6" },
+  { prob: 0.028, type: "crc_1_rare", label: "+1 CRC", crcValue: 1, xpValue: 0, color: "#F59E0B" },
+  { prob: 0.002, type: "crc_10_rare", label: "+10 CRC", crcValue: 10, xpValue: 0, color: "#EC4899" },
 ];
 
 let cachedDailyWheel: DailyRewardConfigEntry[] | null = null;
@@ -53,7 +51,7 @@ function normalizeRewards(rewards: DailyRewardConfigEntry[]): DailyRewardConfigE
 
 function keepWheelRewardsOnly(rewards: DailyRewardConfigEntry[]): DailyRewardConfigEntry[] {
   const filtered = rewards.filter((reward) => (
-    reward.type === "nothing" || reward.crcValue > 0 || reward.xpValue > 0
+    reward.crcValue > 0 || reward.xpValue > 0
   ));
   if (filtered.length === 0) return DEFAULT_DAILY_WHEEL_PROBS;
 
@@ -67,7 +65,8 @@ function keepWheelRewardsOnly(rewards: DailyRewardConfigEntry[]): DailyRewardCon
 }
 
 function isLegacyDailyWheelConfig(rewards: DailyRewardConfigEntry[]): boolean {
-  return rewards.some((r) => r.type === "crc_10" && r.crcValue === 10 && Math.abs(r.prob - 0.03) < 0.001)
+  return rewards.some((r) => r.type === "nothing" || (r.crcValue === 0 && r.xpValue === 0))
+    || rewards.some((r) => r.type === "crc_10" && r.crcValue === 10 && Math.abs(r.prob - 0.03) < 0.001)
     || rewards.some((r) => r.type === "jackpot" && Math.abs(r.prob - 0.01) < 0.001);
 }
 

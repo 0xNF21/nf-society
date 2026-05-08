@@ -149,7 +149,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
             <p className="mt-1 text-sm">+{stake.format(result.crcValue)}</p>
           )}
           {result.xpValue > 0 && (
-            <p className="mt-1 text-sm">+{result.xpValue} XP</p>
+            <p className="mt-1 text-sm">+{result.xpValue} XP de solde</p>
           )}
         </div>
       )}

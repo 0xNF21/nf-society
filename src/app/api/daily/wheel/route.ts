@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { dailySessions } from "@/lib/db/schema";
+import { dailySessions, players } from "@/lib/db/schema";
 import { allowDailyRepeatTests, determineDailyWheelResult, isSafeBalanceSafe } from "@/lib/daily";
 import { payPrize } from "@/lib/wallet";
-import { awardPlayerXp } from "@/lib/xp-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +24,7 @@ export async function POST(req: NextRequest) {
     if (!session.address || !session.txHash) {
       return NextResponse.json({ error: "Payment not confirmed yet" }, { status: 400 });
     }
+    const sessionAddress = session.address.toLowerCase();
 
     if (!allowDailyRepeatTests()) {
       const [canonical] = await db
@@ -75,13 +75,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const updated = await db.update(dailySessions).set({
-      spinResult: JSON.stringify(result),
-      spinPlayed: true,
-    }).where(and(
-      eq(dailySessions.id, session.id),
-      eq(dailySessions.spinPlayed, false),
-    )).returning({ wheelResult: dailySessions.spinResult });
+    const updated = await db.transaction(async (tx) => {
+      const rows = await tx.update(dailySessions).set({
+        spinResult: JSON.stringify(result),
+        spinPlayed: true,
+      }).where(and(
+        eq(dailySessions.id, session.id),
+        eq(dailySessions.spinPlayed, false),
+      )).returning({ wheelResult: dailySessions.spinResult });
+
+      if (rows.length > 0 && result.xpValue > 0) {
+        const xpCredit = Math.floor(result.xpValue);
+        await tx.execute(sql`
+          INSERT INTO ${players} (address, xp, xp_balance, level, streak, last_seen, created_at)
+          VALUES (${sessionAddress}, 0, ${xpCredit}, 1, 0, NOW(), NOW())
+          ON CONFLICT (address) DO UPDATE
+          SET xp_balance = ${players.xpBalance} + ${xpCredit},
+              last_seen = NOW()
+        `);
+      }
+
+      return rows;
+    });
 
     if (updated.length === 0) {
       const [current] = await db
@@ -107,14 +122,6 @@ export async function POST(req: NextRequest) {
       } catch (err: any) {
         console.error("[DailyWheel] Prize error:", err.message);
       }
-    }
-
-    if (result.xpValue > 0) {
-      void awardPlayerXp({
-        address: session.address,
-        action: "daily_wheel",
-        xpAmount: result.xpValue,
-      }).catch(() => {});
     }
 
     return NextResponse.json({ result });
