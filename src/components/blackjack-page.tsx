@@ -431,6 +431,7 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   }, [watchingActionPayment, pendingPaidAction, handId, tokenRef]);
 
   const scanForHand = useCallback(async () => {
+    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
       const res = await fetch(`/api/blackjack-scan?tableSlug=${table.slug}&token=${tokenRef.current}`, { method: "POST" });
@@ -444,16 +445,16 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug, tokenRef]);
+  }, [stake.realStakesEnabled, table.slug, tokenRef]);
 
   // Poll scan for initial payment detection
   // Fast poll (5s) when actively watching, slow poll (15s) as fallback
   useEffect(() => {
-    if (handId || restoring) return;
+    if (!stake.realStakesEnabled || handId || restoring) return;
     const ms = watchingPayment ? 5000 : 15000;
     const interval = setInterval(scanForHand, ms);
     return () => clearInterval(interval);
-  }, [handId, restoring, watchingPayment, scanForHand]);
+  }, [stake.realStakesEnabled, handId, restoring, watchingPayment, scanForHand]);
 
 
   // Fetch hand state when handId changes

@@ -604,6 +604,7 @@ function RealDiceGame({ table }: { table: DiceTable }) {
 
   // Scan for payment
   const scanForRound = useCallback(async () => {
+    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
       await fetch(`/api/dice-scan?tableSlug=${table.slug}`, { method: "POST" });
@@ -617,15 +618,15 @@ function RealDiceGame({ table }: { table: DiceTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug, tokenRef]);
+  }, [stake.realStakesEnabled, table.slug, tokenRef]);
 
   // Poll scan
   useEffect(() => {
-    if (round || restoring) return;
+    if (!stake.realStakesEnabled || round || restoring) return;
     const ms = watchingPayment ? 5000 : 15000;
     const interval = setInterval(scanForRound, ms);
     return () => clearInterval(interval);
-  }, [round, restoring, watchingPayment, scanForRound]);
+  }, [stake.realStakesEnabled, round, restoring, watchingPayment, scanForRound]);
 
   // Handle roll action
   const handleRoll = useCallback(async () => {

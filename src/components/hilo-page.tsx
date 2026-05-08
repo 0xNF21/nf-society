@@ -520,6 +520,7 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
 
   // Scan for payment
   const scanForRound = useCallback(async () => {
+    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
       await fetch(`/api/hilo-scan?tableSlug=${table.slug}`, { method: "POST" });
@@ -533,15 +534,15 @@ function RealHiLoGame({ table }: { table: HiLoTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug, tokenRef]);
+  }, [stake.realStakesEnabled, table.slug, tokenRef]);
 
   // Poll scan
   useEffect(() => {
-    if (round || restoring) return;
+    if (!stake.realStakesEnabled || round || restoring) return;
     const ms = watchingPayment ? 5000 : 15000;
     const interval = setInterval(scanForRound, ms);
     return () => clearInterval(interval);
-  }, [round, restoring, watchingPayment, scanForRound]);
+  }, [stake.realStakesEnabled, round, restoring, watchingPayment, scanForRound]);
 
   // Handle game action
   const handleAction = useCallback(async (action: "higher" | "lower" | "cashout") => {

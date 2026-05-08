@@ -396,6 +396,7 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
 
   // Scan for payment
   const scanForFlip = useCallback(async () => {
+    if (!stake.realStakesEnabled) return;
     setScanning(true);
     try {
       const res = await fetch(`/api/coin-flip-scan?tableSlug=${table.slug}`, { method: "POST" });
@@ -419,16 +420,16 @@ function RealCoinFlipGame({ table }: { table: CoinFlipTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug, tokenRef]);
+  }, [stake.realStakesEnabled, table.slug, tokenRef]);
 
   // Poll scan for payment detection
   // Fast poll (5s) when actively watching, slow poll (15s) as fallback
   useEffect(() => {
-    if (result || flipping || restoring) return;
+    if (!stake.realStakesEnabled || result || flipping || restoring) return;
     const ms = watchingPayment ? 5000 : 15000;
     const interval = setInterval(scanForFlip, ms);
     return () => clearInterval(interval);
-  }, [result, flipping, restoring, watchingPayment, scanForFlip]);
+  }, [stake.realStakesEnabled, result, flipping, restoring, watchingPayment, scanForFlip]);
 
   const resetGame = useCallback(() => {
     setResult(null);
