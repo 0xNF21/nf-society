@@ -38,7 +38,7 @@ function normalizeAdminRewards(key: "scratch" | "spin", rewards: unknown[]): { r
 
     seenTypes.add(type);
     normalized.push({
-      prob: Math.round(prob * 1_000_000) / 1_000_000,
+      prob: Math.round(prob * 1_000_000_000) / 1_000_000_000,
       type,
       label,
       crcValue: Math.round(crcValue * 1_000) / 1_000,

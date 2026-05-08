@@ -57,11 +57,18 @@ export function DailyTab({ password }: { password: string }) {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   function isEmptyReward(entry: DailyRewardEntry) {
-    return entry.crcValue <= 0 && entry.xpValue <= 0;
+    const type = entry.type.toLowerCase();
+    const label = entry.label.toLowerCase();
+    return entry.crcValue <= 0 && entry.xpValue <= 0 && (
+      type === "nothing" ||
+      type.startsWith("nothing_") ||
+      label === "rien" ||
+      label === "nothing"
+    );
   }
 
   function roundProb(prob: number) {
-    return Math.round(Math.max(0, prob) * 1_000_000) / 1_000_000;
+    return Math.round(Math.max(0, prob) * 1_000_000_000) / 1_000_000_000;
   }
 
   function updateEntry(table: "scratch" | "spin", index: number, field: string, value: unknown) {
@@ -163,8 +170,21 @@ export function DailyTab({ password }: { password: string }) {
     return fixed.replace(/\.?0+$/, "");
   }
 
+  function formatProbabilityPercent(prob: number) {
+    const pct = prob * 100;
+    if (pct === 0) return "0";
+    if (pct < 0.0001) return pct.toPrecision(3);
+    if (pct < 0.01) return formatExpected(pct, 6);
+    if (pct < 1) return formatExpected(pct, 4);
+    return formatExpected(pct, 3);
+  }
+
   function rebalanceEntries(table: "scratch" | "spin", entries: DailyRewardEntry[]) {
-    const balanced = entries.map(entry => ({ ...entry, prob: roundProb(entry.prob) }));
+    const balanced: DailyRewardEntry[] = [];
+    for (const entry of entries.map(entry => ({ ...entry, prob: roundProb(entry.prob) }))) {
+      if (isEmptyReward(entry) && balanced.some(isEmptyReward)) continue;
+      balanced.push(entry);
+    }
     let emptyIdx = balanced.findIndex(isEmptyReward);
 
     if (emptyIdx < 0) {
@@ -188,11 +208,13 @@ export function DailyTab({ password }: { password: string }) {
     setBudgetError(null);
     setBudgetMessage(null);
 
+    const hasCrcBudget = budgetCrc.trim() !== "";
+    const hasXpBudget = budgetXp.trim() !== "";
     const dailyCount = Number(budgetDailyCount);
-    const crcBudget = Number(budgetCrc || 0);
-    const xpBudget = Number(budgetXp || 0);
+    const crcBudget = hasCrcBudget ? Number(budgetCrc) : null;
+    const xpBudget = hasXpBudget ? Number(budgetXp) : null;
 
-    if (budgetCrc.trim() === "" && budgetXp.trim() === "") {
+    if (!hasCrcBudget && !hasXpBudget) {
       setBudgetError("Entre au moins un budget CRC ou XP. Pour couper les gains, mets explicitement 0.");
       return;
     }
@@ -200,33 +222,35 @@ export function DailyTab({ password }: { password: string }) {
       setBudgetError("Entre un nombre de daily joues superieur a 0.");
       return;
     }
-    if (!Number.isFinite(crcBudget) || crcBudget < 0 || !Number.isFinite(xpBudget) || xpBudget < 0) {
+    if ((hasCrcBudget && (!Number.isFinite(crcBudget) || crcBudget! < 0)) || (hasXpBudget && (!Number.isFinite(xpBudget) || xpBudget! < 0))) {
       setBudgetError("Les budgets CRC et XP doivent etre des nombres positifs.");
       return;
     }
 
-    const targetCrcEv = crcBudget / dailyCount;
-    const targetXpEv = xpBudget / dailyCount;
+    const targetCrcEv = hasCrcBudget ? crcBudget! / dailyCount : combinedCrcEv;
+    const targetXpEv = hasXpBudget ? xpBudget! / dailyCount : combinedXpEv;
 
-    if (targetCrcEv > 0 && combinedCrcEv <= 0) {
+    if (hasCrcBudget && targetCrcEv > 0 && combinedCrcEv <= 0) {
       setBudgetError("Ajoute au moins une ligne de gain CRC avant de calculer un budget CRC.");
       return;
     }
-    if (targetXpEv > 0 && combinedXpEv <= 0) {
+    if (hasXpBudget && targetXpEv > 0 && combinedXpEv <= 0) {
       setBudgetError("Ajoute au moins une ligne de gain XP avant de calculer un budget XP.");
       return;
     }
 
-    const crcScale = combinedCrcEv > 0 ? targetCrcEv / combinedCrcEv : 0;
-    const xpScale = combinedXpEv > 0 ? targetXpEv / combinedXpEv : 0;
+    const crcScale = hasCrcBudget ? (combinedCrcEv > 0 ? targetCrcEv / combinedCrcEv : 0) : 1;
+    const xpScale = hasXpBudget ? (combinedXpEv > 0 ? targetXpEv / combinedXpEv : 0) : 1;
 
     const scaleEntries = (entries: DailyRewardEntry[]) => entries.map(entry => {
-      if (entry.crcValue > 0 && entry.xpValue > 0) {
-        return { ...entry, prob: roundProb(entry.prob * Math.min(crcScale || 0, xpScale || 0)) };
-      }
-      if (entry.crcValue > 0) return { ...entry, prob: roundProb(entry.prob * crcScale) };
-      if (entry.xpValue > 0) return { ...entry, prob: roundProb(entry.prob * xpScale) };
-      return { ...entry, prob: 0 };
+      if (isEmptyReward(entry)) return { ...entry, prob: 0 };
+
+      const scales = [
+        entry.crcValue > 0 && hasCrcBudget ? crcScale : null,
+        entry.xpValue > 0 && hasXpBudget ? xpScale : null,
+      ].filter((scale): scale is number => scale !== null);
+      const factor = scales.length > 0 ? Math.min(...scales) : 1;
+      return { ...entry, prob: roundProb(entry.prob * factor) };
     });
 
     const nextScratch = rebalanceEntries("scratch", scaleEntries(editScratch));
@@ -320,7 +344,7 @@ export function DailyTab({ password }: { password: string }) {
               <div>
                 <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">Prob %</label>
                 <input type="text" inputMode="decimal"
-                  defaultValue={entry.prob * 100}
+                  defaultValue={formatProbabilityPercent(entry.prob)}
                   key={`prob-${tableKey}-${i}-${entries.length}-${draftVersion}`}
                   onBlur={e => updateEntry(tableKey, i, "prob", (parseFloat(e.target.value) || 0) / 100)}
                   className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
@@ -350,7 +374,7 @@ export function DailyTab({ password }: { password: string }) {
             </div>
             <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-ink/55 dark:text-white/55">
               <span>EV ligne: {(entry.prob * entry.xpValue).toFixed(2)} XP</span>
-              <span>{(entry.prob * entry.crcValue).toFixed(4)} CRC</span>
+              <span>{formatExpected(entry.prob * entry.crcValue, 6)} CRC</span>
             </div>
           </div>
         ))}
@@ -395,15 +419,17 @@ export function DailyTab({ password }: { password: string }) {
     { label: "100 daily joues", count: 100 },
     { label: "1 000 daily joues", count: 1000 },
   ];
+  const hasCrcBudgetInput = budgetCrc.trim() !== "";
+  const hasXpBudgetInput = budgetXp.trim() !== "";
   const budgetDailyNumber = Number(budgetDailyCount);
-  const budgetCrcNumber = Number(budgetCrc || 0);
-  const budgetXpNumber = Number(budgetXp || 0);
-  const hasBudgetInput = budgetCrc.trim() !== "" || budgetXp.trim() !== "";
+  const budgetCrcNumber = hasCrcBudgetInput ? Number(budgetCrc) : 0;
+  const budgetXpNumber = hasXpBudgetInput ? Number(budgetXp) : 0;
+  const hasBudgetInput = hasCrcBudgetInput || hasXpBudgetInput;
   const budgetPreviewValid =
     hasBudgetInput &&
     Number.isFinite(budgetDailyNumber) && budgetDailyNumber > 0 &&
-    Number.isFinite(budgetCrcNumber) && budgetCrcNumber >= 0 &&
-    Number.isFinite(budgetXpNumber) && budgetXpNumber >= 0;
+    (!hasCrcBudgetInput || (Number.isFinite(budgetCrcNumber) && budgetCrcNumber >= 0)) &&
+    (!hasXpBudgetInput || (Number.isFinite(budgetXpNumber) && budgetXpNumber >= 0));
   const budgetTargetCrcEv = budgetPreviewValid ? budgetCrcNumber / budgetDailyNumber : 0;
   const budgetTargetXpEv = budgetPreviewValid ? budgetXpNumber / budgetDailyNumber : 0;
   const budgetProjectionCount = Number.isFinite(budgetDailyNumber) && budgetDailyNumber > 0 ? budgetDailyNumber : 100;
@@ -463,6 +489,9 @@ export function DailyTab({ password }: { password: string }) {
             <p className="mt-1 text-sm text-ink/70 dark:text-white/70">
               Entre ce que tu peux distribuer sur une journee. Le calculateur ajuste les probabilites XP/CRC et met le reste sur les lignes vides.
             </p>
+            <p className="mt-1 text-xs font-semibold text-ink/55 dark:text-white/55">
+              Laisse un champ budget vide pour ne pas modifier cette famille. Mets 0 pour la couper volontairement.
+            </p>
           </div>
           <button
             onClick={applyBudgetCalculator}
@@ -514,7 +543,11 @@ export function DailyTab({ password }: { password: string }) {
         <div className="mt-3 rounded-lg bg-ink/[0.03] p-3 text-xs text-ink/70 dark:bg-white/10 dark:text-white/70">
           {budgetPreviewValid ? (
             <span>
-              Cible calculee: <strong>{formatExpected(budgetTargetXpEv, 2)} XP</strong> et <strong>{formatExpected(budgetTargetCrcEv)} CRC</strong> en moyenne par daily complet.
+              Cible calculee:{" "}
+              <strong>{hasXpBudgetInput ? `${formatExpected(budgetTargetXpEv, 2)} XP` : "XP inchange"}</strong>
+              {" "}et{" "}
+              <strong>{hasCrcBudgetInput ? `${formatExpected(budgetTargetCrcEv)} CRC` : "CRC inchange"}</strong>
+              {" "}en moyenne par daily complet.
             </span>
           ) : (
             <span>Entre des valeurs valides pour voir la cible moyenne par daily.</span>
