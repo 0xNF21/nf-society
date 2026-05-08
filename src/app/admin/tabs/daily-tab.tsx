@@ -51,11 +51,8 @@ interface DailyBudgetTableProposal {
 }
 
 interface DailyDesignerDraft {
-  xpPerDaily: string;
-  crcPerDaily: string;
-  crcDailyCap: string;
+  crcBudgetPerDay: string;
   maxNothingChance: string;
-  specialChance: string;
   scratchShare: string;
 }
 
@@ -127,11 +124,8 @@ const emptyBudgetProposals = (): Record<DailyRewardTableKey, DailyBudgetTablePro
 });
 
 const emptyDesignerDraft = (): DailyDesignerDraft => ({
-  xpPerDaily: "",
-  crcPerDaily: "",
-  crcDailyCap: "",
+  crcBudgetPerDay: "",
   maxNothingChance: "35",
-  specialChance: "",
   scratchShare: "50",
 });
 
@@ -1068,40 +1062,26 @@ export function DailyTab({ password }: { password: string }) {
     setDesignerProposal(null);
 
     const scenarioDailyCount = Number(budgetDailyCount);
-    const hasXpBudget = designerDraft.xpPerDaily.trim() !== "";
-    const hasCrcBudget = designerDraft.crcPerDaily.trim() !== "";
-    const hasCrcDailyCap = designerDraft.crcDailyCap.trim() !== "";
+    const hasCrcBudget = designerDraft.crcBudgetPerDay.trim() !== "";
     const hasMaxNothing = designerDraft.maxNothingChance.trim() !== "";
-    const hasSpecialChance = designerDraft.specialChance.trim() !== "";
-    const xpBudget = hasXpBudget ? Number(designerDraft.xpPerDaily) : null;
-    const crcBudget = hasCrcBudget ? Number(designerDraft.crcPerDaily) : null;
-    const crcDailyCap = hasCrcDailyCap ? Number(designerDraft.crcDailyCap) : null;
+    const crcBudget = hasCrcBudget ? Number(designerDraft.crcBudgetPerDay) : null;
     const maxNothing = hasMaxNothing ? Number(designerDraft.maxNothingChance) : null;
-    const specialChance = hasSpecialChance ? Number(designerDraft.specialChance) : null;
     const scratchSharePct = Number(designerDraft.scratchShare);
 
     if (!Number.isFinite(scenarioDailyCount) || scenarioDailyCount <= 0) {
-      setBudgetError("Entre un scenario de daily joues superieur a 0.");
+      setBudgetError("Entre un nombre de daily/jour superieur a 0.");
       return;
     }
-    if (hasXpBudget && (!Number.isFinite(xpBudget) || xpBudget! < 0)) {
-      setBudgetError("La moyenne XP par daily doit etre un nombre positif.");
+    if (!hasCrcBudget) {
+      setBudgetError("Entre le budget CRC que tu peux distribuer par jour.");
       return;
     }
     if (hasCrcBudget && (!Number.isFinite(crcBudget) || crcBudget! < 0)) {
-      setBudgetError("La moyenne CRC par daily doit etre un nombre positif.");
-      return;
-    }
-    if (hasCrcDailyCap && (!Number.isFinite(crcDailyCap) || crcDailyCap! < 0)) {
-      setBudgetError("Le garde-fou CRC / jour doit etre un nombre positif.");
+      setBudgetError("Le budget CRC / jour doit etre un nombre positif.");
       return;
     }
     if (hasMaxNothing && (!Number.isFinite(maxNothing) || maxNothing! < 0 || maxNothing! > 100)) {
       setBudgetError("Le max Rien doit etre compris entre 0% et 100%.");
-      return;
-    }
-    if (hasSpecialChance && (!Number.isFinite(specialChance) || specialChance! < 0 || specialChance! > 100)) {
-      setBudgetError("La chance bonus doit etre comprise entre 0% et 100%.");
       return;
     }
     if (!Number.isFinite(scratchSharePct) || scratchSharePct < 0 || scratchSharePct > 100) {
@@ -1110,20 +1090,12 @@ export function DailyTab({ password }: { password: string }) {
     }
 
     const scratchShare = scratchSharePct / 100;
-    const totalXpEv = hasXpBudget ? xpBudget! : combinedXpEv;
-    const totalCrcEv = hasCrcBudget ? crcBudget! : combinedCrcEv;
-    const totalSpecialChance = hasSpecialChance ? specialChance! / 100 : null;
+    const totalCrcEv = crcBudget! / scenarioDailyCount;
     const maxNothingProb = hasMaxNothing ? maxNothing! / 100 : null;
 
-    const xpSplit = hasXpBudget
-      ? splitTarget(totalXpEv, scratchShare, canUseCategory(editScratch, "xp"), canUseCategory(editSpin, "xp"))
-      : { scratch: scratchMetrics.xpEv, spin: spinMetrics.xpEv };
-    const crcSplit = hasCrcBudget
-      ? splitTarget(totalCrcEv, scratchShare, canUseCategory(editScratch, "crc"), canUseCategory(editSpin, "crc"))
-      : { scratch: scratchMetrics.crcEv, spin: spinMetrics.crcEv };
-    const specialSplit = totalSpecialChance !== null
-      ? splitTarget(totalSpecialChance, scratchShare, canUseCategory(editScratch, "special"), canUseCategory(editSpin, "special"))
-      : { scratch: null, spin: null };
+    const xpSplit = { scratch: scratchMetrics.xpEv, spin: spinMetrics.xpEv };
+    const crcSplit = splitTarget(totalCrcEv, scratchShare, canUseCategory(editScratch, "crc"), canUseCategory(editSpin, "crc"));
+    const specialSplit = { scratch: scratchMetrics.specialChance, spin: spinMetrics.specialChance };
 
     const nextScratch = optimizeTableWithLocks("scratch", editScratch, {
       xpEv: xpSplit.scratch,
@@ -1140,10 +1112,6 @@ export function DailyTab({ password }: { password: string }) {
 
     const blockers = [...nextScratch.blockers, ...nextSpin.blockers];
     const warnings = [...nextScratch.warnings, ...nextSpin.warnings];
-    const projectedCrcForScenario = (nextScratch.metrics.crcEv + nextSpin.metrics.crcEv) * scenarioDailyCount;
-    if (blockers.length === 0 && hasCrcDailyCap && projectedCrcForScenario > crcDailyCap! + 0.000000001) {
-      warnings.push(`Garde-fou CRC: le scenario ${formatExpected(scenarioDailyCount, 0)} daily/jour projette ${formatExpected(projectedCrcForScenario)} CRC/jour, au-dessus de ${formatExpected(crcDailyCap!)} CRC/jour.`);
-    }
 
     setDesignerProposal({
       scratch: nextScratch.entries,
@@ -1155,7 +1123,7 @@ export function DailyTab({ password }: { password: string }) {
     });
     setBudgetMessage(blockers.length > 0
       ? "Objectif impossible avec les lignes actuelles. Baisse la moyenne, augmente les montants de gains, ou deverrouille des lignes."
-      : "Proposition generee. Verifie le resume puis applique si ca te va.");
+      : `Budget converti: ${formatExpected(crcBudget!)} CRC/jour pour ${formatExpected(scenarioDailyCount, 0)} daily/jour.`);
   }
 
   function applyDesignerProposal() {
@@ -1232,6 +1200,13 @@ export function DailyTab({ password }: { password: string }) {
   const dailyProjections = DAILY_AUDIENCE_SCENARIOS;
   const budgetDailyNumber = Number(budgetDailyCount);
   const budgetProjectionCount = Number.isFinite(budgetDailyNumber) && budgetDailyNumber > 0 ? budgetDailyNumber : 100;
+  const designerHasCrcBudget = designerDraft.crcBudgetPerDay.trim() !== "";
+  const designerCrcBudgetNumber = Number(designerDraft.crcBudgetPerDay);
+  const designerTargetCrcEv = designerHasCrcBudget && Number.isFinite(designerCrcBudgetNumber) && designerCrcBudgetNumber >= 0
+    ? designerCrcBudgetNumber / budgetProjectionCount
+    : null;
+  const currentScenarioXp = combinedXpEv * budgetProjectionCount;
+  const currentScenarioCrc = combinedCrcEv * budgetProjectionCount;
   const designerProposalXpEv = designerProposal
     ? designerProposal.scratchMetrics.xpEv + designerProposal.spinMetrics.xpEv
     : 0;
@@ -1328,51 +1303,73 @@ export function DailyTab({ password }: { password: string }) {
           <div>
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-marine dark:text-cyan-300" />
-              <h3 className="text-sm font-black uppercase tracking-widest text-ink dark:text-white">Daily Reward Designer</h3>
+              <h3 className="text-sm font-black uppercase tracking-widest text-ink dark:text-white">Budget daily CRC</h3>
             </div>
             <p className="mt-1 text-sm text-ink/70 dark:text-white/70">
-              Configure une moyenne par daily complet, puis controle le risque CRC avec des projections d'audience.
+              Entre le budget CRC que tu peux distribuer par jour. Le designer le transforme en probabilites.
             </p>
             <p className="mt-1 text-xs font-semibold text-ink/55 dark:text-white/55">
-              Les verrous figent une ligne. Le designer ajuste le reste et recalcule "Rien".
+              L'XP reste en observation pour l'instant: on la reglera quand l'economie des mises XP sera stabilisee.
             </p>
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 xl:grid-cols-[1fr_1.35fr_1fr]">
-          <section className="rounded-lg border border-ink/10 bg-ink/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03]">
-            <p className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Objectif par daily</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
+          <section className="rounded-lg border border-marine/15 bg-sky-50/70 p-3 dark:border-cyan-400/20 dark:bg-cyan-950/20">
+            <p className="text-[10px] font-black uppercase tracking-widest text-marine dark:text-cyan-200">Budget CRC</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="text-xs font-bold text-ink/70 dark:text-white/70">XP moyen</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={designerDraft.xpPerDaily}
-                  onChange={e => updateDesignerDraft("xpPerDaily", e.target.value)}
-                  placeholder={formatExpected(combinedXpEv, 2)}
-                  className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-bold text-ink/70 dark:text-white/70">CRC moyen</span>
+                <span className="text-xs font-bold text-ink/70 dark:text-white/70">Budget CRC / jour</span>
                 <input
                   type="number"
                   min={0}
                   step="0.001"
-                  value={designerDraft.crcPerDaily}
-                  onChange={e => updateDesignerDraft("crcPerDaily", e.target.value)}
-                  placeholder={formatExpected(combinedCrcEv)}
+                  value={designerDraft.crcBudgetPerDay}
+                  onChange={e => updateDesignerDraft("crcBudgetPerDay", e.target.value)}
+                  placeholder={formatExpected(currentScenarioCrc)}
+                  className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-bold text-ink/70 dark:text-white/70">Daily estimes / jour</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={budgetDailyCount}
+                  onChange={e => updateDailyCount(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
                 />
               </label>
             </div>
+            <div className="mt-3 rounded-lg bg-white/80 p-3 text-xs font-semibold text-ink/70 dark:bg-zinc-950/60 dark:text-white/70">
+              {designerTargetCrcEv === null
+                ? "Entre un budget pour voir le CRC moyen par daily."
+                : `${formatExpected(designerCrcBudgetNumber)} CRC/jour avec ${formatExpected(budgetProjectionCount, 0)} daily/jour = ${formatExpected(designerTargetCrcEv)} CRC moyen par daily complet.`}
+            </div>
           </section>
 
           <section className="rounded-lg border border-ink/10 bg-ink/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03]">
-            <p className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Contraintes</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">XP a surveiller</p>
+            <div className="mt-3 grid gap-2 text-xs">
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2 dark:bg-zinc-950/60">
+                <span className="font-semibold text-ink/60 dark:text-white/60">XP moyen / daily</span>
+                <span className="font-black text-ink dark:text-white">{formatExpected(combinedXpEv, 2)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2 dark:bg-zinc-950/60">
+                <span className="font-semibold text-ink/60 dark:text-white/60">XP / jour estime</span>
+                <span className="font-black text-ink dark:text-white">{formatExpected(currentScenarioXp, 0)}</span>
+              </div>
+              <p className="text-ink/55 dark:text-white/55">
+                Le designer garde l'XP actuel. Pour modifier l'XP, ajuste les lignes XP dans Scratch/Roue puis observe l'impact.
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-ink/10 bg-ink/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03]">
+          <p className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Contraintes simples</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <label className="block">
                 <span className="text-xs font-bold text-ink/70 dark:text-white/70">Max Rien (%)</span>
                 <input
@@ -1382,19 +1379,6 @@ export function DailyTab({ password }: { password: string }) {
                   step="0.001"
                   value={designerDraft.maxNothingChance}
                   onChange={e => updateDesignerDraft("maxNothingChance", e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-bold text-ink/70 dark:text-white/70">Bonus total (%)</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.001"
-                  value={designerDraft.specialChance}
-                  onChange={e => updateDesignerDraft("specialChance", e.target.value)}
-                  placeholder={formatProbabilityPercent(combinedSpecialChance)}
                   className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
                 />
               </label>
@@ -1410,37 +1394,10 @@ export function DailyTab({ password }: { password: string }) {
                   className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
                 />
               </label>
-            </div>
-          </section>
-
-          <section className="rounded-lg border border-ink/10 bg-ink/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03]">
-            <p className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Projection</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <label className="block">
-                <span className="text-xs font-bold text-ink/70 dark:text-white/70">Daily / jour</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={budgetDailyCount}
-                  onChange={e => updateDailyCount(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-bold text-ink/70 dark:text-white/70">Alerte CRC / jour</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.001"
-                  value={designerDraft.crcDailyCap}
-                  onChange={e => updateDesignerDraft("crcDailyCap", e.target.value)}
-                  placeholder={formatExpected(combinedCrcEv * budgetProjectionCount)}
-                  className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-                />
-              </label>
-            </div>
-          </section>
+              <div className="rounded-lg bg-white/70 p-3 text-xs font-semibold text-ink/60 dark:bg-zinc-950/60 dark:text-white/60">
+                Bonus speciaux conserves: {formatProbabilityPercent(combinedSpecialChance)}%
+              </div>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -1449,7 +1406,7 @@ export function DailyTab({ password }: { password: string }) {
             className="inline-flex items-center gap-2 rounded-lg bg-marine px-4 py-2 text-sm font-bold text-white hover:opacity-90"
           >
             <RefreshCw className="h-4 w-4" />
-            Optimiser les probas
+            Calculer les probas CRC
           </button>
           <button
             onClick={applyDesignerProposal}
@@ -1466,7 +1423,7 @@ export function DailyTab({ password }: { password: string }) {
             ? "border-red-200 bg-red-50/70 dark:border-red-500/25 dark:bg-red-500/10"
             : "border-marine/15 bg-sky-50/70 dark:border-cyan-400/20 dark:bg-cyan-950/20"}`}>
             <p className={`text-xs font-black uppercase tracking-widest ${designerHasBlockers ? "text-red-700 dark:text-red-300" : "text-marine dark:text-cyan-200"}`}>
-              {designerHasBlockers ? "Objectif impossible" : "Proposition"}
+              {designerHasBlockers ? "Objectif impossible" : "Resultat calcule"}
             </p>
             {!designerHasBlockers && (
               <>
