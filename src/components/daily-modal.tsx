@@ -69,6 +69,15 @@ export default function DailyModal() {
       label: entry.label,
       color: entry.color || "#6B7280",
     }));
+  const allRewards = [...scratchRewards, ...spinRewards];
+  const visibleCrcRewards = allRewards
+    .filter((entry) => entry.crcValue > 0)
+    .reduce<DailyRewardEntry[]>((unique, entry) => {
+      if (!unique.some((row) => row.crcValue === entry.crcValue)) unique.push(entry);
+      return unique;
+    }, [])
+    .sort((a, b) => a.crcValue - b.crcValue);
+  const hasXpReward = allRewards.some((entry) => entry.xpValue > 0);
 
   useEffect(() => {
     let active = true;
@@ -543,6 +552,33 @@ export default function DailyModal() {
                   >
                     🧪 Demo ({t.testWithoutPaying[locale]})
                   </button>
+                  )}
+
+                  {(hasXpReward || visibleCrcRewards.length > 0) && (
+                    <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-50/70 p-3 text-left dark:bg-amber-950/20">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-black uppercase tracking-widest text-amber-700">
+                          {locale === "fr" ? "Gains possibles" : "Possible rewards"}
+                        </span>
+                        {visibleCrcRewards.length > 0 && (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                            {locale === "fr" ? "CRC rare" : "Rare CRC"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {hasXpReward && (
+                          <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">
+                            XP
+                          </span>
+                        )}
+                        {visibleCrcRewards.map((entry) => (
+                          <span key={`crc-${entry.crcValue}`} className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
+                            +{stake.format(entry.crcValue)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
                   {/* Probability dropdown */}

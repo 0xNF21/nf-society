@@ -68,6 +68,54 @@ export function DailyTab({ password }: { password: string }) {
     });
   }
 
+  function createEntry(table: "scratch" | "spin", kind: "xp" | "crc" | "nothing"): DailyRewardEntry {
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const visual = table === "scratch"
+      ? { symbol: kind === "crc" ? "💎" : kind === "xp" ? "✨" : "▫️" }
+      : { color: kind === "crc" ? "#F59E0B" : kind === "xp" ? "#8B5CF6" : "#6B7280" };
+
+    if (kind === "crc") {
+      return {
+        prob: 0.001,
+        type: `crc_${id}`,
+        label: "+1 CRC",
+        crcValue: 1,
+        xpValue: 0,
+        ...visual,
+      };
+    }
+
+    if (kind === "xp") {
+      return {
+        prob: 0.01,
+        type: `xp_${id}`,
+        label: "+10 XP",
+        crcValue: 0,
+        xpValue: 10,
+        ...visual,
+      };
+    }
+
+    return {
+      prob: 0.01,
+      type: `nothing_${id}`,
+      label: "Rien",
+      crcValue: 0,
+      xpValue: 0,
+      ...visual,
+    };
+  }
+
+  function addEntry(table: "scratch" | "spin", kind: "xp" | "crc" | "nothing") {
+    const setter = table === "scratch" ? setEditScratch : setEditSpin;
+    setter(prev => [...prev, createEntry(table, kind)]);
+  }
+
+  function removeEntry(table: "scratch" | "spin", index: number) {
+    const setter = table === "scratch" ? setEditScratch : setEditSpin;
+    setter(prev => prev.filter((_, i) => i !== index));
+  }
+
   async function saveTable(key: "scratch" | "spin") {
     setSaving(key);
     const rewards = key === "scratch" ? editScratch : editSpin;
@@ -102,9 +150,29 @@ export function DailyTab({ password }: { password: string }) {
 
     return (
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-xs font-bold text-ink/40 uppercase tracking-widest">{title}</h3>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => addEntry(tableKey, "xp")}
+              className="inline-flex items-center gap-1 rounded-lg bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-200"
+            >
+              <Sparkles className="h-3 w-3" />
+              Ajouter XP
+            </button>
+            <button
+              onClick={() => addEntry(tableKey, "crc")}
+              className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-200"
+            >
+              <Gift className="h-3 w-3" />
+              Ajouter CRC
+            </button>
+            <button
+              onClick={() => addEntry(tableKey, "nothing")}
+              className="rounded-lg bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-ink/50 hover:bg-ink/10"
+            >
+              Ajouter vide
+            </button>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isValid ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
               Total: {(total * 100).toFixed(1)}%
             </span>
@@ -119,18 +187,36 @@ export function DailyTab({ password }: { password: string }) {
         </div>
 
         {entries.map((entry, i) => (
-          <div key={i} className="p-3 rounded-xl bg-white/60 dark:bg-white/5 border border-ink/5 space-y-2">
+          <div key={entry.type || i} className="p-3 rounded-xl bg-white/60 dark:bg-white/5 border border-ink/5 space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-xl">{entry.symbol || "🎯"}</span>
+              {tableKey === "scratch" ? (
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink/5 text-xl">{entry.symbol || "?"}</span>
+              ) : (
+                <span className="h-8 w-8 rounded-lg border border-white/70 shadow-sm" style={{ backgroundColor: entry.color || "#6B7280" }} />
+              )}
               <input value={entry.label} onChange={e => updateEntry(tableKey, i, "label", e.target.value)}
                 className="flex-1 px-2 py-1 rounded-lg border border-ink/10 text-sm font-semibold" />
+              <button
+                onClick={() => removeEntry(tableKey, i)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/35 hover:bg-red-100 hover:text-red-600"
+                aria-label="Supprimer cette ligne"
+                title="Supprimer cette ligne"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+              <div className="sm:col-span-2">
+                <label className="text-[10px] text-ink/40 font-bold">Type</label>
+                <input value={entry.type}
+                  onChange={e => updateEntry(tableKey, i, "type", e.target.value)}
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-mono" />
+              </div>
               <div>
                 <label className="text-[10px] text-ink/40 font-bold">Prob %</label>
                 <input type="text" inputMode="decimal"
                   defaultValue={entry.prob * 100}
-                  key={`prob-${tableKey}-${i}-${scratch.length}`}
+                  key={`prob-${tableKey}-${i}-${entries.length}`}
                   onBlur={e => updateEntry(tableKey, i, "prob", (parseFloat(e.target.value) || 0) / 100)}
                   className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
               </div>
@@ -149,11 +235,15 @@ export function DailyTab({ password }: { password: string }) {
                   className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
               </div>
               <div>
-                <label className="text-[10px] text-ink/40 font-bold">{entry.symbol !== undefined ? "Symbole" : "Couleur"}</label>
+                <label className="text-[10px] text-ink/40 font-bold">{tableKey === "scratch" ? "Symbole" : "Couleur"}</label>
                 <input value={entry.symbol || entry.color || ""}
-                  onChange={e => updateEntry(tableKey, i, entry.symbol !== undefined ? "symbol" : "color", e.target.value)}
+                  onChange={e => updateEntry(tableKey, i, tableKey === "scratch" ? "symbol" : "color", e.target.value)}
                   className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm" />
               </div>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-ink/40">
+              <span>EV ligne: {(entry.prob * entry.xpValue).toFixed(2)} XP</span>
+              <span>{(entry.prob * entry.crcValue).toFixed(4)} CRC</span>
             </div>
           </div>
         ))}
