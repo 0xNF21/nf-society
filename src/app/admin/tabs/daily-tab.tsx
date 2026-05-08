@@ -49,6 +49,45 @@ interface DailyBudgetTableProposal {
   blockers: string[];
 }
 
+interface DailyBudgetPreview {
+  draft: DailyBudgetDraft;
+  hasCrcBudget: boolean;
+  hasXpBudget: boolean;
+  hasSpecialBudget: boolean;
+  hasMaxNothingBudget: boolean;
+  valid: boolean;
+  targetCrcEv: number;
+  targetXpEv: number;
+  targetSpecialChance: number;
+  targetMaxNothingChance: number;
+}
+
+interface DailyBudgetPanelProps {
+  tableKey: DailyRewardTableKey;
+  title: string;
+  metrics: DailyRewardMetrics;
+  preview: DailyBudgetPreview;
+  proposal: DailyBudgetTableProposal | null;
+  budgetProjectionCount: number;
+  onPreview: (table: DailyRewardTableKey, optimizeSmallWins?: boolean) => void;
+  onUpdateDraft: (table: DailyRewardTableKey, field: keyof DailyBudgetDraft, value: string) => void;
+  onApplyProposal: (table: DailyRewardTableKey) => void;
+  onAcceptNothingLimit: (table: DailyRewardTableKey) => void;
+}
+
+interface RewardTableProps {
+  title: string;
+  tableKey: DailyRewardTableKey;
+  entries: DailyRewardEntry[];
+  draftVersion: number;
+  saving: string | null;
+  hasChanges: boolean;
+  onAddEntry: (table: DailyRewardTableKey, kind: "xp" | "crc" | "nothing") => void;
+  onRemoveEntry: (table: DailyRewardTableKey, index: number) => void;
+  onUpdateEntry: (table: DailyRewardTableKey, index: number, field: string, value: unknown) => void;
+  onSave: (table: DailyRewardTableKey) => void;
+}
+
 const emptyBudgetDraft = (): DailyBudgetDraft => ({
   crc: "",
   xp: "",
@@ -60,6 +99,395 @@ const emptyBudgetProposals = (): Record<DailyRewardTableKey, DailyBudgetTablePro
   scratch: null,
   spin: null,
 });
+
+function isEmptyReward(entry: DailyRewardEntry) {
+  const type = entry.type.toLowerCase();
+  const label = entry.label.toLowerCase();
+  return entry.crcValue <= 0 && entry.xpValue <= 0 && (
+    type === "nothing" ||
+    type.startsWith("nothing_") ||
+    label === "rien" ||
+    label === "nothing"
+  );
+}
+
+function isSpecialReward(entry: DailyRewardEntry) {
+  return entry.crcValue <= 0 && entry.xpValue <= 0 && !isEmptyReward(entry);
+}
+
+function roundProb(prob: number) {
+  return Math.round(Math.max(0, prob) * 1_000_000_000) / 1_000_000_000;
+}
+
+function totalProb(entries: DailyRewardEntry[]) {
+  return entries.reduce((s, e) => s + e.prob, 0);
+}
+
+function getRewardMetrics(entries: DailyRewardEntry[]): DailyRewardMetrics {
+  return {
+    crcEv: entries.reduce((s, r) => s + r.prob * r.crcValue, 0),
+    xpEv: entries.reduce((s, r) => s + r.prob * r.xpValue, 0),
+    crcChance: entries.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0),
+    specialChance: entries.filter(isSpecialReward).reduce((s, r) => s + r.prob, 0),
+    nothingChance: entries.filter(isEmptyReward).reduce((s, r) => s + r.prob, 0),
+  };
+}
+
+function formatExpected(value: number, decimals = 3) {
+  if (decimals === 0) return Math.round(value).toLocaleString("fr-FR");
+  const fixed = value.toFixed(decimals);
+  return fixed.replace(/\.?0+$/, "");
+}
+
+function formatProbabilityPercent(prob: number) {
+  const pct = prob * 100;
+  if (pct === 0) return "0";
+  if (pct < 0.0001) return pct.toPrecision(3);
+  if (pct < 0.01) return formatExpected(pct, 6);
+  if (pct < 1) return formatExpected(pct, 4);
+  return formatExpected(pct, 3);
+}
+
+function DailyBudgetPanel({
+  tableKey,
+  title,
+  metrics,
+  preview,
+  proposal,
+  budgetProjectionCount,
+  onPreview,
+  onUpdateDraft,
+  onApplyProposal,
+  onAcceptNothingLimit,
+}: DailyBudgetPanelProps) {
+  const proposalCanApply = Boolean(proposal && proposal.blockers.length === 0);
+  const proposalNeedsHigherNothingLimit = Boolean(
+    proposal &&
+    preview.hasMaxNothingBudget &&
+    preview.valid &&
+    proposal.metrics.nothingChance > (preview.targetMaxNothingChance / 100) + 0.000000001
+  );
+
+  return (
+    <section className="rounded-xl border border-ink/10 bg-ink/[0.025] p-3 dark:border-white/10 dark:bg-white/[0.04]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-widest text-ink dark:text-white">{title}</p>
+          <p className="mt-1 text-xs font-semibold text-ink/65 dark:text-white/65">
+            Actuel: {formatExpected(metrics.xpEv, 2)} XP / {formatExpected(metrics.crcEv)} CRC. Rien {formatProbabilityPercent(metrics.nothingChance)}%.
+          </p>
+        </div>
+        <button
+          onClick={() => onPreview(tableKey, false)}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-marine px-3 py-2 text-xs font-bold text-white hover:opacity-90"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Previsualiser
+        </button>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget CRC / jour</label>
+          <input
+            type="number"
+            min={0}
+            step="0.001"
+            value={preview.draft.crc}
+            onChange={e => onUpdateDraft(tableKey, "crc", e.target.value)}
+            placeholder={formatExpected(metrics.crcEv * budgetProjectionCount)}
+            className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget XP / jour</label>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={preview.draft.xp}
+            onChange={e => onUpdateDraft(tableKey, "xp", e.target.value)}
+            placeholder={formatExpected(metrics.xpEv * budgetProjectionCount, 0)}
+            className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Bonus speciaux (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step="0.001"
+            value={preview.draft.specialChance}
+            onChange={e => onUpdateDraft(tableKey, "specialChance", e.target.value)}
+            placeholder={formatProbabilityPercent(metrics.specialChance)}
+            className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Max rien (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step="0.001"
+            value={preview.draft.maxNothingChance}
+            onChange={e => onUpdateDraft(tableKey, "maxNothingChance", e.target.value)}
+            placeholder={formatProbabilityPercent(metrics.nothingChance)}
+            className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-lg bg-white/70 p-3 text-xs text-ink/70 dark:bg-zinc-950/70 dark:text-white/70">
+        {preview.valid ? (
+          <span>
+            Cible {title}:{" "}
+            <strong>{preview.hasXpBudget ? `${formatExpected(preview.targetXpEv, 2)} XP` : "XP inchange"}</strong>
+            {" "}et{" "}
+            <strong>{preview.hasCrcBudget ? `${formatExpected(preview.targetCrcEv)} CRC` : "CRC inchange"}</strong>
+            {" "}par tirage. Bonus:{" "}
+            <strong>{preview.hasSpecialBudget ? `${formatExpected(preview.targetSpecialChance, 3)}%` : "inchanges"}</strong>.
+            {" "}Max rien:{" "}
+            <strong>{preview.hasMaxNothingBudget ? `${formatExpected(preview.targetMaxNothingChance, 3)}%` : "non limite"}</strong>.
+          </span>
+        ) : (
+          <span>Entre des valeurs valides pour voir la cible {title.toLowerCase()}.</span>
+        )}
+      </div>
+
+      {proposal && (
+        <div className="mt-3 rounded-xl border border-marine/15 bg-sky-50/70 p-3 shadow-sm dark:border-cyan-400/20 dark:bg-cyan-950/20">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-marine dark:text-cyan-200">Proposition {title}</p>
+              <p className="mt-1 text-sm font-semibold text-ink dark:text-white">
+                {formatExpected(proposal.metrics.xpEv, 2)} XP et {formatExpected(proposal.metrics.crcEv)} CRC en moyenne par tirage.
+              </p>
+              <p className="mt-1 text-xs font-semibold text-ink/70 dark:text-white/75">
+                Rien: {formatProbabilityPercent(proposal.metrics.nothingChance)}%. Bonus speciaux: {formatProbabilityPercent(proposal.metrics.specialChance)}%.
+              </p>
+            </div>
+            <div className="grid min-w-[220px] grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg border border-ink/10 bg-white p-2 dark:border-white/10 dark:bg-zinc-950/80">
+                <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">100 daily</p>
+                <p className="font-bold text-ink dark:text-white">~{formatExpected(proposal.metrics.xpEv * 100, 0)} XP</p>
+                <p className="font-bold text-emerald-700 dark:text-emerald-300">~{formatExpected(proposal.metrics.crcEv * 100)} CRC</p>
+              </div>
+              <div className="rounded-lg border border-ink/10 bg-white p-2 dark:border-white/10 dark:bg-zinc-950/80">
+                <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">1 000 daily</p>
+                <p className="font-bold text-ink dark:text-white">~{formatExpected(proposal.metrics.xpEv * 1000, 0)} XP</p>
+                <p className="font-bold text-emerald-700 dark:text-emerald-300">~{formatExpected(proposal.metrics.crcEv * 1000)} CRC</p>
+              </div>
+            </div>
+          </div>
+
+          {proposal.optimizedSmallWins && (
+            <p className="mt-3 rounded-lg bg-green-50 p-3 text-xs font-semibold text-green-800 dark:bg-green-500/10 dark:text-green-200">
+              Petits gains +1 XP ajoutes dans cette proposition pour baisser le taux de "Rien" sans exploser le budget.
+            </p>
+          )}
+
+          {proposal.blockers.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {proposal.blockers.map((blocker, index) => (
+                <p key={index} className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {blocker}
+                </p>
+              ))}
+              <p className="text-xs font-semibold text-ink/75 dark:text-white/75">
+                Pour debloquer: baisse le budget demande, augmente les montants des lots, ou ajoute des gains plus gros pour distribuer la meme valeur avec moins de probabilite.
+              </p>
+            </div>
+          )}
+
+          {proposal.warnings.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {proposal.warnings.map((warning, index) => (
+                <p key={index} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {warning}
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={() => onApplyProposal(tableKey)}
+              disabled={!proposalCanApply}
+              className="inline-flex items-center gap-2 rounded-lg bg-marine px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <CheckCircle className="h-3.5 w-3.5" />
+              Appliquer {title}
+            </button>
+            {proposalNeedsHigherNothingLimit && (
+              <button
+                onClick={() => onAcceptNothingLimit(tableKey)}
+                disabled={!proposalCanApply}
+                className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Accepter {formatProbabilityPercent(proposal.metrics.nothingChance)}% et appliquer
+              </button>
+            )}
+            {proposalNeedsHigherNothingLimit && !proposal.optimizedSmallWins && (
+              <button
+                onClick={() => onPreview(tableKey, true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:opacity-90"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Optimiser avec +1 XP
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DailyRewardTable({
+  title,
+  tableKey,
+  entries,
+  draftVersion,
+  saving,
+  hasChanges,
+  onAddEntry,
+  onRemoveEntry,
+  onUpdateEntry,
+  onSave,
+}: RewardTableProps) {
+  const total = totalProb(entries);
+  const isValid = Math.abs(total - 1.0) <= 0.01;
+
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="text-xs font-bold text-ink/65 uppercase tracking-widest dark:text-white/70">{title}</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => onAddEntry(tableKey, "xp")}
+            className="inline-flex items-center gap-1 rounded-lg bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-200 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:bg-violet-500/25"
+          >
+            <Sparkles className="h-3 w-3" />
+            Ajouter XP
+          </button>
+          <button
+            onClick={() => onAddEntry(tableKey, "crc")}
+            className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:hover:bg-emerald-500/25"
+          >
+            <Gift className="h-3 w-3" />
+            Ajouter CRC
+          </button>
+          <button
+            onClick={() => onAddEntry(tableKey, "nothing")}
+            className="rounded-lg bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-ink/65 hover:bg-ink/10 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15"
+          >
+            Ajouter vide
+          </button>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isValid ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+            Total: {(total * 100).toFixed(1)}%
+          </span>
+          {hasChanges && (
+            <button
+              onClick={() => onSave(tableKey)}
+              disabled={saving === tableKey || !isValid}
+              className="px-3 py-1 rounded-lg bg-marine text-white text-xs font-bold hover:opacity-90 disabled:opacity-50"
+              title={!isValid ? "Le total des probabilites doit etre proche de 100%" : ""}
+            >
+              {saving === tableKey ? <Loader2 className="h-3 w-3 animate-spin" /> : "Sauvegarder"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {entries.map((entry, i) => (
+        <div key={entry.type || i} className="p-3 rounded-xl bg-white/90 dark:bg-zinc-950/70 border border-ink/10 dark:border-white/10 space-y-2 shadow-sm">
+          <div className="flex items-center gap-2">
+            {tableKey === "scratch" ? (
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink/5 text-xl">{entry.symbol || "?"}</span>
+            ) : (
+              <span className="h-8 w-8 rounded-lg border border-white/70 shadow-sm" style={{ backgroundColor: entry.color || "#6B7280" }} />
+            )}
+            <input
+              value={entry.label}
+              onChange={e => onUpdateEntry(tableKey, i, "label", e.target.value)}
+              className="flex-1 px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-semibold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+            <button
+              onClick={() => onRemoveEntry(tableKey, i)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/55 hover:bg-red-100 hover:text-red-600 dark:text-white/45 dark:hover:bg-red-500/15 dark:hover:text-red-300"
+              aria-label="Supprimer cette ligne"
+              title="Supprimer cette ligne"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">Type</label>
+              <input
+                value={entry.type}
+                onChange={e => onUpdateEntry(tableKey, i, "type", e.target.value)}
+                className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-mono text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">Prob %</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                defaultValue={formatProbabilityPercent(entry.prob)}
+                key={`prob-${tableKey}-${i}-${entries.length}-${draftVersion}`}
+                onBlur={e => onUpdateEntry(tableKey, i, "prob", (parseFloat(e.target.value) || 0) / 100)}
+                className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">CRC</label>
+              <input
+                type="number"
+                step="0.1"
+                min={0}
+                defaultValue={entry.crcValue}
+                key={`crc-${tableKey}-${i}-${entries.length}-${draftVersion}`}
+                onBlur={e => onUpdateEntry(tableKey, i, "crcValue", parseFloat(e.target.value) || 0)}
+                className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">XP</label>
+              <input
+                type="number"
+                step="1"
+                min={0}
+                defaultValue={entry.xpValue}
+                key={`xp-${tableKey}-${i}-${entries.length}-${draftVersion}`}
+                onBlur={e => onUpdateEntry(tableKey, i, "xpValue", parseFloat(e.target.value) || 0)}
+                className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">{tableKey === "scratch" ? "Symbole" : "Couleur"}</label>
+              <input
+                value={entry.symbol || entry.color || ""}
+                onChange={e => onUpdateEntry(tableKey, i, tableKey === "scratch" ? "symbol" : "color", e.target.value)}
+                className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-ink/55 dark:text-white/55">
+            <span>EV ligne: {(entry.prob * entry.xpValue).toFixed(2)} XP</span>
+            <span>{formatExpected(entry.prob * entry.crcValue, 6)} CRC</span>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
 
 export function DailyTab({ password }: { password: string }) {
   const [scratch, setScratch] = useState<DailyRewardEntry[]>([]);
@@ -97,25 +525,6 @@ export function DailyTab({ password }: { password: string }) {
   const [testResult, setTestResult] = useState<any>(null);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-
-  function isEmptyReward(entry: DailyRewardEntry) {
-    const type = entry.type.toLowerCase();
-    const label = entry.label.toLowerCase();
-    return entry.crcValue <= 0 && entry.xpValue <= 0 && (
-      type === "nothing" ||
-      type.startsWith("nothing_") ||
-      label === "rien" ||
-      label === "nothing"
-    );
-  }
-
-  function isSpecialReward(entry: DailyRewardEntry) {
-    return entry.crcValue <= 0 && entry.xpValue <= 0 && !isEmptyReward(entry);
-  }
-
-  function roundProb(prob: number) {
-    return Math.round(Math.max(0, prob) * 1_000_000_000) / 1_000_000_000;
-  }
 
   function clearBudgetOutcome(table?: DailyRewardTableKey) {
     setBudgetError(null);
@@ -226,35 +635,6 @@ export function DailyTab({ password }: { password: string }) {
     const original = key === "scratch" ? scratch : spin;
     const edited = key === "scratch" ? editScratch : editSpin;
     return JSON.stringify(original) !== JSON.stringify(edited);
-  }
-
-  function totalProb(entries: DailyRewardEntry[]) {
-    return entries.reduce((s, e) => s + e.prob, 0);
-  }
-
-  function getRewardMetrics(entries: DailyRewardEntry[]): DailyRewardMetrics {
-    return {
-      crcEv: entries.reduce((s, r) => s + r.prob * r.crcValue, 0),
-      xpEv: entries.reduce((s, r) => s + r.prob * r.xpValue, 0),
-      crcChance: entries.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0),
-      specialChance: entries.filter(isSpecialReward).reduce((s, r) => s + r.prob, 0),
-      nothingChance: entries.filter(isEmptyReward).reduce((s, r) => s + r.prob, 0),
-    };
-  }
-
-  function formatExpected(value: number, decimals = 3) {
-    if (decimals === 0) return Math.round(value).toLocaleString("fr-FR");
-    const fixed = value.toFixed(decimals);
-    return fixed.replace(/\.?0+$/, "");
-  }
-
-  function formatProbabilityPercent(prob: number) {
-    const pct = prob * 100;
-    if (pct === 0) return "0";
-    if (pct < 0.0001) return pct.toPrecision(3);
-    if (pct < 0.01) return formatExpected(pct, 6);
-    if (pct < 1) return formatExpected(pct, 4);
-    return formatExpected(pct, 3);
   }
 
   function rebalanceEntries(table: DailyRewardTableKey, entries: DailyRewardEntry[]) {
@@ -510,115 +890,6 @@ export function DailyTab({ password }: { password: string }) {
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-ink/30" /></div>;
 
-  function RewardTable({ title, tableKey, entries }: { title: string; tableKey: "scratch" | "spin"; entries: DailyRewardEntry[] }) {
-    const total = totalProb(entries);
-    const isValid = Math.abs(total - 1.0) <= 0.01;
-
-    return (
-      <div className="space-y-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-xs font-bold text-ink/65 uppercase tracking-widest dark:text-white/70">{title}</h3>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => addEntry(tableKey, "xp")}
-              className="inline-flex items-center gap-1 rounded-lg bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-200 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:bg-violet-500/25"
-            >
-              <Sparkles className="h-3 w-3" />
-              Ajouter XP
-            </button>
-            <button
-              onClick={() => addEntry(tableKey, "crc")}
-              className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:hover:bg-emerald-500/25"
-            >
-              <Gift className="h-3 w-3" />
-              Ajouter CRC
-            </button>
-            <button
-              onClick={() => addEntry(tableKey, "nothing")}
-              className="rounded-lg bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-ink/65 hover:bg-ink/10 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15"
-            >
-              Ajouter vide
-            </button>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isValid ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-              Total: {(total * 100).toFixed(1)}%
-            </span>
-            {hasChanges(tableKey) && (
-              <button onClick={() => saveTable(tableKey)} disabled={saving === tableKey || !isValid}
-                className="px-3 py-1 rounded-lg bg-marine text-white text-xs font-bold hover:opacity-90 disabled:opacity-50"
-                title={!isValid ? "Le total des probabilites doit etre proche de 100%" : ""}>
-                {saving === tableKey ? <Loader2 className="h-3 w-3 animate-spin" /> : "Sauvegarder"}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {entries.map((entry, i) => (
-          <div key={entry.type || i} className="p-3 rounded-xl bg-white/90 dark:bg-zinc-950/70 border border-ink/10 dark:border-white/10 space-y-2 shadow-sm">
-            <div className="flex items-center gap-2">
-              {tableKey === "scratch" ? (
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink/5 text-xl">{entry.symbol || "?"}</span>
-              ) : (
-                <span className="h-8 w-8 rounded-lg border border-white/70 shadow-sm" style={{ backgroundColor: entry.color || "#6B7280" }} />
-              )}
-              <input value={entry.label} onChange={e => updateEntry(tableKey, i, "label", e.target.value)}
-                className="flex-1 px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-semibold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
-              <button
-                onClick={() => removeEntry(tableKey, i)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/55 hover:bg-red-100 hover:text-red-600 dark:text-white/45 dark:hover:bg-red-500/15 dark:hover:text-red-300"
-                aria-label="Supprimer cette ligne"
-                title="Supprimer cette ligne"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
-              <div className="sm:col-span-2">
-                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">Type</label>
-                <input value={entry.type}
-                  onChange={e => updateEntry(tableKey, i, "type", e.target.value)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-mono text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
-              </div>
-              <div>
-                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">Prob %</label>
-                <input type="text" inputMode="decimal"
-                  defaultValue={formatProbabilityPercent(entry.prob)}
-                  key={`prob-${tableKey}-${i}-${entries.length}-${draftVersion}`}
-                  onBlur={e => updateEntry(tableKey, i, "prob", (parseFloat(e.target.value) || 0) / 100)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
-              </div>
-              <div>
-                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">CRC</label>
-                <input type="number" step="0.1" min={0}
-                  defaultValue={entry.crcValue}
-                  key={`crc-${tableKey}-${i}-${entries.length}-${draftVersion}`}
-                  onBlur={e => updateEntry(tableKey, i, "crcValue", parseFloat(e.target.value) || 0)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
-              </div>
-              <div>
-                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">XP</label>
-                <input type="number" step="1" min={0}
-                  defaultValue={entry.xpValue}
-                  key={`xp-${tableKey}-${i}-${entries.length}-${draftVersion}`}
-                  onBlur={e => updateEntry(tableKey, i, "xpValue", parseFloat(e.target.value) || 0)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
-              </div>
-              <div>
-                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">{tableKey === "scratch" ? "Symbole" : "Couleur"}</label>
-                <input value={entry.symbol || entry.color || ""}
-                  onChange={e => updateEntry(tableKey, i, tableKey === "scratch" ? "symbol" : "color", e.target.value)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-ink/55 dark:text-white/55">
-              <span>EV ligne: {(entry.prob * entry.xpValue).toFixed(2)} XP</span>
-              <span>{formatExpected(entry.prob * entry.crcValue, 6)} CRC</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   async function runTest() {
     if (!testAddress) return;
     setTesting(true);
@@ -693,196 +964,8 @@ export function DailyTab({ password }: { password: string }) {
     };
   }
 
-  function BudgetTableCalculator({ tableKey, title, metrics }: { tableKey: DailyRewardTableKey; title: string; metrics: DailyRewardMetrics }) {
-    const preview = getBudgetPreview(tableKey, metrics);
-    const proposal = budgetProposals[tableKey];
-    const proposalCanApply = Boolean(proposal && proposal.blockers.length === 0);
-    const proposalNeedsHigherNothingLimit = Boolean(
-      proposal &&
-      preview.hasMaxNothingBudget &&
-      preview.valid &&
-      proposal.metrics.nothingChance > (preview.targetMaxNothingChance / 100) + 0.000000001
-    );
-
-    return (
-      <div className="rounded-xl border border-ink/10 bg-ink/[0.025] p-3 dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-widest text-ink dark:text-white">{title}</p>
-            <p className="mt-1 text-xs font-semibold text-ink/65 dark:text-white/65">
-              Actuel: {formatExpected(metrics.xpEv, 2)} XP / {formatExpected(metrics.crcEv)} CRC. Rien {formatProbabilityPercent(metrics.nothingChance)}%.
-            </p>
-          </div>
-          <button
-            onClick={() => previewBudgetCalculator(tableKey, false)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-marine px-3 py-2 text-xs font-bold text-white hover:opacity-90"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Previsualiser
-          </button>
-        </div>
-
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget CRC / jour</label>
-            <input
-              type="number"
-              min={0}
-              step="0.001"
-              value={preview.draft.crc}
-              onChange={e => updateBudgetDraft(tableKey, "crc", e.target.value)}
-              placeholder={formatExpected(metrics.crcEv * budgetProjectionCount)}
-              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget XP / jour</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={preview.draft.xp}
-              onChange={e => updateBudgetDraft(tableKey, "xp", e.target.value)}
-              placeholder={formatExpected(metrics.xpEv * budgetProjectionCount, 0)}
-              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Bonus speciaux (%)</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step="0.001"
-              value={preview.draft.specialChance}
-              onChange={e => updateBudgetDraft(tableKey, "specialChance", e.target.value)}
-              placeholder={formatProbabilityPercent(metrics.specialChance)}
-              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Max rien (%)</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step="0.001"
-              value={preview.draft.maxNothingChance}
-              onChange={e => updateBudgetDraft(tableKey, "maxNothingChance", e.target.value)}
-              placeholder={formatProbabilityPercent(metrics.nothingChance)}
-              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
-            />
-          </div>
-        </div>
-
-        <div className="mt-3 rounded-lg bg-white/70 p-3 text-xs text-ink/70 dark:bg-zinc-950/70 dark:text-white/70">
-          {preview.valid ? (
-            <span>
-              Cible {title}:{" "}
-              <strong>{preview.hasXpBudget ? `${formatExpected(preview.targetXpEv, 2)} XP` : "XP inchange"}</strong>
-              {" "}et{" "}
-              <strong>{preview.hasCrcBudget ? `${formatExpected(preview.targetCrcEv)} CRC` : "CRC inchange"}</strong>
-              {" "}par tirage. Bonus:{" "}
-              <strong>{preview.hasSpecialBudget ? `${formatExpected(preview.targetSpecialChance, 3)}%` : "inchanges"}</strong>.
-              {" "}Max rien:{" "}
-              <strong>{preview.hasMaxNothingBudget ? `${formatExpected(preview.targetMaxNothingChance, 3)}%` : "non limite"}</strong>.
-            </span>
-          ) : (
-            <span>Entre des valeurs valides pour voir la cible {title.toLowerCase()}.</span>
-          )}
-        </div>
-
-        {proposal && (
-          <div className="mt-3 rounded-xl border border-marine/15 bg-sky-50/70 p-3 shadow-sm dark:border-cyan-400/20 dark:bg-cyan-950/20">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-marine dark:text-cyan-200">Proposition {title}</p>
-                <p className="mt-1 text-sm font-semibold text-ink dark:text-white">
-                  {formatExpected(proposal.metrics.xpEv, 2)} XP et {formatExpected(proposal.metrics.crcEv)} CRC en moyenne par tirage.
-                </p>
-                <p className="mt-1 text-xs font-semibold text-ink/70 dark:text-white/75">
-                  Rien: {formatProbabilityPercent(proposal.metrics.nothingChance)}%. Bonus speciaux: {formatProbabilityPercent(proposal.metrics.specialChance)}%.
-                </p>
-              </div>
-              <div className="grid min-w-[220px] grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg border border-ink/10 bg-white p-2 dark:border-white/10 dark:bg-zinc-950/80">
-                  <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">100 daily</p>
-                  <p className="font-bold text-ink dark:text-white">~{formatExpected(proposal.metrics.xpEv * 100, 0)} XP</p>
-                  <p className="font-bold text-emerald-700 dark:text-emerald-300">~{formatExpected(proposal.metrics.crcEv * 100)} CRC</p>
-                </div>
-                <div className="rounded-lg border border-ink/10 bg-white p-2 dark:border-white/10 dark:bg-zinc-950/80">
-                  <p className="font-black uppercase tracking-widest text-ink/55 dark:text-white/55">1 000 daily</p>
-                  <p className="font-bold text-ink dark:text-white">~{formatExpected(proposal.metrics.xpEv * 1000, 0)} XP</p>
-                  <p className="font-bold text-emerald-700 dark:text-emerald-300">~{formatExpected(proposal.metrics.crcEv * 1000)} CRC</p>
-                </div>
-              </div>
-            </div>
-
-            {proposal.optimizedSmallWins && (
-              <p className="mt-3 rounded-lg bg-green-50 p-3 text-xs font-semibold text-green-800 dark:bg-green-500/10 dark:text-green-200">
-                Petits gains +1 XP ajoutes dans cette proposition pour baisser le taux de "Rien" sans exploser le budget.
-              </p>
-            )}
-
-            {proposal.blockers.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {proposal.blockers.map((blocker, index) => (
-                  <p key={index} className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    {blocker}
-                  </p>
-                ))}
-                <p className="text-xs font-semibold text-ink/75 dark:text-white/75">
-                  Pour debloquer: baisse le budget demande, augmente les montants des lots, ou ajoute des gains plus gros pour distribuer la meme valeur avec moins de probabilite.
-                </p>
-              </div>
-            )}
-
-            {proposal.warnings.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {proposal.warnings.map((warning, index) => (
-                  <p key={index} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    {warning}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                onClick={() => applyBudgetProposal(tableKey)}
-                disabled={!proposalCanApply}
-                className="inline-flex items-center gap-2 rounded-lg bg-marine px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                <CheckCircle className="h-3.5 w-3.5" />
-                Appliquer {title}
-              </button>
-              {proposalNeedsHigherNothingLimit && (
-                <button
-                  onClick={() => acceptProposalNothingLimitAndApply(tableKey)}
-                  disabled={!proposalCanApply}
-                  className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  Accepter {formatProbabilityPercent(proposal.metrics.nothingChance)}% et appliquer
-                </button>
-              )}
-              {proposalNeedsHigherNothingLimit && !proposal.optimizedSmallWins && (
-                <button
-                  onClick={() => previewBudgetCalculator(tableKey, true)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:opacity-90"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Optimiser avec +1 XP
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
+  const scratchBudgetPreview = getBudgetPreview("scratch", scratchMetrics);
+  const spinBudgetPreview = getBudgetPreview("spin", spinMetrics);
 
   return (
     <div className="space-y-8">
@@ -959,8 +1042,30 @@ export function DailyTab({ password }: { password: string }) {
         </div>
 
         <div className="mt-4 grid gap-4 2xl:grid-cols-2">
-          <BudgetTableCalculator tableKey="scratch" title="Scratch" metrics={scratchMetrics} />
-          <BudgetTableCalculator tableKey="spin" title="Roue" metrics={spinMetrics} />
+          <DailyBudgetPanel
+            tableKey="scratch"
+            title="Scratch"
+            metrics={scratchMetrics}
+            preview={scratchBudgetPreview}
+            proposal={budgetProposals.scratch}
+            budgetProjectionCount={budgetProjectionCount}
+            onPreview={previewBudgetCalculator}
+            onUpdateDraft={updateBudgetDraft}
+            onApplyProposal={applyBudgetProposal}
+            onAcceptNothingLimit={acceptProposalNothingLimitAndApply}
+          />
+          <DailyBudgetPanel
+            tableKey="spin"
+            title="Roue"
+            metrics={spinMetrics}
+            preview={spinBudgetPreview}
+            proposal={budgetProposals.spin}
+            budgetProjectionCount={budgetProjectionCount}
+            onPreview={previewBudgetCalculator}
+            onUpdateDraft={updateBudgetDraft}
+            onApplyProposal={applyBudgetProposal}
+            onAcceptNothingLimit={acceptProposalNothingLimitAndApply}
+          />
         </div>
 
         {budgetError && (
@@ -977,8 +1082,30 @@ export function DailyTab({ password }: { password: string }) {
         )}
       </div>
 
-      <RewardTable title="Scratch Card — Tableau de gains" tableKey="scratch" entries={editScratch} />
-      <RewardTable title="Roue — Segments" tableKey="spin" entries={editSpin} />
+      <DailyRewardTable
+        title="Scratch Card — Tableau de gains"
+        tableKey="scratch"
+        entries={editScratch}
+        draftVersion={draftVersion}
+        saving={saving}
+        hasChanges={hasChanges("scratch")}
+        onAddEntry={addEntry}
+        onRemoveEntry={removeEntry}
+        onUpdateEntry={updateEntry}
+        onSave={saveTable}
+      />
+      <DailyRewardTable
+        title="Roue — Segments"
+        tableKey="spin"
+        entries={editSpin}
+        draftVersion={draftVersion}
+        saving={saving}
+        hasChanges={hasChanges("spin")}
+        onAddEntry={addEntry}
+        onRemoveEntry={removeEntry}
+        onUpdateEntry={updateEntry}
+        onSave={saveTable}
+      />
 
       {/* Test mode */}
       <div className="p-4 rounded-xl border-2 border-dashed border-amber-300/50 bg-amber-50/30 dark:bg-amber-900/10 space-y-3">
