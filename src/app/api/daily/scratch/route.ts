@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { determineScratchResult, isSafeBalanceSafe } from "@/lib/daily";
 import { payPrize } from "@/lib/wallet";
 import { awardPlayerXp } from "@/lib/xp-server";
@@ -51,11 +51,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Save result
-    await db.update(dailySessions).set({
+    const updated = await db.update(dailySessions).set({
       scratchResult: JSON.stringify(result),
       scratchPlayed: true,
-    }).where(eq(dailySessions.id, session.id));
+    }).where(and(
+      eq(dailySessions.id, session.id),
+      eq(dailySessions.scratchPlayed, false),
+    )).returning({ scratchResult: dailySessions.scratchResult });
+
+    if (updated.length === 0) {
+      const [current] = await db
+        .select({ scratchResult: dailySessions.scratchResult })
+        .from(dailySessions)
+        .where(eq(dailySessions.id, session.id))
+        .limit(1);
+      return NextResponse.json({
+        result: current?.scratchResult ? JSON.parse(current.scratchResult) : null,
+        alreadyPlayed: true,
+      });
+    }
 
     // Pay the scratch reward via the same method as the daily claim
     // (balance-claim → balance; on-chain claim → on-chain payout).

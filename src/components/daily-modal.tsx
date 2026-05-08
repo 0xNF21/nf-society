@@ -6,12 +6,22 @@ import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
 import ScratchCard from "@/components/scratch-card";
 import SpinWheel from "@/components/spin-wheel";
+import type { SpinSegment } from "@/lib/daily-shared";
 import { X, Copy, Check, Loader2, Sparkles, ChevronDown, Wallet } from "lucide-react";
 import { useMiniApp } from "@/components/miniapp-provider";
 import { useConnectedAddress } from "@/hooks/use-connected-address";
 import { useStakeLabel } from "@/hooks/use-stake-label";
 
-type Phase = "init" | "payment" | "scratch" | "spin" | "complete";
+type Phase = "init" | "payment" | "scratch" | "complete";
+type DailyRewardEntry = {
+  prob: number;
+  type: string;
+  label: string;
+  crcValue: number;
+  xpValue: number;
+  symbol?: string;
+  color?: string;
+};
 
 export default function DailyModal() {
   const { locale } = useLocale();
@@ -35,6 +45,7 @@ export default function DailyModal() {
   const [miniAppError, setMiniAppError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [scratchResult, setScratchResult] = useState<any>(null);
+  const [scratchDone, setScratchDone] = useState(false);
   const [spinResult, setSpinResult] = useState<any>(null);
   const [spinning, setSpinning] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -43,6 +54,26 @@ export default function DailyModal() {
   const [claimingFromBalance, setClaimingFromBalance] = useState(false);
   const [balanceClaimError, setBalanceClaimError] = useState<string | null>(null);
   const [claimingFree, setClaimingFree] = useState(false);
+  const [spinRewards, setSpinRewards] = useState<DailyRewardEntry[]>([]);
+  const spinSegments: SpinSegment[] = spinRewards
+    .filter((entry) => entry.color)
+    .map((entry) => ({
+      type: entry.type,
+      label: entry.label,
+      color: entry.color || "#6B7280",
+    }));
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/daily/config", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!active) return;
+        if (Array.isArray(data?.spin)) setSpinRewards(data.spin);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const routeClaimedSession = useCallback((data: any, claimedAddress: string) => {
     setToken(data.token);
@@ -56,16 +87,20 @@ export default function DailyModal() {
     if (data.alreadyClaimed) {
       if (data.scratchPlayed && data.spinPlayed) {
         setScratchResult(data.scratchResult);
+        setScratchDone(true);
         setSpinResult(data.spinResult);
         setPhase("complete");
       } else if (data.scratchPlayed) {
         setScratchResult(data.scratchResult);
-        setPhase("spin");
+        setScratchDone(true);
+        setPhase("scratch");
       } else {
+        setScratchDone(false);
         setPhase("scratch");
       }
     } else {
       setScratchResult(null);
+      setScratchDone(false);
       setSpinResult(null);
       setSpinning(false);
       setPhase("scratch");
@@ -128,12 +163,15 @@ export default function DailyModal() {
           if (session.status === "confirmed") {
             if (session.scratchPlayed && session.spinPlayed) {
               setScratchResult(session.scratchResult);
+              setScratchDone(true);
               setSpinResult(session.spinResult);
               setPhase("complete");
             } else if (session.scratchPlayed && !session.spinPlayed) {
               setScratchResult(session.scratchResult);
-              setPhase("spin");
+              setScratchDone(true);
+              setPhase("scratch");
             } else {
+              setScratchDone(false);
               setPhase("scratch");
             }
           } else if (session.status === "waiting") {
@@ -172,6 +210,7 @@ export default function DailyModal() {
             address: data.address,
             date: new Date().toISOString().slice(0, 10),
           }));
+          setScratchDone(false);
           setPhase("scratch");
         } else if (data.status === "expired") {
           setPhase("init");
@@ -217,12 +256,15 @@ export default function DailyModal() {
           setAddress(session.address);
           if (session.scratchPlayed && session.spinPlayed) {
             setScratchResult(session.scratchResult);
+            setScratchDone(true);
             setSpinResult(session.spinResult);
             setPhase("complete");
           } else if (session.scratchPlayed) {
             setScratchResult(session.scratchResult);
-            setPhase("spin");
+            setScratchDone(true);
+            setPhase("scratch");
           } else {
+            setScratchDone(false);
             setPhase("scratch");
           }
         }
@@ -245,6 +287,7 @@ export default function DailyModal() {
     setPaymentLink("");
     setQrCode("");
     setScratchResult(null);
+    setScratchDone(false);
     setSpinResult(null);
     setSpinning(false);
     setPhase("init");
@@ -373,9 +416,16 @@ export default function DailyModal() {
 
       // Route to the right phase based on what's already played today.
       const s = data.session || {};
-      if (s.scratchPlayed && s.spinPlayed) setPhase("complete");
-      else if (s.scratchPlayed) setPhase("spin");
-      else setPhase("scratch");
+      if (s.scratchPlayed && s.spinPlayed) {
+        setScratchDone(true);
+        setPhase("complete");
+      } else if (s.scratchPlayed) {
+        setScratchDone(true);
+        setPhase("scratch");
+      } else {
+        setScratchDone(false);
+        setPhase("scratch");
+      }
     } catch (err: any) {
       setBalanceClaimError(err?.message || t.errorGeneric[locale]);
     } finally {
@@ -651,41 +701,47 @@ export default function DailyModal() {
 
               {/* ─── PHASE: SCRATCH ─── */}
               {phase === "scratch" && (
-                <div className="text-center py-2">
-                  <h3 className="text-lg font-bold mb-1">{t.scratchTitle[locale]}</h3>
-                  <p className="text-ink/60 text-sm mb-4">{t.scratchInstruction[locale]}</p>
+                <div className="text-center py-2 space-y-6">
+                  <section>
+                    <h3 className="text-lg font-bold mb-1">{t.scratchTitle[locale]}</h3>
+                    <p className="text-ink/60 text-sm mb-4">{t.scratchInstruction[locale]}</p>
 
-                  {scratchResult ? (
-                    <ScratchCard
-                      result={scratchResult}
-                      onComplete={() => {
-                        setTimeout(() => setPhase("spin"), 2000);
-                      }}
-                      locale={locale}
-                    />
-                  ) : (
-                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-amber-500" />
-                  )}
+                    {scratchResult ? (
+                      <ScratchCard
+                        result={scratchResult}
+                        onComplete={() => {
+                          setTimeout(() => setScratchDone(true), 1200);
+                        }}
+                        locale={locale}
+                      />
+                    ) : (
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto text-amber-500" />
+                    )}
+                  </section>
+
+                  <section className={`pt-5 border-t border-ink/5 ${scratchDone ? "" : "opacity-45"}`}>
+                    <h3 className="text-lg font-bold mb-4">{t.spinTitle[locale]}</h3>
+                    {scratchDone ? (
+                      <SpinWheel
+                        result={spinResult}
+                        onSpin={handleSpin}
+                        onComplete={() => {
+                          setTimeout(() => setPhase("complete"), 2000);
+                        }}
+                        spinning={spinning}
+                        locale={locale}
+                        segments={spinSegments.length > 0 ? spinSegments : undefined}
+                      />
+                    ) : (
+                      <div className="h-28 flex items-center justify-center rounded-xl bg-ink/[0.03] text-sm text-ink/45 font-medium">
+                        {locale === "fr" ? "Grattez le ticket pour debloquer la roue" : "Scratch the ticket to unlock the wheel"}
+                      </div>
+                    )}
+                  </section>
                 </div>
               )}
 
               {/* ─── PHASE: SPIN ─── */}
-              {phase === "spin" && (
-                <div className="text-center py-2">
-                  <h3 className="text-lg font-bold mb-4">{t.spinTitle[locale]}</h3>
-
-                  <SpinWheel
-                    result={spinResult}
-                    onSpin={handleSpin}
-                    onComplete={() => {
-                      setTimeout(() => setPhase("complete"), 2000);
-                    }}
-                    spinning={spinning}
-                    locale={locale}
-                  />
-                </div>
-              )}
-
               {/* ─── PHASE: COMPLETE ─── */}
               {phase === "complete" && (
                 <div className="py-2">
@@ -742,7 +798,9 @@ export default function DailyModal() {
                     )}
                   </button>
 
-                  <p className="text-center text-ink/50 text-xs mt-3">{t.comeBack[locale]}</p>
+                  <p className="text-center text-ink/50 text-xs mt-3">
+                    {locale === "fr" ? "Mode test temporaire : vous pouvez relancer tout de suite." : "Temporary test mode: you can play again right away."}
+                  </p>
                 </div>
               )}
             </div>

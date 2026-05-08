@@ -15,9 +15,16 @@ export type SpinResult = {
   crcValue: number;
   xpValue: number;
   segmentIndex: number;
+  color?: string;
 };
 
-export const SPIN_SEGMENTS = [
+export type SpinSegment = {
+  type: string;
+  label: string;
+  color: string;
+};
+
+export const SPIN_SEGMENTS: SpinSegment[] = [
   { type: "nothing",   label: "Rien",       color: "#6B7280" },
   { type: "xp_50",     label: "+50 XP",     color: "#8B5CF6" },
   { type: "crc_1",     label: "+1 CRC",     color: "#10B981" },

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { determineSpinResult, isSafeBalanceSafe } from "@/lib/daily";
 import { payPrize } from "@/lib/wallet";
 import { awardPlayerXp } from "@/lib/xp-server";
@@ -24,6 +24,9 @@ export async function POST(req: NextRequest) {
     }
     if (!session.address || !session.txHash) {
       return NextResponse.json({ error: "Payment not confirmed yet" }, { status: 400 });
+    }
+    if (!session.scratchPlayed) {
+      return NextResponse.json({ error: "Scratch must be played before spin" }, { status: 400 });
     }
     if (session.spinPlayed) {
       return NextResponse.json({
@@ -51,11 +54,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Save result
-    await db.update(dailySessions).set({
+    const updated = await db.update(dailySessions).set({
       spinResult: JSON.stringify(result),
       spinPlayed: true,
-    }).where(eq(dailySessions.id, session.id));
+    }).where(and(
+      eq(dailySessions.id, session.id),
+      eq(dailySessions.spinPlayed, false),
+    )).returning({ spinResult: dailySessions.spinResult });
+
+    if (updated.length === 0) {
+      const [current] = await db
+        .select({ spinResult: dailySessions.spinResult })
+        .from(dailySessions)
+        .where(eq(dailySessions.id, session.id))
+        .limit(1);
+      return NextResponse.json({
+        result: current?.spinResult ? JSON.parse(current.spinResult) : null,
+        alreadyPlayed: true,
+      });
+    }
 
     // Pay the spin reward via the same method as the daily claim.
     if (result.crcValue > 0) {

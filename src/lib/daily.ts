@@ -52,7 +52,7 @@ let cachedSpin: typeof DEFAULT_SPIN_PROBS | null = null;
 let dailyCacheTime = 0;
 const DAILY_CACHE_TTL = 60_000;
 
-async function getScratchProbs() {
+export async function getScratchProbs() {
   if (cachedScratch && Date.now() - dailyCacheTime < DAILY_CACHE_TTL) return cachedScratch;
   try {
     const { dailyRewardsConfig } = await import("./db/schema");
@@ -67,7 +67,7 @@ async function getScratchProbs() {
   return DEFAULT_SCRATCH_PROBS;
 }
 
-async function getSpinProbs() {
+export async function getSpinProbs() {
   if (cachedSpin && Date.now() - dailyCacheTime < DAILY_CACHE_TTL) return cachedSpin;
   try {
     const { dailyRewardsConfig } = await import("./db/schema");
@@ -155,6 +155,7 @@ export async function determineSpinResult(seed: string): Promise<SpinResult> {
     crcValue: winner.crcValue,
     xpValue: winner.xpValue,
     segmentIndex: winnerIndex,
+    color: winner.color,
   };
 }
 

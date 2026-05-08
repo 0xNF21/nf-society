@@ -6,6 +6,7 @@ import { dailySessions, players } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { generateDailyToken, todayString } from "@/lib/daily";
 import { awardPlayerXp } from "@/lib/xp-server";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/daily/claim-from-balance  { address }
@@ -19,12 +20,9 @@ export async function POST(req: NextRequest) {
   if (limited) return limited;
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const addressRaw = body?.address ? String(body.address) : "";
-    const addr = addressRaw.trim().toLowerCase();
-    if (!addr || !/^0x[a-f0-9]{40}$/.test(addr)) {
-      return NextResponse.json({ error: "invalid_address" }, { status: 400 });
-    }
+    const addressOr401 = await requireAuthenticatedAddress(req);
+    if (addressOr401 instanceof NextResponse) return addressOr401;
+    const addr = addressOr401.toLowerCase();
 
     const [player] = await db
       .select({ balance: players.balanceCrc })
@@ -45,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     await db
       .update(dailySessions)
-      .set({ txHash: `balance:${sessionId}` })
+      .set({ txHash: `balance:${sessionId}:daily-test` })
       .where(eq(dailySessions.id, sessionId));
 
     void awardPlayerXp({ address: addr, action: "daily_checkin" }).catch(() => {});

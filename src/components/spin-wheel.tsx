@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { SpinResult } from "@/lib/daily-shared";
+import type { SpinResult, SpinSegment } from "@/lib/daily-shared";
 import { SPIN_SEGMENTS } from "@/lib/daily-shared";
 import { useTheme } from "@/components/theme-provider";
 import { translations } from "@/lib/i18n";
@@ -13,12 +13,10 @@ type Props = {
   onComplete: () => void;
   spinning: boolean;
   locale: "fr" | "en";
+  segments?: SpinSegment[];
 };
 
-const SEGMENT_COUNT = 8;
-const SEGMENT_ANGLE = 360 / SEGMENT_COUNT;
-
-export default function SpinWheel({ result, onSpin, onComplete, spinning, locale }: Props) {
+export default function SpinWheel({ result, onSpin, onComplete, spinning, locale, segments = SPIN_SEGMENTS }: Props) {
   const { theme } = useTheme();
   const stake = useStakeLabel("daily");
   const isDark = theme === "dark";
@@ -27,6 +25,8 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
   const [hasSpun, setHasSpun] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wheelRef = useRef<HTMLDivElement>(null);
+  const segmentCount = Math.max(segments.length, 1);
+  const segmentAngle = 360 / segmentCount;
 
   // Draw wheel on canvas
   useEffect(() => {
@@ -43,9 +43,9 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
 
     ctx.clearRect(0, 0, size, size);
 
-    SPIN_SEGMENTS.forEach((segment, i) => {
-      const startAngle = (i * SEGMENT_ANGLE - 90) * (Math.PI / 180);
-      const endAngle = ((i + 1) * SEGMENT_ANGLE - 90) * (Math.PI / 180);
+    segments.forEach((segment, i) => {
+      const startAngle = (i * segmentAngle - 90) * (Math.PI / 180);
+      const endAngle = ((i + 1) * segmentAngle - 90) * (Math.PI / 180);
 
       // Draw segment
       ctx.beginPath();
@@ -87,7 +87,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
     ctx.strokeStyle = isDark ? "#333" : "#ffffff";
     ctx.lineWidth = 3;
     ctx.stroke();
-  }, [isDark, stake]);
+  }, [isDark, segmentAngle, segments, stake]);
 
   // Trigger spin animation
   useEffect(() => {
@@ -98,13 +98,13 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
     // Calculate target rotation
     // Segment 0 is at the top (12 o'clock position)
     // We want the winning segment to land under the pointer (at top)
-    const targetSegmentCenter = result.segmentIndex * SEGMENT_ANGLE + SEGMENT_ANGLE / 2;
+    const targetSegmentCenter = result.segmentIndex * segmentAngle + segmentAngle / 2;
     const fullSpins = 5 * 360; // 5 full rotations
     // We rotate clockwise, so subtract the target angle from 360
     const targetRotation = fullSpins + (360 - targetSegmentCenter);
 
     setRotation(prev => prev + targetRotation);
-  }, [spinning, result]);
+  }, [spinning, result, segmentAngle]);
 
   const handleTransitionEnd = useCallback(() => {
     if (!hasSpun) return;

@@ -1,8 +1,7 @@
 import { db } from "@/lib/db";
 import { dailySessions, jackpotPool, claimedPayments } from "@/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
-import { todayString } from "@/lib/daily";
 import { executePayout } from "@/lib/payout";
 import { awardPlayerXp } from "@/lib/xp-server";
 
@@ -48,47 +47,6 @@ export async function runDailyScan(): Promise<number> {
 
     if (!session) continue;
     if (session.address) continue;
-
-    const today = todayString();
-    const [existing] = await db
-      .select({ id: dailySessions.id })
-      .from(dailySessions)
-      .where(and(
-        eq(dailySessions.address, playerAddress),
-        eq(dailySessions.date, today),
-      ))
-      .limit(1);
-
-    if (existing) {
-      // User already played today but with a different session token
-      // Link this new session to their existing confirmed session data
-      const [confirmedSession] = await db
-        .select()
-        .from(dailySessions)
-        .where(eq(dailySessions.id, existing.id))
-        .limit(1);
-      if (confirmedSession && confirmedSession.address) {
-        await db.update(dailySessions).set({
-          address: confirmedSession.address,
-          txHash: confirmedSession.txHash,
-          scratchPlayed: confirmedSession.scratchPlayed,
-          scratchResult: confirmedSession.scratchResult,
-          spinPlayed: confirmedSession.spinPlayed,
-          spinResult: confirmedSession.spinResult,
-        }).where(eq(dailySessions.id, session.id));
-        // Mark tx as claimed so we don't reprocess
-        await db.insert(claimedPayments).values({
-          txHash,
-          gameType: "daily",
-          gameId: session.id,
-          playerAddress,
-          amountCrc: 1,
-        }).onConflictDoNothing();
-        globalClaimed.add(txHash);
-        processed++;
-      }
-      continue;
-    }
 
     try {
       await db.update(dailySessions).set({

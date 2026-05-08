@@ -2,8 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
-import { todayString } from "@/lib/daily";
+import { eq } from "drizzle-orm";
 import { generateGamePaymentLink } from "@/lib/circles";
 
 const SESSION_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
@@ -46,33 +45,6 @@ export async function GET(req: NextRequest) {
     const elapsed = Date.now() - new Date(session.createdAt).getTime();
     if (elapsed > SESSION_EXPIRY_MS) {
       return NextResponse.json({ status: "expired" });
-    }
-
-    // Check if THIS user already has a confirmed session today
-    const address = req.nextUrl.searchParams.get("address");
-    if (address) {
-      const today = todayString();
-      const [existingConfirmed] = await db
-        .select()
-        .from(dailySessions)
-        .where(and(
-          eq(dailySessions.date, today),
-          eq(dailySessions.address, address.toLowerCase()),
-        ))
-        .limit(1);
-
-      if (existingConfirmed) {
-        await db.update(dailySessions).set({
-          address: existingConfirmed.address,
-          txHash: existingConfirmed.txHash,
-          scratchPlayed: existingConfirmed.scratchPlayed,
-          scratchResult: existingConfirmed.scratchResult,
-          spinPlayed: existingConfirmed.spinPlayed,
-          spinResult: existingConfirmed.spinResult,
-        }).where(eq(dailySessions.id, session.id));
-
-        return confirmedResponse({ ...session, ...existingConfirmed, id: session.id, token: session.token });
-      }
     }
 
     // Return waiting with payment link so frontend can show QR on reload

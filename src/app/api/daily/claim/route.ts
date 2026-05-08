@@ -3,6 +3,7 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
 import { generateDailyToken, todayString } from "@/lib/daily";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/daily/claim
@@ -16,13 +17,9 @@ export async function POST(req: NextRequest) {
   if (limited) return limited;
 
   try {
-    const { address } = await req.json();
-
-    if (!address || typeof address !== "string" || !address.startsWith("0x")) {
-      return NextResponse.json({ error: "Valid address required" }, { status: 400 });
-    }
-
-    const normalizedAddress = address.toLowerCase();
+    const addressOr401 = await requireAuthenticatedAddress(req);
+    if (addressOr401 instanceof NextResponse) return addressOr401;
+    const normalizedAddress = addressOr401.toLowerCase();
     const date = todayString();
     const token = generateDailyToken();
 
@@ -30,7 +27,7 @@ export async function POST(req: NextRequest) {
       token,
       date,
       address: normalizedAddress,
-      txHash: "miniapp-free-claim",
+      txHash: `daily-free:${token}`,
     });
 
     return NextResponse.json({
