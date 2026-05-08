@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
           INSERT INTO ${players} (address, xp, xp_balance, level, streak, last_seen, created_at)
           VALUES (${sessionAddress}, 0, ${xpCredit}, 1, 0, NOW(), NOW())
           ON CONFLICT (address) DO UPDATE
-          SET xp_balance = ${players.xpBalance} + ${xpCredit},
+          SET xp_balance = players.xp_balance + ${xpCredit},
               last_seen = NOW()
         `);
       }
