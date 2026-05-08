@@ -167,7 +167,15 @@ export function ChancePayment({
         betCrc={amountCrc}
         isChance
         extraBody={balExtras as Record<string, unknown> | undefined}
-        onStarted={(result) => onBalancePaid?.(result)}
+        onStarted={(result) => {
+          if (onBalancePaid) {
+            onBalancePaid(result);
+          } else {
+            setTimeout(() => {
+              if (typeof window !== "undefined") window.location.reload();
+            }, 300);
+          }
+        }}
       />
     );
   }
