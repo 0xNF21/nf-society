@@ -5,7 +5,7 @@ import {
   Loader2, Eye, EyeOff, Clock,
   Flag, Gift, Sparkles, Trash2, RefreshCw, Send,
   ChevronDown, ExternalLink, AlertCircle, CheckCircle, XCircle,
-  Palette, Check, Archive,
+  Palette, Check, Archive, Calculator,
 } from "lucide-react";
 import Link from "next/link";
 import type { FlagRow, FlagStatus } from "../types";
@@ -30,6 +30,12 @@ export function DailyTab({ password }: { password: string }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [editScratch, setEditScratch] = useState<DailyRewardEntry[]>([]);
   const [editSpin, setEditSpin] = useState<DailyRewardEntry[]>([]);
+  const [draftVersion, setDraftVersion] = useState(0);
+  const [budgetDailyCount, setBudgetDailyCount] = useState("100");
+  const [budgetCrc, setBudgetCrc] = useState("");
+  const [budgetXp, setBudgetXp] = useState("");
+  const [budgetError, setBudgetError] = useState<string | null>(null);
+  const [budgetMessage, setBudgetMessage] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -39,6 +45,7 @@ export function DailyTab({ password }: { password: string }) {
       setSpin(data.spin || []);
       setEditScratch(data.scratch || []);
       setEditSpin(data.spin || []);
+      setDraftVersion(v => v + 1);
     } catch {}
     setLoading(false);
   }, [password]);
@@ -49,6 +56,14 @@ export function DailyTab({ password }: { password: string }) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  function isEmptyReward(entry: DailyRewardEntry) {
+    return entry.crcValue <= 0 && entry.xpValue <= 0;
+  }
+
+  function roundProb(prob: number) {
+    return Math.round(Math.max(0, prob) * 1_000_000) / 1_000_000;
+  }
+
   function updateEntry(table: "scratch" | "spin", index: number, field: string, value: unknown) {
     const setter = table === "scratch" ? setEditScratch : setEditSpin;
     setter(prev => {
@@ -56,11 +71,11 @@ export function DailyTab({ password }: { password: string }) {
 
       // Auto-balance: when changing a prob, adjust "nothing" (first entry) to keep total = 100%
       if (field === "prob") {
-        const nothingIdx = updated.findIndex(e => e.type === "nothing");
+        const nothingIdx = updated.findIndex(isEmptyReward);
         if (nothingIdx >= 0 && nothingIdx !== index) {
           const othersTotal = updated.reduce((s, e, i) => i === nothingIdx ? s : s + e.prob, 0);
           const newNothingProb = Math.max(0, 1 - othersTotal);
-          updated[nothingIdx] = { ...updated[nothingIdx], prob: Math.round(newNothingProb * 1000) / 1000 };
+          updated[nothingIdx] = { ...updated[nothingIdx], prob: roundProb(newNothingProb) };
         }
       }
 
@@ -143,8 +158,93 @@ export function DailyTab({ password }: { password: string }) {
   }
 
   function formatExpected(value: number, decimals = 3) {
+    if (decimals === 0) return Math.round(value).toLocaleString("fr-FR");
     const fixed = value.toFixed(decimals);
     return fixed.replace(/\.?0+$/, "");
+  }
+
+  function rebalanceEntries(table: "scratch" | "spin", entries: DailyRewardEntry[]) {
+    const balanced = entries.map(entry => ({ ...entry, prob: roundProb(entry.prob) }));
+    let emptyIdx = balanced.findIndex(isEmptyReward);
+
+    if (emptyIdx < 0) {
+      balanced.push({ ...createEntry(table, "nothing"), prob: 0 });
+      emptyIdx = balanced.length - 1;
+    }
+
+    const positiveTotal = balanced.reduce((sum, entry, index) => index === emptyIdx ? sum : sum + entry.prob, 0);
+    if (positiveTotal > 1.000001) {
+      return {
+        error: `${table === "scratch" ? "Scratch" : "Roue"} depasse 100% de probabilites positives. Baisse le budget ou augmente les montants de gains.`,
+        entries: balanced,
+      };
+    }
+
+    balanced[emptyIdx] = { ...balanced[emptyIdx], prob: roundProb(1 - positiveTotal) };
+    return { entries: balanced };
+  }
+
+  function applyBudgetCalculator() {
+    setBudgetError(null);
+    setBudgetMessage(null);
+
+    const dailyCount = Number(budgetDailyCount);
+    const crcBudget = Number(budgetCrc || 0);
+    const xpBudget = Number(budgetXp || 0);
+
+    if (budgetCrc.trim() === "" && budgetXp.trim() === "") {
+      setBudgetError("Entre au moins un budget CRC ou XP. Pour couper les gains, mets explicitement 0.");
+      return;
+    }
+    if (!Number.isFinite(dailyCount) || dailyCount <= 0) {
+      setBudgetError("Entre un nombre de daily joues superieur a 0.");
+      return;
+    }
+    if (!Number.isFinite(crcBudget) || crcBudget < 0 || !Number.isFinite(xpBudget) || xpBudget < 0) {
+      setBudgetError("Les budgets CRC et XP doivent etre des nombres positifs.");
+      return;
+    }
+
+    const targetCrcEv = crcBudget / dailyCount;
+    const targetXpEv = xpBudget / dailyCount;
+
+    if (targetCrcEv > 0 && combinedCrcEv <= 0) {
+      setBudgetError("Ajoute au moins une ligne de gain CRC avant de calculer un budget CRC.");
+      return;
+    }
+    if (targetXpEv > 0 && combinedXpEv <= 0) {
+      setBudgetError("Ajoute au moins une ligne de gain XP avant de calculer un budget XP.");
+      return;
+    }
+
+    const crcScale = combinedCrcEv > 0 ? targetCrcEv / combinedCrcEv : 0;
+    const xpScale = combinedXpEv > 0 ? targetXpEv / combinedXpEv : 0;
+
+    const scaleEntries = (entries: DailyRewardEntry[]) => entries.map(entry => {
+      if (entry.crcValue > 0 && entry.xpValue > 0) {
+        return { ...entry, prob: roundProb(entry.prob * Math.min(crcScale || 0, xpScale || 0)) };
+      }
+      if (entry.crcValue > 0) return { ...entry, prob: roundProb(entry.prob * crcScale) };
+      if (entry.xpValue > 0) return { ...entry, prob: roundProb(entry.prob * xpScale) };
+      return { ...entry, prob: 0 };
+    });
+
+    const nextScratch = rebalanceEntries("scratch", scaleEntries(editScratch));
+    if (nextScratch.error) {
+      setBudgetError(nextScratch.error);
+      return;
+    }
+
+    const nextSpin = rebalanceEntries("spin", scaleEntries(editSpin));
+    if (nextSpin.error) {
+      setBudgetError(nextSpin.error);
+      return;
+    }
+
+    setEditScratch(nextScratch.entries);
+    setEditSpin(nextSpin.entries);
+    setDraftVersion(v => v + 1);
+    setBudgetMessage("Probas recalculees. Verifie le resultat puis sauvegarde Scratch et Roue pour publier.");
   }
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-ink/30" /></div>;
@@ -156,25 +256,25 @@ export function DailyTab({ password }: { password: string }) {
     return (
       <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-xs font-bold text-ink/40 uppercase tracking-widest">{title}</h3>
+          <h3 className="text-xs font-bold text-ink/65 uppercase tracking-widest dark:text-white/70">{title}</h3>
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => addEntry(tableKey, "xp")}
-              className="inline-flex items-center gap-1 rounded-lg bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-200"
+              className="inline-flex items-center gap-1 rounded-lg bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-200 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:bg-violet-500/25"
             >
               <Sparkles className="h-3 w-3" />
               Ajouter XP
             </button>
             <button
               onClick={() => addEntry(tableKey, "crc")}
-              className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-200"
+              className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:hover:bg-emerald-500/25"
             >
               <Gift className="h-3 w-3" />
               Ajouter CRC
             </button>
             <button
               onClick={() => addEntry(tableKey, "nothing")}
-              className="rounded-lg bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-ink/50 hover:bg-ink/10"
+              className="rounded-lg bg-ink/5 px-2.5 py-1 text-[11px] font-bold text-ink/65 hover:bg-ink/10 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15"
             >
               Ajouter vide
             </button>
@@ -192,7 +292,7 @@ export function DailyTab({ password }: { password: string }) {
         </div>
 
         {entries.map((entry, i) => (
-          <div key={entry.type || i} className="p-3 rounded-xl bg-white/60 dark:bg-white/5 border border-ink/5 space-y-2">
+          <div key={entry.type || i} className="p-3 rounded-xl bg-white/90 dark:bg-zinc-950/70 border border-ink/10 dark:border-white/10 space-y-2 shadow-sm">
             <div className="flex items-center gap-2">
               {tableKey === "scratch" ? (
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink/5 text-xl">{entry.symbol || "?"}</span>
@@ -200,10 +300,10 @@ export function DailyTab({ password }: { password: string }) {
                 <span className="h-8 w-8 rounded-lg border border-white/70 shadow-sm" style={{ backgroundColor: entry.color || "#6B7280" }} />
               )}
               <input value={entry.label} onChange={e => updateEntry(tableKey, i, "label", e.target.value)}
-                className="flex-1 px-2 py-1 rounded-lg border border-ink/10 text-sm font-semibold" />
+                className="flex-1 px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-semibold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
               <button
                 onClick={() => removeEntry(tableKey, i)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/35 hover:bg-red-100 hover:text-red-600"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/55 hover:bg-red-100 hover:text-red-600 dark:text-white/45 dark:hover:bg-red-500/15 dark:hover:text-red-300"
                 aria-label="Supprimer cette ligne"
                 title="Supprimer cette ligne"
               >
@@ -212,41 +312,43 @@ export function DailyTab({ password }: { password: string }) {
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
               <div className="sm:col-span-2">
-                <label className="text-[10px] text-ink/40 font-bold">Type</label>
+                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">Type</label>
                 <input value={entry.type}
                   onChange={e => updateEntry(tableKey, i, "type", e.target.value)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-mono" />
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-mono text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
               </div>
               <div>
-                <label className="text-[10px] text-ink/40 font-bold">Prob %</label>
+                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">Prob %</label>
                 <input type="text" inputMode="decimal"
                   defaultValue={entry.prob * 100}
-                  key={`prob-${tableKey}-${i}-${entries.length}`}
+                  key={`prob-${tableKey}-${i}-${entries.length}-${draftVersion}`}
                   onBlur={e => updateEntry(tableKey, i, "prob", (parseFloat(e.target.value) || 0) / 100)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
               </div>
               <div>
-                <label className="text-[10px] text-ink/40 font-bold">CRC</label>
+                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">CRC</label>
                 <input type="number" step="0.1" min={0}
                   defaultValue={entry.crcValue}
+                  key={`crc-${tableKey}-${i}-${entries.length}-${draftVersion}`}
                   onBlur={e => updateEntry(tableKey, i, "crcValue", parseFloat(e.target.value) || 0)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
               </div>
               <div>
-                <label className="text-[10px] text-ink/40 font-bold">XP</label>
+                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">XP</label>
                 <input type="number" step="1" min={0}
                   defaultValue={entry.xpValue}
+                  key={`xp-${tableKey}-${i}-${entries.length}-${draftVersion}`}
                   onBlur={e => updateEntry(tableKey, i, "xpValue", parseFloat(e.target.value) || 0)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm font-bold" />
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
               </div>
               <div>
-                <label className="text-[10px] text-ink/40 font-bold">{tableKey === "scratch" ? "Symbole" : "Couleur"}</label>
+                <label className="text-[10px] text-ink/60 font-bold dark:text-white/60">{tableKey === "scratch" ? "Symbole" : "Couleur"}</label>
                 <input value={entry.symbol || entry.color || ""}
                   onChange={e => updateEntry(tableKey, i, tableKey === "scratch" ? "symbol" : "color", e.target.value)}
-                  className="w-full px-2 py-1 rounded-lg border border-ink/10 text-sm" />
+                  className="w-full px-2 py-1 rounded-lg border border-ink/10 bg-white text-sm text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white" />
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-ink/40">
+            <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-ink/55 dark:text-white/55">
               <span>EV ligne: {(entry.prob * entry.xpValue).toFixed(2)} XP</span>
               <span>{(entry.prob * entry.crcValue).toFixed(4)} CRC</span>
             </div>
@@ -284,19 +386,35 @@ export function DailyTab({ password }: { password: string }) {
   const scratchCrcChance = editScratch.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0);
   const spinCrcChance = editSpin.filter(r => r.crcValue > 0).reduce((s, r) => s + r.prob, 0);
   const crcHitRate = 1 - (1 - scratchCrcChance) * (1 - spinCrcChance);
-  const crcTone = combinedCrcEv > 0.05 ? "text-red-600 bg-red-100" : combinedCrcEv > 0.02 ? "text-amber-600 bg-amber-100" : "text-green-600 bg-green-100";
+  const crcTone = combinedCrcEv > 0.05
+    ? "text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-500/20"
+    : combinedCrcEv > 0.02
+      ? "text-amber-700 bg-amber-100 dark:text-amber-200 dark:bg-amber-500/20"
+      : "text-green-700 bg-green-100 dark:text-green-200 dark:bg-green-500/20";
   const dailyProjections = [
     { label: "100 daily joues", count: 100 },
     { label: "1 000 daily joues", count: 1000 },
   ];
+  const budgetDailyNumber = Number(budgetDailyCount);
+  const budgetCrcNumber = Number(budgetCrc || 0);
+  const budgetXpNumber = Number(budgetXp || 0);
+  const hasBudgetInput = budgetCrc.trim() !== "" || budgetXp.trim() !== "";
+  const budgetPreviewValid =
+    hasBudgetInput &&
+    Number.isFinite(budgetDailyNumber) && budgetDailyNumber > 0 &&
+    Number.isFinite(budgetCrcNumber) && budgetCrcNumber >= 0 &&
+    Number.isFinite(budgetXpNumber) && budgetXpNumber >= 0;
+  const budgetTargetCrcEv = budgetPreviewValid ? budgetCrcNumber / budgetDailyNumber : 0;
+  const budgetTargetXpEv = budgetPreviewValid ? budgetXpNumber / budgetDailyNumber : 0;
+  const budgetProjectionCount = Number.isFinite(budgetDailyNumber) && budgetDailyNumber > 0 ? budgetDailyNumber : 100;
 
   return (
     <div className="space-y-8">
-      <div className={`p-4 rounded-xl border-2 ${combinedCrcEv > 0.05 ? "border-red-300" : combinedCrcEv > 0.02 ? "border-amber-300" : "border-green-300"} space-y-4`}>
+      <div className={`p-4 rounded-xl border-2 bg-gradient-to-br from-white via-amber-50/50 to-emerald-50/40 shadow-sm dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 ${combinedCrcEv > 0.05 ? "border-red-300 dark:border-red-500/50" : combinedCrcEv > 0.02 ? "border-amber-300 dark:border-amber-500/50" : "border-green-300 dark:border-green-500/50"} space-y-4`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <span className="text-xs font-bold text-ink/40 uppercase tracking-widest">Gain moyen attendu</span>
-            <p className="mt-1 text-sm text-ink/60">
+            <span className="text-xs font-bold text-ink/70 uppercase tracking-widest dark:text-white/75">Gain moyen attendu</span>
+            <p className="mt-1 text-sm text-ink/70 dark:text-white/70">
               Estimation statistique pour <strong>1 daily complet</strong> (scratch + roue). Ce n'est pas un gain garanti joueur par joueur.
             </p>
           </div>
@@ -306,33 +424,114 @@ export function DailyTab({ password }: { password: string }) {
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-ink/5 bg-white/60 p-3 dark:bg-white/5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-ink/35">Par 1 daily joue</p>
+          <div className="rounded-lg border border-ink/10 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-zinc-950/70">
+            <p className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Par 1 daily joue</p>
             <p className="mt-1 text-sm font-bold text-ink dark:text-white">{combinedXpEv.toFixed(1)} XP moyen</p>
-            <p className="text-sm font-bold text-emerald-600">{formatExpected(combinedCrcEv)} CRC moyen</p>
-            <p className="mt-1 text-xs text-ink/45">{(crcHitRate * 100).toFixed(2)}% de chance de toucher au moins 1 CRC</p>
+            <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatExpected(combinedCrcEv)} CRC moyen</p>
+            <p className="mt-1 text-xs text-ink/60 dark:text-white/60">{(crcHitRate * 100).toFixed(2)}% de chance de toucher au moins 1 CRC</p>
           </div>
           {dailyProjections.map((projection) => (
-            <div key={projection.count} className="rounded-lg border border-ink/5 bg-white/60 p-3 dark:bg-white/5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-ink/35">{projection.label}</p>
+            <div key={projection.count} className="rounded-lg border border-ink/10 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-zinc-950/70">
+              <p className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">{projection.label}</p>
               <p className="mt-1 text-sm font-bold text-ink dark:text-white">
                 ~{formatExpected(combinedXpEv * projection.count, 0)} XP distribues
               </p>
-              <p className="text-sm font-bold text-emerald-600">
+              <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
                 ~{formatExpected(combinedCrcEv * projection.count)} CRC distribues
               </p>
-              <p className="mt-1 text-xs text-ink/45">Projection moyenne, les resultats reels peuvent varier.</p>
+              <p className="mt-1 text-xs text-ink/60 dark:text-white/60">Projection moyenne, les resultats reels peuvent varier.</p>
             </div>
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-3 text-xs text-ink/50">
+        <div className="flex flex-wrap gap-3 text-xs text-ink/65 dark:text-white/65">
           <span>Detail scratch: {scratchXpEv.toFixed(1)} XP / {formatExpected(scratchCrcEv)} CRC par daily</span>
           <span>Detail roue: {spinXpEv.toFixed(1)} XP / {formatExpected(spinCrcEv)} CRC par daily</span>
           <span>Formule: gain moyen = gain configure x probabilite</span>
         </div>
-        {combinedCrcEv > 0.05 && <p className="text-xs text-red-600 font-semibold">Attention: gain CRC moyen eleve pour un daily gratuit.</p>}
-        {combinedCrcEv <= 0.05 && <p className="text-xs text-green-600 font-semibold">Les CRC restent rares; l'XP porte la recompense principale.</p>}
+        {combinedCrcEv > 0.05 && <p className="text-xs text-red-700 font-semibold dark:text-red-300">Attention: gain CRC moyen eleve pour un daily gratuit.</p>}
+        {combinedCrcEv <= 0.05 && <p className="text-xs text-green-700 font-semibold dark:text-green-300">Les CRC restent rares; l'XP porte la recompense principale.</p>}
+      </div>
+
+      <div className="rounded-xl border border-marine/15 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-zinc-950">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-marine dark:text-cyan-300" />
+              <h3 className="text-sm font-black uppercase tracking-widest text-ink dark:text-white">Calculateur de budget daily</h3>
+            </div>
+            <p className="mt-1 text-sm text-ink/70 dark:text-white/70">
+              Entre ce que tu peux distribuer sur une journee. Le calculateur ajuste les probabilites XP/CRC et met le reste sur les lignes vides.
+            </p>
+          </div>
+          <button
+            onClick={applyBudgetCalculator}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-marine px-3 py-2 text-xs font-bold text-white hover:opacity-90"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Appliquer aux probas
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Daily estimes / jour</label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={budgetDailyCount}
+              onChange={e => setBudgetDailyCount(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget CRC / jour</label>
+            <input
+              type="number"
+              min={0}
+              step="0.001"
+              value={budgetCrc}
+              onChange={e => setBudgetCrc(e.target.value)}
+              placeholder={formatExpected(combinedCrcEv * budgetProjectionCount)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink/60 dark:text-white/60">Budget XP / jour</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={budgetXp}
+              onChange={e => setBudgetXp(e.target.value)}
+              placeholder={formatExpected(combinedXpEv * budgetProjectionCount, 0)}
+              className="mt-1 w-full rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-bold text-ink dark:border-white/10 dark:bg-zinc-900 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-lg bg-ink/[0.03] p-3 text-xs text-ink/70 dark:bg-white/10 dark:text-white/70">
+          {budgetPreviewValid ? (
+            <span>
+              Cible calculee: <strong>{formatExpected(budgetTargetXpEv, 2)} XP</strong> et <strong>{formatExpected(budgetTargetCrcEv)} CRC</strong> en moyenne par daily complet.
+            </span>
+          ) : (
+            <span>Entre des valeurs valides pour voir la cible moyenne par daily.</span>
+          )}
+        </div>
+        {budgetError && (
+          <p className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {budgetError}
+          </p>
+        )}
+        {budgetMessage && (
+          <p className="mt-3 flex items-start gap-2 rounded-lg bg-green-50 p-3 text-xs font-semibold text-green-700 dark:bg-green-500/10 dark:text-green-300">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            {budgetMessage}
+          </p>
+        )}
       </div>
 
       <RewardTable title="Scratch Card — Tableau de gains" tableKey="scratch" entries={editScratch} />
@@ -350,7 +549,7 @@ export function DailyTab({ password }: { password: string }) {
           </button>
         </div>
         {testResult && (
-          <div className="p-3 rounded-xl bg-white/80 dark:bg-white/5 border border-ink/5 space-y-2 text-sm">
+          <div className="p-3 rounded-xl bg-white/90 dark:bg-zinc-950/70 border border-ink/10 dark:border-white/10 space-y-2 text-sm shadow-sm">
             {testResult.error ? (
               <p className="text-red-500">{testResult.error}</p>
             ) : (
