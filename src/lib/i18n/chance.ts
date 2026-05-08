@@ -294,7 +294,7 @@ export const chanceTranslations = {
     failedTryAgain: { fr: "Echec — reessayez", en: "Failed — try again" },
     errorGeneric: { fr: "Erreur", en: "Error" },
     testWithoutPaying: { fr: "tester sans payer", en: "test without paying" },
-    viewProbabilities: { fr: "Voir les probabilités", en: "View probabilities" },
+    viewProbabilities: { fr: "Gain possible en %", en: "Possible rewards (%)" },
     refundOneCrc: { fr: "Bonus quotidien", en: "Daily bonus" },
     wheelLabel: { fr: "Roue du jour", en: "Daily Wheel" },
     claimFree: { fr: "Reclamer mon daily (gratuit)", en: "Claim my daily (free)" },

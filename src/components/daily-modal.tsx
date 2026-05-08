@@ -6,7 +6,6 @@ import { useAuthSession } from "@/components/auth-provider";
 import { useDemo } from "@/components/demo-provider";
 import { useLocale } from "@/components/language-provider";
 import SpinWheel from "@/components/spin-wheel";
-import { useStakeLabel } from "@/hooks/use-stake-label";
 import type { DailyWheelResult, SpinSegment } from "@/lib/daily-shared";
 import { translations } from "@/lib/i18n";
 
@@ -41,7 +40,6 @@ export default function DailyModal() {
     openLogin,
   } = useAuthSession();
   const t = translations.daily;
-  const stake = useStakeLabel();
 
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("init");
@@ -64,53 +62,23 @@ export default function DailyModal() {
       }))
   ), [wheelRewards]);
 
-  const visibleCrcRewards = useMemo(() => (
-    wheelRewards
-      .filter((entry) => entry.crcValue > 0)
-      .reduce<DailyRewardEntry[]>((unique, entry) => {
-        if (!unique.some((row) => row.crcValue === entry.crcValue)) unique.push(entry);
-        return unique;
-      }, [])
-      .sort((a, b) => a.crcValue - b.crcValue)
-  ), [wheelRewards]);
-
-  const hasXpReward = wheelRewards.some((entry) => entry.xpValue > 0);
   const arcadeLabel = useCallback((label: unknown) => (
-    stake.t(String(label ?? "")).replace(/\bJACKPOT\b/g, "DOTATION")
-  ), [stake]);
+    String(label ?? "").replace(/\bJACKPOT\b/g, "DOTATION")
+  ), []);
+  const formatRewardAmount = useCallback((value: number) => (
+    value.toLocaleString(locale === "fr" ? "fr-FR" : "en-US", { maximumFractionDigits: 3 })
+  ), [locale]);
   const rewardLabel = useCallback((entry: DailyRewardEntry) => {
-    if (entry.crcValue > 0) return `+${stake.format(entry.crcValue)}`;
+    if (entry.crcValue > 0) return `+${formatRewardAmount(entry.crcValue)} CRC`;
     if (entry.xpValue > 0) return `+${entry.xpValue} XP de solde`;
     return arcadeLabel(entry.label || entry.type);
-  }, [arcadeLabel, stake]);
+  }, [arcadeLabel, formatRewardAmount]);
+  const resultLabel = useCallback((result: DailyWheelResult) => {
+    if (result.crcValue > 0) return `+${formatRewardAmount(result.crcValue)} CRC`;
+    if (result.xpValue > 0) return `+${result.xpValue} XP de solde`;
+    return arcadeLabel(result.label || result.type);
+  }, [arcadeLabel, formatRewardAmount]);
   const rewardProb = (entry: DailyRewardEntry) => `${Math.round(entry.prob * 1000) / 10}%`;
-
-  const rewardPreview = (hasXpReward || visibleCrcRewards.length > 0) ? (
-    <div className="rounded-xl border border-amber-400/30 bg-amber-50/70 p-3 text-left dark:bg-amber-950/20">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-black uppercase tracking-widest text-amber-700">
-          {locale === "fr" ? "Gains possibles" : "Possible rewards"}
-        </span>
-        {visibleCrcRewards.length > 0 && (
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-            {locale === "fr" ? "CRC rare" : "Rare CRC"}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {hasXpReward && (
-          <span className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">
-            Solde XP
-          </span>
-        )}
-        {visibleCrcRewards.map((entry) => (
-          <span key={`crc-${entry.crcValue}`} className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
-            +{stake.format(entry.crcValue)}
-          </span>
-        ))}
-      </div>
-    </div>
-  ) : null;
 
   const saveDailySession = useCallback((sessionToken: string, sessionAddress?: string | null) => {
     try {
@@ -329,7 +297,7 @@ export default function DailyModal() {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-ink/10 bg-paper p-5 shadow-2xl dark:bg-[#111114]">
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#111114]">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-black uppercase tracking-wide text-ink">{t.title[locale]}</h2>
@@ -347,7 +315,6 @@ export default function DailyModal() {
 
             {phase === "init" && (
               <div className="space-y-4 text-center">
-                {rewardPreview}
                 {needsAuth && (
                   <div className="rounded-xl border border-violet-500/20 bg-violet-500/10 p-4 text-left">
                     <p className="text-sm font-black text-ink dark:text-white">
@@ -378,7 +345,6 @@ export default function DailyModal() {
 
             {phase === "wheel" && (
               <div className="space-y-5">
-                {rewardPreview}
                 <div className="text-center">
                   <h3 className="text-lg font-black text-ink">{t.spinTitle[locale]}</h3>
                   <p className="text-sm font-medium text-ink/60">
@@ -404,10 +370,10 @@ export default function DailyModal() {
                 <div className="rounded-xl border border-ink/10 bg-ink/[0.03] p-4 text-center">
                   <p className="text-xs font-black uppercase tracking-widest text-ink/50">{t.summaryTitle[locale]}</p>
                   <p className="mt-2 text-2xl font-black text-ink">
-                    {wheelResult ? arcadeLabel(wheelResult.label) : t.nothing[locale]}
+                    {wheelResult ? resultLabel(wheelResult) : t.nothing[locale]}
                   </p>
                   {wheelResult?.crcValue ? (
-                    <p className="mt-1 text-sm font-black text-emerald-600">+{stake.format(wheelResult.crcValue)}</p>
+                    <p className="mt-1 text-sm font-black text-emerald-600">+{formatRewardAmount(wheelResult.crcValue)} CRC</p>
                   ) : null}
                   {wheelResult?.xpValue ? (
                     <p className="mt-1 text-sm font-black text-violet-600">+{wheelResult.xpValue} XP de solde</p>

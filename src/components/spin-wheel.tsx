@@ -5,7 +5,6 @@ import { useTheme } from "@/components/theme-provider";
 import type { SpinResult, SpinSegment } from "@/lib/daily-shared";
 import { SPIN_SEGMENTS } from "@/lib/daily-shared";
 import { translations } from "@/lib/i18n";
-import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type Props = {
   result: SpinResult | null;
@@ -18,7 +17,6 @@ type Props = {
 
 export default function SpinWheel({ result, onSpin, onComplete, spinning, locale, segments = SPIN_SEGMENTS }: Props) {
   const { theme } = useTheme();
-  const stake = useStakeLabel("daily");
   const isDark = theme === "dark";
   const [rotation, setRotation] = useState(0);
   const [showResult, setShowResult] = useState(false);
@@ -70,7 +68,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
       ctx.textBaseline = "middle";
       ctx.shadowColor = "rgba(0,0,0,0.5)";
       ctx.shadowBlur = 2;
-      ctx.fillText(stake.t(segment.label).replace(/\bJACKPOT\b/g, "DOTATION"), 0, 0);
+      ctx.fillText(segment.label.replace(/\bJACKPOT\b/g, "DOTATION"), 0, 0);
       ctx.restore();
     });
 
@@ -81,7 +79,17 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
     ctx.strokeStyle = isDark ? "#333" : "#ffffff";
     ctx.lineWidth = 3;
     ctx.stroke();
-  }, [isDark, segmentAngle, segments, stake]);
+  }, [isDark, segmentAngle, segments]);
+
+  const formatRewardAmount = useCallback((value: number) => (
+    value.toLocaleString(locale === "fr" ? "fr-FR" : "en-US", { maximumFractionDigits: 3 })
+  ), [locale]);
+
+  const resultLabel = useCallback((spinResult: SpinResult) => {
+    if (spinResult.crcValue > 0) return `+${formatRewardAmount(spinResult.crcValue)} CRC`;
+    if (spinResult.xpValue > 0) return `+${spinResult.xpValue} XP de solde`;
+    return spinResult.label.replace(/\bJACKPOT\b/g, "DOTATION");
+  }, [formatRewardAmount]);
 
   useEffect(() => {
     if (!spinning || !result) return;
@@ -144,9 +152,9 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
             ? "bg-amber-100 text-amber-800"
             : "bg-ink/5 text-ink/60"
         }`}>
-          <p className="text-xl font-bold">{stake.t(result.label).replace(/\bJACKPOT\b/g, "DOTATION")}</p>
+          <p className="text-xl font-bold">{resultLabel(result)}</p>
           {result.crcValue > 0 && (
-            <p className="mt-1 text-sm">+{stake.format(result.crcValue)}</p>
+            <p className="mt-1 text-sm">+{formatRewardAmount(result.crcValue)} CRC</p>
           )}
           {result.xpValue > 0 && (
             <p className="mt-1 text-sm">+{result.xpValue} XP de solde</p>
