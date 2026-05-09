@@ -51,6 +51,7 @@ export type ChancePlayerRound = {
   betCrc: number;
   payoutCrc: number;
   createdAt: Date;
+  txHash: string | null;
 };
 
 export type ChanceGameServerConfig = {
@@ -82,6 +83,7 @@ function createStandardConfig(opts: {
   betCol?: string;       // default "betCrc"
   payoutCol?: string;    // default "payoutCrc"
   dateCol?: string;      // default "createdAt"
+  txCol?: string;        // default "transactionHash"
   // Statuts a exclure des stats — typiquement ["playing"] pour ne pas
   // compter les rounds abandonnees (user paye puis ferme la page).
   // Sans ce filtre, le wagered est gonfle alors que le payout reste a 0,
@@ -95,6 +97,7 @@ function createStandardConfig(opts: {
     betCol = "betCrc",
     payoutCol = "payoutCrc",
     dateCol = "createdAt",
+    txCol = "transactionHash",
     excludeStatuses,
     statusCol = "status",
   } = opts;
@@ -103,6 +106,7 @@ function createStandardConfig(opts: {
   const betField = table[betCol];
   const payoutField = table[payoutCol];
   const dateField = table[dateCol];
+  const txField = table[txCol];
   const statusField = excludeStatuses && excludeStatuses.length > 0 ? table[statusCol] : null;
   const statusFilter = statusField ? notInArray(statusField, excludeStatuses!) : undefined;
 
@@ -196,6 +200,7 @@ function createStandardConfig(opts: {
           betCrc: betField,
           payoutCrc: payoutField,
           createdAt: dateField,
+          txHash: txField,
         })
         .from(table)
         .where(whereClause as any)
@@ -204,6 +209,7 @@ function createStandardConfig(opts: {
         betCrc: Number(r.betCrc ?? 0),
         payoutCrc: Number(r.payoutCrc ?? 0),
         createdAt: r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt),
+        txHash: typeof r.txHash === "string" ? r.txHash : null,
       }));
     },
   };
@@ -349,6 +355,7 @@ const lootboxesConfig: ChanceGameServerConfig = {
         betCrc: lootboxes.pricePerOpenCrc,
         payoutCrc: lootboxOpens.rewardCrc,
         createdAt: lootboxOpens.openedAt,
+        txHash: lootboxOpens.transactionHash,
       })
       .from(lootboxOpens)
       .innerJoin(lootboxes, eq(lootboxOpens.lootboxId, lootboxes.id))
@@ -358,6 +365,7 @@ const lootboxesConfig: ChanceGameServerConfig = {
       betCrc: Number(r.betCrc ?? 0),
       payoutCrc: Number(r.payoutCrc ?? 0),
       createdAt: r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt),
+      txHash: typeof r.txHash === "string" ? r.txHash : null,
     }));
   },
 };

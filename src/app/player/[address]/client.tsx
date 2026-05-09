@@ -354,7 +354,7 @@ export default function PlayerProfileClient({
                 </div>
               </div>
 
-              {/* CRC misés / gagnés */}
+              {/* Participations / récompenses */}
               <div className="flex justify-between items-center px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
                 <div className="text-center flex-1">
                   {hideTotalBet ? (
@@ -597,7 +597,33 @@ function XpEventHistory({ address, locale }: { address: string; locale: "fr" | "
   );
 }
 
-type Tx = { type: "in" | "out"; amount: number; label: string; category: string; date: string };
+type TxCurrency = "CRC" | "Fragments";
+type Tx = { type: "in" | "out"; amount: number; currency?: TxCurrency; label: string; category: string; date: string };
+
+function formatTxAmount(amount: number, currency: TxCurrency | undefined, locale: "fr" | "en", sign?: "+" | "-"): string {
+  const unit = currency ?? "CRC";
+  const value = Math.abs(amount);
+  const formatted = unit === "Fragments"
+    ? Math.round(value).toLocaleString(localeBcp47(locale), { maximumFractionDigits: 0 })
+    : formatCrc(value);
+  return `${sign ?? ""}${formatted} ${unit}`;
+}
+
+function formatTxTotals(txs: Tx[], type: "in" | "out", locale: "fr" | "en"): string {
+  const sign = type === "in" ? "+" : "-";
+  const fragments = txs
+    .filter((tx) => tx.type === type && (tx.currency ?? "CRC") === "Fragments")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const crc = txs
+    .filter((tx) => tx.type === type && (tx.currency ?? "CRC") === "CRC")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+
+  const parts: string[] = [];
+  if (fragments > 0) parts.push(formatTxAmount(fragments, "Fragments", locale, sign));
+  if (crc > 0) parts.push(formatTxAmount(crc, "CRC", locale, sign));
+  const fallbackCurrency: TxCurrency = txs.some((tx) => (tx.currency ?? "CRC") === "Fragments") ? "Fragments" : "CRC";
+  return parts.length > 0 ? parts.join(" / ") : formatTxAmount(0, fallbackCurrency, locale);
+}
 
 function TransactionHistory({ address, locale }: { address: string; locale: "fr" | "en" }) {
   const t = translations.playerProfile;
@@ -616,9 +642,6 @@ function TransactionHistory({ address, locale }: { address: string; locale: "fr"
       .catch(() => {})
       .finally(() => setLoading(false));
   }
-
-  const totalIn = txs.filter(t => t.type === "in").reduce((s, t) => s + t.amount, 0);
-  const totalOut = txs.filter(t => t.type === "out").reduce((s, t) => s + t.amount, 0);
 
   return (
     <div className="rounded-2xl bg-white/70 backdrop-blur-sm border border-ink/10 shadow-sm overflow-hidden">
@@ -646,11 +669,11 @@ function TransactionHistory({ address, locale }: { address: string; locale: "fr"
               {/* Summary */}
               <div className="flex gap-2">
                 <div className="flex-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 p-2 text-center">
-                  <p className="text-sm font-bold text-emerald-600">+{Math.round(totalIn * 1000) / 1000} CRC</p>
+                  <p className="text-sm font-bold text-emerald-600">{formatTxTotals(txs, "in", locale)}</p>
                   <p className="text-[10px] text-emerald-600/60">{t.received[locale]}</p>
                 </div>
                 <div className="flex-1 rounded-xl bg-red-50 dark:bg-red-900/20 p-2 text-center">
-                  <p className="text-sm font-bold text-red-500">-{Math.round(totalOut * 1000) / 1000} CRC</p>
+                  <p className="text-sm font-bold text-red-500">{formatTxTotals(txs, "out", locale)}</p>
                   <p className="text-[10px] text-red-500/60">{t.spent[locale]}</p>
                 </div>
               </div>
@@ -671,7 +694,7 @@ function TransactionHistory({ address, locale }: { address: string; locale: "fr"
                       </div>
                     </div>
                     <span className={`text-xs font-bold whitespace-nowrap ${tx.type === "in" ? "text-emerald-600" : "text-red-500"}`}>
-                      {tx.type === "in" ? "+" : "-"}{tx.amount} CRC
+                      {formatTxAmount(tx.amount, tx.currency, locale, tx.type === "in" ? "+" : "-")}
                     </span>
                   </div>
                 ))}

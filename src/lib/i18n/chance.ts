@@ -303,6 +303,7 @@ export const chanceTranslations = {
     title: { fr: "Jeux de Chance", en: "Games of Chance" },
     dailyTitle: { fr: "Roue Quotidienne", en: "Daily Wheel" },
     dailyDesc: { fr: "Tournez la roue quotidienne pour gagner des Fragments ou du CRC.", en: "Spin the daily wheel to win Fragments or CRC." },
+    dailyBadge: { fr: "Gratuit", en: "Free" },
     lotteriesTitle: { fr: "Loteries", en: "Lotteries" },
     lotteriesDesc: { fr: "Loteries transparentes sur la blockchain Gnosis.", en: "Transparent lotteries on Gnosis blockchain." },
     lootboxTitle: { fr: "Lootboxes", en: "Lootboxes" },
