@@ -8,12 +8,12 @@ import {
   FlaskConical,
   Sparkles,
   Users,
-  Wallet,
   ShieldCheck,
   Zap,
   Trophy,
   Gamepad2,
   Lock,
+  Gift,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "@/components/language-provider";
@@ -75,6 +75,9 @@ const CHANCE_EMOJI: Record<string, string> = {
 
 type PlatformStatsLite = {
   allTime: { rounds: number; players: number; wagered: number; paidOut: number };
+  crcRewards?: {
+    distributed: number;
+  };
 };
 
 export default function LandingFragments() {
@@ -94,7 +97,10 @@ export default function LandingFragments() {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled || !data) return;
-        setStats({ allTime: data.allTime });
+        setStats({
+          allTime: data.allTime,
+          crcRewards: data.crcRewards,
+        });
       })
       .catch(() => {});
     return () => {
@@ -128,6 +134,7 @@ export default function LandingFragments() {
 
   const wageredFragments = stats ? Math.round(stats.allTime.wagered * CRC_TO_FRAGMENTS_RATIO) : null;
   const paidOutFragments = stats ? Math.round(stats.allTime.paidOut * CRC_TO_FRAGMENTS_RATIO) : null;
+  const distributedCrc = stats?.crcRewards ? stats.crcRewards.distributed : null;
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -183,7 +190,7 @@ export default function LandingFragments() {
       </section>
 
       <section ref={statsSectionRef} className="max-w-6xl mx-auto px-4 pb-16 w-full">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
           <StatCard
             icon={<Sparkles className="h-5 w-5" />}
             target={stats?.allTime.rounds ?? null}
@@ -215,6 +222,15 @@ export default function LandingFragments() {
             loading={t.statsLoading[locale]}
             locale={locale}
             visible={statsVisible}
+          />
+          <StatCard
+            icon={<Gift className="h-5 w-5" />}
+            target={distributedCrc}
+            label={t.statsCrcDistributed[locale]}
+            loading={t.statsLoading[locale]}
+            locale={locale}
+            visible={statsVisible}
+            formatValue={(value) => formatStatNumber(value, locale, 3)}
           />
         </div>
       </section>
@@ -405,6 +421,7 @@ function StatCard({
   loading,
   locale,
   visible,
+  formatValue,
 }: {
   icon: React.ReactNode;
   target: number | null;
@@ -412,9 +429,12 @@ function StatCard({
   loading: string;
   locale: "fr" | "en";
   visible: boolean;
+  formatValue?: (value: number) => string;
 }) {
-  const animated = useCountUp(target, { enabled: visible, duration: 1500 });
-  const display = animated != null ? animated.toLocaleString(locale) : null;
+  const animated = useCountUp(target, { enabled: visible && !formatValue, duration: 1500 });
+  const display = formatValue
+    ? (visible && target != null ? formatValue(target) : null)
+    : (animated != null ? animated.toLocaleString(locale) : null);
   return (
     <div className="rounded-2xl bg-white dark:bg-white/5 border border-ink/5 dark:border-white/10 p-5">
       <div className="flex items-center gap-2 text-ink/50 dark:text-white/50 text-xs font-semibold uppercase tracking-widest">
@@ -426,6 +446,10 @@ function StatCard({
       </div>
     </div>
   );
+}
+
+function formatStatNumber(value: number, locale: "fr" | "en", maximumFractionDigits = 0) {
+  return value.toLocaleString(locale, { maximumFractionDigits });
 }
 
 function HowStep({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {

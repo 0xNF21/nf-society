@@ -77,6 +77,13 @@ export type PlatformStats = {
 
   // Historique des 100 dernieres parties (multi + chance confondus)
   recentGames: RecentGameRow[];
+
+  // Rewards CRC publics en mode F2P : daily rare + saisons / DAO rewards.
+  crcRewards: {
+    distributed: number;
+    dailyDistributed: number;
+    seasonDistributed: number;
+  };
 };
 
 const MULTI_GAME_META: Record<string, { label: string; emoji: string; color: string }> = {
@@ -550,11 +557,44 @@ async function getCasinoBank(): Promise<PlatformStats["casinoBank"]> {
   }
 }
 
+async function computeCrcRewardsStats(): Promise<PlatformStats["crcRewards"]> {
+  try {
+    const payoutRows = await db
+      .select({
+        dailyDistributed: sql<number>`COALESCE(SUM(CASE WHEN ${payouts.gameType} = 'daily-wheel' THEN ${payouts.amountCrc} ELSE 0 END), 0)::float`,
+        seasonDistributed: sql<number>`COALESCE(SUM(CASE WHEN (${payouts.gameType} LIKE 'season-%' OR ${payouts.gameType} IN ('dao-reward', 'dao_reward', 'season-reward', 'season_reward')) THEN ${payouts.amountCrc} ELSE 0 END), 0)::float`,
+      })
+      .from(payouts)
+      .where(and(
+        sql`${payouts.amountCrc} > 0`,
+        inArray(payouts.status, ["success", "sending"]),
+        sql`COALESCE(${payouts.transferTxHash}, '') NOT LIKE 'fragments:%'`,
+        sql`(${payouts.gameType} = 'daily-wheel' OR ${payouts.gameType} LIKE 'season-%' OR ${payouts.gameType} IN ('dao-reward', 'dao_reward', 'season-reward', 'season_reward'))`,
+      ));
+
+    const dailyDistributed = Number(payoutRows[0]?.dailyDistributed ?? 0);
+    const seasonDistributed = Number(payoutRows[0]?.seasonDistributed ?? 0);
+
+    return {
+      distributed: dailyDistributed + seasonDistributed,
+      dailyDistributed,
+      seasonDistributed,
+    };
+  } catch (err) {
+    console.error("[platform-stats] crc rewards fetch failed:", err);
+    return {
+      distributed: 0,
+      dailyDistributed: 0,
+      seasonDistributed: 0,
+    };
+  }
+}
+
 /**
  * Entry point: agrege tout en parallele.
  */
 export async function computePlatformStats(): Promise<PlatformStats> {
-  const [casinoBank, period24h, period7d, period30d, allTime, games, dailyData, recentGames] = await Promise.all([
+  const [casinoBank, period24h, period7d, period30d, allTime, games, dailyData, recentGames, crcRewards] = await Promise.all([
     getCasinoBank(),
     computePeriodStats(daysAgo(1)),
     computePeriodStats(daysAgo(7)),
@@ -563,6 +603,7 @@ export async function computePlatformStats(): Promise<PlatformStats> {
     computeGamesBreakdown(),
     computeDaily30d(),
     getRecentGames(100),
+    computeCrcRewardsStats(),
   ]);
 
   return {
@@ -575,5 +616,6 @@ export async function computePlatformStats(): Promise<PlatformStats> {
     daily30d: dailyData.points,
     chartGames: dailyData.chartGames,
     recentGames,
+    crcRewards,
   };
 }

@@ -155,6 +155,7 @@ export const landingTranslations = {
     statsPlayers: { fr: "Joueurs uniques", en: "Unique players" },
     statsWagered: { fr: "Fragments engages", en: "Fragments played" },
     statsPaidOut: { fr: "Fragments distribues", en: "Fragments distributed" },
+    statsCrcDistributed: { fr: "CRC distribues", en: "CRC distributed" },
     statsBank: { fr: "Pot communautaire", en: "Community pool" },
     statsLoading: { fr: "Chargement...", en: "Loading..." },
     gamesTitle: { fr: "Nos 17 jeux", en: "Our 17 games" },
