@@ -1,6 +1,8 @@
 # NF Society
 
-Plateforme communautaire du DAO NF Society sur Gnosis Chain (Circles Protocol).
+Plateforme communautaire free-to-play du DAO NF Society sur Gnosis Chain
+(Circles Protocol). Le rail de jeu actif est **Fragments** ; les CRC sont
+reserves aux rewards explicites, remboursements et cashouts legacy.
 
 ## Commands
 
@@ -34,13 +36,13 @@ src/
     api/         # 130+ routes API (POST/GET, DB operations)
     # 17 jeux, chacun avec son lobby + sa page de jeu :
     # Multijoueur : morpion, memory, dames, pfc, relics, crc-races
-    # Chance/casino : blackjack, coin-flip, crash-dash, dice, hilo, keno,
+    # Arcade chance : blackjack, coin-flip, crash-dash, dice, hilo, keno,
     #                 mines, plinko, roulette, loterie/loteries,
     #                 lootbox/lootboxes
-    daily/       # Daily scratch + spin + jackpot
-    shop/        # Boutique XP
-    exchange/    # Echange CRC (on-chain direct, pas d'API)
-    chance/      # Hub des jeux chance
+    daily/       # Daily Fragments/XP + rewards CRC configurees
+    shop/        # Boutique Fragments
+    exchange/    # Echange CRC legacy / gouvernance
+    chance/      # Hub arcade chance
     multijoueur/ # Hub des jeux multi
     admin/       # Dashboard admin (1873 l. — en dette)
     dashboard/   # Dashboard joueur
@@ -49,14 +51,17 @@ src/
     ui/          # shadcn/ui primitives (ne pas modifier)
     demo-provider.tsx    # Mode demo global (React Context)
     miniapp-provider.tsx # Contexte Mini App Circles (isMiniApp, sendPayment)
-    game-payment.tsx     # Paiement multijoueur (QR + Mini App)
-    chance-payment.tsx   # Paiement chance (QR + Mini App)
-    balance-pay-button.tsx # Bouton "Payer depuis mon solde" (balance system)
+    free-play-start.tsx  # Lancement F2P via /api/{jeu}/start-free
+    game-payment.tsx     # Paiement multijoueur legacy / real-stakes
+    chance-payment.tsx   # Paiement chance legacy / real-stakes
+    balance-pay-button.tsx # Bouton legacy "Payer depuis mon solde"
   lib/
     db/schema/        # Drizzle schema (51 tables, un fichier par domaine)
-    circles.ts        # SDK Circles, generation liens paiement, detection tx
-    payout.ts         # Payout via Gnosis Safe + Zodiac Roles Modifier
-    wallet.ts         # Balance system : top-up, debit, credit, cashout
+    fragments.ts      # Helpers Fragments (rail arcade F2P)
+    wallet-fragments.ts # Debit/credit Fragments pour jouer
+    circles.ts        # SDK Circles, liens paiement legacy, detection tx legacy
+    payout.ts         # Payout source-aware (Fragments vs CRC)
+    wallet.ts         # Balance/cashout CRC legacy
     wallet-ledger.ts  # Helpers append-only pour wallet_ledger
     wallet-game-dispatch.ts # Routing balance-pay par jeu
     rate-limit.ts     # Rate limiter Upstash + fallback in-memory
@@ -69,22 +74,31 @@ src/
     telegram/         # Bot Telegram (grammy) — support messages
 ```
 
-## Les 2 modes de paiement
+## Rail de jeu actuel : Fragments
 
-Chaque jeu peut etre paye de deux facons :
+Chaque jeu doit privilegier le parcours **Free-to-Play + Fragments** :
 
-### Mode 1 — Paiement direct on-chain (original)
-- 1 transaction Gnosis par partie depuis le wallet Circles du joueur
-- Le serveur poll la blockchain pour detecter la tx
-- Plus lent + frais de gas, mais 100% on-chain auditable
+- aucune tx Gnosis pour lancer les jeux par defaut ;
+- `POST /api/{jeu}/start-free` debite `players.fragments_balance` ;
+- `src/lib/wallet-fragments.ts` cree les rows de jeu via le dispatcher existant ;
+- `game_fragment_events` trace les debits/gains ;
+- le `sourceTxHash` synthetique est `fragments:{eventId}` ;
+- les gains de partie creditent des Fragments, jamais des CRC.
 
-### Mode 2 — Balance system (Phase 3, recommande)
-- Le joueur depose ses CRC en une fois dans la Safe NF Society (top-up)
-- `players.balance_crc` est credite, `wallet_ledger` enregistre la tx
-- Chaque partie suivante debite le solde DB (`POST /api/wallet/pay-game`), **zero tx on-chain**
-- Cashout a tout moment via `POST /api/wallet/cashout-init` → Safe renvoie les CRC
+Les champs historiques `betCrc` restent dans beaucoup de schemas comme unite de
+reference. En F2P, ils sont convertis en Fragments par `crcToFragments()`.
 
-**Important** — ce n'est **pas un wallet custodial** au sens Coinbase : on ne gere pas les cles du joueur. Le solde est une simple ecriture comptable off-chain adossee 1:1 aux CRC detenus dans la Safe. L'invariant `sum(players.balance_crc) ≈ Safe_onchain_balance` est check par `/api/admin/wallet-health`.
+## Rails CRC legacy
+
+Les anciens rails existent encore, mais ne sont plus le chemin produit normal :
+
+- paiement direct on-chain via `/api/{jeu}-scan` ;
+- balance CRC via `players.balance_crc` et `/api/wallet/pay-game` ;
+- cashout legacy via `/api/wallet/cashout-init`.
+
+Tout flux CRC de jeu doit rester derriere `LEGAL_MODE`, `real_stakes` et
+`respondIfStakesDisabled(gameKey)`. Le cashout legacy reste ouvert pour les
+joueurs qui avaient un solde avant le pivot.
 
 ## Les 2 modes d'interface (standalone vs Mini App)
 
@@ -92,17 +106,18 @@ Le projet detecte automatiquement (via `useMiniApp()`) s'il tourne :
 
 ### Mode A — Standalone (navigateur classique)
 - L'utilisateur ouvre `nf-society.vercel.app` directement
-- Paiement : affichage d'un QR code + lien Gnosis App (deep link)
-- Cross-device : scan sur desktop, signature sur mobile
-- Gere dans `game-payment.tsx` / `chance-payment.tsx` via `qrcode` lib
+- En F2P, les jeux se lancent avec Fragments sans QR de paiement
+- Les QR / liens Gnosis App ne concernent que les rails CRC legacy ou explicitement reactives
 
 ### Mode B — Mini App Circles (iframe)
 - Le projet tourne en iframe a l'interieur de l'app Circles/Gnosis
-- Paiement : bouton natif → `sendPayment(recipient, amount, data)` via `postMessage` bridge
-- Signature 1-tap, pas de QR
+- En F2P, le contexte Mini App sert surtout a l'identite, au profil, aux rewards et au cashout legacy
+- `sendPayment(recipient, amount, data)` ne doit etre utilise que pour un flux CRC autorise
 - SDK : `src/lib/miniapp-bridge.ts` + `useMiniApp()` hook
 
-**Regle** : ne jamais generer le QR code en mode Mini App. Toujours utiliser `<GamePayment>` / `<ChancePayment>` qui gerent les deux cas automatiquement.
+**Regle** : ne pas afficher d'UI de paiement CRC pour lancer une partie F2P.
+`<GamePayment>`, `<ChancePayment>` et `balance-pay-button` sont legacy /
+real-stakes et doivent rester derriere les guards.
 
 ## Conventions
 
@@ -133,28 +148,30 @@ Le projet utilise un framework generique pour les jeux multijoueurs.
 ### Fichiers cles du framework
 - `src/lib/game-registry.ts` — Registre central de tous les jeux (config, table DB, routes, couleurs)
 - `src/lib/multiplayer.ts` — Helpers serveur (createMultiplayerGame, scanGamePayments, calculateWinAmount, getLobbyGames, getPlayerStats)
-- `src/components/game-lobby.tsx` — Composant lobby reutilisable (mise, prive/public, rejoindre)
-- `src/components/game-payment.tsx` — Composant paiement reutilisable (QR, scan, boutons)
+- `src/components/game-lobby.tsx` — Composant lobby reutilisable (participation, prive/public, rejoindre)
+- `src/components/free-play-start.tsx` — Bouton de lancement F2P via Fragments
+- `src/components/game-payment.tsx` — Composant paiement legacy / real-stakes (QR, scan, boutons)
 - `src/hooks/use-player-token.ts` — Hook token joueur (localStorage + URL injection)
 - `src/hooks/use-game-polling.ts` — Hook polling etat de jeu
 
 ### Checklist — Nouveau jeu multijoueur
 
 1. **Logique jeu** : `src/lib/{jeu}.ts` (types, regles, fonctions pures)
-2. **Schema DB** : `src/lib/db/schema/{jeu}.ts` avec colonnes communes (slug, betCrc, recipientAddress, commissionPct, player1/2Address, player1/2TxHash, player1/2Token, isPrivate, status, winnerAddress, payoutStatus, payoutTxHash, createdAt, updatedAt) + colonnes specifiques
+2. **Schema DB** : `src/lib/db/schema/{jeu}.ts` avec colonnes communes. Les champs `betCrc`, `recipientAddress`, `player1/2TxHash`, `payoutTxHash` peuvent rester pour compat legacy, mais le rail F2P utilise `fragments:{eventId}` comme source.
 3. **Export schema** : ajouter dans `src/lib/db/schema.ts`
 4. **Enregistrer dans le registre** : ajouter une entree dans `GAME_REGISTRY` de `src/lib/game-registry.ts`
-5. **i18n** : ajouter section `{jeu}` + `landing{Jeu}` dans `src/lib/i18n.ts` (cles lobby standardisees : back, title, subtitle, createGame, betPerPlayer, crcPerPlayer, winnerGets, commission, creating, createBtn, joinGame, gameCode, join, payToStart, payToJoin, payCrc, copied, copyPayLink, inviteP2, scanningPayments, scanPayments, **rules** — texte multi-lignes avec \n, **bold** et - bullets)
+5. **i18n** : ajouter section `{jeu}` + `landing{Jeu}` dans `src/lib/i18n.ts`. Le wording public doit parler de participation/Fragments, pas de mise CRC.
 6. **API create** : `src/app/api/{jeu}/route.ts` — POST appelle `createMultiplayerGame("{jeu}", body)`
-7. **API scan** : `src/app/api/{jeu}-scan/route.ts` — POST appelle `scanGamePayments("{jeu}", slug)`
-8. **API actions** : `src/app/api/{jeu}/[slug]/route.ts` — GET + POST pour les moves (CUSTOM)
-9. **Page lobby** : `src/app/{jeu}/page.tsx` — utilise `<GameLobby gameKey="{jeu}" />`
-10. **Page jeu** : `src/app/{jeu}/[slug]/page.tsx` — utilise `<GamePayment>`, `usePlayerToken`, `useGamePolling` + UI custom
-11. **Feature flag** : ajouter dans la table `featureFlags`
-12. **Migration DB** : creer la table en production
-13. **Build** : verifier `npx tsc --noEmit`
+7. **API start-free** : `src/app/api/{jeu}/start-free/route.ts` — POST appelle `payGameFromFragments(...)`
+8. **API scan legacy** : `src/app/api/{jeu}-scan/route.ts` — POST appelle `scanGamePayments("{jeu}", slug)` et reste gate par `respondIfStakesDisabled`
+9. **API actions** : `src/app/api/{jeu}/[slug]/route.ts` — GET + POST pour les moves (CUSTOM)
+10. **Page lobby** : `src/app/{jeu}/page.tsx` — utilise `<GameLobby gameKey="{jeu}" />`
+11. **Page jeu** : `src/app/{jeu}/[slug]/page.tsx` — utilise `usePlayerToken`, `useGamePolling` + UI custom ; paiement CRC uniquement si real-stakes est explicitement actif
+12. **Feature flag** : ajouter dans la table `featureFlags`
+13. **Migration DB** : creer la table en production
+14. **Build** : verifier `npx tsc --noEmit`
 
-Lobby, paiement, scan, stats, admin = **automatique via le registre**.
+Lobby, start-free, stats, admin = **automatique via le registre**. Le scan/paiement CRC est legacy.
 
 ## Framework Chance (jeux solo)
 
@@ -162,15 +179,18 @@ Le projet utilise un pattern pour les jeux de chance single-player (coin-flip, b
 
 ### Fichiers cles du framework chance
 - `src/lib/game-registry.ts` — `CHANCE_REGISTRY` pour les jeux chance
-- `src/components/chance-payment.tsx` — Composant paiement reutilisable (Mini App + QR)
+- `src/components/free-play-start.tsx` — Bouton de lancement F2P via Fragments
+- `src/components/chance-payment.tsx` — Composant paiement legacy / real-stakes (Mini App + QR)
 - `src/components/pnl-card.tsx` — Carte resultat partageable
 - `src/hooks/use-player-token.ts` — Token joueur (localStorage)
-- `src/lib/payout.ts` — Paiement automatique via Safe + Roles Modifier
-- `src/lib/circles.ts` — Detection paiement on-chain (gameKeys ligne ~439)
+- `src/lib/wallet-fragments.ts` — Creation de rounds F2P + debits/gains Fragments
+- `src/lib/payout.ts` — Payout source-aware (Fragments ou CRC autorise)
+- `src/lib/circles.ts` — Detection paiement on-chain legacy (gameKeys ligne ~439)
 - `src/lib/game-data.ts` — Encodage/decodage gameData dans les tx
 
 ### Pattern jeu interactif (type Hi-Lo, Mines)
-- Paiement CRC → scan cree la partie avec etat initial → actions serveur (reveal/cashout) → payout au cashout
+- F2P : `start-free` debite des Fragments → cree la partie avec etat initial → actions serveur (reveal/cashout) → gain en Fragments
+- Legacy CRC : scan on-chain possible uniquement si real-stakes est explicitement actif
 - `gameState` stocke en JSONB dans la DB, mis a jour a chaque action
 - `getVisibleState()` cache les infos sensibles (positions mines, deck) cote client
 - `playerToken` verifie a chaque action (anti-triche)
@@ -178,37 +198,40 @@ Le projet utilise un pattern pour les jeux de chance single-player (coin-flip, b
 ### Checklist — Nouveau jeu chance
 
 1. **Logique jeu** : `src/lib/{jeu}.ts` (types, regles, fonctions pures, crypto-secure RNG serveur, Math.random client/demo)
-2. **Schema DB** : `src/lib/db/schema/{jeu}.ts` — {jeu}Tables (slug, betOptions, recipientAddress, colors, status) + {jeu}Rounds (playerAddress, transactionHash, betCrc, playerToken, gameState jsonb, status, outcome, payoutCrc, payoutStatus, payoutTxHash, errorMessage, createdAt, updatedAt)
+2. **Schema DB** : `src/lib/db/schema/{jeu}.ts` — {jeu}Tables (slug, betOptions, recipientAddress, colors, status) + {jeu}Rounds (playerAddress, transactionHash, betCrc, playerToken, gameState jsonb, status, outcome, payoutCrc, payoutStatus, payoutTxHash, errorMessage, createdAt, updatedAt). Les champs CRC restent compat legacy ; en F2P `transactionHash` doit etre `fragments:{eventId}`.
 3. **Export schema** : ajouter dans `src/lib/db/schema.ts`
 4. **Enregistrer** : ajouter dans `CHANCE_REGISTRY` de `src/lib/game-registry.ts`
 5. **gameKeys** : ajouter `"{jeu}"` dans la liste gameKeys de `src/lib/circles.ts` (~ligne 439)
 6. **i18n** : ajouter section `{jeu}` dans `src/lib/i18n.ts` + `{jeu}Title`/`{jeu}Desc` dans section `chance`
 7. **API config** : `src/app/api/{jeu}/route.ts` — GET table config, POST creer table (admin)
-8. **API scan** : `src/app/api/{jeu}-scan/route.ts` — scanner paiements, creer partie, XP
-9. **API active** : `src/app/api/{jeu}/active/route.ts` — restaurer session par token
-10. **API actions** : `src/app/api/{jeu}/[id]/action/route.ts` — POST actions + payout via `executePayout()`
-11. **Lobby page** : `src/app/{jeu}/page.tsx` — liste des tables actives depuis DB
-12. **Server page** : `src/app/{jeu}/[slug]/page.tsx` — detection DEMO + query DB + passe au client
-13. **Client component** : `src/components/{jeu}-page.tsx` — DemoGame (client-only) + RealGame (paiement + polling + actions API)
-14. **Chance hub** : ajouter carte dans `src/app/chance/page.tsx`
-15. **Generer la migration** : `npm run db:generate -- --name add_{jeu}_tables`
+8. **API start-free** : `src/app/api/{jeu}/start-free/route.ts` — POST appelle `payGameFromFragments(...)`
+9. **API scan legacy** : `src/app/api/{jeu}-scan/route.ts` — scanner paiements CRC, creer partie, XP ; reste gate par `respondIfStakesDisabled`
+10. **API active** : `src/app/api/{jeu}/active/route.ts` — restaurer session par token
+11. **API actions** : `src/app/api/{jeu}/[id]/action/route.ts` — POST actions + payout via `executePayout()`
+12. **Lobby page** : `src/app/{jeu}/page.tsx` — liste des tables actives depuis DB
+13. **Server page** : `src/app/{jeu}/[slug]/page.tsx` — detection DEMO + query DB + passe au client
+14. **Client component** : `src/components/{jeu}-page.tsx` — DemoGame (client-only) + RealGame (Fragments + polling + actions API)
+15. **Chance hub** : ajouter carte dans `src/app/chance/page.tsx`
+16. **Generer la migration** : `npm run db:generate -- --name add_{jeu}_tables`
     → drizzle-kit compare schema vs meta snapshot, ecrit `drizzle/NNNN_add_{jeu}_tables.sql` + met a jour le snapshot. Plus besoin de route API temporaire ni de script node manuel.
-16. **Appliquer en local** : `npm run db:migrate` (utilise DATABASE_URL de `.env.local`)
-17. **Appliquer sur Neon** : `npx vercel env pull .env.neon && DATABASE_URL=$(grep DATABASE_URL .env.neon | cut -d= -f2-) npm run db:migrate && rm .env.neon`
-18. **Creer la table 'classic'** : POST sur `/api/{jeu}` avec `recipientAddress = SAFE_ADDRESS` (en local puis en prod via fetch sur nf-society.vercel.app)
-19. **Build** : `npm run typecheck` puis `npm run build`
-20. **Commit + push** : deploiement auto Vercel + migration deja appliquee sur Neon
+17. **Appliquer en local** : `npm run db:migrate` (utilise DATABASE_URL de `.env.local`)
+18. **Appliquer sur Neon** : `npx vercel env pull .env.neon && DATABASE_URL=$(grep DATABASE_URL .env.neon | cut -d= -f2-) npm run db:migrate && rm .env.neon`
+19. **Creer la table 'classic'** : POST sur `/api/{jeu}` avec `recipientAddress = SAFE_ADDRESS` (en local puis en prod via fetch sur nf-society.vercel.app)
+20. **Build** : `npm run typecheck` puis `npm run build`
+21. **Commit + push** : deploiement auto Vercel + migration deja appliquee sur Neon
 
 ### SAFE_ADDRESS (Relayer NF Society)
-`0x960A0784640fD6581D221A56df1c60b65b5ebB6f` — utiliser comme recipientAddress pour tous les jeux.
+`0x960A0784640fD6581D221A56df1c60b65b5ebB6f` — utiliser comme recipientAddress pour les tables legacy/real-stakes. Les parties F2P utilisent Fragments.
 
-## Liens de paiement Gnosis
+## Liens de paiement Gnosis (legacy)
 
 - Le parametre `data` dans l'URL Gnosis DOIT etre du **texte brut**, PAS du hex
 - Format : `game:id:token` (ex: `morpion:K7PCE2:46bcdcd6`)
 - `generateGamePaymentLink()` dans `src/lib/circles.ts` genere le lien correct
 - `decodeGameData()` dans `src/lib/game-data.ts` supporte texte ET ancien JSON hex
 - Doc : https://docs.aboutcircles.com/tutorials-and-examples/circles-x-gnosis-app-starter-kit
+
+Ne pas utiliser ces liens pour lancer les parties F2P Fragments.
 
 ## Watch Out
 

@@ -36,8 +36,8 @@ Plateforme communautaire d'une **DAO** sur **Gnosis Chain** utilisant le **Circl
 
 ### Les 17 jeux
 - **Multijoueur 1v1** (6) : morpion, dames, memory, pfc (pierre-feuille-ciseaux), relics, crc-races
-- **Chance / casino-like** (11) : blackjack, coin-flip, crash-dash, dice, hilo, keno, mines, plinko, roulette, lootbox, lottery
-- **Daily** : scratch, spin, jackpot
+- **Arcade chance** (11) : blackjack, coin-flip, crash-dash, dice, hilo, keno, mines, plinko, roulette, lootbox, lottery
+- **Daily** : drops Fragments/XP et rewards CRC configurees par la plateforme
 
 ### Stack
 - Next.js 14 App Router, TypeScript
@@ -59,9 +59,11 @@ src/
   components/    # 44 composants top-level + ui/ (shadcn)
   lib/
     db/schema/   # Drizzle schemas (1 fichier par domaine)
-    circles.ts   # SDK Circles, génération liens paiement, scan tx
-    payout.ts    # Payout Safe + Zodiac Roles
-    wallet.ts    # Balance system
+    fragments.ts # Helpers Fragments (rail arcade F2P)
+    wallet-fragments.ts # Debit/credit Fragments pour jouer
+    circles.ts   # SDK Circles, liens paiement legacy, scan tx legacy
+    payout.ts    # Payout source-aware (Fragments vs CRC)
+    wallet.ts    # Balance/cashout CRC legacy
     stakes.ts    # Kill switch F2P
     legal-mode.ts # Kill switch env-level
     payment.ts   # Encodage gameData dans tx
@@ -70,20 +72,30 @@ src/
 
 ---
 
-## 3. Les 2 modes de paiement par jeu
+## 3. Rail de jeu actuel : Fragments
 
-### Mode 1 — Direct on-chain (legacy)
-- 1 tx Gnosis par partie depuis le wallet du joueur
-- Le serveur poll la blockchain pour détecter (`/api/{jeu}-scan`)
-- Plus lent + frais de gas, 100% on-chain auditable
+Le rail produit par defaut est **Free-to-Play + Fragments**.
 
-### Mode 2 — Balance system (Phase 3)
-- Top-up unique vers la Safe → `players.balance_crc` crédité
-- Chaque partie débite le solde DB (`POST /api/wallet/pay-game`)
-- **Zéro tx on-chain** par partie
-- Cashout à tout moment via `/api/wallet/cashout-init`
+### Fragments (actif)
+- Aucune tx Gnosis n'est requise pour lancer les jeux par defaut.
+- Les routes `start-free` debitent `players.fragments_balance`.
+- Les events sont traces dans `game_fragment_events`.
+- Les parties recoivent un `sourceTxHash` synthetique `fragments:{eventId}`.
+- Les gains de partie creditent des Fragments, jamais des CRC.
+- Les Fragments ne sont ni withdrawables ni convertibles en CRC.
 
-**Important** : ce n'est **pas un wallet custodial** au sens Coinbase. On ne gère pas les clés du joueur. `balance_crc` est une simple écriture comptable off-chain adossée 1:1 aux CRC dans la Safe NF Society. L'invariant `sum(players.balance_crc) ≈ Safe_onchain_balance` est monitoré par `/api/admin/wallet-health`.
+Les anciens champs `betCrc` restent souvent dans les tables de jeux comme unite
+de reference historique. En F2P, `src/lib/wallet-fragments.ts` convertit cette
+reference en Fragments via `crcToFragments()`.
+
+### Rails CRC legacy (non defaut)
+- **Direct on-chain** : scan via `/api/{jeu}-scan`, garde par `respondIfStakesDisabled(gameKey)`.
+- **Balance CRC** : top-up vers Safe + debit `players.balance_crc`, garde par `LEGAL_MODE` et les flags.
+- **Cashout legacy** : reste ouvert pour rembourser les joueurs qui avaient un solde CRC avant le pivot.
+
+Ces rails ne doivent pas etre presentes comme le parcours normal. Pour reactiver
+des mises CRC, il faut `LEGAL_MODE=REAL_STAKES_ALLOWED` **et** les flags DB
+appropries. Sans configuration explicite, le produit reste en Fragments.
 
 ---
 
@@ -93,26 +105,25 @@ Détectés automatiquement via `useMiniApp()` :
 
 ### Mode A — Standalone (navigateur)
 - L'utilisateur ouvre `nf-society.vercel.app` directement
-- Paiement : QR code + lien Gnosis App (deep link)
-- Cross-device : scan sur desktop, signature sur mobile
-- Dans `game-payment.tsx` / `chance-payment.tsx`
+- En F2P, les jeux se lancent avec Fragments sans QR de paiement
+- Les QR / liens Gnosis App ne concernent que les rails CRC legacy ou explicitement reactives
 
 ### Mode B — Mini App Circles (iframe)
 - Le projet tourne en iframe à l'intérieur de l'app Circles/Gnosis
-- Paiement : bouton natif → `sendPayment(recipient, amount, data)` via `postMessage`
-- Signature 1-tap, pas de QR
+- En F2P, le contexte Mini App sert surtout a l'identite, au profil, aux rewards et au cashout legacy
+- Le bouton natif `sendPayment(recipient, amount, data)` ne doit etre utilise que pour un flux CRC autorise
 - SDK : `src/lib/miniapp-bridge.ts` + `useMiniApp()` hook
 - Auth future : utiliser `sign_message` via le host Mini App officiel quand disponible,
   puis verification serveur de la signature pour creer la session. Voir
   `docs/codex/AUTH-MINIAPP-SIGNMESSAGE.md`.
 
-**Règle stricte** : ne jamais générer le QR en mode Mini App. Toujours utiliser `<GamePayment>` / `<ChancePayment>` qui gèrent les deux cas.
+**Règle stricte** : en F2P, ne pas afficher d'UI de paiement CRC pour lancer une partie. Les composants de paiement (`<GamePayment>`, `<ChancePayment>`, `balance-pay-button`) sont legacy / real-stakes et doivent rester derriere les guards.
 
 ---
 
 ## 5. Le pivot légal (pourquoi tout ça change)
 
-Le founder pivote la plateforme de **"casino CRC"** vers **"arcade XP gratuite + tournois DAO"**.
+Le founder pivote la plateforme de **"casino CRC"** vers **"arcade Fragments gratuite + rewards CRC explicites"**.
 
 ### Le droit français
 L'article L320-1 du Code de la sécurité intérieure et l'ANJ caractérisent un **jeu d'argent** par 4 critères cumulatifs :
@@ -127,11 +138,12 @@ L'article L320-1 précise que **les jeux de skill peuvent aussi être visés** q
 - Aucune mise des joueurs
 - Aucun top-up CRC
 - Aucun pot mutualisé
-- Aucune commission
-- Aucun gain CRC issu d'un random
-- Les CRC distribués viennent de la **DAO** via tournois gratuits, challenges skill, saisons, bounties
+- Aucune commission CRC issue d'une mise joueur
+- Aucun payout CRC de fin de partie issu d'un stake ou d'un pot joueur
+- Les jeux peuvent crediter/debiter des Fragments uniquement
+- Les CRC distribues viennent de rewards explicites : **DAO**, saisons skill, bounties, daily/config plateforme, remboursements, corrections admin
 
-**Important** : les jeux casino-like existants restent jouables, mais en **Arcade XP** (XP non-convertible, sans valeur monétaire). Les CRC sont réservés aux **tournois skill** + **rewards DAO**.
+**Important** : les jeux chance existants restent jouables, mais en **Arcade Fragments**. Les Fragments sont non-convertibles, non-withdrawable, sans valeur monetaire. Les CRC sont reserves aux **rewards explicites** et aux flux legacy autorises.
 
 ### Le mot-clé
 **Source-aware** : le code distingue les sources de financement par préfixe de `txHash` :
@@ -140,9 +152,10 @@ L'article L320-1 précise que **les jeux de skill peuvent aussi être visés** q
 |---|---|---|
 | `0x...` (40 hex) | Paiement on-chain réel | Safe + Roles → ERC-1155 transfer |
 | `balance:{ledgerId}` | Débit `players.balance_crc` | `creditPrize` → ledger entry |
-| `xp:{eventId}` | Débit XP via `game_xp_events` | `executeXpPayout` → XP credit |
+| `fragments:{eventId}` | Débit Fragments via `game_fragment_events` | `executeFragmentsPayout` → credit Fragments |
+| `xp:{eventId}` | Ancien rail XP / compat | traité comme Fragments, jamais Safe |
 
-Le routing doit **respecter le rail d'origine**. Une partie financée en XP ne doit JAMAIS payer en CRC, même par accident.
+Le routing doit **respecter le rail d'origine**. Une partie financee en Fragments ne doit JAMAIS payer en CRC, meme par accident.
 
 ---
 
@@ -150,20 +163,20 @@ Le routing doit **respecter le rail d'origine**. Une partie financée en XP ne d
 
 ### Les 2 flags DB (table `feature_flags`)
 - `real_stakes` : `"enabled"` (CRC mode) ou `"hidden"` (F2P)
-- `chance_games_xp_only` : `"enabled"` (nominal) ou `"hidden"` (force XP pour chance games même si real_stakes=enabled)
+- `chance_games_fragments_only` : `"enabled"` (nominal) ou `"hidden"` (force Fragments pour chance games même si real_stakes=enabled)
 
-⚠️ **Sémantique inversée pour chance_games_xp_only** :
+⚠️ **Sémantique inversée pour chance_games_fragments_only** :
 - `"enabled"` = override OFF (nominal, on respecte real_stakes)
-- `"hidden"` = override ON (force chance en XP)
+- `"hidden"` = override ON (force chance en Fragments)
 
 C'est confusing mais on ne renomme pas — historique du projet.
 
 ### Truth table
-| `real_stakes` | `chance_games_xp_only` | Comportement |
+| `real_stakes` | `chance_games_fragments_only` | Comportement |
 |---|---|---|
 | `enabled` | `enabled` | All CRC |
-| `enabled` | `hidden` | Skill multi en CRC, chance en XP |
-| `hidden` | * | All XP |
+| `enabled` | `hidden` | Skill multi en CRC, chance en Fragments |
+| `hidden` | * | All Fragments |
 
 ### Le kill switch env-level (depuis PR 1)
 - `LEGAL_MODE` env var, défaut **`F2P_ONLY`**
@@ -174,28 +187,32 @@ C'est confusing mais on ne renomme pas — historique du projet.
 ### Les helpers centraux
 - `src/lib/legal-mode.ts` → `getLegalMode()`, `isF2POnlyMode()`, `areTopupsEnabled()`
 - `src/lib/stakes.ts` → `isRealStakesEnabled(gameKey?)`, `respondIfStakesDisabled()`, `assertRealStakesEnabled()`
-- `src/lib/payout.ts` → `executePayout()` avec routing source-aware par priorités (5 niveaux)
+- `src/lib/payout.ts` → `executePayout()` avec routing source-aware par priorites strictes
 - `src/lib/wallet.ts` → `payPrize()`, `payCommission()`, `creditPrize()`, `getBalance()`
-- `src/lib/wallet-xp.ts` → `payGameFromXp()`, `creditMultiWinnerXp()`
+- `src/lib/fragments.ts` → `crcToFragments()`, `fragmentsToCrc()`, helpers de solde Fragments
+- `src/lib/wallet-fragments.ts` → `payGameFromFragments()`, `creditMultiWinnerFragments()`
 
-### Les 6 routes `start-free` (rail XP multi)
-`morpion`, `dames`, `memory`, `pfc`, `relics`, `crc-races` — équivalent XP de `/api/wallet/pay-game`.
+### Les routes `start-free` (rail Fragments)
+Chaque jeu jouable en F2P expose une route `src/app/api/{jeu}/start-free/route.ts`.
+Ces routes sont l'equivalent Fragments de l'ancien `/api/wallet/pay-game`.
 
-### Les 16 routes `*-scan` (paiements on-chain)
-Toutes gatées par `respondIfStakesDisabled(gameKey)`.
+### Les routes `*-scan` (paiements on-chain legacy)
+Toutes gatees par `respondIfStakesDisabled(gameKey)`.
 
 ### Le système de payout
 `executePayout` route par priorité :
-1. `sourceTxHash="xp:..."` → `executeXpPayout` (toujours XP)
+1. `sourceTxHash="fragments:..."` ou `"xp:..."` → `executeFragmentsPayout` (toujours Fragments)
 2. `sourceTxHash="balance:..."` → blocked (passer par `creditPrize`)
 3. `payoutReason ∈ {legacy_cashout, game_refund, dao_reward, admin_correction}` → `executeOnchainPayout`
-4. `LEGAL_MODE = F2P_ONLY` → blocked (filet final)
-5. `REAL_STAKES_ALLOWED` → fallback flag-based (XP si chance_xp_only force, sinon on-chain)
+4. `payoutReason=daily_random_crc` + `gameType=daily-*` → `executeOnchainPayout`
+5. `LEGAL_MODE = F2P_ONLY` → blocked (filet final)
+6. `REAL_STAKES_ALLOWED` → fallback flag-based (Fragments si chance_fragments_only force, sinon on-chain)
 
 `PayoutReason` whitelist :
 ```ts
 "legacy_cashout" | "game_refund" | "dao_reward" | "admin_correction"  // OK en F2P
-"game_win" | "shop_crc" | "daily_random_crc" | "lottery_win" | "unknown" // bloqué en F2P
+"daily_random_crc" // OK uniquement pour gameType daily-*
+"game_win" | "shop_crc" | "lottery_win" | "unknown" // bloqué en F2P
 ```
 
 ---
@@ -210,7 +227,7 @@ Toutes gatées par `respondIfStakesDisabled(gameKey)`.
 | **PR 3** | ⏳ | Wording : casino → arcade, mise → participation, suppression jackpot/bet/stake |
 | **PR 4** | ⏳ | Migration `balance_crc → legacy_balance_crc` + `claimable_rewards_crc` |
 | **PR 5** | ⏳ | Schema `competitions`, `seasons`, `reward_allocations`, `competition_scores` |
-| **PR 6** | ⏳ | Season Zero MVP : 3 jeux skill (Dames + Morpion + Puissance 4), dotation DAO fixe |
+| **PR 6** | ⏳ | Season Zero MVP : 3 jeux skill (Dames + Relics + Memory), dotation DAO fixe |
 
 **Principe de séquence** : couper l'exposition avant de construire le remplacement. Chaque PR est défensive ou additive — jamais "je casse pour reconstruire".
 
@@ -289,8 +306,9 @@ Si une nouvelle PR commence sans brief, demande au founder de le créer depuis `
 - `src/lib/legal-mode.ts` — kill switch env (LEGAL_MODE)
 - `src/lib/stakes.ts` — kill switch DB flags
 - `src/lib/payout.ts` — système payout source-aware
-- `src/lib/wallet.ts` — balance system + payPrize/payCommission
-- `src/lib/wallet-xp.ts` — équivalent XP de balance
+- `src/lib/fragments.ts` — helpers Fragments
+- `src/lib/wallet-fragments.ts` — rail F2P Fragments pour lancer/crediter les jeux
+- `src/lib/wallet.ts` — balance system legacy + payPrize/payCommission
 - `src/lib/circles.ts` — SDK Circles, scan paiements on-chain
 - `src/lib/multiplayer.ts` — helpers multi (createMultiplayerGame, scanGamePayments)
 - `src/lib/game-registry.ts` — registre central des jeux
@@ -300,11 +318,11 @@ Si une nouvelle PR commence sans brief, demande au founder de le créer depuis `
 - `src/lib/db/schema/{jeu}.ts` — table par jeu
 
 ### Routes critiques
-- `src/app/api/wallet/topup-scan/route.ts` — entrée balance system (410 Gone en F2P depuis PR 1)
-- `src/app/api/wallet/pay-game/route.ts` — débit balance pour partie
-- `src/app/api/wallet/cashout-init/route.ts` — retrait legacy
-- `src/app/api/{jeu}/start-free/route.ts` — rail XP multi (gaté depuis PR 1)
-- `src/app/api/{jeu}-scan/route.ts` — scan paiements on-chain par jeu
+- `src/app/api/{jeu}/start-free/route.ts` — rail Fragments F2P
+- `src/app/api/wallet/topup-scan/route.ts` — entrée balance system legacy (410 Gone en F2P)
+- `src/app/api/wallet/pay-game/route.ts` — débit balance CRC legacy
+- `src/app/api/wallet/cashout-init/route.ts` — retrait legacy toujours ouvert
+- `src/app/api/{jeu}-scan/route.ts` — scan paiements on-chain legacy par jeu
 - `src/app/api/payout/route.ts` — endpoint admin (whitelist depuis PR 1)
 
 ---
