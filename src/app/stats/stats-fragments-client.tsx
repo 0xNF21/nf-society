@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Sparkles, Users, Trophy, Zap, Gift } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
-import type { XpPlatformStats } from "@/lib/platform-stats-xp";
+import type { FragmentPlatformStats } from "@/lib/platform-stats-fragments";
 
 const GAME_LABELS: Record<string, { fr: string; en: string }> = {
   morpion: { fr: "Morpion", en: "Tic-Tac-Toe" },
@@ -26,9 +26,9 @@ const GAME_LABELS: Record<string, { fr: string; en: string }> = {
   lottery: { fr: "Loterie", en: "Lottery" },
 };
 
-export default function StatsXpClient({ stats }: { stats: XpPlatformStats }) {
+export default function StatsFragmentsClient({ stats }: { stats: FragmentPlatformStats }) {
   const { locale } = useLocale();
-  const t = translations.statsXp;
+  const t = translations.statsFragments;
   const bcp47 = locale === "fr" ? "fr-FR" : "en-US";
   const fmt = (n: number) => n.toLocaleString(bcp47);
 
@@ -68,13 +68,13 @@ export default function StatsXpClient({ stats }: { stats: XpPlatformStats }) {
                 icon={<Zap className="h-5 w-5" />}
                 label={t.kpiWagered[locale]}
                 value={fmt(allTime.wagered)}
-                unit="XP"
+                unit="Fragments"
               />
               <Kpi
                 icon={<Trophy className="h-5 w-5" />}
                 label={t.kpiPaidOut[locale]}
                 value={fmt(allTime.paidOut)}
-                unit="XP"
+                unit="Fragments"
               />
             </div>
 
@@ -94,8 +94,8 @@ export default function StatsXpClient({ stats }: { stats: XpPlatformStats }) {
                     {t.daoPoolTotal[locale]}
                   </div>
                   <div className="mt-1 font-display text-3xl font-bold text-marine tabular-nums">
-                    {fmt(daoPool.totalXp)}{" "}
-                    <span className="text-base text-ink/50 dark:text-white/50">XP</span>
+                    {fmt(daoPool.totalFragments)}{" "}
+                    <span className="text-base text-ink/50 dark:text-white/50">Fragments</span>
                   </div>
                 </div>
                 <div>
@@ -103,8 +103,8 @@ export default function StatsXpClient({ stats }: { stats: XpPlatformStats }) {
                     {t.daoPoolMonth[locale]}
                   </div>
                   <div className="mt-1 font-display text-3xl font-bold text-ink dark:text-white tabular-nums">
-                    {fmt(daoPool.last30dXp)}{" "}
-                    <span className="text-base text-ink/50 dark:text-white/50">XP</span>
+                    {fmt(daoPool.last30dFragments)}{" "}
+                    <span className="text-base text-ink/50 dark:text-white/50">Fragments</span>
                   </div>
                 </div>
               </div>
@@ -141,10 +141,10 @@ export default function StatsXpClient({ stats }: { stats: XpPlatformStats }) {
                           {fmt(row.uniquePlayers)}
                         </td>
                         <td className="px-5 py-2.5 text-right tabular-nums text-ink/70 dark:text-white/70">
-                          {fmt(row.wagered)} <span className="text-xs opacity-60">XP</span>
+                          {fmt(row.wagered)} <span className="text-xs opacity-60">Fragments</span>
                         </td>
                         <td className="px-5 py-2.5 text-right tabular-nums text-ink/70 dark:text-white/70">
-                          {fmt(row.paidOut)} <span className="text-xs opacity-60">XP</span>
+                          {fmt(row.paidOut)} <span className="text-xs opacity-60">Fragments</span>
                         </td>
                       </tr>
                     ))}

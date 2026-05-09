@@ -4,8 +4,9 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { dailySessions, players } from "@/lib/db/schema";
 import { and, eq, sql } from "drizzle-orm";
-import { allowDailyRepeatTests, generateDailyToken, todayString } from "@/lib/daily";
+import { allowDailyRepeatTests, generateDailyToken, parseDailyWheelResult, todayString } from "@/lib/daily";
 import { requireAuthenticatedAddress } from "@/lib/auth/session";
+import { checkAndAwardBadges } from "@/lib/badges";
 
 function sessionPayload(session: typeof dailySessions.$inferSelect) {
   return {
@@ -13,14 +14,14 @@ function sessionPayload(session: typeof dailySessions.$inferSelect) {
     token: session.token,
     address: session.address,
     wheelPlayed: session.spinPlayed,
-    wheelResult: session.spinResult ? JSON.parse(session.spinResult) : null,
+    wheelResult: parseDailyWheelResult(session.spinResult),
   };
 }
 
 /**
- * POST /api/daily/claim-from-balance  { address }
+ * POST /api/daily/claim-from-balance
  *
- * Balance-mode equivalent of the daily flow.
+ * Legacy balance-mode daily flow. Identity comes from the authenticated session.
  */
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "daily-claim", 60, 60000);
@@ -71,6 +72,23 @@ export async function POST(req: NextRequest) {
         .set({ txHash: `balance:${session.id}:daily` })
         .where(eq(dailySessions.id, session.id));
 
+      await tx.execute(sql`
+        INSERT INTO ${players} (address, xp, fragments_balance, fragments_spent, level, streak, last_seen, last_daily_checkin_at, created_at)
+        VALUES (${addr}, 0, 0, 0, 1, 1, NOW(), ${date}::date, NOW())
+        ON CONFLICT (address) DO UPDATE
+        SET streak = CASE
+              WHEN players.last_daily_checkin_at IS NULL THEN 1
+              WHEN players.last_daily_checkin_at::date = ${date}::date THEN players.streak
+              WHEN players.last_daily_checkin_at::date = (${date}::date - INTERVAL '1 day')::date THEN players.streak + 1
+              ELSE 1
+            END,
+            last_daily_checkin_at = CASE
+              WHEN players.last_daily_checkin_at::date = ${date}::date THEN players.last_daily_checkin_at
+              ELSE ${date}::date
+            END,
+            last_seen = NOW()
+      `);
+
       return {
         session: {
           ...session,
@@ -82,6 +100,14 @@ export async function POST(req: NextRequest) {
 
     if (!claimed) {
       return NextResponse.json({ error: "no_balance" }, { status: 403 });
+    }
+
+    if (!claimed.alreadyClaimed) {
+      try {
+        await checkAndAwardBadges(addr, "daily_checkin", { hour: new Date().getHours() });
+      } catch (badgeErr) {
+        console.error("[Daily] claim-from-balance badge check error:", badgeErr);
+      }
     }
 
     return NextResponse.json({

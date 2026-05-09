@@ -1,28 +1,28 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { payGameFromXp } from "@/lib/wallet-xp";
+import { payGameFromFragments } from "@/lib/wallet-fragments";
 import { isRealStakesEnabled } from "@/lib/stakes";
 import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/morpion/start-free
  *
- * Equivalent XP de /api/wallet/pay-game pour une partie morpion.
+ * Equivalent Fragments de /api/wallet/pay-game pour une partie morpion.
  * Utilise en mode Free-to-Play (flag `real_stakes=hidden`).
  *
  * Body: {
  *   slug: string,          // slug de la partie morpion existante (creee via POST /api/morpion)
  *   address: string,       // adresse du joueur (peut etre un handle demo 0x...)
  *   playerToken: string,   // token anti-triche cote client
- *   amount: number,        // mise XP
+ *   amount: number,        // mise Fragments
  * }
  *
- * Success: 200 { ok: true, xpAfter, role: "player1"|"player2", gameRow }
+ * Success: 200 { ok: true, fragmentsAfter, role: "player1"|"player2", gameRow }
  * Errors :
  *   400 missing_fields / invalid_address / invalid_amount / missing_player_token / unsupported_game
  *   404 not_found
- *   422 insufficient_xp / wrong_bet / already_joined / already_full
+ *   422 insufficient_fragments / wrong_bet / already_joined / already_full
  *   500 internal_error
  */
 export async function POST(req: NextRequest) {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   // Gate F2P — si le mode CRC reel est actif pour ce jeu, le client doit
   // utiliser /api/wallet/pay-game (balance) ou le scan on-chain (paiement
-  // direct), pas la route XP gratuite. Bloque la fuite "start-free + payout
+  // direct), pas la route Fragments gratuite. Bloque la fuite "start-free + payout
   // CRC" identifiee dans l'audit PR1.
   if (await isRealStakesEnabled("morpion")) {
     return NextResponse.json(
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
 
-    const result = await payGameFromXp({
+    const result = await payGameFromFragments({
       gameKey: "morpion",
       slug: String(slug),
       address,

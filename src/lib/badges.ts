@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { badges, playerBadges, players } from "@/lib/db/schema";
 import type { BadgeCondition } from "@/lib/db/schema";
-import { eq, and, count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 
 const CIRCLES_RPC_URL = process.env.NEXT_PUBLIC_CIRCLES_RPC_URL || "https://rpc.aboutcircles.com/";
 
@@ -78,7 +78,6 @@ async function evaluateCondition(
         return (context.totalLootbox ?? 0) >= needed;
       }
       if (condition.action?.includes("daily_checkin")) {
-        // Count total players for founder/early_adopter type badges
         const [{ count: playerCount }] = await db.select({ count: count() }).from(players);
         return Number(playerCount) <= needed;
       }

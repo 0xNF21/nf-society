@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { applyAction, getVisibleState, calculatePayout, isValidAction } from "@/lib/hilo";
 import type { HiLoState, HiLoAction } from "@/lib/hilo";
 import { payPrize } from "@/lib/wallet";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { awardPlayerXpSafely } from "@/lib/xp-server";
 
 export async function POST(
   req: NextRequest,
@@ -101,8 +101,14 @@ export async function POST(
           }).where(eq(hiloRounds.id, roundId));
         }
 
-        // XP for win — fire and forget (don't block the response).
-        void awardPlayerXp({ address: round.playerAddress, action: "hilo_win" }).catch(() => {});
+        // XP for win is awaited; failures are logged without breaking the response.
+        await awardPlayerXpSafely({
+          address: round.playerAddress,
+          action: "hilo_win",
+          sourceType: "hilo",
+          sourceId: `round:${round.id}`,
+          metadata: { tableId: round.tableId },
+        });
       }
     }
 

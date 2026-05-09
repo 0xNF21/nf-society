@@ -8,7 +8,7 @@ import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { resolveCoinFlip, isValidChoice } from "@/lib/coin-flip";
 import type { CoinSide } from "@/lib/coin-flip";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { awardPlayerXpSafely } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 // Start block — set to a recent block, only scan recent payments
@@ -155,9 +155,21 @@ export async function POST(req: NextRequest) {
 
         // XP — direct call to xp-server (no HTTP roundtrip, no auth).
         try {
-          void awardPlayerXp({ address: playerAddress, action: "coin_flip_play" }).catch(() => {});
+          await awardPlayerXpSafely({
+            address: playerAddress,
+            action: "coin_flip_play",
+            sourceType: "coin_flip",
+            sourceId: `result:${inserted[0].id}`,
+            metadata: { tableId: table.id, txHash },
+          });
           if (result.outcome === "win") {
-            void awardPlayerXp({ address: playerAddress, action: "coin_flip_win" }).catch(() => {});
+            await awardPlayerXpSafely({
+              address: playerAddress,
+              action: "coin_flip_win",
+              sourceType: "coin_flip",
+              sourceId: `result:${inserted[0].id}`,
+              metadata: { tableId: table.id, txHash },
+            });
           }
         } catch {}
 

@@ -1,4 +1,4 @@
-// Auto-split from src/lib/i18n.ts — pages domain sections
+// Auto-split from src/lib/i18n.ts  pages domain sections
 
 export const pagesTranslations = {
   legal: {
@@ -29,8 +29,8 @@ export const pagesTranslations = {
     by: { fr: "par", en: "by" },
     participate: { fr: "Participer", en: "Join" },
     footer: {
-      fr: "NF Society — Loteries décentralisées et transparentes",
-      en: "NF Society — Decentralized and transparent lotteries",
+      fr: "NF Society  Loteries décentralisées et transparentes",
+      en: "NF Society  Decentralized and transparent lotteries",
     },
     builtOn: {
       fr: "Construit sur la blockchain Gnosis avec l'infrastructure Circles.",
@@ -107,7 +107,7 @@ export const pagesTranslations = {
   },
   dao: {
     title: { fr: "Dashboard DAO", en: "DAO Dashboard" },
-    subtitle: { fr: "NF Society — Vue d'ensemble du DAO", en: "NF Society — DAO Overview" },
+    subtitle: { fr: "NF Society  Vue d'ensemble du DAO", en: "NF Society  DAO Overview" },
     loading: { fr: "Chargement des données...", en: "Loading data..." },
     error: { fr: "Erreur lors du chargement", en: "Error loading data" },
     retry: { fr: "Réessayer", en: "Retry" },
@@ -216,6 +216,7 @@ export const pagesTranslations = {
     viewProfile: { fr: "Voir mon profil", en: "View my profile" },
     levelLabel: { fr: "Niveau", en: "Level" },
     streakLabel: { fr: "Streak quotidien", en: "Daily streak" },
+    fragmentsBalance: { fr: "Fragments", en: "Fragments" },
     disconnectTitle: { fr: "Changer de profil", en: "Switch profile" },
   },
   playerProfile: {
@@ -227,7 +228,7 @@ export const pagesTranslations = {
     dailyStreak: { fr: "Streak quotidien", en: "Daily streak" },
     days: { fr: "jour", en: "day" },
     daysPlural: { fr: "jours", en: "days" },
-    bonus7days: { fr: "🏆 Bonus 7 jours débloqué !", en: "🏆 7-day bonus unlocked!" },
+    bonus7days: { fr: "7 jours de suite", en: "7 days in a row" },
     xpTiers: { fr: "Paliers XP", en: "XP Tiers" },
     stats: { fr: "Statistiques", en: "Statistics" },
     gamesPlayed: { fr: "Parties jouées", en: "Games played" },
@@ -244,20 +245,24 @@ export const pagesTranslations = {
     loss: { fr: "Défaite", en: "Loss" },
     draw: { fr: "Égalité", en: "Draw" },
     vs: { fr: "vs", en: "vs" },
-    loadingStats: { fr: "Chargement…", en: "Loading…" },
+    loadingStats: { fr: "Chargement", en: "Loading" },
     games: { fr: "parties", en: "games" },
     transactionsTitle: { fr: "Transactions", en: "Transactions" },
+    xpHistoryTitle: { fr: "Historique XP", en: "XP History" },
     loading: { fr: "Chargement...", en: "Loading..." },
     noTransactions: { fr: "Aucune transaction", en: "No transactions" },
+    noXpEvents: { fr: "Aucun gain XP pour le moment", en: "No XP gains yet" },
+    xpHistoryPrivate: { fr: "Historique XP visible uniquement par le proprietaire du profil", en: "XP history is only visible to the profile owner" },
     received: { fr: "Recu", en: "Received" },
     spent: { fr: "Depense", en: "Spent" },
+    xpEarned: { fr: "XP affiches", en: "XP shown" },
     xpTo: { fr: "pour", en: "to" },
   },
   shop: {
-    title: { fr: "Boutique XP", en: "XP Shop" },
+    title: { fr: "Boutique Fragments", en: "Fragments Shop" },
     back: { fr: "Retour", en: "Back" },
-    noXpProfile: { fr: "Aucun profil XP trouve pour cette adresse. Jouez pour collecter de l'XP !", en: "No XP profile found for this address. Play to collect XP!" },
-    availableXp: { fr: "XP disponible", en: "Available XP" },
+    noFragmentsProfile: { fr: "Aucun profil trouve pour cette adresse. Jouez au daily pour collecter des Fragments !", en: "No profile found for this address. Play the daily to collect Fragments!" },
+    availableFragments: { fr: "Fragments disponibles", en: "Available Fragments" },
     level: { fr: "Niveau", en: "Level" },
     buy: { fr: "Acheter", en: "Buy" },
     confirmBuy: { fr: "Confirmer", en: "Confirm" },
@@ -268,7 +273,7 @@ export const pagesTranslations = {
     daysLeft: { fr: "j restants", en: "d left" },
     couponActive: { fr: "Coupon actif", en: "Coupon active" },
     levelRequired: { fr: "Niveau requis :", en: "Level required:" },
-    insufficientXp: { fr: "XP insuffisant", en: "Insufficient XP" },
+    insufficientFragments: { fr: "Fragments insuffisants", en: "Insufficient Fragments" },
     allCategories: { fr: "Tous", en: "All" },
     catGame: { fr: "Jeux", en: "Games" },
     catBoost: { fr: "Boosts", en: "Boosts" },
@@ -277,7 +282,7 @@ export const pagesTranslations = {
     catCrc: { fr: "CRC Direct", en: "CRC Direct" },
     connectFirst: { fr: "Vérifiez votre identité pour accéder à la boutique", en: "Verify your identity to access the shop" },
     demoMode: { fr: "Mode Démo", en: "Demo Mode" },
-    demoDesc: { fr: "Testez avec 50 000 XP", en: "Test with 50,000 XP" },
+    demoDesc: { fr: "Testez avec 50 000 Fragments", en: "Test with 50,000 Fragments" },
     noItems: { fr: "Aucun article dans cette catégorie", en: "No items in this category" },
     authTitle: { fr: "Vérification d'identité", en: "Identity Verification" },
     authDesc: { fr: "Envoyez 1 CRC pour prouver votre identité. Le paiement est automatiquement remboursé.", en: "Send 1 CRC to prove your identity. Payment is automatically refunded." },
@@ -292,7 +297,7 @@ export const pagesTranslations = {
     authRefunded: { fr: "1 CRC remboursé automatiquement", en: "1 CRC automatically refunded" },
   },
   demo: {
-    banner: { fr: "Mode Démo — Les transactions sont simulées", en: "Demo Mode — Transactions are simulated" },
+    banner: { fr: "Mode Démo  Les transactions sont simulées", en: "Demo Mode  Transactions are simulated" },
     exit: { fr: "Quitter", en: "Exit" },
     enter: { fr: "Essayer en démo", en: "Try demo" },
     enterDesc: { fr: "Explorez la plateforme sans wallet", en: "Explore the platform without a wallet" },
@@ -358,9 +363,9 @@ export const pagesTranslations = {
     hidePnl: { fr: "Masquer mes recompenses", en: "Hide my rewards" },
     hidePnlDesc: { fr: "Les recompenses ne seront pas visibles sur ton profil public.", en: "Rewards won't be visible on your public profile." },
     hideTotalBet: { fr: "Masquer mes participations", en: "Hide my participations" },
-    hideTotalBetDesc: { fr: "Le total des XP engages ne sera pas visible.", en: "Total XP played won't be visible." },
-    hideXpSpent: { fr: "Masquer mes d\u00e9penses XP", en: "Hide my XP spending" },
-    hideXpSpentDesc: { fr: "Les achats au shop ne seront pas visibles.", en: "Shop purchases won't be visible." },
+    hideTotalBetDesc: { fr: "Le total des Fragments engages ne sera pas visible.", en: "Total Fragments played won't be visible." },
+    hideFragmentsSpent: { fr: "Masquer mes depenses Fragments", en: "Hide my Fragments spending" },
+    hideFragmentsSpentDesc: { fr: "Les achats au shop ne seront pas visibles.", en: "Shop purchases won't be visible." },
     hideGameHistory: { fr: "Masquer mon historique de parties", en: "Hide my game history" },
     hideGameHistoryDesc: { fr: "Les derni\u00e8res parties jou\u00e9es ne seront pas visibles.", en: "Your recent games won't be visible." },
     hideFromLeaderboard: { fr: "Retirer du leaderboard", en: "Remove from leaderboard" },
@@ -404,8 +409,8 @@ export const pagesTranslations = {
     back: { fr: "Retour", en: "Back" },
     title: { fr: "Stats plateforme", en: "Platform stats" },
     subtitle: {
-      fr: "Activite arcade, XP et progression en temps reel",
-      en: "Arcade activity, XP and progression in real time",
+      fr: "Activite arcade, Fragments et progression en temps reel",
+      en: "Arcade activity, Fragments and progression in real time",
     },
     casinoBank: { fr: "Pool arcade", en: "Arcade pool" },
     casinoBankDesc: {
@@ -418,8 +423,8 @@ export const pagesTranslations = {
     last7d: { fr: "7 jours", en: "7 days" },
     last30d: { fr: "30 jours", en: "30 days" },
     allTime: { fr: "Depuis le debut", en: "All time" },
-    wagered: { fr: "XP engages", en: "XP played" },
-    paidOut: { fr: "XP distribues", en: "XP distributed" },
+    wagered: { fr: "Fragments engages", en: "Fragments played" },
+    paidOut: { fr: "Fragments distribues", en: "Fragments distributed" },
     profit: { fr: "Profit", en: "Profit" },
     rounds: { fr: "parties", en: "rounds" },
     players: { fr: "joueurs", en: "players" },

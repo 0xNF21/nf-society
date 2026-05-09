@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
-import { dailySessions } from "@/lib/db/schema";
-import { allowDailyRepeatTests, generateDailyToken, todayString } from "@/lib/daily";
+import { dailySessions, players } from "@/lib/db/schema";
+import { allowDailyRepeatTests, generateDailyToken, parseDailyWheelResult, todayString } from "@/lib/daily";
 import { requireAuthenticatedAddress } from "@/lib/auth/session";
+import { checkAndAwardBadges } from "@/lib/badges";
 import { and, eq, sql } from "drizzle-orm";
 
 function sessionPayload(session: typeof dailySessions.$inferSelect) {
@@ -11,7 +12,7 @@ function sessionPayload(session: typeof dailySessions.$inferSelect) {
     token: session.token,
     address: session.address,
     wheelPlayed: session.spinPlayed,
-    wheelResult: session.spinResult ? JSON.parse(session.spinResult) : null,
+    wheelResult: parseDailyWheelResult(session.spinResult),
   };
 }
 
@@ -57,8 +58,33 @@ export async function POST(req: NextRequest) {
         txHash: `daily-free:${token}`,
       }).returning();
 
+      await tx.execute(sql`
+        INSERT INTO ${players} (address, xp, fragments_balance, fragments_spent, level, streak, last_seen, last_daily_checkin_at, created_at)
+        VALUES (${normalizedAddress}, 0, 0, 0, 1, 1, NOW(), ${date}::date, NOW())
+        ON CONFLICT (address) DO UPDATE
+        SET streak = CASE
+              WHEN players.last_daily_checkin_at IS NULL THEN 1
+              WHEN players.last_daily_checkin_at::date = ${date}::date THEN players.streak
+              WHEN players.last_daily_checkin_at::date = (${date}::date - INTERVAL '1 day')::date THEN players.streak + 1
+              ELSE 1
+            END,
+            last_daily_checkin_at = CASE
+              WHEN players.last_daily_checkin_at::date = ${date}::date THEN players.last_daily_checkin_at
+              ELSE ${date}::date
+            END,
+            last_seen = NOW()
+      `);
+
       return { session, alreadyClaimed: false };
     });
+
+    if (!claimed.alreadyClaimed) {
+      try {
+        await checkAndAwardBadges(normalizedAddress, "daily_checkin", { hour: new Date().getHours() });
+      } catch (badgeErr) {
+        console.error("[Daily Claim] Badge check error:", badgeErr);
+      }
+    }
 
     return NextResponse.json({
       ...sessionPayload(claimed.session),

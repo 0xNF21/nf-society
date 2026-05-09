@@ -87,7 +87,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
 
   const resultLabel = useCallback((spinResult: SpinResult) => {
     if (spinResult.crcValue > 0) return `+${formatRewardAmount(spinResult.crcValue)} CRC`;
-    if (spinResult.xpValue > 0) return `+${spinResult.xpValue} XP de solde`;
+    if (spinResult.fragmentsValue > 0) return `+${spinResult.fragmentsValue} Fragments`;
     return spinResult.label.replace(/\bJACKPOT\b/g, "DOTATION");
   }, [formatRewardAmount]);
 
@@ -148,7 +148,7 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
 
       {showResult && result && (
         <div className={`animate-bounce rounded-xl p-4 text-center ${
-          result.crcValue > 0 || result.xpValue > 0
+          result.crcValue > 0 || result.fragmentsValue > 0
             ? "bg-amber-100 text-amber-800"
             : "bg-ink/5 text-ink/60"
         }`}>
@@ -156,8 +156,8 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
           {result.crcValue > 0 && (
             <p className="mt-1 text-sm">+{formatRewardAmount(result.crcValue)} CRC</p>
           )}
-          {result.xpValue > 0 && (
-            <p className="mt-1 text-sm">+{result.xpValue} XP de solde</p>
+          {result.fragmentsValue > 0 && (
+            <p className="mt-1 text-sm">+{result.fragmentsValue} Fragments</p>
           )}
         </div>
       )}

@@ -5,13 +5,22 @@ import { shopItems } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { checkAdminAuth } from "@/lib/admin-auth";
 
+const HIDDEN_LEGACY_SHOP_SLUGS = new Set(["spin_refund", "spin_week_refund"]);
+const normalizeShopItem = <T extends { category: string; description: string }>(item: T): T =>
+  item.category === "crc" && item.description.includes("XP")
+    ? { ...item, description: item.description.replaceAll("XP", "Fragments") }
+    : item;
+
 // GET — list all shop items
 export async function GET(req: NextRequest) {
   const limited = await enforceRateLimit(req, "admin-shop", 10, 60000);
   if (limited) return limited;
 
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const items = await db.select().from(shopItems);
+  const rawItems = await db.select().from(shopItems);
+  const items = rawItems
+    .filter((item) => !HIDDEN_LEGACY_SHOP_SLUGS.has(item.slug))
+    .map(normalizeShopItem);
   return NextResponse.json({ items });
 }
 
@@ -28,7 +37,7 @@ export async function PATCH(req: NextRequest) {
 
     // Only allow updating specific fields
     const allowed: Record<string, unknown> = {};
-    if (typeof updates.xpCost === "number") allowed.xpCost = updates.xpCost;
+    if (typeof updates.fragmentsCost === "number") allowed.fragmentsCost = updates.fragmentsCost;
     if (typeof updates.levelRequired === "number") allowed.levelRequired = updates.levelRequired;
     if (typeof updates.stock === "number" || updates.stock === null) allowed.stock = updates.stock;
     if (typeof updates.active === "boolean") allowed.active = updates.active;
@@ -57,9 +66,9 @@ export async function POST(req: NextRequest) {
 
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const { slug, name, description, icon, category, xpCost, levelRequired, stock, active } = await req.json();
-    if (!slug || !name || !description || !icon || !category || typeof xpCost !== "number") {
-      return NextResponse.json({ error: "slug, name, description, icon, category, xpCost required" }, { status: 400 });
+    const { slug, name, description, icon, category, fragmentsCost, levelRequired, stock, active } = await req.json();
+    if (!slug || !name || !description || !icon || !category || typeof fragmentsCost !== "number") {
+      return NextResponse.json({ error: "slug, name, description, icon, category, fragmentsCost required" }, { status: 400 });
     }
     const [created] = await db.insert(shopItems).values({
       slug,
@@ -67,7 +76,7 @@ export async function POST(req: NextRequest) {
       description,
       icon,
       category,
-      xpCost,
+      fragmentsCost,
       levelRequired: levelRequired ?? 1,
       stock: stock ?? null,
       active: active ?? true,

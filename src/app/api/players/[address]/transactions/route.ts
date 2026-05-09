@@ -6,6 +6,8 @@ import { eq, desc, sql, and } from "drizzle-orm";
 import { ALL_SERVER_GAMES } from "@/lib/game-registry-server";
 import { GAME_LABELS } from "@/lib/game-registry";
 import { ALL_CHANCE_SERVER_GAMES } from "@/lib/chance-registry-server";
+import { getAuthenticatedAddress } from "@/lib/auth/session";
+import { getPrivacyFlags } from "@/lib/privacy";
 
 export const dynamic = "force-dynamic";
 
@@ -26,30 +28,41 @@ export async function GET(
 
   try {
     const addr = params.address.toLowerCase();
+    const authenticatedAddress = await getAuthenticatedAddress(_req).catch(() => null);
+    const isOwner = authenticatedAddress?.toLowerCase() === addr;
+    const privacy = isOwner ? null : await getPrivacyFlags(addr);
+
+    if (privacy?.hideGameHistory) {
+      return NextResponse.json({ transactions: [] });
+    }
+
     const transactions: Transaction[] = [];
 
     // 1. Payouts received (CRC in)
-    const playerPayouts = await db.select({
-      amountCrc: payouts.amountCrc,
-      gameType: payouts.gameType,
-      reason: payouts.reason,
-      createdAt: payouts.createdAt,
-    }).from(payouts).where(
-      and(eq(payouts.recipientAddress, addr), eq(payouts.status, "success"))
-    ).orderBy(desc(payouts.createdAt));
+    if (!privacy?.hidePnl) {
+      const playerPayouts = await db.select({
+        amountCrc: payouts.amountCrc,
+        gameType: payouts.gameType,
+        reason: payouts.reason,
+        createdAt: payouts.createdAt,
+      }).from(payouts).where(
+        and(eq(payouts.recipientAddress, addr), eq(payouts.status, "success"))
+      ).orderBy(desc(payouts.createdAt));
 
-    for (const p of playerPayouts) {
-      transactions.push({
-        type: "in",
-        amount: Number(p.amountCrc),
-        label: p.reason || `${p.gameType} payout`,
-        category: p.gameType,
-        date: p.createdAt.toISOString(),
-      });
+      for (const p of playerPayouts) {
+        transactions.push({
+          type: "in",
+          amount: Number(p.amountCrc),
+          label: p.reason || `${p.gameType} payout`,
+          category: p.gameType,
+          date: p.createdAt.toISOString(),
+        });
+      }
     }
 
     // 2. Game bets (CRC out) — from each game table
-    for (const config of ALL_SERVER_GAMES) {
+    if (!privacy?.hideTotalBet) {
+      for (const config of ALL_SERVER_GAMES) {
       try {
         const games = await db.select({
           slug: config.table.slug,
@@ -72,12 +85,14 @@ export async function GET(
           });
         }
       } catch {}
+      }
     }
 
     // 3. Chance game bets (CRC out) — blackjack, hilo, mines, dice, coin_flip,
     //    roulette, keno, plinko, crash_dash, lootboxes.
     //    Rounds abandonnees (status="playing") sont exclues via le registre.
-    for (const cfg of ALL_CHANCE_SERVER_GAMES) {
+    if (!privacy?.hideTotalBet) {
+      for (const cfg of ALL_CHANCE_SERVER_GAMES) {
       try {
         const rounds = await cfg.getPlayerRounds(addr);
         for (const r of rounds) {
@@ -91,10 +106,12 @@ export async function GET(
           });
         }
       } catch {}
+      }
     }
 
     // 4. Daily sessions (CRC out — 1 CRC each)
-    try {
+    if (!privacy?.hideTotalBet) {
+      try {
       const sessions = await db.select({
         date: dailySessions.date,
         createdAt: dailySessions.createdAt,
@@ -111,7 +128,8 @@ export async function GET(
           date: s.createdAt.toISOString(),
         });
       }
-    } catch {}
+      } catch {}
+    }
 
     // Sort by date desc
     transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

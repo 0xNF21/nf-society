@@ -7,7 +7,7 @@ import { rouletteTables, rouletteRounds, claimedPayments } from "@/lib/db/schema
 import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { createInitialState } from "@/lib/roulette";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { awardPlayerXpSafely } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 const ROULETTE_START_BLOCK = "0x2B7DE5C";
@@ -123,11 +123,16 @@ export async function POST(req: NextRequest) {
           amountCrc: betCrc,
         }).onConflictDoNothing();
 
-        // XP — fire-and-forget. A slow or unreachable XP endpoint must
-        // never block the scan response (caused scan hangs when
-        // NEXT_PUBLIC_APP_URL pointed at a non-listening port).
+        // XP is awaited so the write is attempted before the scan response.
+        // Failures are logged inside the helper without breaking the scan.
         {
-          void awardPlayerXp({ address: playerAddress, action: "roulette_play" }).catch(() => {});
+          await awardPlayerXpSafely({
+            address: playerAddress,
+            action: "roulette_play",
+            sourceType: "roulette",
+            sourceId: `round:${inserted[0].id}`,
+            metadata: { tableId: table.id, txHash },
+          });
         }
 
       } catch (err: any) {

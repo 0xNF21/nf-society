@@ -1,18 +1,19 @@
 /**
- * Helpers purs pour le pivot Free-to-Play.
- * Ce fichier ne contient aucune dependance serveur (pas de DB, pas de `pg`),
- * donc il peut etre importe librement depuis les composants client.
+ * Pure helpers for the Free-to-Play pivot.
+ * This file has no server dependency, so client components can import it.
  *
- * Pour les helpers serveur (isRealStakesEnabled, assertRealStakesEnabled),
- * voir `src/lib/stakes.ts`.
+ * XP is progression only. The arcade balance, stakes, payouts and daily wheel
+ * non-CRC rewards are called Fragments.
  */
 
-export const REAL_STAKES_FLAG_KEY = "real_stakes";
-/** Force XP-only on chance games even when real_stakes=enabled. */
-export const CHANCE_XP_ONLY_FLAG_KEY = "chance_games_xp_only";
+import {
+  CRC_TO_FRAGMENTS_RATIO,
+  crcToFragments,
+} from "@/lib/fragments";
 
-/** 1 CRC = 10 XP en mode F2P. Conversion appliquee pour les mises et les gains. */
-export const CRC_TO_XP_RATIO = 10;
+export const REAL_STAKES_FLAG_KEY = "real_stakes";
+/** Force Fragments-only on chance games even when real_stakes=enabled. */
+export const CHANCE_FRAGMENTS_ONLY_FLAG_KEY = "chance_games_fragments_only";
 
 /**
  * Game keys classified as "chance" (gambling-shaped, vs skill 1v1 multi).
@@ -41,23 +42,8 @@ export function isChanceGameKey(gameKey: string | null | undefined): boolean {
   return CHANCE_GAME_KEYS.has(gameKey);
 }
 
-/** Convertit un montant CRC vers son equivalent XP en mode F2P. */
-export function crcToXp(crc: number): number {
-  return Math.round(crc * CRC_TO_XP_RATIO);
-}
-
-/** Convertit un montant XP vers son equivalent CRC. */
-export function xpToCrc(xp: number): number {
-  return xp / CRC_TO_XP_RATIO;
-}
-
 /**
- * Formate un montant en texte "X CRC" ou "X XP" selon le mode actif.
- * Utile pour tous les labels de lobby, paiement, stats, PnL card, etc.
- *
- * @example
- *   formatStake(125, { realStakesEnabled: true })  → "125 CRC"
- *   formatStake(125, { realStakesEnabled: false }) → "1 250 XP"
+ * Formats a CRC amount as either CRC or its Fragments equivalent.
  */
 export function formatStake(
   crcAmount: number,
@@ -74,37 +60,28 @@ export function formatStake(
     return `${str} CRC`;
   }
 
-  const xp = crcToXp(crcAmount);
-  const str = xp.toLocaleString(bcp47, { maximumFractionDigits: decimals });
-  return `${str} XP`;
+  const fragments = crcToFragments(crcAmount);
+  const str = fragments.toLocaleString(bcp47, { maximumFractionDigits: decimals });
+  return `${str} Fragments`;
 }
 
-/** Label court de l'unite active ("CRC" ou "XP"), pour headers de colonnes et graphiques. */
-export function stakeUnit(realStakesEnabled: boolean): "CRC" | "XP" {
-  return realStakesEnabled ? "CRC" : "XP";
+/** Active stake unit label for table headers and charts. */
+export function stakeUnit(realStakesEnabled: boolean): "CRC" | "Fragments" {
+  return realStakesEnabled ? "CRC" : "Fragments";
 }
 
 /**
- * Transforme un texte pour le mode F2P :
- *   - Remplace "CRC" par "XP"
- *   - Multiplie les nombres qui precedent "CRC" par le ratio (x10)
- *
- * @example
- *   translateStakeText("Payer 5 CRC", false) → "Payer 50 XP"
- *   translateStakeText("gagnez 1.5 CRC", false) → "gagnez 15 XP"
- *   translateStakeText("gagnez des CRC", false) → "gagnez des XP"
- *   translateStakeText("Payer 5 CRC", true) → "Payer 5 CRC"  (inchange en mode CRC)
+ * Converts CRC wording to Fragments wording for F2P screens.
  */
 export function translateStakeText(text: string, realStakesEnabled: boolean): string {
   if (realStakesEnabled || !text) return text;
-  // 1) "(\d[.,]?\d*) CRC" → "(\d*10) XP"
+
   let out = text.replace(/(\d+(?:[.,]\d+)?)\s*CRC\b/g, (_, n: string) => {
     const value = parseFloat(n.replace(",", "."));
-    if (!Number.isFinite(value)) return `${n} XP`;
-    const xp = Math.round(value * CRC_TO_XP_RATIO);
-    return `${xp} XP`;
+    if (!Number.isFinite(value)) return `${n} Fragments`;
+    return `${crcToFragments(value)} Fragments`;
   });
-  // 2) Remaining "CRC" (no leading number) → "XP"
-  out = out.replace(/\bCRC\b/g, "XP");
+
+  out = out.replace(/\bCRC\b/g, "Fragments");
   return out;
 }

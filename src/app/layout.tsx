@@ -9,7 +9,6 @@ import { MiniAppProvider } from "@/components/miniapp-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import { FeatureFlagProvider } from "@/components/feature-flag-provider";
 import DemoBanner from "@/components/demo-banner";
-import StakesDisabledBanner from "@/components/stakes-disabled-banner";
 import ProfileModal from "@/components/profile-modal";
 import DailyModal from "@/components/daily-modal";
 import BottomNav from "@/components/bottom-nav";
@@ -27,11 +26,11 @@ const body = Sora({
 
 export const metadata: Metadata = {
   title: "NF Society — Community Gaming Platform",
-  description: "Arcade Free-to-Play, XP progression, badges and community rewards on NF Society.",
+  description: "Free-to-Play arcade, Fragments, daily CRC rewards, badges and community progression on NF Society.",
   metadataBase: new URL("https://nf-society.vercel.app"),
   openGraph: {
     title: "NF Society",
-    description: "Arcade Free-to-Play, XP progression, badges and community rewards on NF Society.",
+    description: "Free-to-Play arcade, Fragments, daily CRC rewards, badges and community progression on NF Society.",
     url: "https://nf-society.vercel.app",
     siteName: "NF Society",
     locale: "fr_FR",
@@ -40,7 +39,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "NF Society",
-    description: "Arcade Free-to-Play, XP progression, badges and community rewards on NF Society.",
+    description: "Free-to-Play arcade, Fragments, daily CRC rewards, badges and community progression on NF Society.",
   },
   icons: {
     icon: "/nf-society-logo.png",
@@ -71,7 +70,6 @@ export default function RootLayout({
               <MiniAppProvider>
                 <AuthProvider>
                   <FeatureFlagProvider>
-                    <StakesDisabledBanner />
                     <DemoBanner />
                     {children}
                     <ProfileModal />

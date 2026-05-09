@@ -29,6 +29,62 @@
       "when": 1778186233473,
       "tag": "0005_add_verify_token_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778248620000,
+      "tag": "0006_add_player_xp_balance",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778249100000,
+      "tag": "0007_add_player_last_daily_checkin_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778250300000,
+      "tag": "0008_add_xp_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778251200000,
+      "tag": "0009_rename_playable_xp_to_fragments",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778276580000,
+      "tag": "0010_daily_wheel_only_cleanup",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778364000000,
+      "tag": "0011_drop_shop_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778367600000,
+      "tag": "0012_normalize_daily_spin_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1778371200000,
+      "tag": "0013_remove_daily_xp_rewards",
+      "breakpoints": true
     }
   ]
 }

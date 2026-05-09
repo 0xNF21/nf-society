@@ -1,4 +1,4 @@
-// Auto-split from src/lib/i18n.ts — chance domain sections
+﻿// Auto-split from src/lib/i18n.ts — chance domain sections
 
 export const chanceTranslations = {
   lottery: {
@@ -216,7 +216,7 @@ export const chanceTranslations = {
     probability: { fr: "Probabilité", en: "Probability" },
     reward: { fr: "Recompense", en: "Reward" },
     won: { fr: "a gagné", en: "won" },
-    sendInstructions: { fr: "Utilise tes XP pour ouvrir une lootbox", en: "Use XP to open a lootbox" },
+    sendInstructions: { fr: "Utilise tes Fragments pour ouvrir une lootbox", en: "Use Fragments to open a lootbox" },
     copyAddress: { fr: "Copier l'adresse", en: "Copy address" },
     copied: { fr: "Copié !", en: "Copied!" },
     scanQr: { fr: "Scanner pour payer", en: "Scan to pay" },
@@ -238,12 +238,12 @@ export const chanceTranslations = {
     rulesTitle: { fr: "Comment jouer ?", en: "How to play?" },
     rulesStep1: { fr: "Clique sur Participer et engage {price} pour ouvrir une lootbox.", en: "Click Join and use {price} to open a lootbox." },
     rulesStep2: { fr: "La transaction est détectée automatiquement et l'animation se lance.", en: "The transaction is automatically detected and the animation starts." },
-    rulesStep3: { fr: "La boîte révèle ta recompense — de {min} XP jusqu'à {max} XP pour la dotation !", en: "The box reveals your reward — from {min} XP up to {max} XP for the reward pool!" },
-    rulesStep4: { fr: "Les XP gagnes sont ajoutes automatiquement a ton profil.", en: "Your XP rewards are added automatically to your profile." },
+    rulesStep3: { fr: "La boîte révèle ta recompense — de {min} Fragments jusqu'à {max} Fragments pour la dotation !", en: "The box reveals your reward — from {min} Fragments up to {max} Fragments for the reward pool!" },
+    rulesStep4: { fr: "Les Fragments gagnes sont ajoutes automatiquement a ton solde de jeu.", en: "Your Fragment rewards are added automatically to your game balance." },
     tierLabel: { fr: "Tiers de gain", en: "Win tiers" },
     rulesDisclaimer: { fr: "Les gains sont distribués selon les probabilités affichées", en: "Winnings are distributed according to the displayed probabilities" },
     rtpTitle: { fr: "📊 RTP — Retour joueur", en: "📊 RTP — Return to player" },
-    rtpDesc: { fr: "Pour 100 XP engages, tu recuperes en moyenne {rtp} XP. Ce chiffre est base sur les probabilites declarees par la plateforme.", en: "For every 100 XP played, you get back on average {rtp} XP. This figure is based on the probabilities declared by the platform." },
+    rtpDesc: { fr: "Pour 100 Fragments engages, tu recuperes en moyenne {rtp} Fragments. Ce chiffre est base sur les probabilites declarees par la plateforme.", en: "For every 100 Fragments played, you get back on average {rtp} Fragments. This figure is based on the probabilities declared by the platform." },
     rtpDeclared: { fr: "Probabilités déclarées", en: "Declared probabilities" },
     rtpTotal: { fr: "Total RTP déclaré", en: "Total declared RTP" },
     rtpDisclaimer: { fr: "Ces probabilités sont déclarées par la plateforme et non auditées par un tiers.", en: "These probabilities are declared by the platform and not audited by a third party." },
@@ -264,7 +264,7 @@ export const chanceTranslations = {
   },
   daily: {
     title: { fr: "Roue Quotidienne", en: "Daily Wheel" },
-    subtitle: { fr: "Tournez la roue quotidienne et gagnez XP ou CRC.", en: "Spin the daily wheel and win XP or CRC." },
+    subtitle: { fr: "Tournez la roue quotidienne et gagnez des Fragments ou du CRC.", en: "Spin the daily wheel and win Fragments or CRC." },
     payButton: { fr: "Jouer le daily", en: "Play daily" },
     waitingPayment: { fr: "En attente du paiement...", en: "Waiting for payment..." },
     detecting: { fr: "Détection en cours...", en: "Detecting payment..." },
@@ -281,7 +281,6 @@ export const chanceTranslations = {
     spinResult: { fr: "Roue", en: "Wheel" },
     nothing: { fr: "Rien", en: "Nothing" },
     refunded: { fr: "Remboursé !", en: "Refunded!" },
-    streakX2: { fr: "Streak x2 demain", en: "Streak x2 tomorrow" },
     jackpotWon: { fr: "DOTATION !", en: "REWARD POOL!" },
     continue: { fr: "Continuer", en: "Continue" },
     scanQr: { fr: "Scannez avec Gnosis App", en: "Scan with Gnosis App" },
@@ -289,8 +288,7 @@ export const chanceTranslations = {
     copied: { fr: "Copié !", en: "Copied!" },
     expired: { fr: "Session expirée", en: "Session expired" },
     tryAgain: { fr: "Réessayer", en: "Try again" },
-    doubleXpTomorrow: { fr: "Double XP demain !", en: "Double XP tomorrow!" },
-    topUpBalanceFirst: { fr: "Utilisez vos XP pour continuer", en: "Use XP to continue" },
+    topUpBalanceFirst: { fr: "Utilisez vos Fragments pour continuer", en: "Use Fragments to continue" },
     failedTryAgain: { fr: "Echec — reessayez", en: "Failed — try again" },
     errorGeneric: { fr: "Erreur", en: "Error" },
     testWithoutPaying: { fr: "tester sans payer", en: "test without paying" },
@@ -304,7 +302,7 @@ export const chanceTranslations = {
   chance: {
     title: { fr: "Jeux de Chance", en: "Games of Chance" },
     dailyTitle: { fr: "Roue Quotidienne", en: "Daily Wheel" },
-    dailyDesc: { fr: "Tournez la roue quotidienne pour gagner XP ou CRC.", en: "Spin the daily wheel to win XP or CRC." },
+    dailyDesc: { fr: "Tournez la roue quotidienne pour gagner des Fragments ou du CRC.", en: "Spin the daily wheel to win Fragments or CRC." },
     lotteriesTitle: { fr: "Loteries", en: "Lotteries" },
     lotteriesDesc: { fr: "Loteries transparentes sur la blockchain Gnosis.", en: "Transparent lotteries on Gnosis blockchain." },
     lootboxTitle: { fr: "Lootboxes", en: "Lootboxes" },
@@ -431,7 +429,7 @@ export const chanceTranslations = {
   plinko: {
     title: { fr: "Plinko", en: "Plinko" },
     subtitle: { fr: "Lachez la bille, laissez la gravite decider. RTP ~99%.", en: "Drop the ball, let gravity decide. ~99% RTP." },
-    chooseTotal: { fr: "Participation totale (XP)", en: "Total entry (XP)" },
+    chooseTotal: { fr: "Participation totale (Fragments)", en: "Total entry (Fragments)" },
     choosePerBall: { fr: "Valeur par bille (CRC)", en: "Value per ball (CRC)" },
     totalBet: { fr: "Participation totale", en: "Total entry" },
     ballValue: { fr: "Par bille", en: "Per ball" },

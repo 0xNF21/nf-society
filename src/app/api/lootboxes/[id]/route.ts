@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { lootboxes, lootboxOpens } from "@/lib/db/schema";
 import { eq, or } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -24,8 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const password = req.headers.get("x-admin-password");
-    if (password !== process.env.ADMIN_PASSWORD) {
+    if (!checkAdminAuth(req)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -57,8 +57,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const password = req.headers.get("x-admin-password");
-    if (password !== process.env.ADMIN_PASSWORD) {
+    if (!checkAdminAuth(req)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

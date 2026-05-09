@@ -7,7 +7,7 @@ import { applyAction, getVisibleState, calculateTotalBet } from "@/lib/blackjack
 import type { BlackjackState, Action } from "@/lib/blackjack";
 import { payPrize, debitForSecondaryBet, isBalancePaid } from "@/lib/wallet";
 import { checkAllNewPayments } from "@/lib/circles";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { awardPlayerXpSafely } from "@/lib/xp-server";
 
 const VALID_ACTIONS: Action[] = ["hit", "stand", "double", "split", "insurance"];
 const PAID_ACTIONS: Action[] = ["double", "split"];
@@ -176,9 +176,15 @@ export async function POST(
         }).where(eq(blackjackHands.id, handId));
       }
 
-      // XP for win — fire and forget (don't block the response).
+      // XP for win is awaited; failures are logged without breaking the response.
       if (updateData.outcome === "win" || updateData.outcome === "blackjack") {
-        void awardPlayerXp({ address: hand.playerAddress, action: "blackjack_win" }).catch(() => {});
+        await awardPlayerXpSafely({
+          address: hand.playerAddress,
+          action: "blackjack_win",
+          sourceType: "blackjack",
+          sourceId: `hand:${hand.id}`,
+          metadata: { tableId: hand.tableId },
+        });
       }
     }
 

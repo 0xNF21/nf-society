@@ -8,7 +8,7 @@ import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { createDeck, dealInitialHands, getVisibleState } from "@/lib/blackjack";
 import type { BlackjackState } from "@/lib/blackjack";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { awardPlayerXpSafely } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 // Blackjack-specific start block — reset after cleanup, only scan recent payments
@@ -149,9 +149,25 @@ export async function POST(req: NextRequest) {
           }).where(eq(blackjackHands.id, inserted[0].id));
         }
 
-        // XP — fire-and-forget. Never block the scan response on XP.
+        // XP is awaited so the write is attempted before the scan response.
         {
-          void awardPlayerXp({ address: playerAddress, action: "blackjack_play" }).catch(() => {});
+          await awardPlayerXpSafely({
+            address: playerAddress,
+            action: "blackjack_play",
+            sourceType: "blackjack",
+            sourceId: `hand:${inserted[0].id}`,
+            metadata: { tableId: table.id, txHash },
+          });
+          const initialOutcome = state.playerHands[0]?.outcome;
+          if (state.status === "finished" && (initialOutcome === "win" || initialOutcome === "blackjack")) {
+            await awardPlayerXpSafely({
+              address: playerAddress,
+              action: "blackjack_win",
+              sourceType: "blackjack",
+              sourceId: `hand:${inserted[0].id}`,
+              metadata: { tableId: table.id, txHash, initialOutcome },
+            });
+          }
         }
 
       } catch (err: any) {

@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { resolveRoll, getVisibleState, calculatePayout, isValidAction } from "@/lib/roulette";
 import type { RouletteState, RouletteAction } from "@/lib/roulette";
 import { payPrize } from "@/lib/wallet";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { awardPlayerXpSafely } from "@/lib/xp-server";
 
 export async function POST(
   req: NextRequest,
@@ -102,10 +102,14 @@ export async function POST(
           }).where(eq(rouletteRounds.id, roundId));
         }
 
-        // XP for win — fire and forget so a slow / unreachable XP endpoint
-        // never blocks the spin response (caused the post-win freeze when
-        // NEXT_PUBLIC_APP_URL pointed at a non-listening port).
-        void awardPlayerXp({ address: round.playerAddress, action: "roulette_win" }).catch(() => {});
+        // XP for win is awaited; failures are logged without breaking the spin response.
+        await awardPlayerXpSafely({
+          address: round.playerAddress,
+          action: "roulette_win",
+          sourceType: "roulette",
+          sourceId: `round:${round.id}`,
+          metadata: { tableId: round.tableId },
+        });
       }
     }
 

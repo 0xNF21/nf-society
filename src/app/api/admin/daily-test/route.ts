@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { checkAdminAuth } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
@@ -40,6 +40,17 @@ export async function POST(req: NextRequest) {
       spinPlayed: true,
     }).where(eq(dailySessions.token, token));
 
+    if (wheelResult.fragmentsValue > 0) {
+      const fragmentsCredit = Math.floor(wheelResult.fragmentsValue);
+      await db.execute(sql`
+        INSERT INTO players (address, xp, fragments_balance, fragments_spent, level, streak, last_seen, created_at)
+        VALUES (${addr}, 0, ${fragmentsCredit}, 0, 1, 0, NOW(), NOW())
+        ON CONFLICT (address) DO UPDATE
+        SET fragments_balance = players.fragments_balance + ${fragmentsCredit},
+            last_seen = NOW()
+      `);
+    }
+
     let wheelPayout = null;
     if (wheelResult.crcValue > 0) {
       try {
@@ -49,6 +60,7 @@ export async function POST(req: NextRequest) {
           recipientAddress: addr,
           amountCrc: wheelResult.crcValue,
           reason: `[TEST] Daily wheel - ${wheelResult.label}`,
+          payoutReason: "daily_random_crc",
         });
       } catch (e: unknown) {
         wheelPayout = { error: e instanceof Error ? e.message : "Payout failed" };

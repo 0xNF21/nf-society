@@ -22,7 +22,7 @@ interface FlagContext {
  * boutons "Top up" / "Pay CRC" alors que le serveur les refuse — UX
  * cassee + utilisateur qui pense pouvoir agir.
  */
-const FAIL_CLOSED_FLAGS = new Set(["real_stakes", "chance_games_xp_only"]);
+const FAIL_CLOSED_FLAGS = new Set(["real_stakes", "chance_games_fragments_only"]);
 
 function defaultStatus(key: string): FlagStatus {
   return FAIL_CLOSED_FLAGS.has(key) ? "hidden" : "enabled";

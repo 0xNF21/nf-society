@@ -1,28 +1,14 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { shopSessions, privacySettings } from "@/lib/db/schema";
+import { privacySettings } from "@/lib/db/schema";
+import { getAuthenticatedAddress } from "@/lib/auth/session";
 import { eq } from "drizzle-orm";
-
-const SESSION_EXPIRY_MS = 60 * 60 * 1000;
-
-async function getSessionAddress(token: string | null): Promise<string | null> {
-  if (!token) return null;
-  const [session] = await db
-    .select()
-    .from(shopSessions)
-    .where(eq(shopSessions.token, token))
-    .limit(1);
-  if (!session?.address) return null;
-  const elapsed = Date.now() - new Date(session.createdAt).getTime();
-  if (elapsed > SESSION_EXPIRY_MS) return null;
-  return session.address.toLowerCase();
-}
 
 const DEFAULT_SETTINGS = {
   hidePnl: false,
   hideTotalBet: false,
-  hideXpSpent: false,
+  hideFragmentsSpent: false,
   hideGameHistory: false,
   hideFromLeaderboard: false,
   hideFromSearch: false,
@@ -32,8 +18,7 @@ const ALLOWED_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof typeof DEFAULT_SETT
 
 export async function GET(req: NextRequest) {
   try {
-    const token = req.nextUrl.searchParams.get("token");
-    const address = await getSessionAddress(token);
+    const address = await getAuthenticatedAddress(req);
     if (!address) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -48,7 +33,7 @@ export async function GET(req: NextRequest) {
       ? {
           hidePnl: row.hidePnl,
           hideTotalBet: row.hideTotalBet,
-          hideXpSpent: row.hideXpSpent,
+          hideFragmentsSpent: row.hideFragmentsSpent,
           hideGameHistory: row.hideGameHistory,
           hideFromLeaderboard: row.hideFromLeaderboard,
           hideFromSearch: row.hideFromSearch,
@@ -65,10 +50,9 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const token: string | null = body?.token ?? null;
     const updates: Record<string, unknown> = body?.settings ?? {};
 
-    const address = await getSessionAddress(token);
+    const address = await getAuthenticatedAddress(req);
     if (!address) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -103,7 +87,7 @@ export async function PATCH(req: NextRequest) {
       settings: {
         hidePnl: row!.hidePnl,
         hideTotalBet: row!.hideTotalBet,
-        hideXpSpent: row!.hideXpSpent,
+        hideFragmentsSpent: row!.hideFragmentsSpent,
         hideGameHistory: row!.hideGameHistory,
         hideFromLeaderboard: row!.hideFromLeaderboard,
         hideFromSearch: row!.hideFromSearch,

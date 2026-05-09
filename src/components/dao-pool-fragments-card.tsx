@@ -7,23 +7,23 @@ import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
 
 type DaoPoolSummary = {
-  totalXp: number;
-  last30dXp: number;
-  byGame: Array<{ gameKey: string; totalXp: number }>;
+  totalFragments: number;
+  last30dFragments: number;
+  byGame: Array<{ gameKey: string; totalFragments: number }>;
 };
 
 /**
  * Carte affichee sur `/dashboard-dao` quand le flag `real_stakes` est sur
- * "hidden" — montre le pot communautaire XP accumule via les commissions
+ * "hidden" — montre le pot communautaire Fragments accumule via les commissions
  * des parties F2P (5% multi + commission chance).
  */
-export function DaoPoolXpCard() {
+export function DaoPoolFragmentsCard() {
   const { locale } = useLocale();
   const { flagStatus, loading: flagsLoading } = useFeatureFlags();
   // Fail-closed : F2P par defaut sauf si real_stakes explicitement "enabled".
   // Voir wallet-balance-card.tsx pour le contexte (PR #45 + UI fail-closed).
   const realStakesDisabled = flagsLoading || flagStatus("real_stakes") !== "enabled";
-  const t = translations.statsXp;
+  const t = translations.statsFragments;
 
   const [data, setData] = useState<DaoPoolSummary | null>(null);
 
@@ -63,7 +63,7 @@ export function DaoPoolXpCard() {
             {t.daoPoolTotal[locale]}
           </div>
           <div className="mt-1 font-display text-3xl sm:text-4xl font-bold text-marine tabular-nums">
-            {fmt(data.totalXp)} <span className="text-base text-ink/50 dark:text-white/50">XP</span>
+            {fmt(data.totalFragments)} <span className="text-base text-ink/50 dark:text-white/50">Fragments</span>
           </div>
         </div>
         <div>
@@ -72,7 +72,7 @@ export function DaoPoolXpCard() {
             {t.daoPoolMonth[locale]}
           </div>
           <div className="mt-1 font-display text-3xl sm:text-4xl font-bold text-ink dark:text-white tabular-nums">
-            {fmt(data.last30dXp)} <span className="text-base text-ink/50 dark:text-white/50">XP</span>
+            {fmt(data.last30dFragments)} <span className="text-base text-ink/50 dark:text-white/50">Fragments</span>
           </div>
         </div>
       </div>
@@ -84,7 +84,7 @@ export function DaoPoolXpCard() {
                 key={g.gameKey}
                 className="px-2.5 py-1 rounded-full bg-white/70 dark:bg-white/10 text-xs font-semibold text-ink/70 dark:text-white/70"
               >
-                {g.gameKey}: {fmt(g.totalXp)} XP
+                {g.gameKey}: {fmt(g.totalFragments)} Fragments
               </span>
             ))}
           </div>

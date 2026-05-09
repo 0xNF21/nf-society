@@ -9,7 +9,7 @@ import { checkAllNewPayments } from "@/lib/circles";
 import { executePayout } from "@/lib/payout";
 import { getRandomReward } from "@/lib/lootbox";
 import { getLootboxXpAction } from "@/lib/xp";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { awardPlayerXpSafely } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 
@@ -164,22 +164,32 @@ export async function POST(req: NextRequest) {
               gameId: `refund-${txHash}`,
               recipientAddress: playerAddress,
               amountCrc: priceCrc,
-              reason: `Lootbox Remboursée — Boutique XP`,
+              reason: `Lootbox Remboursée — Boutique Fragments`,
             });
           }
         } catch (couponErr) {
           console.error("[LootboxScan] Coupon refund error:", couponErr);
         }
 
-        // XP — fire-and-forget. Never block the scan response on XP (was
-        // "non-bloquant" via try/catch but still awaited, which blocks the
-        // scan while the XP route is being called). void + .catch is the
-        // real non-blocking pattern.
+        // XP is awaited so the write is attempted before the scan response.
+        // Failures are logged inside the helper without breaking the scan.
         {
-          void awardPlayerXp({ address: playerAddress, action: "lootbox_open" }).catch(() => {});
+          await awardPlayerXpSafely({
+            address: playerAddress,
+            action: "lootbox_open",
+            sourceType: "lootbox",
+            sourceId: `open:${inserted[0].id}`,
+            metadata: { lootboxId, txHash, rewardCrc },
+          });
           const bonusAction = getLootboxXpAction(rewardCrc, priceCrc);
           if (bonusAction) {
-            void awardPlayerXp({ address: playerAddress, action: bonusAction }).catch(() => {});
+            await awardPlayerXpSafely({
+              address: playerAddress,
+              action: bonusAction,
+              sourceType: "lootbox",
+              sourceId: `open:${inserted[0].id}`,
+              metadata: { lootboxId, txHash, rewardCrc },
+            });
           }
         }
       } catch (err: any) {

@@ -6,8 +6,6 @@ export const dailySessions = pgTable("daily_sessions", {
   address: text("address"),
   txHash: text("tx_hash"),
   date: text("date").notNull(),
-  scratchResult: text("scratch_result"),
-  scratchPlayed: boolean("scratch_played").notNull().default(false),
   spinResult: text("spin_result"),
   spinPlayed: boolean("spin_played").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -5,6 +5,7 @@ import { participants, draws, lotteries } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { getPayoutConfig } from "@/lib/payout";
 import { payPrize, payCommission } from "@/lib/wallet";
+import { isAdminPasswordValid } from "@/lib/admin-auth";
 
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 
@@ -94,9 +95,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "lotteryId is required" }, { status: 400 });
     }
 
-    const adminPassword = process.env.ADMIN_PASSWORD;
-
-    if (!adminPassword || password !== adminPassword) {
+    if (!isAdminPasswordValid(password)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

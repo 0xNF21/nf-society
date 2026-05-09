@@ -6,6 +6,7 @@ import { resolveRound, getWinner, isValidMove } from "@/lib/pfc";
 import type { PfcState, Move } from "@/lib/pfc";
 import { payPrize, payCommission } from "@/lib/wallet";
 import { calculateWinAmount } from "@/lib/multiplayer";
+import { awardMatchResultXp } from "@/lib/xp-server";
 
 export async function GET(
   _req: NextRequest,
@@ -89,6 +90,16 @@ export async function POST(
           winnerAddress,
           updatedAt: new Date(),
         }).where(eq(pfcGames.id, game.id));
+
+        await awardMatchResultXp({
+          playerAddresses: [game.player1Address, game.player2Address],
+          winnerAddress,
+          winAction: "pfc_win",
+          loseAction: "pfc_lose",
+          sourceType: "pfc",
+          sourceId: `game:${game.id}`,
+          metadata: { slug: game.slug },
+        });
 
         // Pay winner asymmetrically.
         try {

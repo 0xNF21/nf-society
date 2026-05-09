@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShoppingBag, Lock, Check, Zap, Shield, Sparkles, Coins, Gamepad2, Loader2, Copy, QrCode, CheckCircle2, Wallet } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Lock, Check, Zap, Shield, Sparkles, Coins, Gamepad2, Loader2 } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { translations } from "@/lib/i18n";
-import { useMiniApp } from "@/components/miniapp-provider";
+import { useAuthSession } from "@/components/auth-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
-import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type ShopItem = {
   id: number;
@@ -17,7 +16,7 @@ type ShopItem = {
   description: string;
   icon: string;
   category: string;
-  xpCost: number;
+  fragmentsCost?: number;
   levelRequired: number;
   refundType: string | null;
   refundAmountCrc: number | null;
@@ -30,11 +29,11 @@ type ShopItem = {
 type PlayerInfo = {
   address: string;
   xp: number;
-  xpSpent: number;
+  fragmentsSpent?: number;
   level: number;
 } | null;
 
-type AuthState = "idle" | "loading" | "waiting" | "confirmed" | "expired";
+type AuthState = "idle" | "confirmed";
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   game: <Gamepad2 className="w-4 h-4" />,
@@ -61,55 +60,44 @@ const ITEM_ICONS: Record<string, string> = {
 };
 
 const DEMO_ITEMS: ShopItem[] = [
-  { id: 1, slug: "lootbox_refund", name: "Lootbox Remboursée", description: "Paie 10 CRC, remboursé automatiquement", icon: "gift", category: "game", xpCost: 500, levelRequired: 1, refundType: "lootbox_refund", refundAmountCrc: 10, stock: null, active: true, status: "available" },
-  { id: 2, slug: "lootbox_rare_refund", name: "Lootbox Rare Remboursée", description: "Paie 10 CRC, remboursé + Rare garanti", icon: "diamond", category: "game", xpCost: 2000, levelRequired: 4, refundType: "lootbox_rare_refund", refundAmountCrc: 10, stock: null, active: true, status: "available" },
-  { id: 3, slug: "spin_refund", name: "Daily Spin Remboursé", description: "Paie 1 CRC daily, remboursé automatiquement", icon: "slot", category: "game", xpCost: 200, levelRequired: 1, refundType: "spin_refund", refundAmountCrc: 1, stock: null, active: true, status: "available" },
-  { id: 4, slug: "spin_week_refund", name: "Pack Spins Semaine", description: "7 daily remboursés sur 7 jours", icon: "package", category: "game", xpCost: 1000, levelRequired: 3, refundType: "spin_refund", refundAmountCrc: 1, stock: null, active: true, status: "available" },
-  { id: 5, slug: "xp_boost_24h", name: "Boost XP 24h", description: "XP x2 pendant 24h", icon: "zap", category: "boost", xpCost: 300, levelRequired: 2, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 6, slug: "xp_boost_7d", name: "Boost XP 7 jours", description: "XP x1.5 pendant 7 jours", icon: "battery", category: "boost", xpCost: 1500, levelRequired: 4, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 7, slug: "commission_reduction_7d", name: "Commission -2%", description: "Commission réduite de 2% pendant 7 jours", icon: "trending-down", category: "boost", xpCost: 800, levelRequired: 3, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 8, slug: "commission_reduction_30d", name: "Commission -3%", description: "Commission réduite de 3% pendant 30 jours", icon: "bar-chart", category: "boost", xpCost: 2500, levelRequired: 6, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 9, slug: "vip_access_7d", name: "Accès VIP 7 jours", description: "Tables VIP + tournois exclusifs", icon: "crown", category: "boost", xpCost: 3000, levelRequired: 5, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 10, slug: "vip_access_30d", name: "Accès VIP 30 jours", description: "Tables VIP + tournois exclusifs", icon: "trophy", category: "boost", xpCost: 8000, levelRequired: 7, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 11, slug: "streak_shield", name: "Bouclier de Streak", description: "Protège ton streak une fois", icon: "shield", category: "protection", xpCost: 400, levelRequired: 2, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 12, slug: "streak_shield_3", name: "Pack Boucliers x3", description: "Protège ton streak 3 fois", icon: "shield", category: "protection", xpCost: 1000, levelRequired: 3, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 13, slug: "badge_silver", name: "Badge Argent", description: "Badge argenté sur ton profil", icon: "award-silver", category: "cosmetic", xpCost: 500, levelRequired: 2, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 14, slug: "badge_gold", name: "Badge Or", description: "Badge doré sur ton profil", icon: "award-gold", category: "cosmetic", xpCost: 2000, levelRequired: 5, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 15, slug: "badge_diamond", name: "Badge Diamant", description: "Badge diamant exclusif", icon: "award-diamond", category: "cosmetic", xpCost: 5000, levelRequired: 8, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 16, slug: "custom_title", name: "Titre Personnalisé", description: "Choisis ton propre titre affiché", icon: "edit", category: "cosmetic", xpCost: 3000, levelRequired: 6, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 17, slug: "hall_of_fame", name: "Hall of Fame", description: "Ton nom gravé pour toujours", icon: "landmark", category: "cosmetic", xpCost: 10000, levelRequired: 9, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 18, slug: "crc_1", name: "1 CRC", description: "Échange XP contre CRC", icon: "coin", category: "crc", xpCost: 150, levelRequired: 1, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 19, slug: "crc_5", name: "5 CRC", description: "Échange XP contre CRC", icon: "coins", category: "crc", xpCost: 650, levelRequired: 3, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 20, slug: "crc_10", name: "10 CRC", description: "Échange XP contre CRC", icon: "gem", category: "crc", xpCost: 1200, levelRequired: 5, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
-  { id: 21, slug: "crc_25", name: "25 CRC", description: "Échange XP contre CRC", icon: "crown", category: "crc", xpCost: 2800, levelRequired: 7, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 1, slug: "lootbox_refund", name: "Lootbox RemboursÃ©e", description: "Paie 10 CRC, remboursÃ© automatiquement", icon: "gift", category: "game", fragmentsCost: 500, levelRequired: 1, refundType: "lootbox_refund", refundAmountCrc: 10, stock: null, active: true, status: "available" },
+  { id: 2, slug: "lootbox_rare_refund", name: "Lootbox Rare RemboursÃ©e", description: "Paie 10 CRC, remboursÃ© + Rare garanti", icon: "diamond", category: "game", fragmentsCost: 2000, levelRequired: 4, refundType: "lootbox_rare_refund", refundAmountCrc: 10, stock: null, active: true, status: "available" },
+  { id: 3, slug: "xp_boost_24h", name: "Boost XP 24h", description: "XP x2 pendant 24h", icon: "zap", category: "boost", fragmentsCost: 300, levelRequired: 2, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 4, slug: "xp_boost_7d", name: "Boost XP 7 jours", description: "XP x1.5 pendant 7 jours", icon: "battery", category: "boost", fragmentsCost: 1500, levelRequired: 4, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 5, slug: "commission_reduction_7d", name: "Commission -2%", description: "Commission rÃ©duite de 2% pendant 7 jours", icon: "trending-down", category: "boost", fragmentsCost: 800, levelRequired: 3, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 6, slug: "commission_reduction_30d", name: "Commission -3%", description: "Commission rÃ©duite de 3% pendant 30 jours", icon: "bar-chart", category: "boost", fragmentsCost: 2500, levelRequired: 6, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 7, slug: "vip_access_7d", name: "AccÃ¨s VIP 7 jours", description: "Tables VIP + tournois exclusifs", icon: "crown", category: "boost", fragmentsCost: 3000, levelRequired: 5, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 8, slug: "vip_access_30d", name: "AccÃ¨s VIP 30 jours", description: "Tables VIP + tournois exclusifs", icon: "trophy", category: "boost", fragmentsCost: 8000, levelRequired: 7, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 9, slug: "streak_shield", name: "Bouclier de Streak", description: "Protege ton streak une fois", icon: "shield", category: "protection", fragmentsCost: 400, levelRequired: 2, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 10, slug: "streak_shield_3", name: "Pack Boucliers x3", description: "Protege ton streak 3 fois", icon: "shield", category: "protection", fragmentsCost: 1000, levelRequired: 3, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 11, slug: "badge_silver", name: "Badge Argent", description: "Badge argentÃ© sur ton profil", icon: "award-silver", category: "cosmetic", fragmentsCost: 500, levelRequired: 2, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 12, slug: "badge_gold", name: "Badge Or", description: "Badge dorÃ© sur ton profil", icon: "award-gold", category: "cosmetic", fragmentsCost: 2000, levelRequired: 5, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 13, slug: "badge_diamond", name: "Badge Diamant", description: "Badge diamant exclusif", icon: "award-diamond", category: "cosmetic", fragmentsCost: 5000, levelRequired: 8, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 14, slug: "custom_title", name: "Titre PersonnalisÃ©", description: "Choisis ton propre titre affichÃ©", icon: "edit", category: "cosmetic", fragmentsCost: 3000, levelRequired: 6, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 15, slug: "hall_of_fame", name: "Hall of Fame", description: "Ton nom gravÃ© pour toujours", icon: "landmark", category: "cosmetic", fragmentsCost: 10000, levelRequired: 9, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 16, slug: "crc_1", name: "1 CRC", description: "Echange Fragments contre CRC", icon: "coin", category: "crc", fragmentsCost: 150, levelRequired: 1, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 17, slug: "crc_5", name: "5 CRC", description: "Echange Fragments contre CRC", icon: "coins", category: "crc", fragmentsCost: 650, levelRequired: 3, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 18, slug: "crc_10", name: "10 CRC", description: "Echange Fragments contre CRC", icon: "gem", category: "crc", fragmentsCost: 1200, levelRequired: 5, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
+  { id: 19, slug: "crc_25", name: "25 CRC", description: "Echange Fragments contre CRC", icon: "crown", category: "crc", fragmentsCost: 2800, levelRequired: 7, refundType: null, refundAmountCrc: null, stock: null, active: true, status: "available" },
 ];
 
 export default function ShopPage() {
   const { locale } = useLocale();
-  const { isDemo, demoPlayer, spendXp } = useDemo();
-  const { isMiniApp, walletAddress, sendPayment } = useMiniApp();
+  const { isDemo, demoPlayer, spendFragments } = useDemo();
+  const { address: sessionAddress, loading: authLoading, openLogin } = useAuthSession();
   const { flagStatus, loading: flagsLoading } = useFeatureFlags();
   // Fail-closed : F2P par defaut sauf si real_stakes explicitement "enabled".
   // Voir wallet-balance-card.tsx pour le contexte (PR #45 + UI fail-closed).
   const realStakesDisabled = flagsLoading || flagStatus("real_stakes") !== "enabled";
-  const stake = useStakeLabel();
   const t = translations.shop;
-  const tm = translations.miniapp;
 
   // Auth state
   const [authState, setAuthState] = useState<AuthState>("idle");
-  const [authToken, setAuthToken] = useState("");
-  const [paymentLink, setPaymentLink] = useState("");
-  const [qrCode, setQrCode] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [miniAppPaying, setMiniAppPaying] = useState(false);
-  const [miniAppError, setMiniAppError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Shop state
   const [items, setItems] = useState<ShopItem[]>([]);
   const [player, setPlayer] = useState<PlayerInfo>(null);
-  const [availableXp, setAvailableXp] = useState(0);
+  const [fragmentsBalance, setFragmentsBalance] = useState(0);
   const [category, setCategory] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState<string | null>(null);
@@ -117,39 +105,37 @@ export default function ShopPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [verifiedAddress, setVerifiedAddress] = useState<string | null>(null);
   const demo = isDemo;
+  const getItemFragmentsCost = (item: ShopItem) => item.fragmentsCost ?? 0;
 
   // Sync demo player data reactively
   useEffect(() => {
     if (isDemo) {
-      setPlayer({ address: demoPlayer.address, xp: demoPlayer.xp, xpSpent: demoPlayer.xpSpent, level: demoPlayer.level });
-      setAvailableXp(demoPlayer.xp - demoPlayer.xpSpent);
+      setPlayer({ address: demoPlayer.address, xp: demoPlayer.xp, fragmentsSpent: demoPlayer.fragmentsSpent, level: demoPlayer.level });
+      setFragmentsBalance(demoPlayer.fragmentsBalance);
       setAuthState("confirmed");
       setItems(prev => prev.length > 0 ? prev : DEMO_ITEMS);
       setLoading(false);
       return;
     }
-    // Mini App: auto-auth with connected wallet
-    if (isMiniApp && walletAddress) {
-      setVerifiedAddress(walletAddress);
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
+    // Server auth session is the source of truth. The Mini App wallet address
+    // is only a hint until the signed auth flow creates the HttpOnly cookie.
+    if (sessionAddress) {
+      setVerifiedAddress(sessionAddress);
       setAuthState("confirmed");
       setLoading(false);
       return;
     }
-    // Check for existing session in localStorage
-    try {
-      const stored = localStorage.getItem("nf-shop-session");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
-          setVerifiedAddress(parsed.address);
-          setAuthState("confirmed");
-        } else {
-          localStorage.removeItem("nf-shop-session");
-        }
-      }
-    } catch {}
+
+    try { localStorage.removeItem("nf-shop-session"); } catch {}
+    setVerifiedAddress(null);
+    setAuthState("idle");
     setLoading(false);
-  }, [isDemo, demoPlayer, isMiniApp, walletAddress]);
+  }, [authLoading, demoPlayer, isDemo, sessionAddress]);
 
   const fetchShop = useCallback(async (address?: string) => {
     try {
@@ -157,96 +143,29 @@ export default function ShopPage() {
       const url = addr ? `/api/shop?address=${addr}` : `/api/shop`;
       const res = await fetch(url);
       const data = await res.json();
+      if (res.status === 401 || data?.error === "AUTH_REQUIRED") {
+        setAuthState("idle");
+        setVerifiedAddress(null);
+        setPlayer(null);
+        setFragmentsBalance(0);
+        return;
+      }
       setItems(data.items || []);
       setPlayer(data.player || null);
-      setAvailableXp(data.availableXp || 0);
+      setFragmentsBalance(data.fragmentsBalance ?? 0);
     } catch (err) {
       console.error("Failed to fetch shop:", err);
     }
   }, [verifiedAddress]);
 
-  // Load shop when verified (skip for demo — enableDemo handles state)
+  // Load shop when verified (skip for demo â€” enableDemo handles state)
   useEffect(() => {
     if (authState === "confirmed" && verifiedAddress && !demo) {
       fetchShop(verifiedAddress);
     }
   }, [authState, verifiedAddress, demo, fetchShop]);
 
-  const [authError, setAuthError] = useState("");
-
-  // Start auth flow
-  const startAuth = async () => {
-    setAuthState("loading");
-    setAuthError("");
-    try {
-      const res = await fetch("/api/shop/auth", { method: "POST" });
-      const data = await res.json();
-
-      if (!res.ok || data.error || !data.paymentLink) {
-        console.error("[Shop Auth] API error:", data.error || "No payment link");
-        setAuthError(data.error || "Erreur de connexion");
-        setAuthState("idle");
-        return;
-      }
-
-      setAuthToken(data.token);
-      setPaymentLink(data.paymentLink);
-      setQrCode(data.qrCode || "");
-      setAuthState("waiting");
-
-      // Start polling
-      pollRef.current = setInterval(async () => {
-        try {
-          const pollRes = await fetch(`/api/shop/auth?token=${data.token}`);
-          const pollData = await pollRes.json();
-
-          if (pollData.status === "confirmed") {
-            if (pollRef.current) clearInterval(pollRef.current);
-            setVerifiedAddress(pollData.address);
-            setAuthState("confirmed");
-            localStorage.setItem("nf-shop-session", JSON.stringify({
-              address: pollData.address,
-              timestamp: Date.now(),
-            }));
-          } else if (pollData.status === "expired") {
-            if (pollRef.current) clearInterval(pollRef.current);
-            setAuthState("expired");
-          }
-        } catch {}
-      }, 3000);
-    } catch (err) {
-      console.error("Auth init error:", err);
-      setAuthState("idle");
-    }
-  };
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
-
-  const handleMiniAppPay = async () => {
-    if (!paymentLink) return;
-    setMiniAppPaying(true);
-    setMiniAppError(null);
-    try {
-      const match = paymentLink.match(/transfer\/(0x[a-fA-F0-9]+)\//);
-      const recipient = match?.[1] || "";
-      await sendPayment(recipient, 1, `shop_auth:${authToken}`);
-    } catch (err: any) {
-      setMiniAppError(typeof err === "string" ? err : err?.message || tm.rejected[locale]);
-    } finally {
-      setMiniAppPaying(false);
-    }
-  };
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(paymentLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const startAuth = () => openLogin();
 
   const { enterDemo: enableDemo } = useDemo();
 
@@ -256,11 +175,12 @@ export default function ShopPage() {
     if (demo) {
       const item = items.find(i => i.slug === slug);
       if (!item) return;
-      const ok = spendXp(item.xpCost);
+      const cost = getItemFragmentsCost(item);
+      const ok = spendFragments(cost);
       if (!ok) return;
       setSuccess(slug);
       setConfirm(null);
-      setAvailableXp(prev => prev - item.xpCost);
+      setFragmentsBalance(prev => prev - cost);
       setItems(prev => prev.map(i =>
         i.slug === slug
           ? { ...i, status: i.category === "cosmetic" ? "owned" : "active" }
@@ -275,15 +195,19 @@ export default function ShopPage() {
       const res = await fetch("/api/shop/buy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: player!.address, item_slug: slug }),
+        body: JSON.stringify({ item_slug: slug }),
       });
       const data = await res.json();
       if (data.success) {
         setSuccess(slug);
         setConfirm(null);
-        setAvailableXp(data.xpRemaining);
+        setFragmentsBalance(data.fragmentsRemaining ?? 0);
         await fetchShop();
         setTimeout(() => setSuccess(null), 2000);
+      } else if (res.status === 401 || data?.error === "AUTH_REQUIRED") {
+        setAuthState("idle");
+        setVerifiedAddress(null);
+        openLogin();
       } else {
         alert(data.error || "Erreur");
       }
@@ -307,12 +231,12 @@ export default function ShopPage() {
   };
 
   // En mode Free-to-Play :
-  //   - la categorie "crc" (echange XP→CRC) est masquee (plus d'emission CRC)
+  //   - la categorie "crc" (echange Fragments -> CRC) est masquee (plus d'emission CRC)
   //   - les items "refund" (dont le nom/desc mentionne un paiement CRC) sont filtres
   //     car les jeux ne coutent plus de CRC
   const visibleItems = realStakesDisabled
-    ? items.filter((i) => i.category !== "crc" && !i.refundType)
-    : items;
+    ? items.filter((i) => i.active !== false && i.category !== "crc" && !i.refundType)
+    : items.filter((i) => i.active !== false);
 
   const filtered = category === "all"
     ? visibleItems
@@ -337,7 +261,7 @@ export default function ShopPage() {
       const daysLeft = until ? Math.ceil((until.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
       return (
         <span className="text-xs font-medium text-violet-600 bg-violet-50 px-2 py-1 rounded-lg">
-          {t.active[locale]}{daysLeft ? ` — ${daysLeft}${t.daysLeft[locale]}` : ""}
+          {t.active[locale]}{daysLeft ? ` â€” ${daysLeft}${t.daysLeft[locale]}` : ""}
         </span>
       );
     }
@@ -351,8 +275,8 @@ export default function ShopPage() {
         </span>
       );
     }
-    if (status === "insufficient_xp") {
-      return <span className="text-xs font-medium text-red-500">{t.insufficientXp[locale]}</span>;
+    if (status === "insufficient_fragments") {
+      return <span className="text-xs font-medium text-red-500">{t.insufficientFragments[locale]}</span>;
     }
 
     if (confirm === item.slug) {
@@ -380,7 +304,7 @@ export default function ShopPage() {
         onClick={() => setConfirm(item.slug)}
         className="px-3 py-1.5 bg-pink-500 text-white text-xs font-bold rounded-lg shadow-sm hover:shadow-md hover:bg-pink-600 transition-all hover:scale-[1.02]"
       >
-        {t.buy[locale]} — {item.xpCost} XP
+        {t.buy[locale]} — {getItemFragmentsCost(item).toLocaleString(locale === "fr" ? "fr-FR" : "en-US")} Fragments
       </button>
     );
   };
@@ -393,7 +317,7 @@ export default function ShopPage() {
     );
   }
 
-  // ─── Auth screen (not verified yet) ───
+  // â”€â”€â”€ Auth screen (not verified yet) â”€â”€â”€
   if (authState !== "confirmed") {
     return (
       <div className="min-h-screen px-4 py-8 max-w-md mx-auto">
@@ -415,9 +339,6 @@ export default function ShopPage() {
 
         {authState === "idle" && (
           <div className="space-y-4">
-            {authError && (
-              <p className="text-sm text-red-500 text-center bg-red-50 rounded-xl py-2 px-3">{authError}</p>
-            )}
             <button
               onClick={startAuth}
               className="w-full py-3 bg-pink-500 text-white font-bold rounded-xl hover:bg-pink-600 transition-colors"
@@ -429,86 +350,17 @@ export default function ShopPage() {
                 onClick={enableDemo}
                 className="px-4 py-2 bg-amber-100 text-amber-700 font-medium rounded-xl text-sm hover:bg-amber-200 transition-colors"
               >
-                {t.demoMode[locale]} — {t.demoDesc[locale]}
+                {t.demoMode[locale]} â€” {t.demoDesc[locale]}
               </button>
             </div>
           </div>
         )}
 
-        {authState === "loading" && (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
-          </div>
-        )}
-
-        {authState === "waiting" && (
-          <div className="space-y-4">
-            {isMiniApp && walletAddress ? (
-              <>
-                <button
-                  onClick={handleMiniAppPay}
-                  disabled={miniAppPaying}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-pink-500 text-white font-bold rounded-xl hover:bg-pink-600 transition-colors disabled:opacity-50"
-                >
-                  {miniAppPaying ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" />{tm.paying[locale]}</>
-                  ) : (
-                    tm.payBtn[locale].replace("{amount}", "1")
-                  )}
-                </button>
-                {miniAppError && <p className="text-xs text-red-500 text-center">{miniAppError}</p>}
-              </>
-            ) : (
-              <>
-                {qrCode && (
-                  <div className="flex justify-center">
-                    <img src={qrCode} alt="QR" className="w-48 h-48 rounded-xl" />
-                  </div>
-                )}
-                <p className="text-center text-xs text-ink/50">{t.authScanQr[locale]}</p>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    readOnly
-                    value={paymentLink}
-                    className="flex-1 text-xs bg-ink/[0.03] rounded-lg px-3 py-2 text-ink/60 truncate"
-                  />
-                  <button
-                    onClick={copyLink}
-                    className="flex items-center gap-1 px-3 py-2 bg-pink-500 text-white text-xs font-bold rounded-lg hover:bg-pink-600 transition-colors"
-                  >
-                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    {copied ? t.authCopied[locale] : t.authOrCopy[locale]}
-                  </button>
-                </div>
-              </>
-            )}
-
-            <div className="flex items-center justify-center gap-2 py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-pink-500" />
-              <span className="text-sm text-ink/50">{t.authWaiting[locale]}</span>
-            </div>
-
-            <p className="text-center text-[10px] text-ink/50">{t.authRefunded[locale]}</p>
-          </div>
-        )}
-
-        {authState === "expired" && (
-          <div className="text-center space-y-4">
-            <p className="text-sm text-red-500 font-medium">{t.authExpired[locale]}</p>
-            <button
-              onClick={() => { setAuthState("idle"); setAuthToken(""); }}
-              className="px-4 py-2 bg-pink-500 text-white font-bold rounded-xl hover:bg-pink-600 transition-colors"
-            >
-              {t.authRetry[locale]}
-            </button>
-          </div>
-        )}
       </div>
     );
   }
 
-  // ─── Shop (verified) ───
+  // â”€â”€â”€ Shop (verified) â”€â”€â”€
   return (
     <div className="min-h-screen px-4 py-8 max-w-2xl mx-auto">
       <div className="mb-6">
@@ -527,8 +379,8 @@ export default function ShopPage() {
             <h1 className="text-2xl font-bold text-ink">{t.title[locale]}</h1>
             {player && (
               <p className="text-sm text-ink/50">
-                {t.availableXp[locale]}: <span className="font-bold text-pink-600">{availableXp.toLocaleString()} XP</span>
-                {" · "}{t.level[locale]} {player.level}
+                {t.availableFragments[locale]}: <span className="font-bold text-pink-600">{fragmentsBalance.toLocaleString(locale === "fr" ? "fr-FR" : "en-US")} Fragments</span>
+                {" Â· "}{t.level[locale]} {player.level}
                 {demo && <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">DEMO</span>}
               </p>
             )}
@@ -545,7 +397,7 @@ export default function ShopPage() {
       {!player && !demo && verifiedAddress && (
         <div className="bg-ink/[0.03] rounded-2xl p-6 mb-6 text-center space-y-3">
           <p className="text-sm text-ink/60">
-            {t.noXpProfile[locale]}
+            {t.noFragmentsProfile[locale]}
           </p>
         </div>
       )}
@@ -574,7 +426,7 @@ export default function ShopPage() {
           <div
             key={item.slug}
             className={`rounded-2xl border-2 border-ink/5 bg-white/80 backdrop-blur-sm p-4 flex items-center gap-4 transition-all hover:shadow-md ${
-              item.status === "level_required" || item.status === "insufficient_xp"
+              item.status === "level_required" || item.status === "insufficient_fragments"
                 ? "opacity-60"
                 : ""
             }`}
@@ -592,7 +444,7 @@ export default function ShopPage() {
               </div>
               <p className="text-xs text-ink/50 leading-relaxed">{item.description}</p>
               <div className="flex items-center gap-3 mt-1">
-                <span className="text-xs font-bold text-pink-600">{item.xpCost.toLocaleString()} XP</span>
+                <span className="text-xs font-bold text-pink-600">{getItemFragmentsCost(item).toLocaleString(locale === "fr" ? "fr-FR" : "en-US")} Fragments</span>
                 {item.levelRequired > 1 && (
                   <span className="text-[10px] text-ink/40">Lv.{item.levelRequired}+</span>
                 )}

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
+import { parseDailyWheelResult } from "@/lib/daily";
 import { eq } from "drizzle-orm";
 
 const SESSION_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
@@ -12,7 +13,7 @@ function confirmedResponse(s: typeof dailySessions.$inferSelect) {
     token: s.token,
     address: s.address,
     wheelPlayed: s.spinPlayed,
-    wheelResult: s.spinResult ? JSON.parse(s.spinResult) : null,
+    wheelResult: parseDailyWheelResult(s.spinResult),
   });
 }
 

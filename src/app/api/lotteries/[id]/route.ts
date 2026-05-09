@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lotteries } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { hasAdminPassword, isAdminPasswordValid } from "@/lib/admin-auth";
 
 export async function GET(
   req: NextRequest,
@@ -30,12 +31,11 @@ export async function PUT(
     const body = await req.json();
     const { password, ...updates } = body;
 
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!adminPassword) {
+    if (!hasAdminPassword()) {
       return NextResponse.json({ error: "Admin password not configured" }, { status: 500 });
     }
 
-    if (password !== adminPassword) {
+    if (!isAdminPasswordValid(password)) {
       return NextResponse.json({ error: "Invalid password" }, { status: 401 });
     }
 

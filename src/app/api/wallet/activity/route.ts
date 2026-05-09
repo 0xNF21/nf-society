@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { getLedger } from "@/lib/wallet";
+import { getAuthenticatedAddress } from "@/lib/auth/session";
 import {
   hiloRounds,
   blackjackHands,
@@ -92,6 +93,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "address required" }, { status: 400 });
     }
     const addr = address.toLowerCase();
+    const authenticatedAddress = await getAuthenticatedAddress(req).catch(() => null);
+    if (authenticatedAddress?.toLowerCase() !== addr) {
+      return NextResponse.json(
+        { error: "AUTH_REQUIRED", message: "Wallet activity is only available to the authenticated owner." },
+        { status: 401 },
+      );
+    }
+
     const limitParam = req.nextUrl.searchParams.get("limit");
     const limit = Math.min(Math.max(parseInt(limitParam || "20", 10) || 20, 1), 100);
 

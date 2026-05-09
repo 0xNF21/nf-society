@@ -10,18 +10,30 @@ type AdminDailyReward = {
   type: string;
   label: string;
   crcValue: number;
-  xpValue: number;
+  fragmentsValue: number;
   color?: string;
 };
 
+type RawAdminDailyReward = Partial<AdminDailyReward> & {
+  xpValue?: unknown;
+};
+
 const MAX_REWARD_ROWS = 20;
-const MAX_DAILY_XP_REWARD = 10_000;
-const MAX_DAILY_EXPECTED_XP = 10_000;
+const MAX_DAILY_FRAGMENTS_REWARD = 10_000;
+const MAX_DAILY_EXPECTED_FRAGMENTS = 10_000;
 const MAX_DAILY_CRC_REWARD = 100;
 const MAX_DAILY_EXPECTED_CRC = 10;
 const MAX_REWARD_TEXT_LENGTH = 48;
 const REWARD_TYPE_RE = /^[a-z0-9][a-z0-9_:-]{1,63}$/;
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
+function normalizePlayableType(value: unknown): string {
+  return String(value ?? "").trim().replace(/^xp_/, "fragments_");
+}
+
+function normalizePlayableLabel(value: unknown): string {
+  return String(value ?? "").trim().replace(/XP( de solde)?/gi, "Fragments");
+}
 
 function normalizeAdminRewards(rewards: unknown[]): { rewards?: AdminDailyReward[]; error?: string } {
   if (rewards.length === 0) return { error: "At least one reward is required" };
@@ -31,12 +43,12 @@ function normalizeAdminRewards(rewards: unknown[]): { rewards?: AdminDailyReward
   const normalized: AdminDailyReward[] = [];
 
   for (let i = 0; i < rewards.length; i++) {
-    const row = rewards[i] as Partial<AdminDailyReward> | null;
+    const row = rewards[i] as RawAdminDailyReward | null;
     const prob = Number(row?.prob);
     const crcValue = Number(row?.crcValue ?? 0);
-    const xpValue = Number(row?.xpValue ?? 0);
-    const type = String(row?.type ?? "").trim();
-    const label = String(row?.label ?? "").trim();
+    const fragmentsValue = Number(row?.fragmentsValue ?? row?.xpValue ?? 0);
+    const type = normalizePlayableType(row?.type);
+    const label = normalizePlayableLabel(row?.label);
     const color = String(row?.color ?? "").trim();
 
     if (!type) return { error: `Reward ${i + 1}: type is required` };
@@ -46,15 +58,15 @@ function normalizeAdminRewards(rewards: unknown[]): { rewards?: AdminDailyReward
     if (label.length > MAX_REWARD_TEXT_LENGTH) return { error: `Reward ${i + 1}: label is too long` };
     if (!Number.isFinite(prob) || prob < 0) return { error: `Reward ${i + 1}: invalid probability` };
     if (!Number.isFinite(crcValue) || crcValue < 0) return { error: `Reward ${i + 1}: invalid CRC value` };
-    if (!Number.isFinite(xpValue) || xpValue < 0) return { error: `Reward ${i + 1}: invalid XP value` };
-    if (crcValue === 0 && xpValue === 0) {
-      return { error: `Reward ${i + 1}: every line must give XP or CRC` };
+    if (!Number.isFinite(fragmentsValue) || fragmentsValue < 0) return { error: `Reward ${i + 1}: invalid Fragments value` };
+    if (crcValue === 0 && fragmentsValue === 0) {
+      return { error: `Reward ${i + 1}: every line must give Fragments or CRC` };
     }
-    if (crcValue > 0 && xpValue > 0) {
-      return { error: `Reward ${i + 1}: choose either XP or CRC, not both` };
+    if (crcValue > 0 && fragmentsValue > 0) {
+      return { error: `Reward ${i + 1}: choose either Fragments or CRC, not both` };
     }
     if (crcValue > MAX_DAILY_CRC_REWARD) return { error: `Reward ${i + 1}: CRC value must be <= ${MAX_DAILY_CRC_REWARD}` };
-    if (xpValue > MAX_DAILY_XP_REWARD) return { error: `Reward ${i + 1}: XP balance value must be <= ${MAX_DAILY_XP_REWARD}` };
+    if (fragmentsValue > MAX_DAILY_FRAGMENTS_REWARD) return { error: `Reward ${i + 1}: Fragments value must be <= ${MAX_DAILY_FRAGMENTS_REWARD}` };
     if (color && !HEX_COLOR_RE.test(color)) return { error: `Reward ${i + 1}: color must be #RRGGBB` };
 
     seenTypes.add(type);
@@ -63,7 +75,7 @@ function normalizeAdminRewards(rewards: unknown[]): { rewards?: AdminDailyReward
       type,
       label,
       crcValue: Math.round(crcValue * 1_000) / 1_000,
-      xpValue: Math.floor(xpValue),
+      fragmentsValue: Math.floor(fragmentsValue),
       color: color || "#6B7280",
     });
   }
@@ -103,9 +115,9 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: `Probabilities sum to ${totalProb.toFixed(3)}, should be 1.0` }, { status: 400 });
     }
 
-    const expectedXp = normalized.rewards.reduce((sum, reward) => sum + reward.prob * reward.xpValue, 0);
-    if (expectedXp > MAX_DAILY_EXPECTED_XP) {
-      return NextResponse.json({ error: `Expected XP balance per wheel is ${expectedXp.toFixed(2)}, max is ${MAX_DAILY_EXPECTED_XP}` }, { status: 400 });
+    const expectedFragments = normalized.rewards.reduce((sum, reward) => sum + reward.prob * reward.fragmentsValue, 0);
+    if (expectedFragments > MAX_DAILY_EXPECTED_FRAGMENTS) {
+      return NextResponse.json({ error: `Expected Fragments per wheel is ${expectedFragments.toFixed(2)}, max is ${MAX_DAILY_EXPECTED_FRAGMENTS}` }, { status: 400 });
     }
 
     const expectedCrc = normalized.rewards.reduce((sum, reward) => sum + reward.prob * reward.crcValue, 0);

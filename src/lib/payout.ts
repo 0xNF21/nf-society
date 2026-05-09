@@ -1,9 +1,10 @@
 import { ethers } from "ethers";
 import { db } from "./db";
-import { payouts, botState, gameXpEvents, daoXpPool, players } from "./db/schema";
+import { payouts, botState, gameFragmentEvents, daoFragmentsPool, players } from "./db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { isRealStakesEnabled } from "./stakes";
 import { isF2POnlyMode } from "./legal-mode";
+import { crcToFragments } from "./fragments";
 
 const GNOSIS_RPC = "https://rpc.gnosischain.com";
 const CIRCLES_HUB_V2 = "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8";
@@ -188,24 +189,28 @@ async function transferErc1155(recipient: string, amountWei: bigint): Promise<st
 }
 
 /**
- * Version Free-to-Play de `executePayout` — credite le winner en XP virtuels
+ * Version Free-to-Play de `executePayout` — credite le winner en Fragments
  * au lieu d'executer un transfert on-chain depuis la Safe.
  *
  * Idempotent via la table `payouts` : si un row existe deja pour ce gameId
  * avec un statut terminal, on retourne `already_paid` sans re-crediter.
  *
  * Commission DAO : on somme les `bet` events pour ce gameType en mode F2P ;
- * la difference entre pot et amountCrc est creditee dans `dao_xp_pool`.
+ * la difference entre pot Fragments et payout Fragments est creditee dans `dao_fragments_pool`.
  * Si aucun bet event n'est trouve (jeux historiques, tests), on saute cette
  * etape sans casser le payout principal.
  */
-async function executeXpPayout(request: PayoutRequest): Promise<PayoutResult> {
+async function executeFragmentsPayout(request: PayoutRequest): Promise<PayoutResult> {
   if (request.amountCrc <= 0) {
     return { success: false, status: "failed", error: "Amount must be greater than 0" };
   }
   const addr = request.recipientAddress.toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(addr)) {
     return { success: false, status: "failed", error: "Invalid recipient address" };
+  }
+  const payoutFragments = crcToFragments(request.amountCrc);
+  if (payoutFragments <= 0) {
+    return { success: false, status: "failed", error: "Fragments payout rounds to 0" };
   }
 
   // Idempotency : if a payout row already exists for this gameId with a
@@ -217,7 +222,7 @@ async function executeXpPayout(request: PayoutRequest): Promise<PayoutResult> {
     return {
       success: false,
       status: "already_paid",
-      error: `XP payout already credited for gameId ${request.gameId}`,
+      error: `Fragments payout already credited for gameId ${request.gameId}`,
       payoutId: existing[0].id,
     };
   }
@@ -229,16 +234,16 @@ async function executeXpPayout(request: PayoutRequest): Promise<PayoutResult> {
       gameId: request.gameId,
       recipientAddress: addr,
       amountCrc: request.amountCrc,
-      reason: request.reason ? `[XP] ${request.reason}` : "[XP] payout",
+      reason: request.reason ? `[Fragments] ${request.reason}` : "[Fragments] payout",
       status: "completed",
-      transferTxHash: `xp:${request.gameId}`,
+      transferTxHash: `fragments:${request.gameId}`,
     }).returning({ id: payouts.id });
     payoutId = inserted.id;
   } else {
     payoutId = existing[0].id;
     await db.update(payouts).set({
       status: "completed",
-      transferTxHash: `xp:${request.gameId}`,
+      transferTxHash: `fragments:${request.gameId}`,
       updatedAt: new Date(),
     }).where(eq(payouts.id, payoutId));
   }
@@ -253,68 +258,66 @@ async function executeXpPayout(request: PayoutRequest): Promise<PayoutResult> {
 
   try {
     await db.transaction(async (tx) => {
-      // Credit the recipient.
+      let pot = 0;
+      if (gameSlug) {
+        const potRows = await tx
+          .select({
+            total: sql<string>`COALESCE(SUM(${gameFragmentEvents.amountFragments}), 0)`,
+          })
+          .from(gameFragmentEvents)
+          .where(and(eq(gameFragmentEvents.gameKey, gameKey), eq(gameFragmentEvents.gameSlug, gameSlug), eq(gameFragmentEvents.eventType, "bet")));
+        pot = Number(potRows[0]?.total ?? 0);
+      }
+
       await tx.execute(
-        sql`UPDATE players
-            SET xp = xp + ${Math.round(request.amountCrc)}, last_seen = NOW()
-            WHERE address = ${addr}`,
+        sql`INSERT INTO players (address, xp, fragments_balance, fragments_spent, level, streak, last_seen, created_at)
+            VALUES (${addr}, 0, ${payoutFragments}, 0, 1, 0, NOW(), NOW())
+            ON CONFLICT (address) DO UPDATE
+            SET fragments_balance = players.fragments_balance + ${payoutFragments},
+                last_seen = NOW()`,
       );
 
-      // If the player row doesn't exist yet, create it with the prize as
-      // initial XP so we don't lose the reward.
-      const upserted = await tx.execute<{ address: string }>(
-        sql`INSERT INTO players (address, xp, level, streak, last_seen, created_at)
-            VALUES (${addr}, ${Math.round(request.amountCrc)}, 1, 0, NOW(), NOW())
-            ON CONFLICT (address) DO NOTHING
-            RETURNING address`,
-      );
-      void upserted;
-
-      await tx.insert(gameXpEvents).values({
+      await tx.insert(gameFragmentEvents).values({
         gameKey,
         gameSlug,
         playerAddress: addr,
         eventType: "win",
-        amountXp: Math.round(request.amountCrc),
+        amountFragments: payoutFragments,
       });
 
       // Commission : somme les bet events pour (gameKey, gameSlug). Si la
-      // somme > amountCrc, la difference va au pot DAO.
+      // somme > payoutFragments, la difference va au pot DAO.
       if (gameSlug) {
-        const potRows = await tx
-          .select({ total: sql<string>`COALESCE(SUM(${gameXpEvents.amountXp}), 0)` })
-          .from(gameXpEvents)
-          .where(and(eq(gameXpEvents.gameKey, gameKey), eq(gameXpEvents.gameSlug, gameSlug), eq(gameXpEvents.eventType, "bet")));
-        const pot = Number(potRows[0]?.total ?? 0);
-        const commission = pot - Math.round(request.amountCrc);
+        const commission = pot - payoutFragments;
         if (commission > 0) {
-          await tx.insert(daoXpPool).values({
+          await tx.insert(daoFragmentsPool).values({
             source: gameKey.includes("-") || ["morpion", "memory", "dames", "relics", "pfc"].includes(gameKey)
               ? "commission_multiplayer"
               : "house_edge_chance",
             gameKey,
-            amountXp: commission,
+            amountFragments: commission,
           });
         }
       }
     });
   } catch (err) {
-    console.error("[executeXpPayout] credit tx error:", err);
-    return { success: false, status: "failed", error: "xp_credit_failed", payoutId };
+    console.error("[executeFragmentsPayout] credit tx error:", err);
+    return { success: false, status: "failed", error: "fragments_credit_failed", payoutId };
   }
 
   return {
     success: true,
     status: "completed",
     payoutId,
-    transferTxHash: `xp:${request.gameId}`,
+    transferTxHash: `fragments:${request.gameId}`,
   };
 }
 
 /**
  * Classification semantique d'un payout. Sert de filet legal :
  *   - legacy_cashout, game_refund, dao_reward, admin_correction → autorises en F2P
- *   - game_win, shop_crc, daily_random_crc, lottery_win, unknown → bloques en F2P
+ *   - daily_random_crc → autorise uniquement pour les rewards daily configurées
+ *   - game_win, shop_crc, lottery_win, unknown → bloques en F2P
  *
  * Si absent dans la PayoutRequest, `inferPayoutReason()` derive une valeur
  * conservative depuis `gameType`.
@@ -339,7 +342,7 @@ export type PayoutRequest = {
   /**
    * Source du paiement initial. Decide du rail de payout en priorite sur
    * tout autre signal :
-   *   "xp:..."     → executeXpPayout (jamais Safe, peu importe le mode)
+   *   "fragments:..." → executeFragmentsPayout (jamais Safe, peu importe le mode)
    *   "balance:..."→ blocked (creditPrize est le bon point d'entree)
    *   "0x..."      → executeOnchainPayout
    *   null/absent  → fallback sur classification par gameType + reason
@@ -482,12 +485,13 @@ async function executeOnchainPayout(request: PayoutRequest): Promise<PayoutResul
 /**
  * Routing central des payouts. L'ordre de priorite est volontairement strict :
  *
- *   1. sourceTxHash = "xp:..."     → executeXpPayout (jamais on-chain)
+ *   1. sourceTxHash = "fragments:..." → executeFragmentsPayout (jamais on-chain)
  *   2. sourceTxHash = "balance:..."→ blocked (passer par creditPrize)
  *   3. reason ∈ {legacy_cashout, game_refund, dao_reward, admin_correction}
  *      → executeOnchainPayout (autorise meme en F2P_ONLY)
- *   4. LEGAL_MODE = F2P_ONLY      → blocked avec code explicite
- *   5. fallback flag-based : si !isRealStakesEnabled(gameType) → XP, sinon on-chain
+ *   4. reason = daily_random_crc + gameType daily-* → executeOnchainPayout
+ *   5. LEGAL_MODE = F2P_ONLY      → blocked avec code explicite
+ *   6. fallback flag-based : si !isRealStakesEnabled(gameType) → Fragments, sinon on-chain
  *
  * Cette structure garantit qu'aucune partie financee en XP ne peut payer en
  * CRC (priority 1), qu'aucune partie financee en balance ne peut atteindre
@@ -499,8 +503,8 @@ export async function executePayout(request: PayoutRequest): Promise<PayoutResul
   const reason = request.payoutReason ?? inferPayoutReason(request.gameType);
 
   // Priority 1 — source XP : toujours XP, ignore mode + flags.
-  if (source.startsWith("xp:")) {
-    return executeXpPayout(request);
+  if (source.startsWith("fragments:") || source.startsWith("xp:")) {
+    return executeFragmentsPayout(request);
   }
 
   // Priority 2 — source balance : ne doit pas reach executePayout.
@@ -525,8 +529,14 @@ export async function executePayout(request: PayoutRequest): Promise<PayoutResul
     return executeOnchainPayout(request);
   }
 
-  // Priority 4 — F2P_ONLY : tout payout CRC residuel est bloque.
-  // En particulier : game_win, shop_crc, daily_random_crc, lottery_win, unknown.
+  // Priority 4 — Daily rewards CRC : autorise uniquement le rail daily.
+  // Les autres gains aleatoires restent bloques par F2P_ONLY.
+  if (reason === "daily_random_crc" && request.gameType.startsWith("daily-")) {
+    return executeOnchainPayout(request);
+  }
+
+  // Priority 5 — F2P_ONLY : tout payout CRC residuel est bloque.
+  // En particulier : game_win, shop_crc, lottery_win, unknown.
   if (isF2POnlyMode()) {
     return {
       success: false,
@@ -536,10 +546,10 @@ export async function executePayout(request: PayoutRequest): Promise<PayoutResul
   }
 
   // Priority 5 — REAL_STAKES_ALLOWED : fallback flag-based.
-  // Si le gameKey n'est pas en mode CRC reel (par ex. chance_xp_only=hidden),
-  // on credite en XP. Sinon on-chain via la Safe.
+  // Si le gameKey n'est pas en mode CRC reel (par ex. chance_fragments_only=hidden),
+  // on credite en Fragments. Sinon on-chain via la Safe.
   if (!(await isRealStakesEnabled(request.gameType))) {
-    return executeXpPayout(request);
+    return executeFragmentsPayout(request);
   }
   return executeOnchainPayout(request);
 }

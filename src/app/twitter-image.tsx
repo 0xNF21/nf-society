@@ -110,7 +110,7 @@ export default async function TwitterImage() {
               marginTop: 8,
             }}
           >
-            17 jeux Free-to-Play · XP virtuels · 100% communautaire
+            17 jeux Free-to-Play · Fragments · 100% communautaire
           </div>
         </div>
 

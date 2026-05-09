@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { resolveRoll, getVisibleState, calculatePayout, isValidAction } from "@/lib/dice";
 import type { DiceState, DiceAction } from "@/lib/dice";
 import { payPrize } from "@/lib/wallet";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { awardPlayerXpSafely } from "@/lib/xp-server";
 
 export async function POST(
   req: NextRequest,
@@ -106,7 +106,13 @@ export async function POST(
         }
 
         // XP for win
-        void awardPlayerXp({ address: round.playerAddress, action: "dice_win" }).catch(() => {});
+        await awardPlayerXpSafely({
+          address: round.playerAddress,
+          action: "dice_win",
+          sourceType: "dice",
+          sourceId: `round:${round.id}`,
+          metadata: { tableId: round.tableId },
+        });
       }
     }
 

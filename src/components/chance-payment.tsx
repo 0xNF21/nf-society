@@ -154,8 +154,8 @@ export function ChancePayment({
   const balExtras = balanceExtras || (ballValue !== undefined ? { ballValue } : undefined);
   const freePlayRouteGameKey = balKey.replace(/_/g, "-");
 
-  // Free-to-Play : bypass le flow CRC (QR, Mini App, balance-pay) et render
-  // l'equivalent XP. Place APRES tous les hooks pour respecter rules-of-hooks.
+  // Free-to-Play : bypass le flow CRC (QR, Mini App, balance-pay) et rend
+  // l'equivalent Fragments. Place APRES tous les hooks pour respecter rules-of-hooks.
   if (realStakesDisabled) {
     const fpAddress = connectedAddress ?? walletAddress ?? null;
     return (

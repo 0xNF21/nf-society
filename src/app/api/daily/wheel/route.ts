@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { dailySessions, players } from "@/lib/db/schema";
-import { allowDailyRepeatTests, determineDailyWheelResult, isSafeBalanceSafe } from "@/lib/daily";
+import { allowDailyRepeatTests, determineDailyWheelResult, isSafeBalanceSafe, parseDailyWheelResult } from "@/lib/daily";
 import { payPrize } from "@/lib/wallet";
 
 export async function POST(req: NextRequest) {
@@ -47,14 +47,14 @@ export async function POST(req: NextRequest) {
           error: "daily_already_claimed",
           alreadyClaimed: true,
           token: canonical.token,
-          result: canonical.wheelResult ? JSON.parse(canonical.wheelResult) : null,
+          result: parseDailyWheelResult(canonical.wheelResult),
         }, { status: 409 });
       }
     }
 
     if (session.spinPlayed) {
       return NextResponse.json({
-        result: session.spinResult ? JSON.parse(session.spinResult) : null,
+        result: parseDailyWheelResult(session.spinResult),
         alreadyPlayed: true,
       });
     }
@@ -68,9 +68,9 @@ export async function POST(req: NextRequest) {
         result = {
           ...result,
           crcValue: 0,
-          xpValue: result.crcValue * 100,
-          label: `+${result.crcValue * 100} XP`,
-          type: "xp_fallback",
+          fragmentsValue: result.crcValue * 100,
+          label: `+${result.crcValue * 100} Fragments`,
+          type: "fragments_fallback",
         };
       }
     }
@@ -84,13 +84,13 @@ export async function POST(req: NextRequest) {
         eq(dailySessions.spinPlayed, false),
       )).returning({ wheelResult: dailySessions.spinResult });
 
-      if (rows.length > 0 && result.xpValue > 0) {
-        const xpCredit = Math.floor(result.xpValue);
+      if (rows.length > 0 && result.fragmentsValue > 0) {
+        const fragmentsCredit = Math.floor(result.fragmentsValue);
         await tx.execute(sql`
-          INSERT INTO ${players} (address, xp, level, streak, last_seen, created_at)
-          VALUES (${sessionAddress}, ${xpCredit}, 1, 0, NOW(), NOW())
+          INSERT INTO ${players} (address, xp, fragments_balance, fragments_spent, level, streak, last_seen, created_at)
+          VALUES (${sessionAddress}, 0, ${fragmentsCredit}, 0, 1, 0, NOW(), NOW())
           ON CONFLICT (address) DO UPDATE
-          SET xp = players.xp + ${xpCredit},
+          SET fragments_balance = players.fragments_balance + ${fragmentsCredit},
               last_seen = NOW()
         `);
       }
@@ -105,26 +105,36 @@ export async function POST(req: NextRequest) {
         .where(eq(dailySessions.id, session.id))
         .limit(1);
       return NextResponse.json({
-        result: current?.wheelResult ? JSON.parse(current.wheelResult) : null,
+        result: parseDailyWheelResult(current?.wheelResult),
         alreadyPlayed: true,
       });
     }
 
+    let payout: Awaited<ReturnType<typeof payPrize>> | null = null;
     if (result.crcValue > 0) {
       try {
-        await payPrize(session.address, result.crcValue, {
+        payout = await payPrize(session.address, result.crcValue, {
           gameType: "daily-wheel",
           gameSlug: String(session.id),
           gameRef: `wheel-${token}`,
           sourceTxHash: session.txHash,
           reason: `Daily wheel - ${result.label}`,
+          payoutReason: "daily_random_crc",
         });
+        if (!payout.ok) {
+          console.error("[DailyWheel] Prize failed:", payout.error);
+        }
       } catch (err: any) {
         console.error("[DailyWheel] Prize error:", err.message);
+        payout = {
+          method: "onchain",
+          ok: false,
+          error: err.message || "Prize payout failed",
+        };
       }
     }
 
-    return NextResponse.json({ result });
+    return NextResponse.json({ result, payout });
   } catch (error: any) {
     console.error("[DailyWheel] Error:", error.message);
     return NextResponse.json({ error: error.message || "Wheel failed" }, { status: 500 });

@@ -29,13 +29,34 @@ export const claimedPayments = pgTable("claimed_payments", {
 export const players = pgTable("players", {
   address:    text("address").primaryKey(),
   xp:         integer("xp").notNull().default(0),
-  xpSpent:    integer("xp_spent").notNull().default(0),
+  fragmentsBalance: integer("fragments_balance").notNull().default(0),
+  fragmentsSpent:   integer("fragments_spent").notNull().default(0),
   level:      integer("level").notNull().default(1),
   streak:     integer("streak").notNull().default(0),
   balanceCrc: real("balance_crc").notNull().default(0),
   lastSeen:   timestamp("last_seen").defaultNow().notNull(),
+  lastDailyCheckinAt: timestamp("last_daily_checkin_at"),
   createdAt:  timestamp("created_at").defaultNow().notNull(),
 });
+
+export const xpEvents = pgTable("xp_events", {
+  id:             serial("id").primaryKey(),
+  address:        text("address").notNull(),
+  action:         text("action").notNull(),
+  amountXp:       integer("amount_xp").notNull(),
+  sourceType:     text("source_type").notNull(),
+  sourceId:       text("source_id").notNull(),
+  xpAfter:        integer("xp_after").notNull(),
+  fragmentsBalanceAfter: integer("fragments_balance_after").notNull(),
+  levelAfter:     integer("level_after").notNull(),
+  metadata:       jsonb("metadata").$type<Record<string, unknown> | null>(),
+  createdAt:      timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueSource: uniqueIndex("xp_events_unique_source_idx")
+    .on(table.address, table.action, table.sourceType, table.sourceId),
+  addressIdx: index("xp_events_address_idx").on(table.address),
+  createdAtIdx: index("xp_events_created_at_idx").on(table.createdAt),
+}));
 
 /**
  * Wallet ledger — append-only log of every balance movement.
@@ -105,7 +126,7 @@ export const privacySettings = pgTable("privacy_settings", {
   address:             text("address").primaryKey(),
   hidePnl:             boolean("hide_pnl").notNull().default(false),
   hideTotalBet:        boolean("hide_total_bet").notNull().default(false),
-  hideXpSpent:         boolean("hide_xp_spent").notNull().default(false),
+  hideFragmentsSpent:  boolean("hide_fragments_spent").notNull().default(false),
   hideGameHistory:     boolean("hide_game_history").notNull().default(false),
   hideFromLeaderboard: boolean("hide_from_leaderboard").notNull().default(false),
   hideFromSearch:      boolean("hide_from_search").notNull().default(false),
@@ -151,38 +172,38 @@ export const botState = pgTable("bot_state", {
 //
 // Les commissions et mises reelles (CRC) sont gatees derriere le flag
 // `real_stakes` de `feature_flags`. Quand le flag est `hidden`, les jeux
-// tournent en mode Free-to-Play XP et remplissent les deux tables ci-dessous.
+// tournent en mode Free-to-Play Fragments et remplissent les deux tables ci-dessous.
 // Les tables de jeux existantes (morpion_games, blackjack_hands, ...) ne sont
 // pas modifiees — elles continuent de stocker l'historique CRC intact.
 
-// Pot communautaire XP : commissions 5% multi + house edge chance agregees
+// Pot communautaire Fragments : commissions 5% multi + house edge chance agregees
 // pour affichage sur /dashboard-dao. Append-only, pas de cashout.
-export const daoXpPool = pgTable("dao_xp_pool", {
+export const daoFragmentsPool = pgTable("dao_fragments_pool", {
   id: serial("id").primaryKey(),
   source: text("source").notNull(),      // 'commission_multiplayer' | 'house_edge_chance' | 'other'
   gameKey: text("game_key"),
-  amountXp: bigint("amount_xp", { mode: "number" }).notNull(),
+  amountFragments: bigint("amount_fragments", { mode: "number" }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({
-  createdAtIdx: index("dao_xp_pool_created_at_idx").on(t.createdAt),
-  sourceIdx: index("dao_xp_pool_source_idx").on(t.source),
+  createdAtIdx: index("dao_fragments_pool_created_at_idx").on(t.createdAt),
+  sourceIdx: index("dao_fragments_pool_source_idx").on(t.source),
 }));
 
-// Journal des mises/gains XP (parties F2P uniquement). Alimente la nouvelle
+// Journal des mises/gains Fragments (parties F2P uniquement). Alimente la nouvelle
 // page /stats en mode F2P. event_type: 'bet' | 'win' | 'loss' | 'draw'.
-export const gameXpEvents = pgTable("game_xp_events", {
+export const gameFragmentEvents = pgTable("game_fragment_events", {
   id: serial("id").primaryKey(),
   gameKey: text("game_key").notNull(),
   gameSlug: text("game_slug"),
   playerAddress: text("player_address"),
   playerToken: text("player_token"),
   eventType: text("event_type").notNull(),
-  amountXp: bigint("amount_xp", { mode: "number" }).notNull(),
+  amountFragments: bigint("amount_fragments", { mode: "number" }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({
-  createdAtIdx: index("game_xp_events_created_at_idx").on(t.createdAt),
-  gameKeyIdx: index("game_xp_events_game_key_idx").on(t.gameKey),
-  playerIdx: index("game_xp_events_player_idx").on(t.playerAddress),
+  createdAtIdx: index("game_fragment_events_created_at_idx").on(t.createdAt),
+  gameKeyIdx: index("game_fragment_events_game_key_idx").on(t.gameKey),
+  playerIdx: index("game_fragment_events_player_idx").on(t.playerAddress),
 }));
 
 // Re-exports from sub-files have moved to `./index.ts`.

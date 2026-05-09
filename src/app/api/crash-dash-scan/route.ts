@@ -7,7 +7,7 @@ import { crashDashTables, crashDashRounds, claimedPayments } from "@/lib/db/sche
 import { eq, inArray } from "drizzle-orm";
 import { checkAllNewPayments } from "@/lib/circles";
 import { createInitialState, generateCrashPoint } from "@/lib/crash-dash";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { awardPlayerXpSafely } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 const CRASH_DASH_START_BLOCK = "0x2B7DE5C";
@@ -125,9 +125,15 @@ export async function POST(req: NextRequest) {
           amountCrc: betCrc,
         }).onConflictDoNothing();
 
-        // XP — fire-and-forget. Never block the scan response on XP.
+        // XP is awaited so the write is attempted before the scan response.
         {
-          void awardPlayerXp({ address: playerAddress, action: "crash_dash_play" }).catch(() => {});
+          await awardPlayerXpSafely({
+            address: playerAddress,
+            action: "crash_dash_play",
+            sourceType: "crash_dash",
+            sourceId: `round:${inserted[0].id}`,
+            metadata: { tableId: table.id, txHash },
+          });
         }
 
       } catch (err: any) {

@@ -24,34 +24,95 @@ type DailyRewardConfigEntry = {
   type: string;
   label: string;
   crcValue: number;
-  xpValue: number;
+  fragmentsValue: number;
   color?: string;
 };
 
+type RawDailyRewardConfigEntry = {
+  prob?: unknown;
+  type?: unknown;
+  label?: unknown;
+  crcValue?: unknown;
+  fragmentsValue?: unknown;
+  xpValue?: unknown;
+  color?: unknown;
+};
+
 const DEFAULT_DAILY_WHEEL_PROBS: DailyRewardConfigEntry[] = [
-  { prob: 0.45, type: "xp_75", label: "+75 XP", crcValue: 0, xpValue: 75, color: "#10B981" },
-  { prob: 0.35, type: "xp_200", label: "+200 XP", crcValue: 0, xpValue: 200, color: "#38BDF8" },
-  { prob: 0.17, type: "xp_500", label: "+500 XP", crcValue: 0, xpValue: 500, color: "#8B5CF6" },
-  { prob: 0.028, type: "crc_1_rare", label: "+1 CRC", crcValue: 1, xpValue: 0, color: "#F59E0B" },
-  { prob: 0.002, type: "crc_10_rare", label: "+10 CRC", crcValue: 10, xpValue: 0, color: "#EC4899" },
+  { prob: 0.45, type: "fragments_75", label: "+75 Fragments", crcValue: 0, fragmentsValue: 75, color: "#10B981" },
+  { prob: 0.35, type: "fragments_200", label: "+200 Fragments", crcValue: 0, fragmentsValue: 200, color: "#38BDF8" },
+  { prob: 0.17, type: "fragments_500", label: "+500 Fragments", crcValue: 0, fragmentsValue: 500, color: "#8B5CF6" },
+  { prob: 0.028, type: "crc_1_rare", label: "+1 CRC", crcValue: 1, fragmentsValue: 0, color: "#F59E0B" },
+  { prob: 0.002, type: "crc_10_rare", label: "+10 CRC", crcValue: 10, fragmentsValue: 0, color: "#EC4899" },
 ];
 
 let cachedDailyWheel: DailyRewardConfigEntry[] | null = null;
 let dailyCacheTime = 0;
 const DAILY_CACHE_TTL = 60_000;
 
-function normalizeRewards(rewards: DailyRewardConfigEntry[]): DailyRewardConfigEntry[] {
-  return rewards.map((reward) => ({
-    ...reward,
-    prob: Number(reward.prob) || 0,
-    crcValue: Math.max(0, Number(reward.crcValue) || 0),
-    xpValue: Math.max(0, Math.floor(Number(reward.xpValue) || 0)),
-  }));
+function nonNegativeNumber(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, numeric);
+}
+
+function nonNegativeInteger(value: unknown): number {
+  return Math.floor(nonNegativeNumber(value));
+}
+
+function fragmentsValueFromReward(reward: RawDailyRewardConfigEntry): number {
+  return nonNegativeInteger(reward.fragmentsValue ?? reward.xpValue);
+}
+
+function normalizeRewardType(type: unknown, fragmentsValue: number, crcValue: number): string {
+  const normalized = String(type ?? "").trim().replace(/^xp_/, "fragments_");
+  if (normalized) return normalized;
+  if (fragmentsValue > 0) return `fragments_${fragmentsValue}`;
+  if (crcValue > 0) return `crc_${String(crcValue).replace(".", "_")}`;
+  return "nothing";
+}
+
+function fallbackRewardLabel(type: string, fragmentsValue: number, crcValue: number): string {
+  if (fragmentsValue > 0) return `+${fragmentsValue} Fragments`;
+  if (crcValue > 0) return `+${crcValue} CRC`;
+  return type || "Rien";
+}
+
+function normalizeRewardLabel(label: unknown, type: string, fragmentsValue: number, crcValue: number): string {
+  const raw = typeof label === "string" ? label.trim() : "";
+  return (raw || fallbackRewardLabel(type, fragmentsValue, crcValue))
+    .replace(/XP( de solde)?/gi, "Fragments");
+}
+
+function normalizeRewards(rewards: unknown): DailyRewardConfigEntry[] {
+  if (!Array.isArray(rewards)) return DEFAULT_DAILY_WHEEL_PROBS;
+
+  return rewards.map((rawReward) => {
+    const reward = rawReward && typeof rawReward === "object"
+      ? rawReward as RawDailyRewardConfigEntry
+      : {};
+    const crcValue = nonNegativeNumber(reward.crcValue);
+    const fragmentsValue = fragmentsValueFromReward(reward);
+    const type = normalizeRewardType(reward.type, fragmentsValue, crcValue);
+    const label = normalizeRewardLabel(reward.label, type, fragmentsValue, crcValue);
+    const color = typeof reward.color === "string" && reward.color.trim()
+      ? reward.color.trim()
+      : undefined;
+
+    return {
+      prob: nonNegativeNumber(reward.prob),
+      type,
+      label,
+      crcValue,
+      fragmentsValue,
+      color,
+    };
+  });
 }
 
 function keepWheelRewardsOnly(rewards: DailyRewardConfigEntry[]): DailyRewardConfigEntry[] {
   const filtered = rewards.filter((reward) => (
-    reward.crcValue > 0 || reward.xpValue > 0
+    reward.crcValue > 0 || reward.fragmentsValue > 0
   ));
   if (filtered.length === 0) return DEFAULT_DAILY_WHEEL_PROBS;
 
@@ -65,7 +126,7 @@ function keepWheelRewardsOnly(rewards: DailyRewardConfigEntry[]): DailyRewardCon
 }
 
 function isLegacyDailyWheelConfig(rewards: DailyRewardConfigEntry[]): boolean {
-  return rewards.some((r) => r.type === "nothing" || (r.crcValue === 0 && r.xpValue === 0))
+  return rewards.some((r) => r.type === "nothing" || (r.crcValue === 0 && r.fragmentsValue === 0))
     || rewards.some((r) => r.type === "crc_10" && r.crcValue === 10 && Math.abs(r.prob - 0.03) < 0.001)
     || rewards.some((r) => r.type === "jackpot" && Math.abs(r.prob - 0.01) < 0.001);
 }
@@ -84,7 +145,7 @@ export async function getDailyWheelProbs() {
 
     if (row) {
       const raw = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards;
-      const normalizedRewards = normalizeRewards(raw as DailyRewardConfigEntry[]);
+      const normalizedRewards = normalizeRewards(raw);
       cachedDailyWheel = isLegacyDailyWheelConfig(normalizedRewards)
         ? DEFAULT_DAILY_WHEEL_PROBS
         : keepWheelRewardsOnly(normalizedRewards);
@@ -99,6 +160,42 @@ export async function getDailyWheelProbs() {
 export function invalidateDailyCache() {
   cachedDailyWheel = null;
   dailyCacheTime = 0;
+}
+
+export function normalizeDailyWheelResult(raw: unknown): DailyWheelResult | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const result = raw as RawDailyRewardConfigEntry & { segmentIndex?: unknown };
+  const crcValue = nonNegativeNumber(result.crcValue);
+  const fragmentsValue = fragmentsValueFromReward(result);
+  const type = normalizeRewardType(result.type, fragmentsValue, crcValue);
+  const label = normalizeRewardLabel(result.label, type, fragmentsValue, crcValue);
+  const segmentIndexValue = Number(result.segmentIndex);
+  const segmentIndex = Number.isInteger(segmentIndexValue) && segmentIndexValue >= 0
+    ? segmentIndexValue
+    : 0;
+  const color = typeof result.color === "string" && result.color.trim()
+    ? result.color.trim()
+    : undefined;
+
+  return {
+    type,
+    label,
+    crcValue,
+    fragmentsValue,
+    segmentIndex,
+    color,
+  };
+}
+
+export function parseDailyWheelResult(value: string | null | undefined): DailyWheelResult | null {
+  if (!value) return null;
+
+  try {
+    return normalizeDailyWheelResult(JSON.parse(value));
+  } catch {
+    return null;
+  }
 }
 
 export function allowDailyRepeatTests(): boolean {
@@ -133,7 +230,7 @@ export async function determineDailyWheelResult(seed: string): Promise<DailyWhee
     type: winner.type,
     label: winner.label,
     crcValue: winner.crcValue,
-    xpValue: winner.xpValue,
+    fragmentsValue: winner.fragmentsValue,
     segmentIndex: winnerIndex,
     color: winner.color,
   };

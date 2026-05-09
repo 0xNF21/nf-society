@@ -60,8 +60,8 @@ export default function DocsPage() {
         {/* What is NF Society */}
         <Section title={fr ? "Qu'est-ce que NF Society ?" : "What is NF Society?"} icon={<HelpCircle className="w-5 h-5 text-marine" />} defaultOpen={true}>
           <P>{fr
-            ? "NF Society est une plateforme communautaire Arcade & XP sur Gnosis Chain. Les jeux quotidiens sont Free-to-Play : jouez, gagnez de l'XP et montez dans le classement."
-            : "NF Society is a community Arcade & XP platform on Gnosis Chain. Everyday games are Free-to-Play: play, earn XP and climb the leaderboard."
+            ? "NF Society est une plateforme communautaire Arcade & Fragments sur Gnosis Chain. Les jeux sont Free-to-Play : jouez avec des Fragments, progressez en XP et montez dans le classement."
+            : "NF Society is a community Arcade & Fragments platform on Gnosis Chain. Games are Free-to-Play: play with Fragments, progress with XP and climb the leaderboard."
           }</P>
           <Bullet>{fr ? <><B>Blockchain</B> : Gnosis Chain</> : <><B>Blockchain</B>: Gnosis Chain</>}</Bullet>
           <Bullet>{fr ? <><B>Token</B> : CRC (Circles Protocol)</> : <><B>Token</B>: CRC (Circles Protocol)</>}</Bullet>
@@ -71,11 +71,11 @@ export default function DocsPage() {
         {/* How to play */}
         <Section title={fr ? "Comment jouer ?" : "How to play?"} icon={<Gamepad2 className="w-5 h-5 text-marine" />}>
           <P>{fr ? "1. Choisissez un jeu Arcade" : "1. Choose an Arcade game"}</P>
-          <P>{fr ? "2. Utilisez vos XP virtuels pour participer" : "2. Use virtual XP to join"}</P>
+          <P>{fr ? "2. Utilisez vos Fragments pour participer" : "2. Use Fragments to join"}</P>
           <P>{fr ? "3. Partagez le code de la partie a votre adversaire" : "3. Share the game code with your opponent"}</P>
-          <P>{fr ? "4. Jouez ! Le gagnant recoit l'XP de recompense de la partie" : "4. Play! Winner receives the game's XP reward"}</P>
+          <P>{fr ? "4. Jouez ! Le gagnant recoit la recompense de partie en Fragments" : "4. Play! Winner receives the game's Fragment reward"}</P>
           <div className="rounded-xl bg-marine/5 dark:bg-marine/10 p-3 border border-marine/10">
-            <P><B>{fr ? "Pot XP" : "XP pool"}</B> : {fr ? "Les participations alimentent le pool XP communautaire." : "Entries feed the community XP pool."}</P>
+            <P><B>{fr ? "Pot Fragments" : "Fragments pool"}</B> : {fr ? "Les participations alimentent le pool Fragments communautaire." : "Entries feed the community Fragments pool."}</P>
           </div>
         </Section>
 
@@ -111,16 +111,14 @@ export default function DocsPage() {
           <P><B>{fr ? "Comment gagner de l'XP :" : "How to earn XP:"}</B></P>
           <Bullet>{fr ? "Gagner une partie : 15-20 XP" : "Win a game: 15-20 XP"}</Bullet>
           <Bullet>{fr ? "Perdre une partie : 5 XP" : "Lose a game: 5 XP"}</Bullet>
-          <Bullet>{fr ? "Roue quotidienne : XP selon la configuration" : "Daily wheel: XP based on configuration"}</Bullet>
           <Bullet>{fr ? "Ouvrir une lootbox : 10-100 XP" : "Open a lootbox: 10-100 XP"}</Bullet>
-          <Bullet>{fr ? "Streak 7 jours : +50 XP bonus" : "7-day streak: +50 XP bonus"}</Bullet>
           <P><B>{fr ? "10 niveaux" : "10 levels"}</B> : {fr ? "de 0 a 20,000 XP" : "from 0 to 20,000 XP"}</P>
         </Section>
 
         {/* Daily */}
         <Section title={fr ? "Tirage Quotidien" : "Daily Draw"} icon={<Gift className="w-5 h-5 text-marine" />}>
           <P>{fr ? "Chaque jour, reclamez gratuitement une roue quotidienne." : "Every day, claim one free daily wheel."}</P>
-          <Bullet>{fr ? "Gagnez de l'XP ou du CRC selon la configuration" : "Win XP or CRC based on configuration"}</Bullet>
+          <Bullet>{fr ? "Gagnez des Fragments ou du CRC selon la configuration" : "Win Fragments or CRC based on configuration"}</Bullet>
           <Bullet>{fr ? "Aucun CRC n'est debite pour lancer le daily" : "No CRC is debited to play the daily"}</Bullet>
         </Section>
 
@@ -135,8 +133,8 @@ export default function DocsPage() {
         </Section>
 
         {/* Shop */}
-        <Section title={fr ? "Boutique XP" : "XP Shop"} icon={<ShoppingBag className="w-5 h-5 text-marine" />}>
-          <P>{fr ? "Depensez vos XP dans la boutique pour obtenir des avantages :" : "Spend your XP in the shop for benefits:"}</P>
+        <Section title={fr ? "Boutique Fragments" : "Fragments Shop"} icon={<ShoppingBag className="w-5 h-5 text-marine" />}>
+          <P>{fr ? "Depensez vos Fragments dans la boutique pour obtenir des avantages :" : "Spend your Fragments in the shop for benefits:"}</P>
           <Bullet>{fr ? "Boosts XP (x2 pendant 24h)" : "XP boosts (x2 for 24h)"}</Bullet>
           <Bullet>{fr ? "Coupons de remboursement" : "Refund coupons"}</Bullet>
           <Bullet>{fr ? "Badges cosmetiques" : "Cosmetic badges"}</Bullet>

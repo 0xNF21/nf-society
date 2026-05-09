@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Blackjack — NF Society",
-  description: "Joue au blackjack classique en mode Arcade XP sur NF Society",
+  description: "Joue au blackjack classique en mode Arcade Fragments sur NF Society",
 };
 
 export default async function BlackjackLobbyPage() {

@@ -1,10 +1,11 @@
 import { db } from "@/lib/db";
 import { players } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { computeLevel, getLevelName, xpToNextLevel, LEVELS } from "@/lib/xp";
+import { computeLevel, getLevelName, getLevelProgress, xpToNextLevel } from "@/lib/xp";
+import { loadXpConfig } from "@/lib/xp-server";
 import { getPlayerBadges } from "@/lib/badges";
 import { getPlayerStats, getPlayerGamesBreakdown } from "@/lib/multiplayer";
-import { getPrivacyFlags } from "@/lib/privacy";
+import { applyGameBreakdownPrivacy, applyPlayerStatsPrivacy, getPrivacyFlags } from "@/lib/privacy";
 import PlayerProfileClient from "./client";
 
 const CIRCLES_RPC_URL = process.env.NEXT_PUBLIC_CIRCLES_RPC_URL || "https://rpc.aboutcircles.com/";
@@ -62,28 +63,29 @@ export default async function PlayerPage({
 }) {
   const address = params.address.toLowerCase();
 
-  const [player] = await db.select().from(players).where(eq(players.address, address));
-  const profile = await getCirclesProfile(address);
+  const [[player], profile, { levels }] = await Promise.all([
+    db.select().from(players).where(eq(players.address, address)),
+    getCirclesProfile(address),
+    loadXpConfig(),
+  ]);
 
   const xp = player?.xp ?? 0;
   const streak = player?.streak ?? 0;
-  const level = computeLevel(xp);
-  const levelName = getLevelName(level);
-  const toNext = xpToNextLevel(xp);
-  const currentLevelXp = LEVELS.find(l => l.level === level)?.xpRequired ?? 0;
-  const nextLevelXp = LEVELS.find(l => l.level === level + 1)?.xpRequired ?? currentLevelXp;
-  const progressPct = nextLevelXp === currentLevelXp
-    ? 100
-    : Math.round(((xp - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100);
+  const level = computeLevel(xp, levels);
+  const levelName = getLevelName(level, levels);
+  const toNext = xpToNextLevel(xp, levels);
+  const progress = getLevelProgress(xp, levels);
 
   const name = profile?.name || `${address.slice(0, 6)}…${address.slice(-4)}`;
   const avatar = profile?.imageUrl || null;
-  const badgesList = await getPlayerBadges(address);
-  const [stats, gamesBreakdown, privacy] = await Promise.all([
+  const [badgesList, rawStats, rawGamesBreakdown, privacy] = await Promise.all([
+    getPlayerBadges(address),
     getPlayerStats(address),
     getPlayerGamesBreakdown(address),
     getPrivacyFlags(address),
   ]);
+  const stats = applyPlayerStatsPrivacy(rawStats, privacy);
+  const gamesBreakdown = applyGameBreakdownPrivacy(rawGamesBreakdown, privacy);
 
   return (
     <PlayerProfileClient
@@ -94,9 +96,11 @@ export default async function PlayerPage({
       level={level}
       levelName={levelName}
       toNext={toNext}
-      progressPct={progressPct}
+      progressPct={progress.progressPct}
+      isMaxLevel={progress.isMaxLevel}
+      nextLevel={progress.nextLevel}
       streak={streak}
-      levels={[...LEVELS]}
+      levels={[...levels]}
       badges={badgesList.map(b => ({ ...b, earnedAt: b.earnedAt?.toISOString() ?? null }))}
       stats={stats}
       gamesBreakdown={gamesBreakdown}

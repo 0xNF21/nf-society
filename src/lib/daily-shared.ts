@@ -5,7 +5,7 @@ export type DailyWheelResult = {
   type: string;
   label: string;
   crcValue: number;
-  xpValue: number;
+  fragmentsValue: number;
   segmentIndex: number;
   color?: string;
 };
@@ -17,9 +17,9 @@ export type DailyWheelSegment = {
 };
 
 export const DAILY_WHEEL_SEGMENTS: DailyWheelSegment[] = [
-  { type: "xp_75",     label: "+75 XP",     color: "#10B981" },
-  { type: "xp_200",    label: "+200 XP",    color: "#38BDF8" },
-  { type: "xp_500",    label: "+500 XP",    color: "#8B5CF6" },
+  { type: "fragments_75",  label: "+75 Fragments",  color: "#10B981" },
+  { type: "fragments_200", label: "+200 Fragments", color: "#38BDF8" },
+  { type: "fragments_500", label: "+500 Fragments", color: "#8B5CF6" },
   { type: "crc_1_rare", label: "+1 CRC",    color: "#F59E0B" },
   { type: "crc_10_rare", label: "+10 CRC",  color: "#EC4899" },
 ];

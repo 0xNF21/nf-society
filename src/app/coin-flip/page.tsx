@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Pile ou Face — NF Society",
-  description: "Pile ou face en mode Arcade XP sur NF Society.",
+  description: "Pile ou face en mode Arcade Fragments sur NF Society.",
 };
 
 export default async function CoinFlipLobbyPage() {
@@ -35,7 +35,7 @@ export default async function CoinFlipLobbyPage() {
         <div className="text-5xl mb-3">🪙</div>
         <h1 className="text-3xl font-bold text-ink mb-2">Pile ou Face</h1>
         <p className="text-sm text-ink/50 max-w-md mx-auto">
-          Choisissez pile ou face, engagez vos XP et progressez en mode Arcade.
+          Choisissez pile ou face, engagez vos Fragments et progressez en mode Arcade.
         </p>
       </div>
 

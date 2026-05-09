@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "NF Society",
     short_name: "NF Society",
-    description: "Free-to-Play arcade, XP progression, and community rewards on Gnosis Chain.",
+    description: "Free-to-Play arcade with Fragments, daily CRC rewards, badges and community progression.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",

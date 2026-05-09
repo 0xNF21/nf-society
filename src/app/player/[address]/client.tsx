@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft, ChevronDown, Sparkles } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { translations, localeBcp47 } from "@/lib/i18n";
 import { formatCrc } from "@/lib/format";
@@ -45,6 +45,19 @@ interface HistoryEntry {
   date: string;
 }
 
+interface XpHistoryEntry {
+  id: number;
+  action: string;
+  amountXp: number;
+  sourceType: string;
+  sourceId: string;
+  xpAfter: number;
+  fragmentsBalanceAfter: number;
+  levelAfter: number;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 interface StatsData {
   totalGames: number;
   wins: number;
@@ -60,7 +73,7 @@ interface StatsData {
 interface PrivacyFlags {
   hidePnl: boolean;
   hideTotalBet: boolean;
-  hideXpSpent: boolean;
+  hideFragmentsSpent: boolean;
   hideGameHistory: boolean;
   hideFromLeaderboard: boolean;
   hideFromSearch: boolean;
@@ -91,6 +104,8 @@ interface Props {
   levelName: string;
   toNext: number;
   progressPct: number;
+  isMaxLevel: boolean;
+  nextLevel: number | null;
   streak: number;
   levels: LevelDef[];
   badges: BadgeData[];
@@ -139,8 +154,59 @@ const RESULT_COLORS: Record<string, string> = {
   draw: "text-ink/50 bg-ink/5 dark:text-ink/40 dark:bg-ink/10",
 };
 
+const XP_ACTION_LABELS: Record<string, { fr: string; en: string }> = {
+  legacy_import: { fr: "XP existant", en: "Existing XP" },
+  lootbox_open: { fr: "Lootbox ouverte", en: "Lootbox opened" },
+  lootbox_rare: { fr: "Bonus lootbox rare", en: "Rare lootbox bonus" },
+  lootbox_mega: { fr: "Bonus lootbox mega", en: "Mega lootbox bonus" },
+  lootbox_legendary: { fr: "Bonus lootbox legendaire", en: "Legendary lootbox bonus" },
+  lootbox_jackpot: { fr: "Bonus jackpot", en: "Jackpot bonus" },
+  morpion_win: { fr: "Morpion gagne", en: "Morpion win" },
+  morpion_lose: { fr: "Morpion termine", en: "Morpion completed" },
+  memory_win: { fr: "Memory gagne", en: "Memory win" },
+  memory_lose: { fr: "Memory termine", en: "Memory completed" },
+  pfc_win: { fr: "PFC gagne", en: "RPS win" },
+  pfc_lose: { fr: "PFC termine", en: "RPS completed" },
+  dames_win: { fr: "Dames gagne", en: "Checkers win" },
+  dames_lose: { fr: "Dames termine", en: "Checkers completed" },
+  relics_win: { fr: "Relics gagne", en: "Relics win" },
+  relics_lose: { fr: "Relics termine", en: "Relics completed" },
+  races_1st: { fr: "Course 1ere place", en: "Race 1st place" },
+  races_2nd: { fr: "Course 2e place", en: "Race 2nd place" },
+  races_3rd: { fr: "Course 3e place", en: "Race 3rd place" },
+  races_participated: { fr: "Course terminee", en: "Race completed" },
+  roulette_play: { fr: "Roulette jouee", en: "Roulette played" },
+  roulette_win: { fr: "Roulette gagnee", en: "Roulette win" },
+  dice_play: { fr: "Dice joue", en: "Dice played" },
+  dice_win: { fr: "Dice gagne", en: "Dice win" },
+  hilo_play: { fr: "Hi-Lo joue", en: "Hi-Lo played" },
+  hilo_win: { fr: "Hi-Lo gagne", en: "Hi-Lo win" },
+  plinko_play: { fr: "Plinko joue", en: "Plinko played" },
+  plinko_win: { fr: "Plinko gagne", en: "Plinko win" },
+  mines_play: { fr: "Mines joue", en: "Mines played" },
+  mines_win: { fr: "Mines gagne", en: "Mines win" },
+  keno_play: { fr: "Keno joue", en: "Keno played" },
+  keno_win: { fr: "Keno gagne", en: "Keno win" },
+  blackjack_play: { fr: "Blackjack joue", en: "Blackjack played" },
+  blackjack_win: { fr: "Blackjack gagne", en: "Blackjack win" },
+  coin_flip_play: { fr: "Coin Flip joue", en: "Coin Flip played" },
+  coin_flip_win: { fr: "Coin Flip gagne", en: "Coin Flip win" },
+  crash_dash_play: { fr: "Crash Dash joue", en: "Crash Dash played" },
+  crash_dash_win: { fr: "Crash Dash gagne", en: "Crash Dash win" },
+};
+
+function formatXpAction(action: string, locale: "fr" | "en"): string {
+  const label = XP_ACTION_LABELS[action]?.[locale];
+  if (label) return label;
+  return action
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export default function PlayerProfileClient({
-  address, name, avatar, xp, level, levelName, toNext, progressPct, streak, levels, badges, stats, gamesBreakdown, privacy,
+  address, name, avatar, xp, level, levelName, toNext, progressPct, isMaxLevel, nextLevel, streak, levels, badges, stats, gamesBreakdown, privacy,
 }: Props) {
   const { locale } = useLocale();
   const t = translations.playerProfile;
@@ -160,6 +226,7 @@ export default function PlayerProfileClient({
 
   const earnedCount = badges.filter(b => b.earned).length;
   const totalVisible = badges.filter(b => !b.secret || b.earned).length;
+  const maxLevel = levels[levels.length - 1]?.level ?? level;
 
   return (
     <div className="min-h-screen bg-sand">
@@ -224,8 +291,8 @@ export default function PlayerProfileClient({
           <div>
             <div className="flex justify-between text-xs text-ink/40 mb-1.5">
               <span>{levelName}</span>
-              {level < 10 ? (
-                <span>{toNext} {t.xpToNext[locale]} {level + 1}</span>
+              {!isMaxLevel && nextLevel ? (
+                <span>{toNext} {t.xpToNext[locale]} {nextLevel}</span>
               ) : (
                 <span>{t.maxLevel[locale]}</span>
               )}
@@ -242,9 +309,10 @@ export default function PlayerProfileClient({
             <p className="text-xs text-ink/30 mt-1 text-right">{progressPct}%</p>
           </div>
 
-          {/* Streak */}
           <div className="flex items-center gap-3 p-3 rounded-xl bg-ink/[0.03] border border-ink/5">
-            <span className="text-2xl">🔥</span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-citrus/10 text-citrus">
+              <Sparkles className="h-4 w-4" />
+            </span>
             <div>
               <p className="text-xs text-ink/40 font-bold uppercase tracking-widest">{t.dailyStreak[locale]}</p>
               <p className="text-lg font-black text-citrus">{streak} {streak > 1 ? t.daysPlural[locale] : t.days[locale]}</p>
@@ -253,6 +321,7 @@ export default function PlayerProfileClient({
               <p className="text-xs font-semibold text-citrus/70 ml-auto">{t.bonus7days[locale]}</p>
             )}
           </div>
+
         </CollapsibleSection>
 
         {/* Statistiques — collapsible */}
@@ -373,6 +442,9 @@ export default function PlayerProfileClient({
           )}
         </CollapsibleSection>
 
+        {/* XP history — lazy loaded */}
+        <XpEventHistory address={address} locale={locale} />
+
         {/* Transactions — lazy loaded */}
         <TransactionHistory address={address} locale={locale} />
 
@@ -414,7 +486,7 @@ export default function PlayerProfileClient({
         </CollapsibleSection>
 
         {/* Paliers XP — collapsible */}
-        <CollapsibleSection title={t.xpTiers[locale]} count={`${level}/10`}>
+        <CollapsibleSection title={t.xpTiers[locale]} count={`${level}/${maxLevel}`}>
           <div className="space-y-1">
             {levels.map((l) => (
               <div key={l.level} className={`flex items-center justify-between py-2 px-3 rounded-xl ${l.level === level ? "bg-marine/8 border border-marine/20" : "bg-transparent"}`}>
@@ -432,6 +504,98 @@ export default function PlayerProfileClient({
 }
 
 /* ─── Transaction History ─── */
+
+function XpEventHistory({ address, locale }: { address: string; locale: "fr" | "en" }) {
+  const t = translations.playerProfile;
+  const [events, setEvents] = useState<XpHistoryEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  function load() {
+    if (loaded || forbidden) { setOpen(!open); return; }
+    setOpen(true);
+    setLoading(true);
+    fetch(`/api/players/${address}/xp-events?limit=50`)
+      .then(async (res) => {
+        if (res.status === 403) {
+          setForbidden(true);
+          return { events: [] };
+        }
+        if (!res.ok) throw new Error("xp_events_failed");
+        return res.json();
+      })
+      .then((data) => {
+        setEvents(data.events || []);
+        setLoaded(true);
+      })
+      .catch(() => setEvents([]))
+      .finally(() => setLoading(false));
+  }
+
+  const totalXp = events.reduce((sum, event) => sum + event.amountXp, 0);
+
+  return (
+    <div className="rounded-2xl bg-white/70 backdrop-blur-sm border border-ink/10 shadow-sm overflow-hidden">
+      <button onClick={load}
+        className="w-full flex items-center justify-between p-5 text-left hover:bg-ink/[0.02] transition-colors">
+        <span className="text-xs text-ink/40 font-bold uppercase tracking-widest">
+          {t.xpHistoryTitle[locale]}
+        </span>
+        <div className="flex items-center gap-2">
+          {loaded && <span className="text-xs text-ink/30 font-semibold">{events.length}</span>}
+          <ChevronDown className={`h-4 w-4 text-ink/30 transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 space-y-3">
+          {loading && <p className="text-center text-xs text-ink/40 py-4">{t.loading[locale]}</p>}
+
+          {forbidden && (
+            <p className="text-center text-xs text-ink/40 py-4">{t.xpHistoryPrivate[locale]}</p>
+          )}
+
+          {loaded && !forbidden && events.length === 0 && (
+            <p className="text-center text-xs text-ink/40 py-4">{t.noXpEvents[locale]}</p>
+          )}
+
+          {loaded && events.length > 0 && (
+            <>
+              <div className="rounded-xl bg-marine/5 dark:bg-blue-900/20 p-3 text-center">
+                <p className="text-lg font-black text-marine dark:text-blue-400">+{totalXp.toLocaleString()} XP</p>
+                <p className="text-[10px] text-marine/60 dark:text-blue-300/60 font-bold uppercase tracking-widest">{t.xpEarned[locale]}</p>
+              </div>
+
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                {events.map((event) => (
+                  <div key={event.id} className="flex items-center justify-between px-3 py-2 rounded-xl bg-ink/[0.03] dark:bg-white/5 border border-ink/5">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-marine/10 text-marine dark:bg-blue-400/15 dark:text-blue-300">
+                        <Sparkles className="h-3.5 w-3.5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs text-ink dark:text-white truncate">{formatXpAction(event.action, locale)}</p>
+                        <p className="text-[10px] text-ink/30">
+                          {new Date(event.createdAt).toLocaleDateString(localeBcp47(locale), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-black text-emerald-600 whitespace-nowrap">+{event.amountXp.toLocaleString()} XP</span>
+                      <p className="text-[10px] text-ink/30">Lv.{event.levelAfter}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Tx = { type: "in" | "out"; amount: number; label: string; category: string; date: string };
 

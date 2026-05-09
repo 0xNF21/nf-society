@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Loader2, LogIn, Sparkles, X } from "lucide-react";
+import { ChevronDown, Loader2, LogIn, X } from "lucide-react";
 import { useAuthSession } from "@/components/auth-provider";
 import { useDemo } from "@/components/demo-provider";
 import { useLocale } from "@/components/language-provider";
@@ -16,7 +16,7 @@ type DailyRewardEntry = {
   type: string;
   label: string;
   crcValue: number;
-  xpValue: number;
+  fragmentsValue: number;
   color?: string;
 };
 
@@ -32,7 +32,7 @@ const todayKey = () => new Date().toISOString().slice(0, 10);
 
 export default function DailyModal() {
   const { locale } = useLocale();
-  const { isDemo, addXp, creditDemoBalance } = useDemo();
+  const { isDemo, creditFragments, creditDemoBalance, addStreak } = useDemo();
   const {
     isAuthenticated,
     address: connectedAddress,
@@ -59,7 +59,7 @@ export default function DailyModal() {
       .filter((entry) => entry.color)
       .map((entry) => ({
         type: entry.type,
-        label: entry.label,
+        label: entry.fragmentsValue > 0 ? `+${entry.fragmentsValue} Fragments` : entry.label,
         color: entry.color || "#6B7280",
       }))
   ), [wheelRewards]);
@@ -72,12 +72,12 @@ export default function DailyModal() {
   ), [locale]);
   const rewardLabel = useCallback((entry: DailyRewardEntry) => {
     if (entry.crcValue > 0) return `+${formatRewardAmount(entry.crcValue)} CRC`;
-    if (entry.xpValue > 0) return `+${entry.xpValue} XP de solde`;
+    if (entry.fragmentsValue > 0) return `+${entry.fragmentsValue} Fragments`;
     return arcadeLabel(entry.label || entry.type);
   }, [arcadeLabel, formatRewardAmount]);
   const resultLabel = useCallback((result: DailyWheelResult) => {
     if (result.crcValue > 0) return `+${formatRewardAmount(result.crcValue)} CRC`;
-    if (result.xpValue > 0) return `+${result.xpValue} XP de solde`;
+    if (result.fragmentsValue > 0) return `+${result.fragmentsValue} Fragments`;
     return arcadeLabel(result.label || result.type);
   }, [arcadeLabel, formatRewardAmount]);
   const rewardProb = (entry: DailyRewardEntry) => `${Math.round(entry.prob * 1000) / 10}%`;
@@ -223,17 +223,6 @@ export default function DailyModal() {
     }
   }, [authLoading, claimDailyFree, connectedAddress, isAuthenticated, openLogin]);
 
-  const handleReplayDaily = useCallback(async () => {
-    setToken(null);
-    setAddress(null);
-    setWheelResult(null);
-    setWheelSpinning(false);
-    setWheelError(null);
-    setPhase("init");
-    clearDailySession();
-    await handleInit();
-  }, [clearDailySession, handleInit]);
-
   const handleWheel = useCallback(async () => {
     if (!token || wheelSpinning) return;
     setWheelResult(null);
@@ -265,19 +254,19 @@ export default function DailyModal() {
   }, [token, wheelFailedMessage, wheelSpinning]);
 
   const handleDemo = useCallback(() => {
-    const configuredWin = wheelRewards.find((entry) => entry.xpValue > 0 || entry.crcValue > 0);
+    const configuredWin = wheelRewards.find((entry) => entry.fragmentsValue > 0 || entry.crcValue > 0);
     const result: DailyWheelResult = configuredWin ? {
       type: configuredWin.type,
       label: configuredWin.label,
       crcValue: configuredWin.crcValue,
-      xpValue: configuredWin.xpValue,
+      fragmentsValue: configuredWin.fragmentsValue,
       segmentIndex: Math.max(0, wheelRewards.indexOf(configuredWin)),
       color: configuredWin.color,
     } : {
-      type: "xp_5",
-      label: "+5 XP",
+      type: "fragments_5",
+      label: "+5 Fragments",
       crcValue: 0,
-      xpValue: 5,
+      fragmentsValue: 5,
       segmentIndex: 1,
       color: "#10B981",
     };
@@ -287,24 +276,33 @@ export default function DailyModal() {
     setWheelResult(result);
     setWheelSpinning(false);
     if (result.crcValue > 0) creditDemoBalance(result.crcValue);
-    if (result.xpValue > 0) addXp("daily_wheel");
+    if (result.fragmentsValue > 0) creditFragments(result.fragmentsValue);
+    addStreak();
     setPhase("complete");
-  }, [addXp, creditDemoBalance, wheelRewards]);
+  }, [addStreak, creditDemoBalance, creditFragments, wheelRewards]);
+
+  const handleReplayDaily = useCallback(async () => {
+    setToken(null);
+    setAddress(null);
+    setWheelResult(null);
+    setWheelSpinning(false);
+    setWheelError(null);
+    setPhase("init");
+    clearDailySession();
+
+    if (isDemo) {
+      handleDemo();
+      return;
+    }
+
+    await handleInit();
+  }, [clearDailySession, handleDemo, handleInit, isDemo]);
 
   const close = () => setOpen(false);
   const needsAuth = !isDemo && !authLoading && !isAuthenticated;
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-lg shadow-amber-500/20 transition hover:bg-amber-600"
-      >
-        <Sparkles className="h-4 w-4" />
-        {t.payButton[locale]}
-      </button>
-
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#111114]">
@@ -358,7 +356,7 @@ export default function DailyModal() {
                 <div className="text-center">
                   <h3 className="text-lg font-black text-ink">{t.spinTitle[locale]}</h3>
                   <p className="text-sm font-medium text-ink/60">
-                    {locale === "fr" ? "Un seul tirage daily : solde XP jouable ou CRC selon la configuration." : "One daily draw: playable XP balance or CRC based on the configuration."}
+                    {locale === "fr" ? "Un seul tirage daily : Fragments jouables ou CRC selon la configuration." : "One daily draw: playable Fragments or CRC based on the configuration."}
                   </p>
                 </div>
                 <SpinWheel
@@ -390,8 +388,8 @@ export default function DailyModal() {
                   {wheelResult?.crcValue ? (
                     <p className="mt-1 text-sm font-black text-emerald-600">+{formatRewardAmount(wheelResult.crcValue)} CRC</p>
                   ) : null}
-                  {wheelResult?.xpValue ? (
-                    <p className="mt-1 text-sm font-black text-violet-600">+{wheelResult.xpValue} XP de solde</p>
+                  {wheelResult?.fragmentsValue ? (
+                    <p className="mt-1 text-sm font-black text-violet-600">+{wheelResult.fragmentsValue} Fragments</p>
                   ) : null}
                   {address && <p className="mt-3 truncate text-xs font-bold text-ink/40">{address}</p>}
                 </div>
