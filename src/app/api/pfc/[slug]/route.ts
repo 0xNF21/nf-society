@@ -6,6 +6,7 @@ import { resolveRound, getWinner, isValidMove } from "@/lib/pfc";
 import type { PfcState, Move } from "@/lib/pfc";
 import { payPrize, payCommission } from "@/lib/wallet";
 import { calculateWinAmount } from "@/lib/multiplayer";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 import { awardMatchResultXp } from "@/lib/xp-server";
 
 export async function GET(
@@ -34,6 +35,13 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { slug: string } }
 ) {
+  // Auth-gated : la session valide la propriete du wallet. Le playerToken
+  // continue a identifier quel slot (P1 ou P2) la session controle dans
+  // cette partie specifique. Address de session + token combines.
+  const addressOr401 = await requireAuthenticatedAddress(req);
+  if (addressOr401 instanceof NextResponse) return addressOr401;
+  const sessionAddress = addressOr401;
+
   try {
     const body = await req.json();
     const { move, playerToken } = body;
@@ -49,15 +57,28 @@ export async function POST(
     const state = game.gameState as PfcState;
     if (!state) return NextResponse.json({ error: "Invalid game state" }, { status: 500 });
 
-    // Identify player by token (mandatory — anti-cheat)
+    // Identify player by token (mandatory — anti-cheat) AND verify the
+    // session address matches the slot's stored address.
     if (!playerToken) {
       return NextResponse.json({ error: "Player token required" }, { status: 401 });
     }
     let playerRole: "p1" | "p2" | null = null;
-    if (game.player1Token === playerToken) playerRole = "p1";
-    else if (game.player2Token === playerToken) playerRole = "p2";
+    let slotAddress: string | null = null;
+    if (game.player1Token === playerToken) {
+      playerRole = "p1";
+      slotAddress = game.player1Address;
+    } else if (game.player2Token === playerToken) {
+      playerRole = "p2";
+      slotAddress = game.player2Address;
+    }
 
     if (!playerRole) return NextResponse.json({ error: "Invalid player token" }, { status: 401 });
+    if (slotAddress && slotAddress.toLowerCase() !== sessionAddress.toLowerCase()) {
+      return NextResponse.json(
+        { error: "Session address does not match slot owner" },
+        { status: 403 },
+      );
+    }
 
     // Check if player already played this round
     if (state.currentRound[playerRole]) {

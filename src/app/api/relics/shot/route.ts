@@ -6,11 +6,17 @@ import { processShot, isDefeated } from '@/lib/relics'
 import { payPrize, payCommission } from '@/lib/wallet'
 import { awardMatchResultXp } from '@/lib/xp-server'
 import type { PlayerGrid } from '@/lib/relics'
+import { requireAuthenticatedAddress } from '@/lib/auth/session'
 
 export async function POST(req: NextRequest) {
+  // Auth-gated : address vient de la session, pas du body.
+  const addressOr401 = await requireAuthenticatedAddress(req)
+  if (addressOr401 instanceof NextResponse) return addressOr401
+  const player = addressOr401
+
   try {
-    const { id, player, row, col, playerToken } = await req.json()
-    if (!id || !player || row == null || col == null)
+    const { id, row, col, playerToken } = await req.json()
+    if (!id || row == null || col == null)
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
     const [game] = await db.select().from(relicsGames).where(eq(relicsGames.slug, id))
@@ -76,7 +82,7 @@ export async function POST(req: NextRequest) {
         const pot = game.betCrc * 2
         const winAmount = pot * (1 - game.commissionPct / 100)
         const commissionAmount = pot * (game.commissionPct / 100)
-        const winnerTxHash = player === game.player1Address ? game.player1TxHash : game.player2TxHash
+        const winnerTxHash = player.toLowerCase() === game.player1Address?.toLowerCase() ? game.player1TxHash : game.player2TxHash
         const prize = await payPrize(player, winAmount, {
           gameType: "relics", gameSlug: game.slug, gameRef: `${game.slug}-winner`,
           sourceTxHash: winnerTxHash,

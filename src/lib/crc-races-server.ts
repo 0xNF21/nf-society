@@ -265,14 +265,28 @@ export async function tickCrcRace(slug: string): Promise<CrcRacesGameRow | null>
   return game;
 }
 
-/** Submit a pending action for a given player (identified by playerToken). */
+/**
+ * Submit a pending action for a given player.
+ *
+ * Identification chain :
+ *   1. `playerToken` finds the racer slot in `game.players`
+ *   2. `sessionAddress` (from the auth cookie) cross-checks that the slot
+ *      owner is the same wallet as the authenticated user. Rejects the
+ *      action if the token belongs to a different racer.
+ *
+ * Both signals must agree — neither alone is enough. Token alone could be
+ * leaked from a shared DOM ; session alone doesn't tell us which slot the
+ * user controls in this specific race.
+ */
 export async function submitCrcRaceAction(
   slug: string,
   playerToken: string,
   action: RaceAction,
   targetAddress: string | null,
+  sessionAddress: string,
 ): Promise<{ ok: true; game: CrcRacesGameRow } | { ok: false; error: string }> {
   if (!playerToken) return { ok: false, error: "Player token required" };
+  if (!sessionAddress) return { ok: false, error: "Session required" };
   const [game] = await db.select().from(crcRacesGames).where(eq(crcRacesGames.slug, slug)).limit(1);
   if (!game) return { ok: false, error: "Race not found" };
   if (game.status !== "racing") return { ok: false, error: "Race not active" };
@@ -280,9 +294,16 @@ export async function submitCrcRaceAction(
   const state = (game.gameState as RaceState) || createInitialState();
   const players: RacePlayer[] = Array.isArray(game.players) ? [...game.players] : [];
   const me = players.find((p) => p.token && p.token === playerToken);
+  if (!me) return { ok: false, error: "Player not in race" };
+  // Cross-check : the slot bound to this token must belong to the
+  // authenticated session. Without this, anyone with the playerToken
+  // (potentially leaked) could play as the legitimate racer.
+  if (me.address.toLowerCase() !== sessionAddress.toLowerCase()) {
+    return { ok: false, error: "Session address does not match racer slot" };
+  }
   const err = canSubmit(me, players, game.status, state.phase, action, targetAddress);
   if (err) return { ok: false, error: err };
-  const myAddr = me!.address.toLowerCase();
+  const myAddr = me.address.toLowerCase();
 
   const pending: PendingAction = { action, targetAddress: targetAddress ? targetAddress.toLowerCase() : null };
   const updatedPlayers = players.map((p) =>

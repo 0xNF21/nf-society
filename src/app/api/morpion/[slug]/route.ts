@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { morpionGames, morpionMoves } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { payPrize, payCommission } from "@/lib/wallet";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
 import { awardMatchResultXp } from "@/lib/xp-server";
 
 const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
@@ -38,12 +39,21 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
+
+  // Auth-gated : address vient de la session, pas du body. Empeche un user
+  // ayant le playerToken (vu dans une URL ou un partage) de jouer comme un
+  // autre. Combine avec playerToken plus bas pour double-check (address
+  // session + token slot).
+  const addressOr401 = await requireAuthenticatedAddress(req);
+  if (addressOr401 instanceof NextResponse) return addressOr401;
+  const playerAddress = addressOr401;
+
   try {
     const body = await req.json();
-    const { playerAddress, position, playerToken } = body;
+    const { position, playerToken } = body;
 
-    if (!playerAddress || typeof position !== "number" || position < 0 || position > 8) {
-      return NextResponse.json({ error: "playerAddress and position (0-8) required" }, { status: 400 });
+    if (typeof position !== "number" || position < 0 || position > 8) {
+      return NextResponse.json({ error: "position (0-8) required" }, { status: 400 });
     }
 
     const [game] = await db.select().from(morpionGames).where(eq(morpionGames.slug, slug)).limit(1);
