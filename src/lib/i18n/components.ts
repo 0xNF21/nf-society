@@ -3,8 +3,8 @@
 export const componentsTranslations = {
   authBanner: {
     notice: {
-      fr: "Connectez votre wallet pour jouer et gagner de l'XP.",
-      en: "Sign in to play and earn XP.",
+      fr: "Connectez votre wallet pour jouer et gagner des Fragments.",
+      en: "Sign in to play and earn Fragments.",
     },
     connect: { fr: "Se connecter", en: "Sign in" },
   },
@@ -278,31 +278,17 @@ export const componentsTranslations = {
     historyKindGamePrize: { fr: "Recompense", en: "Reward" },
     historyKindDailyTicket: { fr: "Ticket Daily", en: "Daily ticket" },
   },
-  stakesBanner: {
-    title: { fr: "Mode Free-to-Play", en: "Free-to-Play mode" },
-    message: {
-      fr: "NF Society est passe en mode Free-to-Play. Les jeux utilisent des XP virtuels, plus de participations CRC.",
-      en: "NF Society is now in Free-to-Play mode. Games use virtual XP, no more CRC entries.",
-    },
-    chanceOnlyTitle: { fr: "Jeux de chance en XP", en: "Chance games in XP" },
-    chanceOnlyMessage: {
-      fr: "Les modes arcade chance (roulette, blackjack, dice...) utilisent des XP virtuels.",
-      en: "Arcade chance modes (roulette, blackjack, dice...) use virtual XP.",
-    },
-    cashoutCta: { fr: "Retirer mes CRC", en: "Withdraw my CRC" },
-    dismiss: { fr: "Masquer", en: "Dismiss" },
-  },
-  statsXp: {
+  statsFragments: {
     title: { fr: "Statistiques Free-to-Play", en: "Free-to-Play statistics" },
     subtitle: {
-      fr: "Toutes les parties depuis le passage en mode F2P. Unit\u00e9 : XP virtuels.",
-      en: "All games since Free-to-Play activation. Unit: virtual XP.",
+      fr: "Toutes les parties depuis le passage en mode F2P. Unite : Fragments.",
+      en: "All games since Free-to-Play activation. Unit: Fragments.",
     },
     kpiRounds: { fr: "Parties jou\u00e9es", en: "Games played" },
     kpiPlayers: { fr: "Joueurs uniques", en: "Unique players" },
-    kpiWagered: { fr: "XP engages", en: "XP played" },
-    kpiPaidOut: { fr: "XP distribues", en: "XP distributed" },
-    daoPoolTitle: { fr: "Pot communautaire XP", en: "Community XP pool" },
+    kpiWagered: { fr: "Fragments engages", en: "Fragments played" },
+    kpiPaidOut: { fr: "Fragments distribues", en: "Fragments distributed" },
+    daoPoolTitle: { fr: "Pot communautaire Fragments", en: "Community Fragments pool" },
     daoPoolTotal: { fr: "Total", en: "Total" },
     daoPoolMonth: { fr: "30 derniers jours", en: "Last 30 days" },
     byGameTitle: { fr: "Par jeu", en: "Per game" },
@@ -323,7 +309,7 @@ export const componentsTranslations = {
     waitingP2: { fr: "En attente de l'autre joueur...", en: "Waiting for the other player..." },
     waitingJoin: { fr: "Partagez le lien pour inviter", en: "Share the link to invite" },
     connectFirst: { fr: "Connecte ton adresse pour jouer", en: "Connect your address to play" },
-    errInsufficientXp: { fr: "Solde XP insuffisant", en: "Insufficient XP balance" },
+    errInsufficientFragments: { fr: "Fragments insuffisants", en: "Insufficient Fragments balance" },
     errAlreadyFull: { fr: "Partie d\u00e9j\u00e0 compl\u00e8te", en: "Game already full" },
     errAlreadyJoined: { fr: "Tu es d\u00e9j\u00e0 dans cette partie", en: "You are already in this game" },
     errWrongBet: { fr: "Montant de participation incorrect", en: "Wrong entry amount" },

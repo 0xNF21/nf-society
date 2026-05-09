@@ -121,7 +121,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
   );
 
   const { status: paymentStatus } = usePaymentWatcher({
-    enabled: watchingPayment && lotteryStatus === "active",
+    enabled: stake.realStakesEnabled && watchingPayment && lotteryStatus === "active",
     dataValue,
     minAmountCRC: lottery.ticketPriceCrc,
     recipientAddress: lottery.recipientAddress,
@@ -134,7 +134,9 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     setScanning(true);
     try {
       const tokenParam = tokenRef.current ? `&token=${tokenRef.current}` : "";
-      await fetch(`/api/scan?${lotteryQuery}`, { method: "POST" });
+      if (stake.realStakesEnabled) {
+        await fetch(`/api/scan?${lotteryQuery}`, { method: "POST" });
+      }
       const res = await fetch(`/api/participants?${lotteryQuery}${tokenParam}`);
       const data = await res.json();
       if (data.count !== undefined) setTicketCount(data.count);
@@ -144,7 +146,7 @@ export default function LotteryPage({ lottery, initialParticipants, initialCount
     } finally {
       setScanning(false);
     }
-  }, [lotteryQuery, tokenRef]);
+  }, [stake.realStakesEnabled, lotteryQuery, tokenRef]);
 
   useEffect(() => {
     if (paymentStatus === "confirmed") {

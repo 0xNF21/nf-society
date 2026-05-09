@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { lootboxes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { isEthereumAddress } from "@/lib/validation";
+import { checkAdminAuth } from "@/lib/admin-auth";
 
 export async function GET() {
   try {
@@ -15,8 +16,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const password = req.headers.get("x-admin-password");
-    if (password !== process.env.ADMIN_PASSWORD) {
+    if (!checkAdminAuth(req)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

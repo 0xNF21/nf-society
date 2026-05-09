@@ -806,15 +806,15 @@ export async function payPrize(
  * Commission payout — source-aware :
  *
  *   sourceTxHash = "balance:..." → creditCommission (DAO treasury balance)
- *   sourceTxHash = "xp:..."      → no-op (executeXpPayout possede deja la commission)
+ *   sourceTxHash = "fragments:..." → no-op (executeFragmentsPayout possede deja la commission)
  *   sourceTxHash = "0x..."       → onchain-implicit (commission reste dans la Safe)
  *
- * Important pour les XP-funded games : `executeXpPayout` (dans payout.ts)
- * calcule la commission a partir de la somme des `game_xp_events` de type
- * `bet` pour cette (gameKey, gameSlug) et l'insere dans `dao_xp_pool` en
+ * Important pour les parties financees en Fragments : `executeFragmentsPayout` (dans payout.ts)
+ * calcule la commission a partir de la somme des `game_fragment_events` de type
+ * `bet` pour cette (gameKey, gameSlug) et l'insere dans `dao_fragments_pool` en
  * meme temps que le credit de victoire. Donc `payCommission` ne doit PAS
  * re-inserer ici, sinon la commission est creditee deux fois (une dans
- * executeXpPayout, une ici via le call site multi).
+ * executeFragmentsPayout, une ici via le call site multi).
  */
 export async function payCommission(
   amountCrc: number,
@@ -824,19 +824,19 @@ export async function payCommission(
     gameRef: string;
     sourceTxHash: string | null | undefined;
   },
-): Promise<{ method: "balance" | "xp-handled-by-payout" | "onchain-implicit"; ok: boolean; ledgerId?: number }> {
+): Promise<{ method: "balance" | "fragments-handled-by-payout" | "onchain-implicit"; ok: boolean; ledgerId?: number }> {
   if (amountCrc <= 0) {
     if (isBalancePaid(opts.sourceTxHash)) return { method: "balance", ok: true };
-    if (typeof opts.sourceTxHash === "string" && opts.sourceTxHash.startsWith("xp:")) {
-      return { method: "xp-handled-by-payout", ok: true };
+    if (typeof opts.sourceTxHash === "string" && (opts.sourceTxHash.startsWith("fragments:") || opts.sourceTxHash.startsWith("xp:"))) {
+      return { method: "fragments-handled-by-payout", ok: true };
     }
     return { method: "onchain-implicit", ok: true };
   }
 
-  // XP-funded game : `executeXpPayout` a deja credite dao_xp_pool depuis la
+  // Partie financee en Fragments : `executeFragmentsPayout` a deja credite dao_fragments_pool depuis la
   // somme des bet events. Re-crediter ici doublerait le compteur DAO.
-  if (typeof opts.sourceTxHash === "string" && opts.sourceTxHash.startsWith("xp:")) {
-    return { method: "xp-handled-by-payout", ok: true };
+  if (typeof opts.sourceTxHash === "string" && (opts.sourceTxHash.startsWith("fragments:") || opts.sourceTxHash.startsWith("xp:"))) {
+    return { method: "fragments-handled-by-payout", ok: true };
   }
 
   if (!isBalancePaid(opts.sourceTxHash)) {

@@ -4,6 +4,7 @@ import { memoryGames } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { payPrize, payCommission } from "@/lib/wallet";
 import { requireAuthenticatedAddress } from "@/lib/auth/session";
+import { awardMatchResultXp } from "@/lib/xp-server";
 
 const GRID_CONFIG: Record<string, { cols: number; rows: number; pairs: number }> = {
   easy:   { cols: 4, rows: 3, pairs: 6 },
@@ -204,6 +205,16 @@ export async function POST(
           winnerAddress,
           updatedAt: new Date(),
         }).where(eq(memoryGames.id, game.id));
+
+        await awardMatchResultXp({
+          playerAddresses: [p1, p2],
+          winnerAddress,
+          winAction: "memory_win",
+          loseAction: "memory_lose",
+          sourceType: "memory",
+          sourceId: `game:${game.id}`,
+          metadata: { slug: game.slug, result },
+        });
 
         // Trigger payout
         const pot = game.betCrc * 2;

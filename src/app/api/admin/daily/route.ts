@@ -1,50 +1,144 @@
 import { NextRequest, NextResponse } from "next/server";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { checkAdminAuth } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { dailyRewardsConfig } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { invalidateDailyCache } from "@/lib/daily";
-import { checkAdminAuth } from "@/lib/admin-auth";
+import { getDailyWheelProbs, invalidateDailyCache } from "@/lib/daily";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
-// GET — get scratch and spin reward tables
+type AdminDailyReward = {
+  prob: number;
+  type: string;
+  label: string;
+  crcValue: number;
+  fragmentsValue: number;
+  color?: string;
+};
+
+type RawAdminDailyReward = Partial<AdminDailyReward> & {
+  xpValue?: unknown;
+};
+
+const MAX_REWARD_ROWS = 20;
+const MAX_DAILY_FRAGMENTS_REWARD = 10_000;
+const MAX_DAILY_EXPECTED_FRAGMENTS = 10_000;
+const MAX_DAILY_CRC_REWARD = 100;
+const MAX_DAILY_EXPECTED_CRC = 10;
+const MAX_REWARD_TEXT_LENGTH = 48;
+const REWARD_TYPE_RE = /^[a-z0-9][a-z0-9_:-]{1,63}$/;
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
+function normalizePlayableType(value: unknown): string {
+  return String(value ?? "").trim().replace(/^xp_/, "fragments_");
+}
+
+function normalizePlayableLabel(value: unknown): string {
+  return String(value ?? "").trim().replace(/XP( de solde)?/gi, "Fragments");
+}
+
+function normalizeAdminRewards(rewards: unknown[]): { rewards?: AdminDailyReward[]; error?: string } {
+  if (rewards.length === 0) return { error: "At least one reward is required" };
+  if (rewards.length > MAX_REWARD_ROWS) return { error: `At most ${MAX_REWARD_ROWS} rewards are allowed` };
+
+  const seenTypes = new Set<string>();
+  const normalized: AdminDailyReward[] = [];
+
+  for (let i = 0; i < rewards.length; i++) {
+    const row = rewards[i] as RawAdminDailyReward | null;
+    const prob = Number(row?.prob);
+    const crcValue = Number(row?.crcValue ?? 0);
+    const fragmentsValue = Number(row?.fragmentsValue ?? row?.xpValue ?? 0);
+    const type = normalizePlayableType(row?.type);
+    const label = normalizePlayableLabel(row?.label);
+    const color = String(row?.color ?? "").trim();
+
+    if (!type) return { error: `Reward ${i + 1}: type is required` };
+    if (!REWARD_TYPE_RE.test(type)) return { error: `Reward ${i + 1}: invalid type format` };
+    if (seenTypes.has(type)) return { error: `Reward ${i + 1}: duplicate type "${type}"` };
+    if (!label) return { error: `Reward ${i + 1}: label is required` };
+    if (label.length > MAX_REWARD_TEXT_LENGTH) return { error: `Reward ${i + 1}: label is too long` };
+    if (!Number.isFinite(prob) || prob < 0) return { error: `Reward ${i + 1}: invalid probability` };
+    if (!Number.isFinite(crcValue) || crcValue < 0) return { error: `Reward ${i + 1}: invalid CRC value` };
+    if (!Number.isFinite(fragmentsValue) || fragmentsValue < 0) return { error: `Reward ${i + 1}: invalid Fragments value` };
+    if (crcValue === 0 && fragmentsValue === 0) {
+      return { error: `Reward ${i + 1}: every line must give Fragments or CRC` };
+    }
+    if (crcValue > 0 && fragmentsValue > 0) {
+      return { error: `Reward ${i + 1}: choose either Fragments or CRC, not both` };
+    }
+    if (crcValue > MAX_DAILY_CRC_REWARD) return { error: `Reward ${i + 1}: CRC value must be <= ${MAX_DAILY_CRC_REWARD}` };
+    if (fragmentsValue > MAX_DAILY_FRAGMENTS_REWARD) return { error: `Reward ${i + 1}: Fragments value must be <= ${MAX_DAILY_FRAGMENTS_REWARD}` };
+    if (color && !HEX_COLOR_RE.test(color)) return { error: `Reward ${i + 1}: color must be #RRGGBB` };
+
+    seenTypes.add(type);
+    normalized.push({
+      prob: Math.round(prob * 1_000_000_000) / 1_000_000_000,
+      type,
+      label,
+      crcValue: Math.round(crcValue * 1_000) / 1_000,
+      fragmentsValue: Math.floor(fragmentsValue),
+      color: color || "#6B7280",
+    });
+  }
+
+  return { rewards: normalized };
+}
+
 export async function GET(req: NextRequest) {
   const limited = await enforceRateLimit(req, "admin-daily", 10, 60000);
   if (limited) return limited;
 
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const rows = await db.select().from(dailyRewardsConfig);
-  const result: Record<string, unknown> = {};
-  for (const row of rows) {
-    result[row.key] = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards;
-  }
-  return NextResponse.json(result);
+
+  const wheel = await getDailyWheelProbs();
+  return NextResponse.json({ wheel });
 }
 
-// PATCH — update a reward table (scratch or spin)
 export async function PATCH(req: NextRequest) {
   const limited = await enforceRateLimit(req, "admin-daily", 10, 60000);
   if (limited) return limited;
 
   if (!checkAdminAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
-    const { key, rewards } = await req.json();
-    if (!key || !Array.isArray(rewards)) {
-      return NextResponse.json({ error: "key and rewards[] required" }, { status: 400 });
+    const { key = "wheel", rewards } = await req.json();
+    if (key !== "wheel" || !Array.isArray(rewards)) {
+      return NextResponse.json({ error: "key=wheel and rewards[] required" }, { status: 400 });
     }
 
-    // Validate probabilities sum to ~1.0
-    const totalProb = rewards.reduce((s: number, r: { prob: number }) => s + r.prob, 0);
+    const normalized = normalizeAdminRewards(rewards);
+    if (normalized.error || !normalized.rewards) {
+      return NextResponse.json({ error: normalized.error || "Invalid rewards" }, { status: 400 });
+    }
+
+    const totalProb = normalized.rewards.reduce((sum, reward) => sum + reward.prob, 0);
     if (Math.abs(totalProb - 1.0) > 0.01) {
       return NextResponse.json({ error: `Probabilities sum to ${totalProb.toFixed(3)}, should be 1.0` }, { status: 400 });
     }
 
-    await db.update(dailyRewardsConfig).set({
-      rewards: JSON.stringify(rewards),
+    const expectedFragments = normalized.rewards.reduce((sum, reward) => sum + reward.prob * reward.fragmentsValue, 0);
+    if (expectedFragments > MAX_DAILY_EXPECTED_FRAGMENTS) {
+      return NextResponse.json({ error: `Expected Fragments per wheel is ${expectedFragments.toFixed(2)}, max is ${MAX_DAILY_EXPECTED_FRAGMENTS}` }, { status: 400 });
+    }
+
+    const expectedCrc = normalized.rewards.reduce((sum, reward) => sum + reward.prob * reward.crcValue, 0);
+    if (expectedCrc > MAX_DAILY_EXPECTED_CRC) {
+      return NextResponse.json({ error: `Expected CRC per wheel is ${expectedCrc.toFixed(4)}, max is ${MAX_DAILY_EXPECTED_CRC}` }, { status: 400 });
+    }
+
+    await db.insert(dailyRewardsConfig).values({
+      key: "wheel",
+      rewards: JSON.stringify(normalized.rewards),
       updatedAt: new Date(),
-    }).where(eq(dailyRewardsConfig.key, key));
+    }).onConflictDoUpdate({
+      target: dailyRewardsConfig.key,
+      set: {
+        rewards: JSON.stringify(normalized.rewards),
+        updatedAt: new Date(),
+      },
+    });
 
     invalidateDailyCache();
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, wheel: normalized.rewards });
   } catch (error) {
     console.error("[Admin Daily] Error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

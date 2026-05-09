@@ -1,18 +1,27 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { payGameFromXp } from "@/lib/wallet-xp";
+import { payGameFromFragments } from "@/lib/wallet-fragments";
+import { isRealStakesEnabled } from "@/lib/stakes";
 import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/blackjack/start-free
  *
- * Equivalent XP du flow CRC pour une main de blackjack.
+ * Equivalent Fragments du flow CRC pour une main de blackjack.
  * Address verifiee server-side via la session auth (jamais depuis le body).
  */
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "blackjack-start-free", 20, 60000);
   if (limited) return limited;
+
+  const gameKey = "blackjack";
+  if (await isRealStakesEnabled(gameKey)) {
+    return NextResponse.json(
+      { error: "USE_PAID_PATH", message: "Real-stakes mode is active for this game. Use the paid flow." },
+      { status: 403 },
+    );
+  }
 
   const addressOr401 = await requireAuthenticatedAddress(req);
   if (addressOr401 instanceof NextResponse) return addressOr401;
@@ -25,8 +34,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
 
-    const result = await payGameFromXp({
-      gameKey: "blackjack",
+    const result = await payGameFromFragments({
+      gameKey,
       slug: String(tableSlug),
       address,
       playerToken: String(playerToken),

@@ -27,6 +27,7 @@ import {
   resolveRound,
   TIER_BETS,
   TIER_LIST,
+  xpActionForRank,
   type PendingAction,
   type RaceAction,
   type RacePlayer,
@@ -34,6 +35,7 @@ import {
   type RaceStatus,
   type RaceTier,
 } from "@/lib/crc-races";
+import { awardPlayerXp } from "@/lib/xp-server";
 
 const WEI_PER_CRC = BigInt("1000000000000000000");
 const GAME_KEY = "crc-races";
@@ -328,6 +330,7 @@ export async function submitCrcRaceAction(
 export async function startCrcRacePayouts(gameId: number): Promise<void> {
   const [game] = await db.select().from(crcRacesGames).where(eq(crcRacesGames.id, gameId)).limit(1);
   if (!game || game.status !== "finished") return;
+  if (game.payoutStatus !== "pending") return;
 
   const players: RacePlayer[] = Array.isArray(game.players) ? game.players : [];
   const nbPlayers = players.length;
@@ -346,12 +349,38 @@ export async function startCrcRacePayouts(gameId: number): Promise<void> {
   }));
   const winnerAddress = winners[0]?.address ?? null;
 
-  await db.update(crcRacesGames).set({
+  const [lockedGame] = await db.update(crcRacesGames).set({
     payouts: payoutEntries,
     payoutStatus: "sending",
     winnerAddress,
     updatedAt: new Date(),
-  }).where(eq(crcRacesGames.id, gameId));
+  }).where(and(eq(crcRacesGames.id, gameId), eq(crcRacesGames.payoutStatus, "pending"))).returning();
+
+  if (!lockedGame) return;
+
+  const xpAwards = players
+    .filter((player) => player.address)
+    .map((player) => ({
+      address: player.address,
+      action: xpActionForRank(player.finishRank, nbPlayers),
+      sourceType: GAME_KEY,
+      sourceId: `game:${game.id}`,
+      metadata: { slug: game.slug, rank: player.finishRank },
+    }));
+
+  const xpResults = await Promise.allSettled(
+    xpAwards.map((award) => awardPlayerXp(award)),
+  );
+
+  xpResults.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error("[CrcRaces] XP award failed:", xpAwards[index], result.reason);
+      return;
+    }
+    if ("error" in result.value) {
+      console.error("[CrcRaces] XP award skipped:", xpAwards[index], result.value.error);
+    }
+  });
 
   const results: CrcRacesPayoutEntry[] = [];
   for (const entry of payoutEntries) {

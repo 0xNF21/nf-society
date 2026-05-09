@@ -23,7 +23,7 @@ function CookiesContentFr({ t, locale }: { t: T; locale: Locale }) {
       <h2>2. Stockage local utilise</h2>
       <ul>
         <li><strong>nf-demo</strong> : boolean pour activer le mode demo</li>
-        <li><strong>nf-demo-progress</strong> : progression XP en mode demo (niveau, streak)</li>
+        <li><strong>nf-demo-progress</strong> : progression XP, Fragments et streak en mode demo</li>
         <li><strong>nf-locale</strong> : langue choisie (FR/EN)</li>
         <li><strong>nf-theme</strong> : theme clair ou sombre</li>
         <li><strong>nf-player-token-*</strong> : jetons de session pour les jeux en cours (anti-triche)</li>
@@ -73,7 +73,7 @@ function CookiesContentEn({ t, locale }: { t: T; locale: Locale }) {
       <h2>2. Local storage used</h2>
       <ul>
         <li><strong>nf-demo</strong>: boolean to enable demo mode</li>
-        <li><strong>nf-demo-progress</strong>: XP progress in demo mode (level, streak)</li>
+        <li><strong>nf-demo-progress</strong>: XP, Fragments and streak progress in demo mode</li>
         <li><strong>nf-locale</strong>: chosen language (FR/EN)</li>
         <li><strong>nf-theme</strong>: light or dark theme</li>
         <li><strong>nf-player-token-*</strong>: session tokens for ongoing games (anti-cheat)</li>

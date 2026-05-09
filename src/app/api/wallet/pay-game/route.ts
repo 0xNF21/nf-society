@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Gate APRES la lecture du body : on a besoin de `gameKey` pour appliquer
-    // l'override par categorie (chance_games_xp_only).
+    // l'override par categorie (chance_games_fragments_only).
     const disabled = await respondIfStakesDisabled(String(gameKey));
     if (disabled) return disabled;
 

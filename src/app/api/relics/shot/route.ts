@@ -4,6 +4,7 @@ import { relicsGames } from '@/lib/db/schema/relics'
 import { eq } from 'drizzle-orm'
 import { processShot, isDefeated } from '@/lib/relics'
 import { payPrize, payCommission } from '@/lib/wallet'
+import { awardMatchResultXp } from '@/lib/xp-server'
 import type { PlayerGrid } from '@/lib/relics'
 import { requireAuthenticatedAddress } from '@/lib/auth/session'
 
@@ -67,6 +68,16 @@ export async function POST(req: NextRequest) {
 
     // Pay winner asymmetrically (balance/on-chain based on their payment).
     if (defeated) {
+      await awardMatchResultXp({
+        playerAddresses: [game.player1Address, game.player2Address],
+        winnerAddress: player,
+        winAction: 'relics_win',
+        loseAction: 'relics_lose',
+        sourceType: 'relics',
+        sourceId: `game:${game.id}`,
+        metadata: { slug: game.slug },
+      })
+
       try {
         const pot = game.betCrc * 2
         const winAmount = pot * (1 - game.commissionPct / 100)

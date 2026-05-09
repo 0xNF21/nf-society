@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { retryPayout } from "@/lib/payout";
+import { isAdminPasswordValid } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { payoutId, password } = body;
 
-    if (password !== process.env.ADMIN_PASSWORD) {
+    if (!isAdminPasswordValid(password)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

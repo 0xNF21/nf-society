@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { payouts } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { executePayout, type PayoutReason } from "@/lib/payout";
+import { checkAdminBearerAuth, isAdminPasswordValid } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { gameType, gameId, recipientAddress, amountCrc, reason, password, payoutReason, sourceTxHash } = body;
 
-    if (password !== process.env.ADMIN_PASSWORD) {
+    if (!isAdminPasswordValid(password)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -78,9 +79,7 @@ export async function GET(request: NextRequest) {
   if (limited) return limited;
 
   try {
-    const authHeader = request.headers.get("authorization");
-    const password = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    if (password !== process.env.ADMIN_PASSWORD) {
+    if (!checkAdminBearerAuth(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

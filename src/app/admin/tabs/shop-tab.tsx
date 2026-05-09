@@ -15,7 +15,7 @@ import { CATEGORY_COLORS, CATEGORY_LABELS, STATUS_CONFIG, STATUS_ORDER, PAYOUT_S
 
 interface ShopItemRow {
   id: number; slug: string; name: string; description: string; icon: string;
-  category: string; xpCost: number; levelRequired: number; stock: number | null; active: boolean;
+  category: string; fragmentsCost: number; levelRequired: number; stock: number | null; active: boolean;
 }
 
 export function ShopTab({ password }: { password: string }) {
@@ -75,9 +75,9 @@ export function ShopTab({ password }: { password: string }) {
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="text-[10px] text-ink/40 font-bold">Prix XP</label>
-                <input type="number" min={0} value={edits.xpCost ?? item.xpCost}
-                  onChange={e => updateField(item.slug, "xpCost", parseInt(e.target.value) || 0)}
+                <label className="text-[10px] text-ink/40 font-bold">Prix Fragments</label>
+                <input type="number" min={0} value={edits.fragmentsCost ?? item.fragmentsCost ?? 0}
+                  onChange={e => updateField(item.slug, "fragmentsCost", parseInt(e.target.value) || 0)}
                   className="w-full px-2 py-1.5 rounded-lg border border-ink/10 text-sm font-bold" />
               </div>
               <div>

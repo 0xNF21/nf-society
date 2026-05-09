@@ -195,7 +195,7 @@ export function GamePayment({
   }
 
   // Free-to-Play : bypass le flow CRC (QR, Mini App, balance-pay, scan) et
-  // render l'equivalent XP. Place APRES tous les hooks pour respecter
+  // rend l'equivalent Fragments. Place APRES tous les hooks pour respecter
   // les rules-of-hooks (pas de hook conditionnel).
   if (realStakesDisabled) {
     if (!isActiveStatus) return null;

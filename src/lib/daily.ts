@@ -1,12 +1,14 @@
 import crypto from "crypto";
-import { keccakHex } from "./hash";
+import { sql } from "drizzle-orm";
+import { ethers } from "ethers";
 import { db } from "./db";
 import { jackpotPool } from "./db/schema";
-import { sql, and } from "drizzle-orm";
+import { keccakHex } from "./hash";
 import { getSafeCrcBalance } from "./payout";
-import { ethers } from "ethers";
+import type { DailyWheelResult } from "./daily-shared";
 
-// ─── Token ────────────────────────────────────────────
+export type { DailyWheelResult } from "./daily-shared";
+
 export function generateDailyToken(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   let code = "";
@@ -17,125 +19,200 @@ export function generateDailyToken(): string {
   return `DAILY-${code}`;
 }
 
-// Re-export types from shared (client-safe) module
-import type { ScratchResult, SpinResult } from "./daily-shared";
-export type { ScratchResult, SpinResult } from "./daily-shared";
+type DailyRewardConfigEntry = {
+  prob: number;
+  type: string;
+  label: string;
+  crcValue: number;
+  fragmentsValue: number;
+  color?: string;
+};
 
-// ─── Default Probabilities (fallback if DB empty) ─────
+type RawDailyRewardConfigEntry = {
+  prob?: unknown;
+  type?: unknown;
+  label?: unknown;
+  crcValue?: unknown;
+  fragmentsValue?: unknown;
+  xpValue?: unknown;
+  color?: unknown;
+};
 
-const DEFAULT_SCRATCH_PROBS = [
-  { prob: 0.200, type: "nothing",   label: "Rien",         crcValue: 0,  xpValue: 0,   symbol: "💨" },
-  { prob: 0.150, type: "xp_50",     label: "+50 XP",       crcValue: 0,  xpValue: 50,  symbol: "⭐" },
-  { prob: 0.330, type: "refund",    label: "Remboursé",    crcValue: 1,  xpValue: 0,   symbol: "🪙" },
-  { prob: 0.132, type: "xp_100",    label: "+100 XP",      crcValue: 0,  xpValue: 100, symbol: "🌟" },
-  { prob: 0.108, type: "crc_2",     label: "+2 CRC",       crcValue: 2,  xpValue: 0,   symbol: "💰" },
-  { prob: 0.040, type: "streak_x2", label: "Streak x2",    crcValue: 0,  xpValue: 0,   symbol: "🔥" },
-  { prob: 0.032, type: "crc_5",     label: "+5 CRC",       crcValue: 5,  xpValue: 0,   symbol: "💎" },
-  { prob: 0.008, type: "crc_20",    label: "+20 CRC",      crcValue: 20, xpValue: 0,   symbol: "👑" },
+const DEFAULT_DAILY_WHEEL_PROBS: DailyRewardConfigEntry[] = [
+  { prob: 0.45, type: "fragments_75", label: "+75 Fragments", crcValue: 0, fragmentsValue: 75, color: "#10B981" },
+  { prob: 0.35, type: "fragments_200", label: "+200 Fragments", crcValue: 0, fragmentsValue: 200, color: "#38BDF8" },
+  { prob: 0.17, type: "fragments_500", label: "+500 Fragments", crcValue: 0, fragmentsValue: 500, color: "#8B5CF6" },
+  { prob: 0.028, type: "crc_1_rare", label: "+1 CRC", crcValue: 1, fragmentsValue: 0, color: "#F59E0B" },
+  { prob: 0.002, type: "crc_10_rare", label: "+10 CRC", crcValue: 10, fragmentsValue: 0, color: "#EC4899" },
 ];
 
-const DEFAULT_SPIN_PROBS = [
-  { prob: 0.20, type: "nothing",   label: "Rien",       crcValue: 0,  xpValue: 0,   color: "#6B7280" },
-  { prob: 0.15, type: "xp_50",     label: "+50 XP",     crcValue: 0,  xpValue: 50,  color: "#8B5CF6" },
-  { prob: 0.30, type: "crc_1",     label: "+1 CRC",     crcValue: 1,  xpValue: 0,   color: "#10B981" },
-  { prob: 0.13, type: "xp_100",    label: "+100 XP",    crcValue: 0,  xpValue: 100, color: "#6366F1" },
-  { prob: 0.13, type: "crc_3",     label: "+3 CRC",     crcValue: 3,  xpValue: 0,   color: "#F59E0B" },
-  { prob: 0.05, type: "streak_x2", label: "Streak x2",  crcValue: 0,  xpValue: 0,   color: "#EF4444" },
-  { prob: 0.03, type: "crc_10",    label: "+10 CRC",    crcValue: 10, xpValue: 0,   color: "#EC4899" },
-  { prob: 0.01, type: "jackpot",   label: "JACKPOT",    crcValue: 0,  xpValue: 0,   color: "#FFD700" },
-];
-
-// ─── DB Cache for daily rewards ───
-
-let cachedScratch: typeof DEFAULT_SCRATCH_PROBS | null = null;
-let cachedSpin: typeof DEFAULT_SPIN_PROBS | null = null;
+let cachedDailyWheel: DailyRewardConfigEntry[] | null = null;
 let dailyCacheTime = 0;
 const DAILY_CACHE_TTL = 60_000;
 
-async function getScratchProbs() {
-  if (cachedScratch && Date.now() - dailyCacheTime < DAILY_CACHE_TTL) return cachedScratch;
-  try {
-    const { dailyRewardsConfig } = await import("./db/schema");
-    const { eq } = await import("drizzle-orm");
-    const [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "scratch"));
-    if (row) {
-      cachedScratch = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards as typeof DEFAULT_SCRATCH_PROBS;
-      dailyCacheTime = Date.now();
-      return cachedScratch!;
-    }
-  } catch {}
-  return DEFAULT_SCRATCH_PROBS;
+function nonNegativeNumber(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, numeric);
 }
 
-async function getSpinProbs() {
-  if (cachedSpin && Date.now() - dailyCacheTime < DAILY_CACHE_TTL) return cachedSpin;
+function nonNegativeInteger(value: unknown): number {
+  return Math.floor(nonNegativeNumber(value));
+}
+
+function fragmentsValueFromReward(reward: RawDailyRewardConfigEntry): number {
+  return nonNegativeInteger(reward.fragmentsValue ?? reward.xpValue);
+}
+
+function normalizeRewardType(type: unknown, fragmentsValue: number, crcValue: number): string {
+  const normalized = String(type ?? "").trim().replace(/^xp_/, "fragments_");
+  if (normalized) return normalized;
+  if (fragmentsValue > 0) return `fragments_${fragmentsValue}`;
+  if (crcValue > 0) return `crc_${String(crcValue).replace(".", "_")}`;
+  return "nothing";
+}
+
+function fallbackRewardLabel(type: string, fragmentsValue: number, crcValue: number): string {
+  if (fragmentsValue > 0) return `+${fragmentsValue} Fragments`;
+  if (crcValue > 0) return `+${crcValue} CRC`;
+  return type || "Rien";
+}
+
+function normalizeRewardLabel(label: unknown, type: string, fragmentsValue: number, crcValue: number): string {
+  const raw = typeof label === "string" ? label.trim() : "";
+  return (raw || fallbackRewardLabel(type, fragmentsValue, crcValue))
+    .replace(/XP( de solde)?/gi, "Fragments");
+}
+
+function normalizeRewards(rewards: unknown): DailyRewardConfigEntry[] {
+  if (!Array.isArray(rewards)) return DEFAULT_DAILY_WHEEL_PROBS;
+
+  return rewards.map((rawReward) => {
+    const reward = rawReward && typeof rawReward === "object"
+      ? rawReward as RawDailyRewardConfigEntry
+      : {};
+    const crcValue = nonNegativeNumber(reward.crcValue);
+    const fragmentsValue = fragmentsValueFromReward(reward);
+    const type = normalizeRewardType(reward.type, fragmentsValue, crcValue);
+    const label = normalizeRewardLabel(reward.label, type, fragmentsValue, crcValue);
+    const color = typeof reward.color === "string" && reward.color.trim()
+      ? reward.color.trim()
+      : undefined;
+
+    return {
+      prob: nonNegativeNumber(reward.prob),
+      type,
+      label,
+      crcValue,
+      fragmentsValue,
+      color,
+    };
+  });
+}
+
+function keepWheelRewardsOnly(rewards: DailyRewardConfigEntry[]): DailyRewardConfigEntry[] {
+  const filtered = rewards.filter((reward) => (
+    reward.crcValue > 0 || reward.fragmentsValue > 0
+  ));
+  if (filtered.length === 0) return DEFAULT_DAILY_WHEEL_PROBS;
+
+  const totalProb = filtered.reduce((sum, reward) => sum + reward.prob, 0);
+  if (totalProb <= 0) return DEFAULT_DAILY_WHEEL_PROBS;
+
+  return filtered.map((reward) => ({
+    ...reward,
+    prob: reward.prob / totalProb,
+  }));
+}
+
+function isLegacyDailyWheelConfig(rewards: DailyRewardConfigEntry[]): boolean {
+  return rewards.some((r) => r.type === "nothing" || (r.crcValue === 0 && r.fragmentsValue === 0))
+    || rewards.some((r) => r.type === "crc_10" && r.crcValue === 10 && Math.abs(r.prob - 0.03) < 0.001)
+    || rewards.some((r) => r.type === "jackpot" && Math.abs(r.prob - 0.01) < 0.001);
+}
+
+export async function getDailyWheelProbs() {
+  if (cachedDailyWheel && Date.now() - dailyCacheTime < DAILY_CACHE_TTL) return cachedDailyWheel;
+
   try {
     const { dailyRewardsConfig } = await import("./db/schema");
     const { eq } = await import("drizzle-orm");
-    const [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "spin"));
+    let [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "wheel"));
+
+    if (!row) {
+      [row] = await db.select().from(dailyRewardsConfig).where(eq(dailyRewardsConfig.key, "spin"));
+    }
+
     if (row) {
-      cachedSpin = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards as typeof DEFAULT_SPIN_PROBS;
+      const raw = typeof row.rewards === "string" ? JSON.parse(row.rewards) : row.rewards;
+      const normalizedRewards = normalizeRewards(raw);
+      cachedDailyWheel = isLegacyDailyWheelConfig(normalizedRewards)
+        ? DEFAULT_DAILY_WHEEL_PROBS
+        : keepWheelRewardsOnly(normalizedRewards);
       dailyCacheTime = Date.now();
-      return cachedSpin!;
+      return cachedDailyWheel;
     }
   } catch {}
-  return DEFAULT_SPIN_PROBS;
+
+  return DEFAULT_DAILY_WHEEL_PROBS;
 }
 
 export function invalidateDailyCache() {
-  cachedScratch = null;
-  cachedSpin = null;
+  cachedDailyWheel = null;
   dailyCacheTime = 0;
 }
 
-// ─── Deterministic seed → [0, 1) ─────────────────────
+export function normalizeDailyWheelResult(raw: unknown): DailyWheelResult | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const result = raw as RawDailyRewardConfigEntry & { segmentIndex?: unknown };
+  const crcValue = nonNegativeNumber(result.crcValue);
+  const fragmentsValue = fragmentsValueFromReward(result);
+  const type = normalizeRewardType(result.type, fragmentsValue, crcValue);
+  const label = normalizeRewardLabel(result.label, type, fragmentsValue, crcValue);
+  const segmentIndexValue = Number(result.segmentIndex);
+  const segmentIndex = Number.isInteger(segmentIndexValue) && segmentIndexValue >= 0
+    ? segmentIndexValue
+    : 0;
+  const color = typeof result.color === "string" && result.color.trim()
+    ? result.color.trim()
+    : undefined;
+
+  return {
+    type,
+    label,
+    crcValue,
+    fragmentsValue,
+    segmentIndex,
+    color,
+  };
+}
+
+export function parseDailyWheelResult(value: string | null | undefined): DailyWheelResult | null {
+  if (!value) return null;
+
+  try {
+    return normalizeDailyWheelResult(JSON.parse(value));
+  } catch {
+    return null;
+  }
+}
+
+export function allowDailyRepeatTests(): boolean {
+  return process.env.DAILY_ALLOW_REPEAT_TESTS === "true"
+    || process.env.VERCEL_ENV === "preview"
+    || process.env.NODE_ENV !== "production";
+}
+
 function seedToNumber(seed: string): number {
   const hash = keccakHex(seed);
-  // Take first 8 hex chars → 32-bit number → normalize to [0, 1)
   const num = parseInt(hash.slice(2, 10), 16);
   return num / 0xFFFFFFFF;
 }
 
-// ─── Scratch Result ───────────────────────────────────
-export async function determineScratchResult(seed: string): Promise<ScratchResult> {
-  const probs = await getScratchProbs();
-  const roll = seedToNumber(seed);
-
-  let cumulative = 0;
-  let winner = probs[0];
-  for (const entry of probs) {
-    cumulative += entry.prob;
-    if (roll < cumulative) {
-      winner = entry;
-      break;
-    }
-  }
-
-  const allSymbols = probs.map((p: any) => p.symbol);
-  const winnerSymbol = winner.symbol;
-  const otherSymbols = allSymbols.filter((s: string) => s !== winnerSymbol);
-
-  const otherRoll = seedToNumber(seed + "-other");
-  const otherSymbol = otherSymbols[Math.floor(otherRoll * otherSymbols.length)];
-
-  const posRoll = seedToNumber(seed + "-pos");
-  const oddPos = Math.floor(posRoll * 3);
-  const symbols = [winnerSymbol, winnerSymbol, winnerSymbol];
-  symbols[oddPos] = otherSymbol;
-
-  return {
-    type: winner.type,
-    label: winner.label,
-    crcValue: winner.crcValue,
-    xpValue: winner.xpValue,
-    symbols,
-  };
-}
-
-// ─── Spin Result ──────────────────────────────────────
-export async function determineSpinResult(seed: string): Promise<SpinResult> {
-  const probs = await getSpinProbs();
-  const roll = seedToNumber(seed + "-spin");
+export async function determineDailyWheelResult(seed: string): Promise<DailyWheelResult> {
+  const probs = await getDailyWheelProbs();
+  const roll = seedToNumber(seed + "-wheel");
 
   let cumulative = 0;
   let winnerIndex = 0;
@@ -153,12 +230,12 @@ export async function determineSpinResult(seed: string): Promise<SpinResult> {
     type: winner.type,
     label: winner.label,
     crcValue: winner.crcValue,
-    xpValue: winner.xpValue,
+    fragmentsValue: winner.fragmentsValue,
     segmentIndex: winnerIndex,
+    color: winner.color,
   };
 }
 
-// ─── Jackpot Info ─────────────────────────────────────
 export async function getJackpotInfo(): Promise<{
   total: number;
   threshold: number;
@@ -180,7 +257,6 @@ export async function getJackpotInfo(): Promise<{
   return { total, threshold, contributors, percentage };
 }
 
-// ─── Safe Balance Check ───────────────────────────────
 const MIN_SAFE_BALANCE_CRC = 500;
 
 export async function isSafeBalanceSafe(): Promise<boolean> {
@@ -189,11 +265,10 @@ export async function isSafeBalanceSafe(): Promise<boolean> {
     const balanceCrc = Number(ethers.formatEther(balance.erc1155));
     return balanceCrc >= MIN_SAFE_BALANCE_CRC;
   } catch {
-    return true; // Assume safe if check fails
+    return true;
   }
 }
 
-// ─── Today string ─────────────────────────────────────
 export function todayString(): string {
   return new Date().toISOString().slice(0, 10);
 }

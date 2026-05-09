@@ -1,17 +1,26 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { payGameFromXp } from "@/lib/wallet-xp";
+import { payGameFromFragments } from "@/lib/wallet-fragments";
+import { isRealStakesEnabled } from "@/lib/stakes";
 import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/lottery/start-free
- * Equivalent XP du flow CRC — creation d'une partie chance.
- * Reutilise le dispatcher existant (assignMultiPlayer / createChanceRound) via payGameFromXp.
+ * Equivalent Fragments du flow CRC - creation d'une partie chance.
+ * Reutilise le dispatcher existant (assignMultiPlayer / createChanceRound) via payGameFromFragments.
  */
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "lottery-start-free", 20, 60000);
   if (limited) return limited;
+
+  const gameKey = "lottery";
+  if (await isRealStakesEnabled(gameKey)) {
+    return NextResponse.json(
+      { error: "USE_PAID_PATH", message: "Real-stakes mode is active for this game. Use the paid flow." },
+      { status: 403 },
+    );
+  }
 
   const addressOr401 = await requireAuthenticatedAddress(req);
   if (addressOr401 instanceof NextResponse) return addressOr401;
@@ -24,8 +33,6 @@ export async function POST(req: NextRequest) {
     if (!slug || !playerToken || typeof amount !== "number") {
       return NextResponse.json({ error: "missing_fields" }, { status: 400 });
     }
-
-    const gameKey = "lottery";
     const extras = {
       ballValue: typeof ballValue === "number" ? ballValue : undefined,
       mineCount: typeof mineCount === "number" ? mineCount : undefined,
@@ -33,7 +40,7 @@ export async function POST(req: NextRequest) {
       choice: choice === "heads" || choice === "tails" ? choice : undefined,
     };
 
-    const result = await payGameFromXp({
+    const result = await payGameFromFragments({
       gameKey,
       slug: String(slug),
       address,

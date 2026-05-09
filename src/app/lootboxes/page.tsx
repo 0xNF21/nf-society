@@ -6,7 +6,7 @@ import LootboxesClient from "./client";
 
 export const metadata: Metadata = {
   title: "NF Society — Lootboxes",
-  description: "Ouvre des lootboxes en mode Arcade XP sur NF Society.",
+  description: "Ouvre des lootboxes en mode Arcade Fragments sur NF Society.",
 };
 
 export const dynamic = "force-dynamic";

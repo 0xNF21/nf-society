@@ -433,27 +433,38 @@ function RealBlackjackGame({ table }: { table: BlackjackTable }) {
   const scanForHand = useCallback(async () => {
     setScanning(true);
     try {
-      const res = await fetch(`/api/blackjack-scan?tableSlug=${table.slug}&token=${tokenRef.current}`, { method: "POST" });
-      const data = await res.json();
+      const data = stake.realStakesEnabled
+        ? await (await fetch(`/api/blackjack-scan?tableSlug=${table.slug}&token=${tokenRef.current}`, { method: "POST" })).json()
+        : { results: [{}] };
       if (data.results && data.results.length > 0) {
-        const newest = data.results[data.results.length - 1];
-        // Skip if this is the hand we just finished (prevents ghost reappearance)
-        if (newest.id !== lastFinishedHandRef.current) {
-          setHandId(newest.id);
+        if (!stake.realStakesEnabled) {
+          const activeRes = await fetch(`/api/blackjack/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
+          const activeData = await activeRes.json();
+          if (activeData.hand) {
+            setWatchingPayment(false);
+            setHandId(activeData.hand.id);
+            setHand(activeData.hand);
+          }
+        } else {
+          const newest = data.results[data.results.length - 1];
+          // Skip if this is the hand we just finished (prevents ghost reappearance)
+          if (newest.id !== lastFinishedHandRef.current) {
+            setHandId(newest.id);
+          }
         }
       }
     } catch {}
     setScanning(false);
-  }, [table.slug, tokenRef]);
+  }, [stake.realStakesEnabled, table.slug, tokenRef]);
 
   // Poll scan for initial payment detection
   // Fast poll (5s) when actively watching, slow poll (15s) as fallback
   useEffect(() => {
-    if (handId || restoring) return;
+    if (!stake.realStakesEnabled || handId || restoring) return;
     const ms = watchingPayment ? 5000 : 15000;
     const interval = setInterval(scanForHand, ms);
     return () => clearInterval(interval);
-  }, [handId, restoring, watchingPayment, scanForHand]);
+  }, [stake.realStakesEnabled, handId, restoring, watchingPayment, scanForHand]);
 
 
   // Fetch hand state when handId changes

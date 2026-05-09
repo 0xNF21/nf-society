@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { lotteries } from "@/lib/db/schema";
 import { eq, ne } from "drizzle-orm";
 import { isEthereumAddress } from "@/lib/validation";
+import { hasAdminPassword, isAdminPasswordValid } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -31,12 +32,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { password, title, organizer, recipientAddress, description, ticketPriceCrc, primaryColor, accentColor, logoUrl, theme, commissionPercent } = body;
 
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!adminPassword) {
+    if (!hasAdminPassword()) {
       return NextResponse.json({ error: "Admin password not configured" }, { status: 500 });
     }
 
-    if (password !== adminPassword) {
+    if (!isAdminPasswordValid(password)) {
       return NextResponse.json({ error: "Invalid password" }, { status: 401 });
     }
 

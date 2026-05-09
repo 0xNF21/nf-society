@@ -539,12 +539,14 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   const scanNow = useCallback(async () => {
     setScanning(true);
     try {
-      await fetch(`/api/lootbox-scan?lootboxId=${lootbox.id}`, { method: "POST", cache: "no-store" });
+      if (stake.realStakesEnabled) {
+        await fetch(`/api/lootbox-scan?lootboxId=${lootbox.id}`, { method: "POST", cache: "no-store" });
+      }
       await fetchOpens();
     } catch {} finally {
       setScanning(false);
     }
-  }, [lootbox.id, fetchOpens]);
+  }, [stake.realStakesEnabled, lootbox.id, fetchOpens]);
 
   const dataValue = useMemo(
     () => encodeGameData({ game: "lootbox", id: lootbox.slug, v: 1, t: tokenRef.current || undefined }),
@@ -557,7 +559,7 @@ export default function LootboxPageClient({ lootbox }: { lootbox: LootboxData })
   );
 
   const { status: paymentStatus } = usePaymentWatcher({
-    enabled: watchingPayment && lootbox.status === "active",
+    enabled: stake.realStakesEnabled && watchingPayment && lootbox.status === "active",
     dataValue,
     minAmountCRC: lootbox.pricePerOpenCrc,
     recipientAddress: lootbox.recipientAddress,

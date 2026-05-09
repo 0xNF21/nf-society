@@ -21,10 +21,18 @@ export const DEFAULT_LEVELS = [
 export const DEFAULT_XP_REWARDS: Record<string, number> = {
   lootbox_open: 10, lootbox_rare: 10, lootbox_mega: 25, lootbox_legendary: 50, lootbox_jackpot: 100,
   morpion_win: 15, morpion_lose: 5, memory_win: 15, memory_lose: 5,
-  daily_checkin: 3, daily_scratch: 5, daily_spin: 5, streak_7days: 50,
   dames_win: 20, dames_lose: 5, relics_win: 20, relics_lose: 5,
   pfc_win: 15, pfc_lose: 5,
   races_1st: 25, races_2nd: 12, races_3rd: 6, races_participated: 3,
+  roulette_play: 2, roulette_win: 10,
+  dice_play: 2, dice_win: 10,
+  hilo_play: 2, hilo_win: 10,
+  plinko_play: 2, plinko_win: 10,
+  mines_play: 2, mines_win: 10,
+  keno_play: 2, keno_win: 10,
+  blackjack_play: 2, blackjack_win: 10,
+  coin_flip_play: 2, coin_flip_win: 10,
+  crash_dash_play: 2, crash_dash_win: 10,
 };
 
 // Server-side: use loadXpConfig() and invalidateXpCache() from xp-server.ts
@@ -53,22 +61,50 @@ export function getLevelName(level: number, levels = DEFAULT_LEVELS): string {
 }
 
 export function xpToNextLevel(xp: number, levels = DEFAULT_LEVELS): number {
-  const currentLevel = computeLevel(xp, levels);
-  const next = levels.find(l => l.level === currentLevel + 1);
-  if (!next) return 0;
-  return next.xpRequired - xp;
+  const progress = getLevelProgress(xp, levels);
+  if (progress.nextLevelXp === null) return 0;
+  return Math.max(0, progress.nextLevelXp - xp);
+}
+
+export function getLevelProgress(xp: number, levels = DEFAULT_LEVELS): {
+  currentLevelXp: number;
+  nextLevel: number | null;
+  nextLevelXp: number | null;
+  progressPct: number;
+  isMaxLevel: boolean;
+} {
+  const orderedLevels = [...levels].sort((a, b) => a.level - b.level);
+  const currentLevel = computeLevel(xp, orderedLevels);
+  const currentIndex = orderedLevels.findIndex((entry) => entry.level === currentLevel);
+  const current = currentIndex >= 0 ? orderedLevels[currentIndex] : orderedLevels[0];
+  const next = currentIndex >= 0 ? orderedLevels[currentIndex + 1] ?? null : null;
+  const currentLevelXp = current?.xpRequired ?? 0;
+
+  if (!next) {
+    return {
+      currentLevelXp,
+      nextLevel: null,
+      nextLevelXp: null,
+      progressPct: 100,
+      isMaxLevel: true,
+    };
+  }
+
+  const span = next.xpRequired - currentLevelXp;
+  const rawProgress = span <= 0 ? 100 : ((xp - currentLevelXp) / span) * 100;
+  const progressPct = Math.max(0, Math.min(100, Math.round(rawProgress)));
+
+  return {
+    currentLevelXp,
+    nextLevel: next.level,
+    nextLevelXp: next.xpRequired,
+    progressPct,
+    isMaxLevel: false,
+  };
 }
 
 export function getXpForAction(action: string, rewards = DEFAULT_XP_REWARDS): number {
   return rewards[action] ?? 0;
-}
-
-export function getAvailableXp(xp: number, xpSpent: number): number {
-  return xp - xpSpent;
-}
-
-export function canAfford(xp: number, xpSpent: number, itemCost: number): boolean {
-  return getAvailableXp(xp, xpSpent) >= itemCost;
 }
 
 export function getLootboxXpAction(rewardCrc: number, priceCrc: number): string | null {

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLocale } from "@/components/language-provider";
 import { translations } from "@/lib/i18n";
-import { crcToXp } from "@/lib/stakes-utils";
+import { crcToFragments } from "@/lib/fragments";
 
 export type FreePlayStartProps = {
   /** Clef du jeu (matche la route `POST /api/{gameKey}/start-free`). */
@@ -19,7 +19,7 @@ export type FreePlayStartProps = {
   playerToken: string;
   /**
    * Montant de la mise, exprime en CRC (valeur stockee en DB dans `bet_crc`).
-   * Le composant applique `crcToXp` (x10) pour l'affichage cote UI.
+   * Le composant applique `crcToFragments` (x10) pour l'affichage cote UI.
    */
   betCrc: number;
   /**
@@ -29,7 +29,7 @@ export type FreePlayStartProps = {
    */
   alreadyJoined?: boolean;
   /** Appele apres demarrage reussi de la partie. Le parent doit rafraichir le game state. */
-  onStarted: (result: { xpAfter: number }) => void;
+  onStarted: (result: { fragmentsAfter: number; [key: string]: unknown }) => void;
   /** Optionnel : route cote serveur (par defaut `/api/{gameKey}/start-free`). */
   endpoint?: string;
   /** Optionnel : payload additionnel envoye au endpoint (ex: extras pour chance). */
@@ -59,7 +59,7 @@ export function FreePlayStart({
   const { locale } = useLocale();
   const t = translations.freePlayStart;
 
-  const betXp = useMemo(() => crcToXp(betCrc), [betCrc]);
+  const betFragments = useMemo(() => crcToFragments(betCrc), [betCrc]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -90,7 +90,7 @@ export function FreePlayStart({
       if (!res.ok || !data?.ok) {
         const key = data?.error as string | undefined;
         const msgMap: Record<string, string> = {
-          insufficient_xp: t.errInsufficientXp[locale],
+          insufficient_fragments: t.errInsufficientFragments[locale],
           already_full: t.errAlreadyFull[locale],
           already_joined: t.errAlreadyJoined[locale],
           wrong_bet: t.errWrongBet[locale],
@@ -100,7 +100,10 @@ export function FreePlayStart({
         setError(msgMap[key ?? ""] ?? t.errGeneric[locale]);
         return;
       }
-      onStarted({ xpAfter: typeof data.xpAfter === "number" ? data.xpAfter : 0 });
+      onStarted({
+        ...data,
+        fragmentsAfter: typeof data.fragmentsAfter === "number" ? data.fragmentsAfter : 0,
+      });
     } catch {
       setError(t.errGeneric[locale]);
     } finally {
@@ -133,8 +136,8 @@ export function FreePlayStart({
             </div>
             <div className="font-display text-2xl font-bold text-ink dark:text-white">
               {t.betLabel[locale]} :{" "}
-              <span className="tabular-nums">{betXp.toLocaleString(locale === "fr" ? "fr-FR" : "en-US")}</span>{" "}
-              XP
+              <span className="tabular-nums">{betFragments.toLocaleString(locale === "fr" ? "fr-FR" : "en-US")}</span>{" "}
+              Fragments
             </div>
           </div>
           {slotCount && (
@@ -191,7 +194,7 @@ export function FreePlayStart({
               ) : (
                 <>
                   <Sparkles className="h-5 w-5 mr-2" />
-                  {isChance ? t.playBtn[locale] : t.joinBtn[locale]} ({betXp.toLocaleString(locale === "fr" ? "fr-FR" : "en-US")} XP)
+                  {isChance ? t.playBtn[locale] : t.joinBtn[locale]} ({betFragments.toLocaleString(locale === "fr" ? "fr-FR" : "en-US")} Fragments)
                 </>
               )}
             </Button>

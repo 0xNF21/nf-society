@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { getLedger } from "@/lib/wallet";
+import { getAuthenticatedAddress } from "@/lib/auth/session";
 import {
   hiloRounds,
   blackjackHands,
@@ -16,6 +17,9 @@ import {
   lootboxes,
   lootboxOpens,
   dailySessions,
+  gameFragmentEvents,
+  shopItems,
+  shopPurchases,
   morpionGames,
   memoryGames,
   relicsGames,
@@ -24,13 +28,16 @@ import {
   crcRacesGames,
   payouts,
 } from "@/lib/db/schema";
-import { sql, eq, and, inArray } from "drizzle-orm";
+import { sql, eq, and, inArray, desc } from "drizzle-orm";
+import { parseDailyWheelResult } from "@/lib/daily";
+import { GAME_LABELS } from "@/lib/game-registry";
 
 type ActivityEntry = {
   id: string;
   address: string;
   kind: string;
   amountCrc: number;
+  amountFragments?: number;
   balanceAfter: number | null;
   reason: string | null;
   txHash: string | null;
@@ -82,6 +89,11 @@ function isOnchain(h: string | null | undefined): boolean {
   return typeof h === "string" && h.startsWith("0x");
 }
 
+function gameLabel(gameKey: string | null | undefined): string {
+  if (!gameKey) return "Jeu";
+  return GAME_LABELS[gameKey] || CHANCE_GAMES.find((g) => g.key === gameKey)?.label || gameKey;
+}
+
 export async function GET(req: NextRequest) {
   const limited = await enforceRateLimit(req, "wallet-activity", 30, 60000);
   if (limited) return limited;
@@ -92,6 +104,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "address required" }, { status: 400 });
     }
     const addr = address.toLowerCase();
+    const authenticatedAddress = await getAuthenticatedAddress(req).catch(() => null);
+    if (authenticatedAddress?.toLowerCase() !== addr) {
+      return NextResponse.json(
+        { error: "AUTH_REQUIRED", message: "Wallet activity is only available to the authenticated owner." },
+        { status: 401 },
+      );
+    }
+
     const limitParam = req.nextUrl.searchParams.get("limit");
     const limit = Math.min(Math.max(parseInt(limitParam || "20", 10) || 20, 1), 100);
 
@@ -112,6 +132,121 @@ export async function GET(req: NextRequest) {
         gameSlug: row.gameSlug || null,
         createdAt: toIso(row.createdAt),
         onchainTxHash: row.onchainTxHash || null,
+      });
+    }
+
+    // 1b. Fragments ledger - actual balance movements in F2P mode.
+    // `loss` events are stats-only: the debit is already represented by `bet`.
+    const fragmentRows = await db
+      .select({
+        id: gameFragmentEvents.id,
+        gameKey: gameFragmentEvents.gameKey,
+        gameSlug: gameFragmentEvents.gameSlug,
+        eventType: gameFragmentEvents.eventType,
+        amountFragments: gameFragmentEvents.amountFragments,
+        createdAt: gameFragmentEvents.createdAt,
+      })
+      .from(gameFragmentEvents)
+      .where(
+        and(
+          sql`LOWER(${gameFragmentEvents.playerAddress}) = ${addr}`,
+          inArray(gameFragmentEvents.eventType, ["bet", "win"]),
+        ),
+      )
+      .orderBy(desc(gameFragmentEvents.createdAt))
+      .limit(100);
+
+    for (const row of fragmentRows) {
+      const amount = Number(row.amountFragments || 0);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      const isBet = row.eventType === "bet";
+      const label = gameLabel(row.gameKey);
+      entries.push({
+        id: `fragments:${row.id}`,
+        address: addr,
+        kind: isBet ? "fragments-bet" : "fragments-win",
+        amountCrc: 0,
+        amountFragments: isBet ? -amount : amount,
+        balanceAfter: null,
+        reason: `${label}${row.gameSlug ? ` ${row.gameSlug}` : ""} - ${isBet ? "mise" : "gain"}`,
+        txHash: null,
+        gameType: row.gameKey,
+        gameSlug: row.gameSlug,
+        createdAt: toIso(row.createdAt),
+        onchainTxHash: null,
+      });
+    }
+
+    // 1c. Daily Fragments are credited directly from daily_sessions.
+    const dailyRewardRows = await db
+      .select({
+        id: dailySessions.id,
+        date: dailySessions.date,
+        spinResult: dailySessions.spinResult,
+        createdAt: dailySessions.createdAt,
+      })
+      .from(dailySessions)
+      .where(
+        and(
+          sql`LOWER(${dailySessions.address}) = ${addr}`,
+          eq(dailySessions.spinPlayed, true),
+          sql`${dailySessions.spinResult} IS NOT NULL`,
+        ),
+      )
+      .orderBy(desc(dailySessions.createdAt))
+      .limit(100);
+
+    for (const session of dailyRewardRows) {
+      const result = parseDailyWheelResult(session.spinResult);
+      const fragmentsValue = Math.floor(Number(result?.fragmentsValue || 0));
+      if (fragmentsValue <= 0) continue;
+      entries.push({
+        id: `daily-fragments:${session.id}`,
+        address: addr,
+        kind: "daily-fragments",
+        amountCrc: 0,
+        amountFragments: fragmentsValue,
+        balanceAfter: null,
+        reason: `Daily - ${result?.label || `+${fragmentsValue} Fragments`}`,
+        txHash: null,
+        gameType: "daily",
+        gameSlug: session.date,
+        createdAt: toIso(session.createdAt),
+        onchainTxHash: null,
+      });
+    }
+
+    // 1d. Boutique purchases spend Fragments but are stored in shop_purchases.
+    const shopRows = await db
+      .select({
+        id: shopPurchases.id,
+        itemSlug: shopPurchases.itemSlug,
+        fragmentsSpent: shopPurchases.fragmentsSpent,
+        createdAt: shopPurchases.createdAt,
+        itemName: shopItems.name,
+      })
+      .from(shopPurchases)
+      .leftJoin(shopItems, eq(shopPurchases.itemSlug, shopItems.slug))
+      .where(sql`LOWER(${shopPurchases.address}) = ${addr}`)
+      .orderBy(desc(shopPurchases.createdAt))
+      .limit(100);
+
+    for (const row of shopRows) {
+      const amount = Number(row.fragmentsSpent || 0);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      entries.push({
+        id: `shop:${row.id}`,
+        address: addr,
+        kind: "shop-purchase",
+        amountCrc: 0,
+        amountFragments: -amount,
+        balanceAfter: null,
+        reason: `Boutique - ${row.itemName || row.itemSlug}`,
+        txHash: null,
+        gameType: "shop",
+        gameSlug: row.itemSlug,
+        createdAt: toIso(row.createdAt),
+        onchainTxHash: null,
       });
     }
 
@@ -341,6 +476,40 @@ export async function GET(req: NextRequest) {
         gameSlug: p.gameId,
         createdAt: toIso(p.createdAt),
         onchainTxHash: p.transferTxHash || null,
+      });
+    }
+
+    // 5b. Daily CRC rewards paid on-chain.
+    const dailyPayoutRows = await db
+      .select({
+        id: payouts.id,
+        gameId: payouts.gameId,
+        amountCrc: payouts.amountCrc,
+        transferTxHash: payouts.transferTxHash,
+        reason: payouts.reason,
+        createdAt: payouts.createdAt,
+      })
+      .from(payouts)
+      .where(
+        and(
+          sql`LOWER(${payouts.recipientAddress}) = ${addr}`,
+          eq(payouts.status, "success"),
+          eq(payouts.gameType, "daily-wheel"),
+        ),
+      );
+    for (const p of dailyPayoutRows) {
+      entries.push({
+        id: `daily-payout:${p.id}`,
+        address: addr,
+        kind: "daily-prize",
+        amountCrc: Number(p.amountCrc),
+        balanceAfter: null,
+        reason: p.reason || "Daily - gain CRC",
+        txHash: p.transferTxHash || null,
+        gameType: "daily",
+        gameSlug: p.gameId,
+        createdAt: toIso(p.createdAt),
+        onchainTxHash: isOnchain(p.transferTxHash) ? p.transferTxHash : null,
       });
     }
 

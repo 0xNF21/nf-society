@@ -3,124 +3,118 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { dailySessions, players } from "@/lib/db/schema";
-import { eq, and, isNull, desc, isNotNull } from "drizzle-orm";
-import { generateDailyToken, todayString } from "@/lib/daily";
-import { awardPlayerXp } from "@/lib/xp-server";
+import { and, eq, sql } from "drizzle-orm";
+import { allowDailyRepeatTests, generateDailyToken, parseDailyWheelResult, todayString } from "@/lib/daily";
+import { requireAuthenticatedAddress } from "@/lib/auth/session";
+import { checkAndAwardBadges } from "@/lib/badges";
+
+function sessionPayload(session: typeof dailySessions.$inferSelect) {
+  return {
+    id: session.id,
+    token: session.token,
+    address: session.address,
+    wheelPlayed: session.spinPlayed,
+    wheelResult: parseDailyWheelResult(session.spinResult),
+  };
+}
 
 /**
- * POST /api/daily/claim-from-balance  { address }
+ * POST /api/daily/claim-from-balance
  *
- * Balance-mode equivalent of the on-chain daily flow. The on-chain version
- * charges 1 CRC and immediately refunds 1 CRC (net 0 — the 1 CRC was only
- * used to prove the sender's wallet). A user with any prepaid balance has
- * already proven their wallet at topup time, so we skip the CRC dance
- * entirely and just confirm today's session for this address.
- *
- * Required:
- *   - body.address: the connected player (Mini App walletAddress or
- *     standalone saved profile). Must have a players row with
- *     balance_crc > 0 — this is our rough identity check. The standalone
- *     footgun (saved profile != actual wallet) is the same as elsewhere
- *     and will be tightened in Phase 3d via payment-proof.
- *
- * Side effects: sets dailySessions.address, awards daily_checkin XP.
- * No CRC movement (balance unchanged, no ledger row).
+ * Legacy balance-mode daily flow. Identity comes from the authenticated session.
  */
 export async function POST(req: NextRequest) {
-  const limited = await enforceRateLimit(req, "daily-claim", 5, 60000);
+  const limited = await enforceRateLimit(req, "daily-claim", 60, 60000);
   if (limited) return limited;
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const addressRaw = body?.address ? String(body.address) : "";
-    const addr = addressRaw.trim().toLowerCase();
-    if (!addr || !/^0x[a-f0-9]{40}$/.test(addr)) {
-      return NextResponse.json({ error: "invalid_address" }, { status: 400 });
-    }
+    const addressOr401 = await requireAuthenticatedAddress(req);
+    if (addressOr401 instanceof NextResponse) return addressOr401;
+    const addr = addressOr401.toLowerCase();
 
-    // Require balance > 0 as a minimum identity proof (user topped up = they
-    // controlled the wallet that did the on-chain topup).
-    const [player] = await db
-      .select({ balance: players.balanceCrc })
-      .from(players)
-      .where(eq(players.address, addr))
-      .limit(1);
-    if (!player || player.balance <= 0) {
+    const date = todayString();
+    const allowRepeat = allowDailyRepeatTests();
+    const claimed = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`daily-claim:${addr}:${date}`})::bigint)`);
+
+      const [player] = await tx
+        .select({ balance: players.balanceCrc })
+        .from(players)
+        .where(eq(players.address, addr))
+        .limit(1);
+      if (!player || player.balance <= 0) {
+        return null;
+      }
+
+      const [existing] = await tx
+        .select()
+        .from(dailySessions)
+        .where(and(
+          eq(dailySessions.address, addr),
+          eq(dailySessions.date, date),
+          sql`${dailySessions.txHash} IS NOT NULL`,
+        ))
+        .orderBy(dailySessions.id)
+        .limit(1);
+
+      if (existing && !allowRepeat) {
+        return { session: existing, alreadyClaimed: true };
+      }
+
+      const token = generateDailyToken();
+      const [session] = await tx
+        .insert(dailySessions)
+        .values({ token, date, address: addr })
+        .returning();
+
+      await tx
+        .update(dailySessions)
+        .set({ txHash: `balance:${session.id}:daily` })
+        .where(eq(dailySessions.id, session.id));
+
+      await tx.execute(sql`
+        INSERT INTO ${players} (address, xp, fragments_balance, fragments_spent, level, streak, last_seen, last_daily_checkin_at, created_at)
+        VALUES (${addr}, 0, 0, 0, 1, 1, NOW(), ${date}::date, NOW())
+        ON CONFLICT (address) DO UPDATE
+        SET streak = CASE
+              WHEN players.last_daily_checkin_at IS NULL THEN 1
+              WHEN players.last_daily_checkin_at::date = ${date}::date THEN players.streak
+              WHEN players.last_daily_checkin_at::date = (${date}::date - INTERVAL '1 day')::date THEN players.streak + 1
+              ELSE 1
+            END,
+            last_daily_checkin_at = CASE
+              WHEN players.last_daily_checkin_at::date = ${date}::date THEN players.last_daily_checkin_at
+              ELSE ${date}::date
+            END,
+            last_seen = NOW()
+      `);
+
+      return {
+        session: {
+          ...session,
+          txHash: `balance:${session.id}:daily`,
+        },
+        alreadyClaimed: false,
+      };
+    });
+
+    if (!claimed) {
       return NextResponse.json({ error: "no_balance" }, { status: 403 });
     }
 
-    const date = todayString();
-
-    // Already claimed today?
-    const [already] = await db
-      .select()
-      .from(dailySessions)
-      .where(and(eq(dailySessions.date, date), eq(dailySessions.address, addr)))
-      .limit(1);
-    if (already) {
-      return NextResponse.json({
-        ok: true,
-        token: already.token,
-        alreadyClaimed: true,
-        session: {
-          id: already.id,
-          scratchPlayed: already.scratchPlayed,
-          scratchResult: already.scratchResult,
-          spinPlayed: already.spinPlayed,
-          spinResult: already.spinResult,
-        },
-      });
-    }
-
-    // Reuse a pending (unconfirmed) session from today, or create one.
-    const [pending] = await db
-      .select()
-      .from(dailySessions)
-      .where(and(eq(dailySessions.date, date), isNull(dailySessions.address)))
-      .orderBy(desc(dailySessions.id))
-      .limit(1);
-
-    let sessionId: number;
-    let token: string;
-    if (pending) {
-      // Atomically claim it for this address only if still unconfirmed.
-      const updated = await db
-        .update(dailySessions)
-        .set({ address: addr, txHash: `balance:${pending.id}` })
-        .where(and(eq(dailySessions.id, pending.id), isNull(dailySessions.address)))
-        .returning({ id: dailySessions.id, token: dailySessions.token });
-      if (updated.length === 0) {
-        // Someone else grabbed it between SELECT and UPDATE — bail and retry
-        // on the next user click (this path is extremely rare).
-        return NextResponse.json({ error: "race_try_again" }, { status: 409 });
+    if (!claimed.alreadyClaimed) {
+      try {
+        await checkAndAwardBadges(addr, "daily_checkin", { hour: new Date().getHours() });
+      } catch (badgeErr) {
+        console.error("[Daily] claim-from-balance badge check error:", badgeErr);
       }
-      sessionId = updated[0].id;
-      token = updated[0].token;
-    } else {
-      token = generateDailyToken();
-      const [inserted] = await db
-        .insert(dailySessions)
-        .values({ token, date, address: addr })
-        .returning({ id: dailySessions.id });
-      sessionId = inserted.id;
-      // Fill txHash now that we have the id (synthetic, no CRC).
-      await db
-        .update(dailySessions)
-        .set({ txHash: `balance:${sessionId}` })
-        .where(eq(dailySessions.id, sessionId));
-    }
-
-    // Award XP — fire-and-forget. The previous try/await/catch still
-    // blocked on the fetch; void+.catch is the real non-blocking pattern.
-    {
-      void awardPlayerXp({ address: addr, action: "daily_checkin" }).catch(() => {});
     }
 
     return NextResponse.json({
       ok: true,
-      token,
-      alreadyClaimed: false,
-      session: { id: sessionId },
+      token: claimed.session.token,
+      alreadyClaimed: claimed.alreadyClaimed,
+      session: sessionPayload(claimed.session),
     });
   } catch (error: any) {
     console.error("[Daily] claim-from-balance error:", error?.message);

@@ -2,9 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dailySessions } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
-import { todayString } from "@/lib/daily";
-import { generateGamePaymentLink } from "@/lib/circles";
+import { parseDailyWheelResult } from "@/lib/daily";
+import { eq } from "drizzle-orm";
 
 const SESSION_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
@@ -13,10 +12,8 @@ function confirmedResponse(s: typeof dailySessions.$inferSelect) {
     status: "confirmed",
     token: s.token,
     address: s.address,
-    scratchPlayed: s.scratchPlayed,
-    spinPlayed: s.spinPlayed,
-    scratchResult: s.scratchResult ? JSON.parse(s.scratchResult) : null,
-    spinResult: s.spinResult ? JSON.parse(s.spinResult) : null,
+    wheelPlayed: s.spinPlayed,
+    wheelResult: parseDailyWheelResult(s.spinResult),
   });
 }
 
@@ -48,37 +45,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "expired" });
     }
 
-    // Check if THIS user already has a confirmed session today
-    const address = req.nextUrl.searchParams.get("address");
-    if (address) {
-      const today = todayString();
-      const [existingConfirmed] = await db
-        .select()
-        .from(dailySessions)
-        .where(and(
-          eq(dailySessions.date, today),
-          eq(dailySessions.address, address.toLowerCase()),
-        ))
-        .limit(1);
-
-      if (existingConfirmed) {
-        await db.update(dailySessions).set({
-          address: existingConfirmed.address,
-          txHash: existingConfirmed.txHash,
-          scratchPlayed: existingConfirmed.scratchPlayed,
-          scratchResult: existingConfirmed.scratchResult,
-          spinPlayed: existingConfirmed.spinPlayed,
-          spinResult: existingConfirmed.spinResult,
-        }).where(eq(dailySessions.id, session.id));
-
-        return confirmedResponse({ ...session, ...existingConfirmed, id: session.id, token: session.token });
-      }
-    }
-
-    // Return waiting with payment link so frontend can show QR on reload
-    const safeAddress = process.env.SAFE_ADDRESS || "";
-    const paymentLink = generateGamePaymentLink(safeAddress, 1, "daily", session.token);
-    return NextResponse.json({ status: "waiting", paymentLink });
+    // Legacy unpaid daily sessions are no longer payable. The daily flow now
+    // requires an authenticated wallet and uses /api/daily/claim directly.
+    return NextResponse.json({ status: "expired" });
   } catch (error: any) {
     console.error("[Daily Session] Error:", error.message);
     return NextResponse.json({ error: error.message || "Session check failed" }, { status: 500 });

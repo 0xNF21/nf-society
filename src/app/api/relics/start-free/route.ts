@@ -1,14 +1,14 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { payGameFromXp } from "@/lib/wallet-xp";
+import { payGameFromFragments } from "@/lib/wallet-fragments";
 import { isRealStakesEnabled } from "@/lib/stakes";
 import { requireAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/relics/start-free
- * Equivalent XP du flow CRC — assignation a un slot multijoueur.
- * Reutilise le dispatcher existant (assignMultiPlayer / createChanceRound) via payGameFromXp.
+ * Equivalent Fragments du flow CRC - assignation a un slot multijoueur.
+ * Reutilise le dispatcher existant (assignMultiPlayer / createChanceRound) via payGameFromFragments.
  */
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "relics-start-free", 20, 60000);
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       choice: choice === "heads" || choice === "tails" ? choice : undefined,
     };
 
-    const result = await payGameFromXp({
+    const result = await payGameFromFragments({
       gameKey,
       slug: String(slug),
       address,

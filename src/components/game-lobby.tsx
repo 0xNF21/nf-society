@@ -143,7 +143,7 @@ export function GameLobby({
                 <span className="text-sm text-ink/50 leading-none">
                   {stake.realStakesEnabled
                     ? t.crcPerPlayer[locale]
-                    : (locale === "fr" ? "XP par joueur" : "XP per player")}
+                    : (locale === "fr" ? "Fragments par joueur" : "Fragments per player")}
                 </span>
               </div>
             </div>

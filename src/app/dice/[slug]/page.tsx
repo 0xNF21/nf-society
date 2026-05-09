@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!table) return { title: "Dice — NF Society" };
   return {
     title: `${table.title} — NF Society Dice`,
-    description: table.description || "Dice en mode Arcade XP",
+    description: table.description || "Dice en mode Arcade Fragments",
   };
 }
 

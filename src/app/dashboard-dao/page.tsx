@@ -27,7 +27,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocale } from "@/components/language-provider";
 import { translations, localeBcp47 } from "@/lib/i18n";
-import { DaoPoolXpCard } from "@/components/dao-pool-xp-card";
+import { DaoPoolFragmentsCard } from "@/components/dao-pool-fragments-card";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
 
 type DaoData = {
@@ -421,7 +421,7 @@ export default function DashboardDaoPage() {
           <p className="text-ink/50 mt-2">{t.subtitle[locale]}</p>
         </header>
 
-        <DaoPoolXpCard />
+        <DaoPoolFragmentsCard />
 
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">

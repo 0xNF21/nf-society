@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!table) return { title: "Plinko — NF Society" };
   return {
     title: `${table.title} — NF Society Plinko`,
-    description: table.description || "Plinko en mode Arcade XP",
+    description: table.description || "Plinko en mode Arcade Fragments",
   };
 }
 

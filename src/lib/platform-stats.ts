@@ -339,7 +339,7 @@ async function computeDaily30d(): Promise<{ points: DailyVolumePoint[]; chartGam
 
   // Multi : deux queries — claimedPayments (on-chain) + walletLedger (balance-pay).
   // Filtre par claimedKeys (multi + crc-races + lottery) pour exclure les non-jeux
-  // (shop_auth, nf_auth, nf_cashout, daily-*, blackjack-refunded, etc.) et
+  // (nf_auth, nf_cashout, daily-*, blackjack-refunded, etc.) et
   // eviter le double-comptage avec les chance games (ex: "lootbox" ici vs
   // "lootboxes" via chance-registry — ce dernier reste source de verite).
   const claimedKeys = [...ALL_SERVER_GAMES.map((g) => g.key), ...EXTRA_CLAIMED_GAMES];

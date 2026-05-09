@@ -4,25 +4,25 @@
  * Lit deux flags dans `feature_flags` :
  *
  *   real_stakes              (kill switch global)
- *     - 'enabled' → mode CRC reel possible (sauf override par chance_games_xp_only)
- *     - 'hidden'  → tout en F2P XP, sans exception (cashout reste ouvert)
+ *     - 'enabled' → mode CRC reel possible (sauf override par chance_games_fragments_only)
+ *     - 'hidden'  → tout en F2P Fragments, sans exception (cashout reste ouvert)
  *
- *   chance_games_xp_only     (override par categorie)
+ *   chance_games_fragments_only     (override par categorie)
  *     - 'enabled' → comportement nominal, on respecte real_stakes pour tous
  *     - 'hidden'  → les chance games (blackjack, roulette, dice, plinko, mines,
  *                   hilo, keno, crash-dash, coin-flip, lootbox, lottery)
- *                   sont forces en XP meme si real_stakes=enabled. Skill multi
+ *                   sont forces en Fragments meme si real_stakes=enabled. Skill multi
  *                   (morpion, dames, memory, pfc, relics, crc-races) reste CRC.
  *
  * Truth table :
- *   real=enabled  + chance_xp_only=enabled  → all CRC
- *   real=enabled  + chance_xp_only=hidden   → skill CRC, chance XP
- *   real=hidden   + (anything)              → all XP
+ *   real=enabled  + chance_fragments_only=enabled  → all CRC
+ *   real=enabled  + chance_fragments_only=hidden   → skill CRC, chance Fragments
+ *   real=hidden   + (anything)              → all Fragments
  *
  * Exception : le cashout (gameType="cashout") ne passe PAS par ces helpers
  * — les retraits CRC restent toujours possibles, meme en F2P total.
  *
- * Les helpers purs (formatStake, crcToXp, isChanceGameKey, etc.) sont dans
+ * Les helpers purs (formatStake, isChanceGameKey, etc.) sont dans
  * `src/lib/stakes-utils.ts` pour pouvoir etre importes par les composants
  * client sans tirer `pg`/DB.
  */
@@ -33,19 +33,16 @@ import { eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import {
   REAL_STAKES_FLAG_KEY,
-  CHANCE_XP_ONLY_FLAG_KEY,
+  CHANCE_FRAGMENTS_ONLY_FLAG_KEY,
   isChanceGameKey,
 } from "./stakes-utils";
 import { isF2POnlyMode } from "./legal-mode";
 
 export {
   REAL_STAKES_FLAG_KEY,
-  CHANCE_XP_ONLY_FLAG_KEY,
-  CRC_TO_XP_RATIO,
+  CHANCE_FRAGMENTS_ONLY_FLAG_KEY,
   CHANCE_GAME_KEYS,
   isChanceGameKey,
-  crcToXp,
-  xpToCrc,
   formatStake,
   stakeUnit,
 } from "./stakes-utils";
@@ -63,7 +60,7 @@ export class StakesDisabledError extends Error {
  * propage en quelques secondes maximum.
  */
 const CACHE_TTL_MS = 10_000;
-type FlagsSnapshot = { realStakes: boolean; chanceXpOnly: boolean };
+type FlagsSnapshot = { realStakes: boolean; chanceFragmentsOnly: boolean };
 let cached: { value: FlagsSnapshot; expiresAt: number } | null = null;
 
 async function readFlags(): Promise<FlagsSnapshot> {
@@ -74,18 +71,18 @@ async function readFlags(): Promise<FlagsSnapshot> {
     const rows = await db
       .select({ key: featureFlags.key, status: featureFlags.status })
       .from(featureFlags)
-      .where(inArray(featureFlags.key, [REAL_STAKES_FLAG_KEY, CHANCE_XP_ONLY_FLAG_KEY]));
+      .where(inArray(featureFlags.key, [REAL_STAKES_FLAG_KEY, CHANCE_FRAGMENTS_ONLY_FLAG_KEY]));
 
     const map = new Map(rows.map((r) => [r.key, r.status] as const));
     // Defaults fail-closed : flag absent = mode F2P. Pour reactiver le mode
     // CRC il faut explicitement poser real_stakes='enabled' en DB ET
     // LEGAL_MODE='REAL_STAKES_ALLOWED' en env.
     const realStatus = map.get(REAL_STAKES_FLAG_KEY) ?? "hidden";
-    const chanceStatus = map.get(CHANCE_XP_ONLY_FLAG_KEY) ?? "hidden";
+    const chanceStatus = map.get(CHANCE_FRAGMENTS_ONLY_FLAG_KEY) ?? "hidden";
 
     const value: FlagsSnapshot = {
       realStakes: realStatus === "enabled",
-      chanceXpOnly: chanceStatus === "enabled",
+      chanceFragmentsOnly: chanceStatus === "enabled",
     };
     cached = { value, expiresAt: now + CACHE_TTL_MS };
     return value;
@@ -94,7 +91,7 @@ async function readFlags(): Promise<FlagsSnapshot> {
     // retombe en mode F2P. C'est le comportement attendu pour un kill switch
     // legal — un panne d'infrastructure ne doit jamais reactiver les mises CRC.
     console.error("[stakes] readFlags failed; defaulting to F2P", error);
-    return { realStakes: false, chanceXpOnly: true };
+    return { realStakes: false, chanceFragmentsOnly: true };
   }
 }
 
@@ -102,7 +99,7 @@ async function readFlags(): Promise<FlagsSnapshot> {
  * Retourne `true` si les mises/gains reels en CRC sont actifs pour ce jeu.
  *
  * @param gameKey — Si fourni et qu'il s'agit d'un chance game, le flag
- * `chance_games_xp_only` peut forcer XP. Si omis, on ne lit que le flag
+ * `chance_games_fragments_only` peut forcer Fragments. Si omis, on ne lit que le flag
  * global `real_stakes` (utile pour les routes qui ne sont pas liees a un jeu
  * specifique, ex: topup-scan).
  */
@@ -113,7 +110,7 @@ export async function isRealStakesEnabled(gameKey?: string | null): Promise<bool
   if (isF2POnlyMode()) return false;
   const flags = await readFlags();
   if (!flags.realStakes) return false; // global kill switch
-  if (gameKey && isChanceGameKey(gameKey) && !flags.chanceXpOnly) return false;
+  if (gameKey && isChanceGameKey(gameKey) && !flags.chanceFragmentsOnly) return false;
   return true;
 }
 
@@ -150,7 +147,7 @@ export async function respondIfStakesDisabled(
   return NextResponse.json(
     {
       error: "stakes_disabled",
-      message: "Real CRC stakes are disabled. The platform is in Free-to-Play (XP) mode.",
+      message: "Real CRC stakes are disabled. The platform is in Free-to-Play (Fragments) mode.",
     },
     { status: 403 },
   );

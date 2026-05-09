@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import type { SpinResult } from "@/lib/daily-shared";
-import { SPIN_SEGMENTS } from "@/lib/daily-shared";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
+import type { SpinResult, SpinSegment } from "@/lib/daily-shared";
+import { SPIN_SEGMENTS } from "@/lib/daily-shared";
 import { translations } from "@/lib/i18n";
-import { useStakeLabel } from "@/hooks/use-stake-label";
 
 type Props = {
   result: SpinResult | null;
@@ -13,22 +12,19 @@ type Props = {
   onComplete: () => void;
   spinning: boolean;
   locale: "fr" | "en";
+  segments?: SpinSegment[];
 };
 
-const SEGMENT_COUNT = 8;
-const SEGMENT_ANGLE = 360 / SEGMENT_COUNT;
-
-export default function SpinWheel({ result, onSpin, onComplete, spinning, locale }: Props) {
+export default function SpinWheel({ result, onSpin, onComplete, spinning, locale, segments = SPIN_SEGMENTS }: Props) {
   const { theme } = useTheme();
-  const stake = useStakeLabel("daily");
   const isDark = theme === "dark";
   const [rotation, setRotation] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [hasSpun, setHasSpun] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wheelRef = useRef<HTMLDivElement>(null);
+  const segmentCount = Math.max(segments.length, 1);
+  const segmentAngle = 360 / segmentCount;
 
-  // Draw wheel on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -43,11 +39,10 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
 
     ctx.clearRect(0, 0, size, size);
 
-    SPIN_SEGMENTS.forEach((segment, i) => {
-      const startAngle = (i * SEGMENT_ANGLE - 90) * (Math.PI / 180);
-      const endAngle = ((i + 1) * SEGMENT_ANGLE - 90) * (Math.PI / 180);
+    segments.forEach((segment, index) => {
+      const startAngle = (index * segmentAngle - 90) * (Math.PI / 180);
+      const endAngle = ((index + 1) * segmentAngle - 90) * (Math.PI / 180);
 
-      // Draw segment
       ctx.beginPath();
       ctx.moveTo(center, center);
       ctx.arc(center, center, radius, startAngle, endAngle);
@@ -55,12 +50,10 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
       ctx.fillStyle = segment.color;
       ctx.fill();
 
-      // Border
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Label
       const midAngle = (startAngle + endAngle) / 2;
       const labelRadius = radius * 0.65;
       const labelX = center + labelRadius * Math.cos(midAngle);
@@ -75,11 +68,10 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
       ctx.textBaseline = "middle";
       ctx.shadowColor = "rgba(0,0,0,0.5)";
       ctx.shadowBlur = 2;
-      ctx.fillText(stake.t(segment.label).replace(/\bJACKPOT\b/g, "DOTATION"), 0, 0);
+      ctx.fillText(segment.label.replace(/\bJACKPOT\b/g, "DOTATION"), 0, 0);
       ctx.restore();
     });
 
-    // Center circle
     ctx.beginPath();
     ctx.arc(center, center, 20, 0, Math.PI * 2);
     ctx.fillStyle = isDark ? "#f5f5f5" : "#1b1b1f";
@@ -87,24 +79,30 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
     ctx.strokeStyle = isDark ? "#333" : "#ffffff";
     ctx.lineWidth = 3;
     ctx.stroke();
-  }, [isDark, stake]);
+  }, [isDark, segmentAngle, segments]);
 
-  // Trigger spin animation
+  const formatRewardAmount = useCallback((value: number) => (
+    value.toLocaleString(locale === "fr" ? "fr-FR" : "en-US", { maximumFractionDigits: 3 })
+  ), [locale]);
+
+  const resultLabel = useCallback((spinResult: SpinResult) => {
+    if (spinResult.crcValue > 0) return `+${formatRewardAmount(spinResult.crcValue)} CRC`;
+    if (spinResult.fragmentsValue > 0) return `+${spinResult.fragmentsValue} Fragments`;
+    return spinResult.label.replace(/\bJACKPOT\b/g, "DOTATION");
+  }, [formatRewardAmount]);
+
   useEffect(() => {
     if (!spinning || !result) return;
 
+    setShowResult(false);
     setHasSpun(true);
 
-    // Calculate target rotation
-    // Segment 0 is at the top (12 o'clock position)
-    // We want the winning segment to land under the pointer (at top)
-    const targetSegmentCenter = result.segmentIndex * SEGMENT_ANGLE + SEGMENT_ANGLE / 2;
-    const fullSpins = 5 * 360; // 5 full rotations
-    // We rotate clockwise, so subtract the target angle from 360
+    const targetSegmentCenter = result.segmentIndex * segmentAngle + segmentAngle / 2;
+    const fullSpins = 5 * 360;
     const targetRotation = fullSpins + (360 - targetSegmentCenter);
 
-    setRotation(prev => prev + targetRotation);
-  }, [spinning, result]);
+    setRotation((prev) => prev + targetRotation);
+  }, [spinning, result, segmentAngle]);
 
   const handleTransitionEnd = useCallback(() => {
     if (!hasSpun) return;
@@ -116,18 +114,15 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* Pointer */}
       <div className="relative">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-10">
-          <svg width="24" height="28" viewBox="0 0 24 28" fill="none">
-            <path d="M12 28L0 0H24L12 28Z" fill={isDark ? "#f5f5f5" : "#1b1b1f"} stroke={isDark ? "#333" : "#fff"} strokeWidth="1.5"/>
+        <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1">
+          <svg width="24" height="28" viewBox="0 0 24 28" fill="none" aria-hidden="true">
+            <path d="M12 28L0 0H24L12 28Z" fill={isDark ? "#f5f5f5" : "#1b1b1f"} stroke={isDark ? "#333" : "#fff"} strokeWidth="1.5" />
           </svg>
         </div>
 
-        {/* Wheel */}
         <div
-          ref={wheelRef}
-          className="w-[280px] h-[280px] sm:w-[300px] sm:h-[300px] rounded-full overflow-hidden border-4 border-ink/20 shadow-xl"
+          className="h-[280px] w-[280px] overflow-hidden rounded-full border-4 border-ink/20 shadow-xl sm:h-[300px] sm:w-[300px]"
           style={{
             transform: `rotate(${rotation}deg)`,
             transition: spinning
@@ -136,42 +131,33 @@ export default function SpinWheel({ result, onSpin, onComplete, spinning, locale
           }}
           onTransitionEnd={handleTransitionEnd}
         >
-          <canvas
-            ref={canvasRef}
-            className="w-full h-full"
-          />
+          <canvas ref={canvasRef} className="h-full w-full" />
         </div>
       </div>
 
-      {/* Spin button */}
       {!hasSpun && (
         <button
+          type="button"
           onClick={onSpin}
           disabled={spinning}
-          className="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+          className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-3 text-lg font-bold text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:hover:scale-100"
         >
           {translations.daily.spinButton[locale]}
         </button>
       )}
 
-      {/* Result display */}
       {showResult && result && (
-        <div className={`text-center p-4 rounded-xl animate-bounce ${
-          result.crcValue > 0 || result.xpValue > 0
+        <div className={`animate-bounce rounded-xl p-4 text-center ${
+          result.crcValue > 0 || result.fragmentsValue > 0
             ? "bg-amber-100 text-amber-800"
-            : result.type === "jackpot"
-              ? "bg-gradient-to-r from-yellow-200 to-amber-200 text-amber-900"
-              : "bg-ink/5 text-ink/60"
+            : "bg-ink/5 text-ink/60"
         }`}>
-          <p className="text-xl font-bold">{stake.t(result.label).replace(/\bJACKPOT\b/g, "DOTATION")}</p>
+          <p className="text-xl font-bold">{resultLabel(result)}</p>
           {result.crcValue > 0 && (
-            <p className="text-sm mt-1">💰 +{stake.format(result.crcValue)}</p>
+            <p className="mt-1 text-sm">+{formatRewardAmount(result.crcValue)} CRC</p>
           )}
-          {result.xpValue > 0 && (
-            <p className="text-sm mt-1">⭐ +{result.xpValue} XP</p>
-          )}
-          {result.type === "streak_x2" && (
-            <p className="text-sm mt-1">🔥 {translations.daily.doubleXpTomorrow[locale]}</p>
+          {result.fragmentsValue > 0 && (
+            <p className="mt-1 text-sm">+{result.fragmentsValue} Fragments</p>
           )}
         </div>
       )}

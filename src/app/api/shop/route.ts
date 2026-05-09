@@ -3,18 +3,46 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { shopItems, shopPurchases, shopCoupons, players } from "@/lib/db/schema";
 import { eq, and, gt } from "drizzle-orm";
-import { getAvailableXp, computeLevel } from "@/lib/xp";
+import { computeLevel } from "@/lib/xp";
+import { loadXpConfig } from "@/lib/xp-server";
+import { getAuthenticatedAddress } from "@/lib/auth/session";
+
+const HIDDEN_LEGACY_SHOP_SLUGS = new Set(["spin_refund", "spin_week_refund"]);
+const normalizeShopItem = <T extends { category: string; description: string }>(item: T): T =>
+  item.category === "crc" && item.description.includes("XP")
+    ? { ...item, description: item.description.replaceAll("XP", "Fragments") }
+    : item;
 
 export async function GET(req: NextRequest) {
   try {
-    const address = req.nextUrl.searchParams.get("address")?.toLowerCase();
+    const requestedAddress = req.nextUrl.searchParams.get("address")?.toLowerCase() ?? null;
+    const authenticatedAddress = (await getAuthenticatedAddress(req).catch(() => null))?.toLowerCase() ?? null;
+    const { levels } = await loadXpConfig();
 
     // Fetch all active shop items
-    const items = await db
+    const rawItems = await db
       .select()
       .from(shopItems)
       .where(eq(shopItems.active, true));
+    const items = rawItems
+      .filter((item) => !HIDDEN_LEGACY_SHOP_SLUGS.has(item.slug))
+      .map(normalizeShopItem);
 
+    if (requestedAddress && requestedAddress !== authenticatedAddress) {
+      return NextResponse.json(
+        {
+          error: "AUTH_REQUIRED",
+          message: "Shop Fragments balance is only available to the authenticated owner.",
+          items,
+          player: null,
+          fragmentsBalance: 0,
+          level: 1,
+        },
+        { status: 401 },
+      );
+    }
+
+    const address = requestedAddress ?? authenticatedAddress;
     if (!address) {
       return NextResponse.json({ items });
     }
@@ -30,13 +58,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         items,
         player: null,
-        availableXp: 0,
+        fragmentsBalance: 0,
         level: 1,
       });
     }
 
-    const availableXp = getAvailableXp(player.xp, player.xpSpent);
-    const level = computeLevel(player.xp);
+    const fragmentsBalance = player.fragmentsBalance;
+    const level = computeLevel(player.xp, levels);
 
     // Fetch active purchases (for boost status)
     const activePurchases = await db
@@ -73,7 +101,7 @@ export async function GET(req: NextRequest) {
 
     // Build item availability map
     const itemsWithStatus = items.map((item) => {
-      const canBuy = availableXp >= item.xpCost && level >= item.levelRequired;
+      const canBuy = fragmentsBalance >= item.fragmentsCost && level >= item.levelRequired;
       const isOwned = item.category === "cosmetic" && ownedCosmetics.some(p => p.itemSlug === item.slug);
       const activeBoost = activePurchases.find(p => p.itemSlug === item.slug);
       const activeCoupon = activeCoupons.find(c => c.type === item.refundType);
@@ -83,7 +111,7 @@ export async function GET(req: NextRequest) {
       else if (activeBoost) status = "active";
       else if (activeCoupon) status = "coupon_active";
       else if (level < item.levelRequired) status = "level_required";
-      else if (availableXp < item.xpCost) status = "insufficient_xp";
+      else if (fragmentsBalance < item.fragmentsCost) status = "insufficient_fragments";
 
       return {
         ...item,
@@ -97,10 +125,11 @@ export async function GET(req: NextRequest) {
       player: {
         address: player.address,
         xp: player.xp,
-        xpSpent: player.xpSpent,
+        fragmentsBalance,
+        fragmentsSpent: player.fragmentsSpent,
         level,
       },
-      availableXp,
+      fragmentsBalance,
       level,
     });
   } catch (error) {

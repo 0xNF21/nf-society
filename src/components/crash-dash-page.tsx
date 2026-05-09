@@ -689,7 +689,9 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
   const scanForRound = useCallback(async () => {
     setScanning(true);
     try {
-      await fetch(`/api/crash-dash-scan?tableSlug=${table.slug}`, { method: "POST" });
+      if (stake.realStakesEnabled) {
+        await fetch(`/api/crash-dash-scan?tableSlug=${table.slug}`, { method: "POST" });
+      }
       const activeRes = await fetch(`/api/crash-dash/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
       const activeData = await activeRes.json();
       if (activeData.round) {
@@ -698,15 +700,15 @@ function RealCrashDashGame({ table }: { table: CrashDashTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug, tokenRef]);
+  }, [stake.realStakesEnabled, table.slug, tokenRef]);
 
   // Poll scan
   useEffect(() => {
-    if (round || restoring) return;
+    if (!stake.realStakesEnabled || round || restoring) return;
     const ms = watchingPayment ? 5000 : 15000;
     const interval = setInterval(scanForRound, ms);
     return () => clearInterval(interval);
-  }, [round, restoring, watchingPayment, scanForRound]);
+  }, [stake.realStakesEnabled, round, restoring, watchingPayment, scanForRound]);
 
   // Handle harvest (cashout) — send to API
   const handleHarvest = useCallback(async (mult: number) => {

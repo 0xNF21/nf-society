@@ -4,6 +4,7 @@ import { morpionGames, morpionMoves } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { payPrize, payCommission } from "@/lib/wallet";
 import { requireAuthenticatedAddress } from "@/lib/auth/session";
+import { awardMatchResultXp } from "@/lib/xp-server";
 
 const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
@@ -133,6 +134,16 @@ export async function POST(
       winnerAddress,
       updatedAt: new Date(),
     }).where(eq(morpionGames.id, game.id));
+
+    await awardMatchResultXp({
+      playerAddresses: [p1, p2],
+      winnerAddress,
+      winAction: "morpion_win",
+      loseAction: "morpion_lose",
+      sourceType: "morpion",
+      sourceId: `game:${game.id}`,
+      metadata: { slug: game.slug, result },
+    });
 
     // Trigger payout
     const pot = game.betCrc * 2;

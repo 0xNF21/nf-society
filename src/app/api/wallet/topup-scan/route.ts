@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { scanWalletTopups, getBalance } from "@/lib/wallet";
 import { areTopupsEnabled } from "@/lib/legal-mode";
+import { getAuthenticatedAddress } from "@/lib/auth/session";
 
 /**
  * POST /api/wallet/topup-scan { address? }
@@ -37,7 +38,18 @@ export async function POST(req: NextRequest) {
     const address = body?.address ? String(body.address) : undefined;
 
     const summary = await scanWalletTopups();
-    const balanceCrc = address ? await getBalance(address) : undefined;
+    let balanceCrc: number | undefined;
+    if (address) {
+      const addr = address.toLowerCase();
+      const authenticatedAddress = await getAuthenticatedAddress(req).catch(() => null);
+      if (authenticatedAddress?.toLowerCase() !== addr) {
+        return NextResponse.json(
+          { error: "AUTH_REQUIRED", message: "Wallet balance is only available to the authenticated owner." },
+          { status: 401 },
+        );
+      }
+      balanceCrc = await getBalance(addr);
+    }
 
     return NextResponse.json({ ...summary, balanceCrc });
   } catch (error: any) {

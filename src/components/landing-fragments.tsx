@@ -22,7 +22,7 @@ import { useFeatureFlags } from "@/components/feature-flag-provider";
 import { translations } from "@/lib/i18n";
 import { GAME_REGISTRY, CHANCE_REGISTRY } from "@/lib/game-registry";
 import { useCountUp } from "@/hooks/use-count-up";
-import { CRC_TO_XP_RATIO } from "@/lib/stakes-utils";
+import { CRC_TO_FRAGMENTS_RATIO } from "@/lib/fragments";
 import LandingHeroMockup from "@/components/landing-hero-mockup";
 
 const MULTI_EMOJI: Record<string, string> = {
@@ -40,7 +40,7 @@ const MULTI_LABEL: Record<string, { fr: string; en: string }> = {
   relics: { fr: "Relics", en: "Relics" },
   dames: { fr: "Dames", en: "Checkers" },
   pfc: { fr: "Pierre-Feuille-Ciseaux", en: "Rock-Paper-Scissors" },
-  "crc-races": { fr: "Courses XP", en: "XP Races" },
+  "crc-races": { fr: "Courses Fragments", en: "Fragment Races" },
 };
 
 const CHANCE_LABEL: Record<string, { fr: string; en: string }> = {
@@ -77,7 +77,7 @@ type PlatformStatsLite = {
   allTime: { rounds: number; players: number; wagered: number; paidOut: number };
 };
 
-export default function LandingXp() {
+export default function LandingFragments() {
   const { locale } = useLocale();
   const { enterDemo } = useDemo();
   const { isVisible } = useFeatureFlags();
@@ -126,8 +126,8 @@ export default function LandingXp() {
   const multiGames = Object.values(GAME_REGISTRY).filter((g) => isVisible(g.featureFlag));
   const chanceGames = Object.values(CHANCE_REGISTRY).filter((g) => isVisible(g.featureFlag));
 
-  const wageredXp = stats ? Math.round(stats.allTime.wagered * CRC_TO_XP_RATIO) : null;
-  const paidOutXp = stats ? Math.round(stats.allTime.paidOut * CRC_TO_XP_RATIO) : null;
+  const wageredFragments = stats ? Math.round(stats.allTime.wagered * CRC_TO_FRAGMENTS_RATIO) : null;
+  const paidOutFragments = stats ? Math.round(stats.allTime.paidOut * CRC_TO_FRAGMENTS_RATIO) : null;
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -177,7 +177,7 @@ export default function LandingXp() {
             </div>
           </div>
           <div className="mt-16 sm:mt-20">
-            <LandingHeroMockup winLabel={locale === "fr" ? "Gain : +90 XP" : "Win: +90 XP"} />
+            <LandingHeroMockup winLabel={locale === "fr" ? "Gain : +90 Fragments" : "Win: +90 Fragments"} />
           </div>
         </div>
       </section>
@@ -202,7 +202,7 @@ export default function LandingXp() {
           />
           <StatCard
             icon={<Zap className="h-5 w-5" />}
-            target={wageredXp}
+            target={wageredFragments}
             label={t.statsWagered[locale]}
             loading={t.statsLoading[locale]}
             locale={locale}
@@ -210,7 +210,7 @@ export default function LandingXp() {
           />
           <StatCard
             icon={<Trophy className="h-5 w-5" />}
-            target={paidOutXp}
+            target={paidOutFragments}
             label={t.statsPaidOut[locale]}
             loading={t.statsLoading[locale]}
             locale={locale}
@@ -371,7 +371,7 @@ export default function LandingXp() {
                 {t.footerDocs[locale]}
               </Link>
               <Link href="/dashboard" className="text-marine font-semibold hover:underline transition-colors">
-                {translations.stakesBanner.cashoutCta[locale]}
+                {t.footerCashoutCta[locale]}
               </Link>
             </div>
           </div>

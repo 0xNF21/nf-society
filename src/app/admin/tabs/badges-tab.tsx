@@ -37,8 +37,8 @@ const ACTION_EXAMPLES = [
   { value: "dames_win", label: "Gagner aux Dames" },
   { value: "relics_win", label: "Gagner a Relics" },
   { value: "memory_win", label: "Gagner au Memory" },
-  { value: "daily_checkin", label: "Check-in quotidien" },
   { value: "lootbox_open", label: "Ouvrir une lootbox" },
+  { value: "daily_checkin", label: "Check-in quotidien" },
 ];
 
 const CATEGORY_OPTIONS = [
@@ -182,8 +182,8 @@ export function BadgesTab({ password }: { password: string }) {
           if (newBadge.condition.type === "games_played") return `Se debloque apres ${newBadge.condition.value} parties jouees`;
           if (newBadge.condition.type === "games_won") return `Se debloque apres ${newBadge.condition.value} victoires`;
           if (newBadge.condition.type === "crc_won") return `Se debloque apres ${newBadge.condition.value} CRC gagnes`;
-          if (newBadge.condition.type === "hour_before") return `Se debloque si check-in avant ${newBadge.condition.value}h`;
-          if (newBadge.condition.type === "hour_between") return `Se debloque si check-in entre ${newBadge.condition.min}h et ${newBadge.condition.max}h`;
+          if (newBadge.condition.type === "hour_before") return `Se debloque si l'action arrive avant ${newBadge.condition.value}h`;
+          if (newBadge.condition.type === "hour_between") return `Se debloque si l'action arrive entre ${newBadge.condition.min}h et ${newBadge.condition.max}h`;
           if (newBadge.condition.type === "lose_streak") return `Se debloque apres ${newBadge.condition.value} defaites de suite`;
           if (newBadge.condition.type === "multi_game") return `Se debloque quand le joueur a joue a ${newBadge.condition.value} jeux differents`;
           return "";

@@ -30,22 +30,25 @@ function TermsContentFr({ t, locale }: { t: T; locale: Locale }) {
       <h2>3. Description du service</h2>
       <p>
         NF Society propose des jeux multijoueurs et des modes arcade en Free-to-Play.
-        Les jeux quotidiens utilisent des XP virtuels sans valeur monetaire. Les anciens soldes CRC
-        restent retirables via le flux legacy prevu a cet effet.
+        Les jeux utilisent des Fragments sans valeur monetaire pour participer. Le daily peut
+        distribuer des rewards CRC rares, susceptibles d'avoir une valeur selon le protocole Circles.
+        Les anciens soldes CRC restent retirables via le flux legacy prevu a cet effet.
       </p>
 
       <h2>4. Conditions d'acces</h2>
       <ul>
         <li>Etre majeur selon la legislation de sa juridiction de residence</li>
-        <li>Utiliser les jeux Arcade en XP virtuels, sans mise reelle</li>
-        <li>Disposer d'un wallet Circles uniquement pour retirer un solde CRC legacy</li>
+        <li>Utiliser les jeux Arcade en Fragments, sans mise reelle</li>
+        <li>Disposer d'un wallet Circles connecte pour le profil, le daily et les rewards CRC</li>
         <li>Le mode demo ne necessite ni wallet ni inscription et reste accessible a tous</li>
       </ul>
 
       <h2>5. Responsabilite de l'utilisateur</h2>
       <p>
-        L'utilisateur joue sous sa propre responsabilite. Les jeux quotidiens ne proposent ni depot CRC,
-        ni mise reelle, ni gain monetaire. Les retraits legacy restent disponibles pour les soldes existants.
+        L'utilisateur joue sous sa propre responsabilite. La participation aux jeux gratuits ne demande
+        ni depot CRC ni mise reelle. Certains rewards daily en CRC peuvent avoir une valeur, mais ils
+        ne necessitent pas de paiement cote utilisateur. Les retraits legacy restent disponibles pour
+        les soldes existants.
       </p>
 
       <h2>6. Limitation de responsabilite</h2>
@@ -105,22 +108,24 @@ function TermsContentEn({ t, locale }: { t: T; locale: Locale }) {
       <h2>3. Service description</h2>
       <p>
         NF Society offers multiplayer games and arcade modes in Free-to-Play.
-        Everyday games use virtual XP with no monetary value. Existing CRC balances remain withdrawable
-        through the dedicated legacy flow.
+        Games use Fragments with no monetary value to participate. The daily reward may distribute
+        rare CRC rewards, which may have value through the Circles protocol. Existing CRC balances
+        remain withdrawable through the dedicated legacy flow.
       </p>
 
       <h2>4. Access conditions</h2>
       <ul>
         <li>Be of legal age under the legislation of the user's jurisdiction</li>
-        <li>Use Arcade games with virtual XP, without real-money stakes</li>
-        <li>Have a verified Circles wallet only to withdraw a legacy CRC balance</li>
+        <li>Use Arcade games with Fragments, without real-money stakes</li>
+        <li>Have a connected Circles wallet for the profile, daily reward and CRC rewards</li>
         <li>Demo mode requires neither wallet nor signup and stays accessible to anyone</li>
       </ul>
 
       <h2>5. User responsibility</h2>
       <p>
-        Users play at their own risk. Everyday games do not offer CRC deposits, real-money stakes,
-        or monetary winnings. Legacy withdrawals remain available for existing balances.
+        Users play at their own risk. Free games do not require CRC deposits or real-money stakes.
+        Some daily CRC rewards may have value, but they do not require payment from the user.
+        Legacy withdrawals remain available for existing balances.
       </p>
 
       <h2>6. Limitation of liability</h2>

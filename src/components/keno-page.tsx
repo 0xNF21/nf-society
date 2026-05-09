@@ -629,7 +629,9 @@ function RealKenoGame({ table }: { table: KenoTable }) {
   const scanForRound = useCallback(async () => {
     setScanning(true);
     try {
-      await fetch(`/api/keno-scan?tableSlug=${table.slug}`, { method: "POST" });
+      if (stake.realStakesEnabled) {
+        await fetch(`/api/keno-scan?tableSlug=${table.slug}`, { method: "POST" });
+      }
       const activeRes = await fetch(`/api/keno/active?tableSlug=${table.slug}&token=${tokenRef.current}`);
       const activeData = await activeRes.json();
       if (activeData.round) {
@@ -639,15 +641,15 @@ function RealKenoGame({ table }: { table: KenoTable }) {
       }
     } catch {}
     setScanning(false);
-  }, [table.slug, tokenRef]);
+  }, [stake.realStakesEnabled, table.slug, tokenRef]);
 
   // Poll scan when watching payment
   useEffect(() => {
-    if (round || restoring) return;
+    if (!stake.realStakesEnabled || round || restoring) return;
     const ms = watchingPayment ? 5000 : 15000;
     const interval = setInterval(scanForRound, ms);
     return () => clearInterval(interval);
-  }, [round, restoring, watchingPayment, scanForRound]);
+  }, [stake.realStakesEnabled, round, restoring, watchingPayment, scanForRound]);
 
   const togglePick = useCallback((n: number) => {
     setPicks((prev) => {

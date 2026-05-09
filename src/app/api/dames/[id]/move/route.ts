@@ -6,6 +6,7 @@ import { isValidMove, applyMove } from '@/lib/dames'
 import type { Move, DamesState } from '@/lib/dames'
 import { payPrize, payCommission } from '@/lib/wallet'
 import { requireAuthenticatedAddress } from '@/lib/auth/session'
+import { awardMatchResultXp } from '@/lib/xp-server'
 
 export async function POST(
   req: NextRequest,
@@ -48,6 +49,16 @@ export async function POST(
       status: finished ? 'finished' : 'playing', updatedAt: new Date(),
     }).where(eq(damesGames.id, game.id))
     if (finished) {
+      await awardMatchResultXp({
+        playerAddresses: [game.player1Address, game.player2Address],
+        winnerAddress: player,
+        winAction: 'dames_win',
+        loseAction: 'dames_lose',
+        sourceType: 'dames',
+        sourceId: `game:${game.id}`,
+        metadata: { slug: game.slug },
+      })
+
       try {
         const pot = game.betCrc * 2
         const winAmount = pot * (1 - game.commissionPct / 100)

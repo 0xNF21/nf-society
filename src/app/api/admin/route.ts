@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { hasAdminPassword, isAdminPasswordValid } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, "admin-login", 10, 60000);
@@ -7,16 +8,15 @@ export async function POST(req: NextRequest) {
 
   try {
     const { password } = await req.json();
-    const adminPassword = process.env.ADMIN_PASSWORD;
 
-    if (!adminPassword) {
+    if (!hasAdminPassword()) {
       return NextResponse.json(
         { error: "Admin password not configured" },
         { status: 500 }
       );
     }
 
-    if (password !== adminPassword) {
+    if (!isAdminPasswordValid(password)) {
       return NextResponse.json({ error: "Invalid password" }, { status: 401 });
     }
 

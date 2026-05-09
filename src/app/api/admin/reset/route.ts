@@ -28,7 +28,7 @@ const RESET_TARGETS: Record<string, { label: string; tables: string[]; where?: s
   games_pfc: { label: "Parties PFC", tables: ["pfc_games"] },
   // Players
   player_badges: { label: "Badges joueurs (pas les definitions)", tables: ["player_badges"] },
-  player_stats: { label: "Stats joueurs (XP, level, streak)", tables: ["players"] },
+  player_stats: { label: "Stats joueurs (XP, level, streak, Fragments)", tables: ["players"] },
   // Shop
   shop_history: { label: "Historique achats shop", tables: ["shop_purchases", "shop_coupons"] },
 };
