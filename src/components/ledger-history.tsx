@@ -11,6 +11,7 @@ type LedgerEntry = {
   address: string;
   kind: string;
   amountCrc: number;
+  amountFragments?: number;
   balanceAfter: number | null;
   reason: string | null;
   txHash: string | null;
@@ -115,12 +116,22 @@ export function LedgerHistory({ address }: LedgerHistoryProps) {
 
 function LedgerEntryRow({ entry, locale }: { entry: LedgerEntry; locale: "fr" | "en" }) {
   const t = translations.wallet;
-  const isCredit = entry.amountCrc > 0;
+  const amountFragments = Number(entry.amountFragments || 0);
+  const isFragments =
+    amountFragments !== 0 ||
+    entry.kind.startsWith("fragments-") ||
+    entry.kind === "daily-fragments" ||
+    entry.kind === "shop-purchase";
+  const amount = isFragments ? amountFragments : Number(entry.amountCrc || 0);
+  const isCredit = amount > 0;
 
   const Icon = iconFor(entry.kind);
   const iconColor = isCredit ? "text-green-500" : "text-red-500";
   const amountColor = isCredit ? "text-green-600" : "text-red-600";
   const prefix = isCredit ? "+" : "";
+  const amountLabel = isFragments
+    ? `${prefix}${amount.toLocaleString(localeBcp47(locale), { maximumFractionDigits: 0 })} Fragments`
+    : `${prefix}${amount.toFixed(2).replace(/\.00$/, "")} CRC`;
 
   const label = labelFor(entry, locale);
   const dateLabel = formatDate(entry.createdAt, locale);
@@ -139,8 +150,7 @@ function LedgerEntryRow({ entry, locale }: { entry: LedgerEntry; locale: "fr" | 
         <p className="text-[11px] text-ink/40">{dateLabel}</p>
       </div>
       <span className={`text-sm font-black tabular-nums shrink-0 ${amountColor}`}>
-        {prefix}
-        {entry.amountCrc.toFixed(2).replace(/\.00$/, "")} CRC
+        {amountLabel}
       </span>
     </>
   );
@@ -181,12 +191,17 @@ function iconFor(kind: string) {
       return ArrowUpCircle;
     case "prize":
     case "game-prize":
+    case "fragments-win":
+    case "daily-fragments":
+    case "daily-prize":
       return Trophy;
     case "commission":
     case "house-bet":
     case "house-payout":
       return Gift;
     case "game-bet":
+    case "fragments-bet":
+    case "shop-purchase":
     case "daily-ticket":
     case "debit":
     default:
