@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "NF Society",
     short_name: "NF Society",
-    description: "Free-to-Play arcade with Fragments, daily CRC rewards, badges and community progression.",
+    description: "Arcade Free-to-Play du DAO NF Society: jeux en Fragments, gouvernance en CRC et rewards CRC.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",

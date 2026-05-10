@@ -1,85 +1,164 @@
 # NF Society
 
-[🇬🇧 Read in English](README.md)
+[Read in English](README.md)
 
-Plateforme de jeux communautaire du DAO **NF Society**, construite sur **Gnosis Chain** avec le protocole **Circles** (tokens CRC).
+Arcade communautaire free-to-play du **DAO NF Society**, construite sur
+**Gnosis Chain** avec le protocole **Circles** (tokens CRC).
 
-17 jeux, un système de solde prépayé, un bot Telegram de support, et deux modes de paiement (standalone et Mini App Circles).
+NF Society utilise maintenant les **Fragments** comme solde arcade jouable. Les
+joueurs peuvent lancer des parties, progresser, gagner de l'XP, débloquer des
+badges et recevoir certaines **récompenses CRC** sans miser ni déposer de CRC
+pour jouer.
+
+---
+
+## Direction Produit Actuelle
+
+### Free-to-Play D'abord
+
+- Aucune participation payante pour lancer les jeux par défaut.
+- Aucune mise CRC, aucun pot CRC alimenté par les joueurs, aucun payout CRC de
+  fin de partie issu d'une mise.
+- Les jeux utilisent les **Fragments**, un solde arcade off-chain.
+- Les Fragments ne sont pas retirables et ne sont pas convertibles en CRC.
+- Les CRC sont réservés aux récompenses configurées par la plateforme ou le DAO,
+  aux remboursements legacy et aux retraits legacy.
+
+### Fragments
+
+Les Fragments sont le rail principal de jeu :
+
+- les joueurs gagnent des Fragments via les récompenses de plateforme, notamment
+  le daily ;
+- les jeux multijoueur et arcade débitent des Fragments quand un joueur
+  participe ;
+- les victoires créditent des Fragments au joueur ;
+- le house edge / les commissions sont suivis dans un pool de Fragments DAO ;
+- certains champs historiques `betCrc` existent encore dans les tables comme
+  unité de référence, mais le rail F2P convertit ce montant en Fragments.
+
+Le helper de conversion actuel est :
+
+```ts
+1 CRC-référence = 10 Fragments
+```
+
+### Récompenses CRC
+
+Le CRC reste important, mais ce n'est plus la mise normale des jeux.
+
+- Les récompenses CRC peuvent venir d'allocations DAO/communautaires, de saisons
+  skill, de bounties ou de campagnes de récompenses configurées.
+- Les récompenses de type saison doivent être claimables après snapshot et
+  review, pas payées instantanément à la fin d'une partie.
+- Les utilisateurs qui avaient un solde CRC avant le pivot peuvent toujours le
+  retirer depuis leur dashboard.
 
 ---
 
 ## Fonctionnalités
 
-### 🎮 Jeux (17)
+### Jeux (17)
 
-**Multijoueur (6)** — mise directe en CRC entre joueurs, le gagnant empoche le pot moins 5% de commission :
-- Morpion, Memory, Dames, Relics (bataille navale), Pierre-Feuille-Ciseaux, CRC Races
+**Multijoueur / skill (6)** - parties gratuites avec Fragments :
 
-**Chance / casino (11)** — solo contre la maison :
-- Blackjack, Coin Flip, Crash Dash, Dice, Hi-Lo, Keno, Mines, Plinko, Roulette, Loteries, Lootboxes
+- Morpion
+- Memory
+- Dames
+- Relics (stratégie type bataille navale)
+- Pierre-Feuille-Ciseaux
+- Courses Fragments
 
-**Récompenses quotidiennes** — scratch card + roue de la chance + jackpot communautaire.
+**Jeux arcade chance (11)** - modes solo arcade avec Fragments :
 
-### 💰 Deux modes de paiement
+- Blackjack
+- Coin Flip
+- Crash Dash
+- Dice
+- Hi-Lo
+- Keno
+- Mines
+- Plinko
+- Roulette
+- Loteries
+- Lootboxes
 
-**1. Paiement direct on-chain** (mode original)
-- 1 transaction Gnosis par partie
-- Le joueur paie depuis son propre wallet Circles
-- Détection automatique via polling blockchain
+**Récompenses quotidiennes** - flow daily centré sur les Fragments, la progression
+XP et les récompenses configurées.
 
-**2. Système de solde** (Phase 3, recommandé)
-- Le joueur dépose une fois son solde via une transaction on-chain vers la Safe NF Society
-- Chaque partie débite ensuite le solde hors-chaîne (instantané, sans frais de gas)
-- Cashout à tout moment : la Safe renvoie le solde restant on-chain
-- **Ce n'est pas un wallet custodial** — les utilisateurs gardent leurs propres clés Circles ; le solde est une simple écriture comptable adossée 1:1 aux CRC détenus dans la Safe
+### Progression
 
-### 📱 Deux modes d'interface
+- Système XP avec 10 niveaux.
+- Badges et achievements, y compris des badges secrets.
+- Boutique Fragments pour achats arcade et cosmétiques.
+- Profil joueur avec avatar Circles et statistiques.
+- Classement global et statistiques de plateforme.
 
-**Standalone** — ouvrir `nf-society.vercel.app` dans n'importe quel navigateur. Paiement via lien Gnosis App + QR code (cross-device : scan sur desktop, signature sur mobile).
+### DAO / Rewards
 
-**Mini App Circles** — le projet tourne en iframe native dans l'app Circles / Gnosis. Signature 1-tap via un bridge `postMessage`, sans QR code.
+- Dashboard trésorerie et stats DAO.
+- Rail de récompense CRC pour les rewards DAO et distributions validées par
+  l'admin.
+- Cible Season Zero : saison courte de skill, participation gratuite, pool CRC
+  DAO fixe, snapshot, review anti-cheat, puis rewards claimables.
 
-La détection est automatique via `useMiniApp()` — les composants choisissent la bonne UI selon le contexte.
+### Modes d'interface
 
-### 📈 Progression
-- Système XP avec 10 niveaux (0 → 20 000 XP)
-- Badges (achievements visibles et secrets)
-- Boutique avec achats en XP
-- Profil joueur avec avatar Circles + stats
-- Classement global
+**Standalone** - ouvrir `nf-society.vercel.app` dans n'importe quel navigateur.
 
-### 🛠️ Infrastructure
-- Rate-limit adossé à Upstash Redis sur toutes les routes d'écriture et admin
-- Payouts automatiques aux gagnants via Gnosis Safe + Zodiac Roles Modifier (permissions cadrées)
-- Bot Telegram de support (grammy) routant les messages vers des topics du forum
-- Tracking d'erreurs Sentry + Vercel Analytics
+**Mini App Circles** - le projet peut tourner en iframe native dans l'app
+Circles / Gnosis. L'app utilise encore le contexte wallet/Circles quand il est
+utile, notamment pour le profil, les rewards et le cashout legacy.
+
+La détection est automatique via `useMiniApp()`, donc les composants affichent
+la bonne UI selon le contexte.
+
+### Sécurité / Infrastructure
+
+- `LEGAL_MODE=F2P_ONLY` est la posture runtime par défaut.
+- Les routes CRC real-stakes sont protégées et demandent une configuration
+  explicite.
+- Le routing de payout source-aware empêche une partie financée en Fragments de
+  payer accidentellement en CRC.
+- Rate-limit adossé à Upstash Redis sur les routes d'écriture et admin.
+- Payouts CRC automatisés via Gnosis Safe + Zodiac Roles Modifier pour les
+  rewards validées, remboursements et cashouts legacy.
+- Bot Telegram de support (grammy) routant les messages vers des topics du
+  forum.
+- Tracking d'erreurs Sentry + Vercel Analytics.
 
 ---
 
-## Stack technique
+## Stack Technique
 
-- **Framework** — Next.js 14 (App Router) + TypeScript
-- **Base de données** — PostgreSQL via Drizzle ORM (51 tables, source unique dans `src/lib/db/schema/`)
-- **Blockchain** — Protocole Circles sur Gnosis Chain, ethers.js + viem
-- **Autorisation des payouts** — Gnosis Safe + Zodiac Roles Modifier (transferts CRC gatés par un rôle)
-- **Rate-limit** — Upstash Redis (`@upstash/ratelimit`) avec fallback in-memory en dev
-- **UI** — Tailwind CSS, primitives Radix (shadcn/ui)
-- **i18n** — maison en FR/EN via React Context
+- **Framework** - Next.js 14 (App Router) + TypeScript.
+- **Base de données** - PostgreSQL via Drizzle ORM.
+- **Blockchain** - Protocole Circles sur Gnosis Chain, ethers.js + viem.
+- **Rewards / payouts** - Gnosis Safe + Zodiac Roles Modifier pour les transferts
+  CRC validés.
+- **Solde arcade** - rail Fragments dans `src/lib/wallet-fragments.ts`.
+- **Gardes F2P** - `src/lib/legal-mode.ts`, `src/lib/stakes.ts`, et payout
+  source-aware dans `src/lib/payout.ts`.
+- **Rate-limit** - Upstash Redis (`@upstash/ratelimit`) avec fallback in-memory
+  en dev.
+- **UI** - Tailwind CSS, primitives Radix (shadcn/ui).
+- **i18n** - maison en FR/EN via React Context.
 
 ---
 
-## Démarrage rapide
+## Démarrage Rapide
 
 ```bash
 git clone https://github.com/0xNF21/nf-society.git
 cd nf-society
 npm install
 cp .env.example .env.local  # remplir les valeurs
-npm run db:migrate          # crée les 51 tables sur un Postgres vide
+npm run db:migrate          # crée les tables sur un Postgres vide
 npm run dev                 # localhost:3000
 ```
 
-Voir [`.env.example`](.env.example) pour la liste complète des variables nécessaires.
+Voir [`.env.example`](.env.example) pour la liste complète des variables
+nécessaires.
 
 ---
 
@@ -92,7 +171,7 @@ npm run start        # lance le build production
 npm run lint         # ESLint
 npm run typecheck    # tsc --noEmit
 
-npm run db:generate  # génère une nouvelle migration à partir d'un changement de schéma
+npm run db:generate  # génère une migration depuis un changement de schéma
 npm run db:migrate   # applique les migrations en attente à DATABASE_URL
 npm run db:push      # push le schéma directement (dev uniquement)
 npm run db:studio    # explore la DB avec drizzle-kit studio
@@ -101,35 +180,37 @@ npm run db:check     # vérifie la cohérence des migrations et snapshots
 
 ---
 
-## Architecture (résumé)
+## Architecture (Résumé)
 
-```
+```text
 src/
   app/
-    api/         # 130+ routes API (jeux, wallet, admin, scan, payout)
-    <jeux>/      # 17 pages de jeux — un lobby + une page de jeu chacune
-    shop/        # Boutique XP
-    chance/      # Hub des jeux de chance
-    multijoueur/ # Hub des jeux multijoueur
+    api/         # routes API : jeux, Fragments, wallet, admin, scan, payout
+    <jeux>/      # 17 pages de jeux : un lobby + une page de jeu chacune
+    shop/        # Boutique Fragments
+    chance/      # Hub arcade chance
+    multijoueur/ # Hub multijoueur
     admin/       # Dashboard admin
-    dashboard/   # Dashboard joueur
-  components/    # Composants React (44 top-level + primitives shadcn/ui)
+    dashboard/   # Dashboard joueur et cashout legacy
+  components/    # Composants React + primitives shadcn/ui
   lib/
-    db/schema/        # Schéma Drizzle, un fichier par domaine
-    circles.ts        # RPC Circles + génération de liens de paiement + détection tx
-    payout.ts         # Payouts Gnosis Safe via Zodiac Roles Modifier
-    wallet.ts         # Système de solde (top-up, débit, crédit, cashout)
-    rate-limit.ts     # Rate limiter adossé à Upstash
-    admin-auth.ts     # Vérif auth admin partagée
-    validation.ts     # Validateurs d'input (regex d'adresse, etc.)
-    i18n.ts           # Traductions FR/EN
-    miniapp-bridge.ts # SDK postMessage pour Mini App Circles
+    db/schema/             # Schéma Drizzle, un fichier par domaine
+    fragments.ts           # Helpers de conversion Fragments
+    wallet-fragments.ts    # Rail de jeu F2P
+    payout.ts              # Payouts source-aware
+    legal-mode.ts          # Garde F2P niveau env
+    stakes.ts              # Gardes real-stakes par jeu
+    wallet.ts              # Helpers legacy solde/cashout CRC
+    circles.ts             # RPC Circles + helpers de paiement
+    rate-limit.ts          # Rate limiter adossé à Upstash
+    miniapp-bridge.ts      # SDK postMessage pour Mini App Circles
 ```
 
-Pour la documentation contributeur détaillée, voir [`CLAUDE.md`](CLAUDE.md).
+Pour la documentation contributeur détaillée, voir
+[`CODEX-PROJECT-CONTEXT.md`](CODEX-PROJECT-CONTEXT.md) et [`CLAUDE.md`](CLAUDE.md).
 
 ---
 
 ## Licence
 
-Propriétaire — NF Society DAO
+Propriétaire - NF Society DAO

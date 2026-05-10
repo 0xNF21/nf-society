@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 
-export const alt = "NF Society — La plateforme de jeux du DAO";
+export const alt = "NF Society - Arcade Fragments du DAO";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -50,7 +50,7 @@ export default async function OpengraphImage() {
                 fontSize: 36,
                 fontWeight: 700,
                 color: "white",
-                letterSpacing: "-0.02em",
+                letterSpacing: 0,
               }}
             >
               NF Society
@@ -88,20 +88,22 @@ export default async function OpengraphImage() {
               textTransform: "uppercase",
             }}
           >
-            La plateforme de jeux du DAO
+            Arcade Free-to-Play du DAO
           </div>
           <div
             style={{
               display: "flex",
-              fontSize: 84,
+              flexDirection: "column",
+              fontSize: 78,
               fontWeight: 800,
               color: "white",
               lineHeight: 1.05,
-              letterSpacing: "-0.03em",
+              letterSpacing: 0,
               maxWidth: 1000,
             }}
           >
-            Joue, progresse, gouverne — en mode Arcade
+            <span>Joue, mise en Fragments</span>
+            <span>Gouverne en CRC</span>
           </div>
           <div
             style={{
@@ -112,7 +114,7 @@ export default async function OpengraphImage() {
               marginTop: 8,
             }}
           >
-            17 jeux on-chain · Payouts automatiques · 100% communautaire
+            17 jeux Free-to-Play | Gagne des CRC via rewards | 100% communautaire
           </div>
         </div>
 
