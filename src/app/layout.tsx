@@ -25,12 +25,12 @@ const body = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "NF Society — Community Gaming Platform",
-  description: "Free-to-Play arcade, Fragments, daily CRC rewards, badges and community progression on NF Society.",
+  title: "NF Society - Arcade Fragments du DAO",
+  description: "Arcade Free-to-Play du DAO NF Society: joue et mise en Fragments, gouverne en CRC et gagne des rewards CRC.",
   metadataBase: new URL("https://nf-society.vercel.app"),
   openGraph: {
     title: "NF Society",
-    description: "Free-to-Play arcade, Fragments, daily CRC rewards, badges and community progression on NF Society.",
+    description: "Arcade Free-to-Play du DAO NF Society: joue et mise en Fragments, gouverne en CRC et gagne des rewards CRC.",
     url: "https://nf-society.vercel.app",
     siteName: "NF Society",
     locale: "fr_FR",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "NF Society",
-    description: "Free-to-Play arcade, Fragments, daily CRC rewards, badges and community progression on NF Society.",
+    description: "Arcade Free-to-Play du DAO NF Society: joue et mise en Fragments, gouverne en CRC et gagne des rewards CRC.",
   },
   icons: {
     icon: "/nf-society-logo.png",
