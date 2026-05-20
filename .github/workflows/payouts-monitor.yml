@@ -1,15 +1,16 @@
 name: Payouts Monitor
 
-# Pings the /api/cron/payouts-monitor endpoint every 5 min to:
+# Manual safety job for /api/cron/payouts-monitor. The previous 5-minute
+# schedule kept Neon compute warm on the free plan, so it is intentionally
+# disabled. Use workflow_dispatch when payouts/refunds need an ops nudge.
+#
+# It pings the endpoint to:
 #  1) confirm "sending" payouts that have been mined on Gnosis
 #  2) retry "failed" payouts (attempts < 3, last update > 2 min)
 #
-# This compensates for Vercel Hobby's 1/day cron limit. The Vercel cron
-# at 4am still runs as a backup safety net.
+# The Vercel cron at 4am still runs as the low-frequency safety net.
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch: # allow manual trigger from Actions tab
 
 jobs:
