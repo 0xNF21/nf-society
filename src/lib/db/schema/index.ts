@@ -38,5 +38,6 @@ export * from "./pfc";
 export * from "./plinko";
 export * from "./relics";
 export * from "./roulette";
+export * from "./season";
 export * from "./shop";
 export * from "./support";
