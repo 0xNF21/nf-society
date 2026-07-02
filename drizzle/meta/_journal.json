@@ -85,6 +85,41 @@
       "when": 1778371200000,
       "tag": "0013_remove_daily_xp_rewards",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778374800000,
+      "tag": "0014_add_season_zero_snapshot_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1778378400000,
+      "tag": "0015_add_season_reward_allocations",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1778382000000,
+      "tag": "0016_add_admin_audit_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1778385600000,
+      "tag": "0017_add_season_game_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1778389200000,
+      "tag": "0018_add_season_draw_scoring",
+      "breakpoints": true
     }
   ]
 }
