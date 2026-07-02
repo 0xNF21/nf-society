@@ -12,4 +12,18 @@ nf_society_export.sql
 tsconfig.tsbuildinfo
 attached_assets/
 
+# Local agent/browser work artifacts
+.chrome-*/
+.codex-*/
+.codex-tmp/
+.next-dev*.log
+.next-direct*.log
+*.err.log
+*.out.log
+*.log
+__pycache__/
+*.pyc
+.claude/*.lock
+.claude/settings.local.json
+
 .vercel
