@@ -15,7 +15,7 @@ export type SeasonStatus = "draft" | "scheduled" | "active" | "review" | "finali
 
 export const seasons = pgTable("seasons", {
   id: serial("id").primaryKey(),
-  slug: text("slug").notNull().unique(),
+  slug: text("slug").notNull(),
   title: text("title").notNull(),
   status: text("status").notNull().$type<SeasonStatus>().default("draft"),
   startAt: timestamp("start_at"),
