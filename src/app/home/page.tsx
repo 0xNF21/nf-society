@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, BarChart3, Swords, ArrowLeftRight, FlaskConical, Lock, LineChart } from "lucide-react";
+import { ArrowRight, BarChart3, Swords, ArrowLeftRight, FlaskConical, Lock, LineChart, CalendarClock } from "lucide-react";
 import { useLocale } from "@/components/language-provider";
 import { useDemo } from "@/components/demo-provider";
 import { useFeatureFlags } from "@/components/feature-flag-provider";
@@ -25,6 +25,16 @@ export default function HomePage() {
       title: locale === "fr" ? "Jouer" : "Play",
       desc: locale === "fr" ? "Jeux, classement et boutique" : "Games, leaderboard and shop",
       color: "text-marine",
+    },
+    {
+      href: "/arcade-night",
+      flag: null,
+      icon: <CalendarClock className="h-8 w-8 text-citrus" />,
+      iconBg: "bg-citrus/10 group-hover:bg-citrus/20",
+      borderHover: "hover:border-citrus/30",
+      title: locale === "fr" ? "Arcade Night" : "Arcade Night",
+      desc: locale === "fr" ? "Beta fermee, Memory + Dames" : "Closed beta, Memory + Dames",
+      color: "text-citrus",
     },
     {
       href: "/dashboard-dao",
