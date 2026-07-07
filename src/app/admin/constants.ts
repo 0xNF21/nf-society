@@ -1,5 +1,5 @@
 /* ─── Shared constants for admin tabs ─── */
-import { Flag, Ticket, Gift, Wallet, Sparkles, Clock, Shield, Trash2, Eye, EyeOff } from "lucide-react";
+import { CalendarClock, Flag, Ticket, Gift, Wallet, Sparkles, Clock, Shield, Trash2, Eye, EyeOff } from "lucide-react";
 import type { FlagStatus, Tab } from "./types";
 
 export const TABS: { key: Tab; label: string; icon: typeof Flag }[] = [
@@ -11,6 +11,7 @@ export const TABS: { key: Tab; label: string; icon: typeof Flag }[] = [
   { key: "shop",      label: "Shop",      icon: Gift },
   { key: "daily",     label: "Daily",     icon: Clock },
   { key: "badges",    label: "Badges",    icon: Shield },
+  { key: "arcadeNight", label: "Arcade Night", icon: CalendarClock },
   { key: "reset",     label: "Reset",     icon: Trash2 },
 ];
 

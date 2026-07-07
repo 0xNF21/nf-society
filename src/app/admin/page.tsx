@@ -14,6 +14,7 @@ import { XpTab } from "./tabs/xp-tab";
 import { ShopTab } from "./tabs/shop-tab";
 import { DailyTab } from "./tabs/daily-tab";
 import { BadgesTab } from "./tabs/badges-tab";
+import { ArcadeNightTab } from "./tabs/arcade-night-tab";
 import { ResetTab } from "./tabs/reset-tab";
 
 /* ─── Main ─── */
@@ -117,6 +118,7 @@ export default function AdminPage() {
           {activeTab === "shop" && <ShopTab password={password} />}
           {activeTab === "daily" && <DailyTab password={password} />}
           {activeTab === "badges" && <BadgesTab password={password} />}
+          {activeTab === "arcadeNight" && <ArcadeNightTab password={password} />}
           {activeTab === "reset" && <ResetTab password={password} />}
         </div>
       </div>
