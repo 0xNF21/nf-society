@@ -1,13 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
   CalendarClock,
   CheckCircle2,
+  Clock3,
   Gamepad2,
   Gift,
+  Hourglass,
   Medal,
+  PlayCircle,
   ShieldCheck,
   Sparkles,
   Trophy,
@@ -24,25 +28,58 @@ const GAME_LINKS: Record<string, string> = {
   dames: "/dames",
 };
 
+type ArcadeNightPhaseKey = "setup" | "scheduled" | "live" | "review" | "finalized";
+
+type ArcadeNightPhase = {
+  key: ArcadeNightPhaseKey;
+  startMs: number | null;
+  endMs: number | null;
+  remainingMs: number;
+  progress: number;
+};
+
+type PhaseCopy = {
+  badge: string;
+  title: string;
+  body: string;
+  countdownLabel: string;
+  countdownValue: string;
+  ctaHint: string;
+  windowDetail: string;
+};
+
 export default function ArcadeNightPage({ state }: { state: ArcadeNightPublicState }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { config } = state;
+  const [nowMs, setNowMs] = useState(() => {
+    const serverNow = new Date(state.serverNow).getTime();
+    return Number.isNaN(serverNow) ? Date.now() : serverNow;
+  });
   const activeGames = config.games.filter((game) => game.enabled);
   const gameNames = activeGames.map((game) => game.label).join(" + ") || (fr ? "Jeux a confirmer" : "Games to confirm");
   const participantValue = config.betaParticipants.length > 0
     ? String(config.betaParticipants.length)
     : "5-10";
+  const phase = getArcadeNightPhase(config, nowMs);
+  const phaseCopy = getPhaseCopy(phase, fr);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const copy = {
     back: fr ? "Retour" : "Back",
-    status: config.publicStatus || (fr ? "Beta fermee bientot" : "Closed beta soon"),
-    title: fr ? "Une soiree beta pour jouer ensemble" : "A beta night to play together",
-    body: fr
-      ? config.note || "Un event court avec quelques membres NF Society pour tester les jeux, le leaderboard et la review avant de lancer des saisons plus grandes."
-      : "A short event with a few NF Society members to test games, leaderboards, and review before larger seasons.",
-    primary: fr ? "S'entrainer sur Memory" : "Practice Memory",
-    secondary: fr ? "S'entrainer sur Dames" : "Practice Dames",
+    status: phaseCopy.badge,
+    title: phase.key === "live"
+      ? fr ? "Arcade Night est en cours" : "Arcade Night is live"
+      : fr ? "Une soiree beta pour jouer ensemble" : "A beta night to play together",
+    body: phase.key === "live"
+      ? phaseCopy.body
+      : fr
+        ? config.note || "Un event court avec quelques membres NF Society pour tester les jeux, le leaderboard et la review avant de lancer des saisons plus grandes."
+        : "A short event with a few NF Society members to test games, leaderboards, and review before larger seasons.",
     detailsTitle: fr ? "Format beta #1" : "Beta #1 format",
     rewardsTitle: fr ? "Dotation DAO" : "DAO reward pool",
     rewardsBody: fr
@@ -52,7 +89,9 @@ export default function ArcadeNightPage({ state }: { state: ArcadeNightPublicSta
     leaderboardBody: fr
       ? "Memory est plus rapide que Dames. Pour eviter un classement global injuste, la beta #1 separe les scores par jeu."
       : "Memory is faster than Dames. To avoid an unfair global ranking, beta #1 separates scores by game.",
-    comingSoon: fr ? "Live leaderboard bientot" : "Live leaderboard soon",
+    comingSoon: phase.key === "live"
+      ? fr ? "Pas de leaderboard public live pendant cette beta: les scores sont verifies apres la fenetre." : "No public live leaderboard during this beta: scores are reviewed after the window."
+      : fr ? "Classement calcule apres la fenetre" : "Leaderboard computed after the window",
     reviewTitle: fr ? "Review avant distribution" : "Review before distribution",
     reviewBody: fr
       ? "Un wallet ne prend qu'une reward competitive par defaut. Si un joueur gagne sur deux jeux, l'autre slot descend au prochain eligible."
@@ -118,23 +157,30 @@ export default function ArcadeNightPage({ state }: { state: ArcadeNightPublicSta
                   {copy.body}
                 </p>
               </div>
+
+              <LiveStatusPanel phase={phase} copy={phaseCopy} />
             </div>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              {activeGames.map((game, index) => (
-                <Button
-                  key={game.key}
-                  asChild
-                  variant={index === 0 ? "default" : "outline"}
-                  className={`min-h-[48px] rounded-2xl px-5 text-sm font-black ${
-                    index === 0 ? "bg-marine hover:bg-marine/90" : ""
-                  }`}
-                >
-                  <Link href={GAME_LINKS[game.key] || "/home"}>
-                    {fr ? `S'entrainer sur ${game.label}` : `Practice ${game.label}`}
-                  </Link>
-                </Button>
-              ))}
+            <div className="mt-8 space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                {activeGames.map((game, index) => (
+                  <Button
+                    key={game.key}
+                    asChild
+                    variant={phase.key === "live" || index === 0 ? "default" : "outline"}
+                    className={`min-h-[48px] rounded-2xl px-5 text-sm font-black ${
+                      phase.key === "live" || index === 0 ? "bg-marine hover:bg-marine/90" : ""
+                    }`}
+                  >
+                    <Link href={GAME_LINKS[game.key] || "/home"}>
+                      {gameCtaLabel(game, phase.key, fr)}
+                    </Link>
+                  </Button>
+                ))}
+              </div>
+              <p className="max-w-2xl text-sm font-semibold leading-6 text-ink/50 dark:text-white/50">
+                {phaseCopy.ctaHint}
+              </p>
             </div>
           </div>
 
@@ -143,7 +189,7 @@ export default function ArcadeNightPage({ state }: { state: ArcadeNightPublicSta
               icon={<CalendarClock className="h-5 w-5" />}
               label={copy.detailsTitle}
               value={formatStart(config.startAt, locale, copy.datePending)}
-              detail={`${config.durationMinutes} min - ${gameNames}, ${copy.fragmentsOnly}`}
+              detail={phaseCopy.windowDetail || `${config.durationMinutes} min - ${gameNames}, ${copy.fragmentsOnly}`}
             />
             <InfoCard
               icon={<Users className="h-5 w-5" />}
@@ -233,8 +279,8 @@ export default function ArcadeNightPage({ state }: { state: ArcadeNightPublicSta
               </div>
               <ul className="space-y-2 text-sm font-semibold text-ink/60 dark:text-white/60">
                 {(fr
-                  ? ["Session wallet obligatoire", "Deux wallets differents", "Parties hors fenetre ignorees", "Montant de Fragments ignore dans le score"]
-                  : ["Wallet session required", "Two different wallets", "Out-of-window matches ignored", "Fragments amount ignored in scoring"]
+                  ? ["Session wallet obligatoire", "Deux wallets differents", "Parties creees et terminees dans la fenetre", "Montant de Fragments ignore dans le score"]
+                  : ["Wallet session required", "Two different wallets", "Matches created and finished inside the window", "Fragments amount ignored in scoring"]
                 ).map((item) => (
                   <li key={item} className="flex gap-2">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
@@ -270,6 +316,41 @@ export default function ArcadeNightPage({ state }: { state: ArcadeNightPublicSta
         </section>
       </div>
     </main>
+  );
+}
+
+function LiveStatusPanel({ phase, copy }: { phase: ArcadeNightPhase; copy: PhaseCopy }) {
+  const Icon = phase.key === "live" ? PlayCircle : phase.key === "scheduled" ? Clock3 : Hourglass;
+  const tone = phase.key === "live"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200"
+    : phase.key === "review" || phase.key === "finalized"
+      ? "border-marine/20 bg-marine/10 text-marine dark:border-blue-300/20 dark:bg-blue-300/10 dark:text-blue-200"
+      : "border-citrus/20 bg-citrus/10 text-citrus";
+
+  return (
+    <div className={`rounded-3xl border p-4 ${tone}`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/70 shadow-sm dark:bg-white/10">
+            <Icon className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-sm font-black">{copy.title}</p>
+            <p className="mt-1 text-sm font-semibold leading-6 opacity-80">{copy.body}</p>
+          </div>
+        </div>
+        <div className="rounded-2xl bg-white/70 px-4 py-3 text-left shadow-sm dark:bg-white/10 sm:text-right">
+          <p className="text-[10px] font-black uppercase tracking-widest opacity-60">{copy.countdownLabel}</p>
+          <p className="mt-1 text-xl font-black">{copy.countdownValue}</p>
+        </div>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/70 dark:bg-white/10">
+        <div
+          className="h-full rounded-full bg-current transition-all duration-500"
+          style={{ width: `${phase.progress}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -336,6 +417,169 @@ function rulesForGame(game: ArcadeNightGameConfig, fr: boolean): string[] {
     `${game.minMatches} valid matches minimum`,
     `${game.minOpponents} opponents minimum`,
   ];
+}
+
+function getArcadeNightPhase(config: ArcadeNightPublicState["config"], nowMs: number): ArcadeNightPhase {
+  if (config.status === "finalized") {
+    return { key: "finalized", startMs: null, endMs: null, remainingMs: 0, progress: 100 };
+  }
+
+  if (!config.startAt) {
+    return { key: "setup", startMs: null, endMs: null, remainingMs: 0, progress: 0 };
+  }
+
+  const startMs = new Date(config.startAt).getTime();
+  if (Number.isNaN(startMs)) {
+    return { key: "setup", startMs: null, endMs: null, remainingMs: 0, progress: 0 };
+  }
+
+  const durationMs = Math.max(1, config.durationMinutes) * 60_000;
+  const endMs = startMs + durationMs;
+
+  if (nowMs < startMs) {
+    return {
+      key: "scheduled",
+      startMs,
+      endMs,
+      remainingMs: startMs - nowMs,
+      progress: 0,
+    };
+  }
+
+  if (nowMs <= endMs) {
+    return {
+      key: "live",
+      startMs,
+      endMs,
+      remainingMs: endMs - nowMs,
+      progress: clampPercent(((nowMs - startMs) / durationMs) * 100),
+    };
+  }
+
+  return {
+    key: "review",
+    startMs,
+    endMs,
+    remainingMs: nowMs - endMs,
+    progress: 100,
+  };
+}
+
+function getPhaseCopy(phase: ArcadeNightPhase, fr: boolean): PhaseCopy {
+  if (phase.key === "live") {
+    return {
+      badge: fr ? "En cours maintenant" : "Live now",
+      title: fr ? "La fenetre Arcade Night est ouverte" : "Arcade Night window is open",
+      body: fr
+        ? "Les parties Memory/Dames creees maintenant et terminees avant la fin comptent pour le dry-run."
+        : "Memory/Dames matches created now and finished before the end count for the dry-run.",
+      countdownLabel: fr ? "Temps restant" : "Time left",
+      countdownValue: formatDuration(phase.remainingMs),
+      ctaHint: fr
+        ? "Important: une partie creee avant le debut ne compte pas. Cree une nouvelle partie pendant que le statut est En cours."
+        : "Important: a match created before the start does not count. Create a new match while the status is Live.",
+      windowDetail: fr
+        ? `${formatDuration(phase.remainingMs)} restants - parties creees + terminees dans la fenetre`
+        : `${formatDuration(phase.remainingMs)} left - matches created + finished inside the window`,
+    };
+  }
+
+  if (phase.key === "scheduled") {
+    return {
+      badge: fr ? "Programme" : "Scheduled",
+      title: fr ? "Depart automatique a l'heure fixee" : "Automatic start at the configured time",
+      body: fr
+        ? "Tu peux partager la page maintenant. Le scoring ne comptera que les parties creees apres le depart."
+        : "You can share the page now. Scoring only counts matches created after the start.",
+      countdownLabel: fr ? "Depart dans" : "Starts in",
+      countdownValue: formatDuration(phase.remainingMs),
+      ctaHint: fr
+        ? "Avant le depart, les boutons servent a s'entrainer. Reviens quand le statut passe En cours."
+        : "Before the start, buttons are for practice. Come back when the status switches to Live.",
+      windowDetail: fr
+        ? `Depart dans ${formatDuration(phase.remainingMs)} - duree officielle configuree`
+        : `Starts in ${formatDuration(phase.remainingMs)} - official configured duration`,
+    };
+  }
+
+  if (phase.key === "review") {
+    return {
+      badge: fr ? "Review en cours" : "Under review",
+      title: fr ? "La fenetre de jeu est terminee" : "The play window is over",
+      body: fr
+        ? "Les nouvelles parties ne comptent plus. Le founder peut lancer le scoring dry-run dans l'admin."
+        : "New matches no longer count. The founder can run the admin scoring dry-run.",
+      countdownLabel: fr ? "Termine depuis" : "Ended",
+      countdownValue: formatDuration(phase.remainingMs),
+      ctaHint: fr
+        ? "Tu peux encore jouer hors classement, mais les parties ne compteront pas pour Arcade Night #1."
+        : "You can still play outside ranking, but matches will not count for Arcade Night #1.",
+      windowDetail: fr
+        ? "Fenetre terminee - review admin avant rewards"
+        : "Window closed - admin review before rewards",
+    };
+  }
+
+  if (phase.key === "finalized") {
+    return {
+      badge: fr ? "Finalise" : "Finalized",
+      title: fr ? "Arcade Night #1 est finalisee" : "Arcade Night #1 is finalized",
+      body: fr
+        ? "Les resultats sont figes. Les parties suivantes sont hors classement."
+        : "Results are locked. Future matches are outside ranking.",
+      countdownLabel: fr ? "Status" : "Status",
+      countdownValue: fr ? "Final" : "Final",
+      ctaHint: fr
+        ? "Les boutons restent disponibles pour jouer hors event."
+        : "Buttons remain available for non-event play.",
+      windowDetail: fr ? "Resultats finalises" : "Results finalized",
+    };
+  }
+
+  return {
+    badge: fr ? "Date a fixer" : "Date needed",
+    title: fr ? "Configure la date pour armer l'event" : "Set a date to arm the event",
+    body: fr
+      ? "Le founder doit fixer une date/heure dans l'admin. Ensuite la page passera automatiquement en live a l'heure prevue."
+      : "The founder must set a date/time in admin. Then this page switches live automatically at the scheduled time.",
+    countdownLabel: fr ? "Fenetre" : "Window",
+    countdownValue: fr ? "Non configuree" : "Not set",
+    ctaHint: fr
+      ? "Pour l'instant, les boutons servent uniquement a tester les jeux."
+      : "For now, buttons are only for testing the games.",
+    windowDetail: fr ? "Date/heure a configurer dans l'admin" : "Date/time to configure in admin",
+  };
+}
+
+function gameCtaLabel(game: ArcadeNightGameConfig, phase: ArcadeNightPhaseKey, fr: boolean): string {
+  if (phase === "live") {
+    return fr ? `Jouer ${game.label} maintenant` : `Play ${game.label} now`;
+  }
+  if (phase === "scheduled") {
+    return fr ? `S'entrainer sur ${game.label}` : `Practice ${game.label}`;
+  }
+  if (phase === "review" || phase === "finalized") {
+    return fr ? `Jouer ${game.label} hors classement` : `Play ${game.label} outside ranking`;
+  }
+  return fr ? `Tester ${game.label}` : `Test ${game.label}`;
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return `${days}j ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}min`;
+  if (minutes > 0) return `${minutes}min ${seconds}s`;
+  return `${seconds}s`;
 }
 
 function formatCrc(value: number): string {

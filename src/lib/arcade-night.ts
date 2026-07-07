@@ -49,6 +49,7 @@ export type ArcadeNightPublicState = {
   tableReady: boolean;
   config: ArcadeNightConfig;
   updatedAt: string | null;
+  serverNow: string;
 };
 
 type ConfigRecord = Record<string, unknown>;
@@ -130,6 +131,7 @@ export async function getArcadeNightPublicState(): Promise<ArcadeNightPublicStat
         tableReady: true,
         config: DEFAULT_ARCADE_NIGHT_CONFIG,
         updatedAt: null,
+        serverNow: new Date().toISOString(),
       };
     }
 
@@ -143,6 +145,7 @@ export async function getArcadeNightPublicState(): Promise<ArcadeNightPublicStat
       tableReady: true,
       config: normalizeConfig(season, games),
       updatedAt: season.updatedAt?.toISOString() ?? null,
+      serverNow: new Date().toISOString(),
     };
   } catch (error) {
     if (isRecoverableSeasonReadError(error)) {
@@ -151,6 +154,7 @@ export async function getArcadeNightPublicState(): Promise<ArcadeNightPublicStat
         tableReady: false,
         config: DEFAULT_ARCADE_NIGHT_CONFIG,
         updatedAt: null,
+        serverNow: new Date().toISOString(),
       };
     }
     throw error;
