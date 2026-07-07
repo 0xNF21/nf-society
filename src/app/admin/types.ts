@@ -9,4 +9,4 @@ export interface FlagRow {
   updatedAt: string;
 }
 
-export type Tab = "flags" | "lotteries" | "lootboxes" | "payouts" | "xp" | "shop" | "daily" | "badges" | "reset";
+export type Tab = "flags" | "lotteries" | "lootboxes" | "payouts" | "xp" | "shop" | "daily" | "badges" | "arcadeNight" | "reset";

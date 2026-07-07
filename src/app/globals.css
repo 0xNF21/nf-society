@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .admin-input {
+    @apply w-full rounded-xl border border-ink/10 bg-white px-3 py-2.5 text-sm font-semibold text-ink outline-none transition-colors placeholder:text-ink/30 focus:border-marine dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-white/30;
+  }
+}
+
 :root {
   color-scheme: light;
   --bg-primary: #f7f4ee;
