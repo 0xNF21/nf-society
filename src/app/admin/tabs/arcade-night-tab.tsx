@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CalendarClock, CheckCircle, Loader2, Save, Trophy } from "lucide-react";
+import { AlertCircle, BarChart3, Camera, CalendarClock, CheckCircle, Loader2, RefreshCw, Save, Trophy } from "lucide-react";
 
 type SeasonStatus = "draft" | "scheduled" | "active" | "review" | "finalized";
 type GameKey = "memory" | "dames";
@@ -38,6 +38,60 @@ type ArcadeNightState = {
     note: string;
   };
   updatedAt: string | null;
+};
+
+type ScoringSnapshot = {
+  generatedAt: string;
+  status: "ready" | "missing_window" | "tables_unavailable";
+  scoringRule: "created_and_finished_within_window";
+  window: {
+    startAt: string | null;
+    endAt: string | null;
+    durationMinutes: number;
+  };
+  warnings: string[];
+  summary: {
+    totalScannedMatches: number;
+    totalValidMatches: number;
+    totalCountedRows: number;
+    eligiblePlayers: number;
+  };
+  games: Array<{
+    gameKey: GameKey;
+    label: string;
+    scannedMatches: number;
+    validMatches: number;
+    countedRows: number;
+    rules: {
+      maxMatches: number;
+      maxMatchesPerOpponent: number;
+      minMatches: number;
+      minOpponents: number;
+    };
+    leaderboard: Array<{
+      rank: number;
+      address: string;
+      points: number;
+      wins: number;
+      draws: number;
+      losses: number;
+      matches: number;
+      rawMatches: number;
+      uniqueOpponents: number;
+      winRate: number;
+      eligibleForRewards: boolean;
+      eligibilityReasons: string[];
+    }>;
+  }>;
+  projectedRewards: Array<{
+    key: string;
+    label: string;
+    gameKey: GameKey | "helper";
+    amountCrc: number;
+    address: string | null;
+    sourceRank: number | null;
+    status: "projected" | "manual" | "unassigned";
+  }>;
 };
 
 type FormState = {
@@ -414,6 +468,8 @@ export function ArcadeNightTab({ password }: { password: string }) {
         </div>
       </div>
 
+      <ArcadeNightScoringPanel password={password} />
+
       <button type="button" onClick={save} disabled={saving}
         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-marine px-4 py-3 text-sm font-black text-white transition-colors hover:bg-marine/90 disabled:opacity-50">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -421,6 +477,207 @@ export function ArcadeNightTab({ password }: { password: string }) {
       </button>
     </section>
   );
+}
+
+function ArcadeNightScoringPanel({ password }: { password: string }) {
+  const [snapshot, setSnapshot] = useState<ScoringSnapshot | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  async function loadSnapshot() {
+    setLoading(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const res = await fetch("/api/admin/arcade-night/scoring", {
+        headers: { "x-admin-password": password },
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || data?.error || "Erreur scoring");
+      setSnapshot(data.snapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur scoring");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveSnapshot() {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const res = await fetch("/api/admin/arcade-night/scoring", {
+        method: "POST",
+        headers: { "x-admin-password": password },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || data?.error || "Erreur snapshot");
+      setSnapshot(data.snapshot);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur snapshot");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-ink/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="flex items-center gap-2 text-lg font-black text-ink dark:text-white">
+            <BarChart3 className="h-5 w-5 text-marine" />
+            Scoring dry-run
+          </h3>
+          <p className="mt-1 text-sm font-semibold text-ink/55 dark:text-white/55">
+            Calcule les leaderboards Memory/Dames sans payout. Regle stricte: partie creee et terminee dans la fenetre.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button type="button" onClick={loadSnapshot} disabled={loading || saving}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-ink/10 px-3 py-2 text-xs font-black text-ink transition-colors hover:bg-ink/5 disabled:opacity-50 dark:border-white/10 dark:text-white">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Calculer
+          </button>
+          <button type="button" onClick={saveSnapshot} disabled={loading || saving || snapshot?.status !== "ready"}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-3 py-2 text-xs font-black text-white transition-colors hover:bg-ink/90 disabled:opacity-50 dark:bg-white dark:text-ink">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            Sauver snapshot
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mt-4 flex gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {saved && (
+        <div className="mt-4 flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
+          <CheckCircle className="h-5 w-5 shrink-0" />
+          <p>Snapshot sauvegarde dans la config Season pour audit.</p>
+        </div>
+      )}
+
+      {!snapshot && (
+        <div className="mt-4 rounded-2xl border border-dashed border-ink/15 p-4 text-sm font-semibold text-ink/45 dark:border-white/15 dark:text-white/45">
+          Lance un calcul quand tu veux verifier les scores provisoires.
+        </div>
+      )}
+
+      {snapshot && (
+        <div className="mt-5 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <ScoringStat label="Status" value={snapshot.status} />
+            <ScoringStat label="Matchs valides" value={String(snapshot.summary.totalValidMatches)} />
+            <ScoringStat label="Lignes comptees" value={String(snapshot.summary.totalCountedRows)} />
+            <ScoringStat label="Eligibles" value={String(snapshot.summary.eligiblePlayers)} />
+          </div>
+
+          {snapshot.warnings.length > 0 && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+              <p className="font-black">Warnings</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {snapshot.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+              </ul>
+            </div>
+          )}
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {snapshot.games.map((game) => (
+              <div key={game.gameKey} className="rounded-2xl border border-ink/10 p-4 dark:border-white/10">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black text-ink dark:text-white">{game.label}</h4>
+                    <p className="mt-1 text-xs font-semibold text-ink/45 dark:text-white/45">
+                      {game.validMatches} match(s) valides · caps {game.rules.maxMatches}/{game.rules.maxMatchesPerOpponent}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-left text-xs">
+                    <thead className="text-ink/40 dark:text-white/40">
+                      <tr>
+                        <th className="py-2 pr-2">#</th>
+                        <th className="py-2 pr-2">Wallet</th>
+                        <th className="py-2 pr-2">Pts</th>
+                        <th className="py-2 pr-2">W/D/L</th>
+                        <th className="py-2 pr-2">Matchs</th>
+                        <th className="py-2 pr-2">Opp.</th>
+                        <th className="py-2 pr-2">Reward</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {game.leaderboard.slice(0, 8).map((entry) => (
+                        <tr key={entry.address} className="border-t border-ink/5 font-semibold dark:border-white/5">
+                          <td className="py-2 pr-2 font-black">{entry.rank}</td>
+                          <td className="py-2 pr-2 font-mono">{shortAddress(entry.address)}</td>
+                          <td className="py-2 pr-2 font-black">{entry.points}</td>
+                          <td className="py-2 pr-2">{entry.wins}/{entry.draws}/{entry.losses}</td>
+                          <td className="py-2 pr-2">{entry.matches}/{entry.rawMatches}</td>
+                          <td className="py-2 pr-2">{entry.uniqueOpponents}</td>
+                          <td className="py-2 pr-2">
+                            {entry.eligibleForRewards ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">OK</span>
+                            ) : (
+                              <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700">
+                                {entry.eligibilityReasons.join(", ")}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {game.leaderboard.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="py-4 text-center font-semibold text-ink/40 dark:text-white/40">
+                            Aucun score pour le moment.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-ink/10 p-4 dark:border-white/10">
+            <h4 className="text-sm font-black text-ink dark:text-white">Rewards projetees</h4>
+            <div className="mt-3 grid gap-2 sm:grid-cols-5">
+              {snapshot.projectedRewards.map((reward) => (
+                <div key={reward.key} className="rounded-xl bg-ink/[0.02] p-3 dark:bg-white/[0.03]">
+                  <p className="text-xs font-black text-ink dark:text-white">{reward.label}</p>
+                  <p className="mt-1 text-xs font-semibold text-ink/45 dark:text-white/45">{formatNumber(reward.amountCrc)} CRC</p>
+                  <p className="mt-2 break-all font-mono text-[10px] font-bold text-marine dark:text-blue-300">
+                    {reward.address ? shortAddress(reward.address) : reward.status === "manual" ? "manuel" : "non assigne"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScoringStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03]">
+      <p className="text-[10px] font-black uppercase tracking-widest text-ink/40 dark:text-white/40">{label}</p>
+      <p className="mt-1 text-lg font-black text-ink dark:text-white">{value}</p>
+    </div>
+  );
+}
+
+function shortAddress(address: string): string {
+  return address.length > 14 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
