@@ -4,6 +4,13 @@ Status: product decision draft
 Owner decision: founder
 Date: 2026-07-02
 
+Canonical implementation rules for beta #1:
+
+> See `docs/season-zero/ARCADE-NIGHT-RULES-FINAL.md`.
+
+If this exploratory product spec and the final rules doc disagree, the final
+rules doc wins for implementation.
+
 ## 1. Decision
 
 Avant de lancer une vraie ligue longue, NF Society commence par des evenements
