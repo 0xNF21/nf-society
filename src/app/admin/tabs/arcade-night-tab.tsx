@@ -54,7 +54,7 @@ type ScoringSnapshot = {
     totalScannedMatches: number;
     totalValidMatches: number;
     totalCountedRows: number;
-    eligiblePlayers: number;
+    eligibleWallets: number;
   };
   games: Array<{
     gameKey: GameKey;
@@ -577,7 +577,7 @@ function ArcadeNightScoringPanel({ password }: { password: string }) {
             <ScoringStat label="Status" value={snapshot.status} />
             <ScoringStat label="Matchs valides" value={String(snapshot.summary.totalValidMatches)} />
             <ScoringStat label="Lignes comptees" value={String(snapshot.summary.totalCountedRows)} />
-            <ScoringStat label="Eligibles" value={String(snapshot.summary.eligiblePlayers)} />
+            <ScoringStat label="Wallets eligibles" value={String(snapshot.summary.eligibleWallets)} />
           </div>
 
           {snapshot.warnings.length > 0 && (

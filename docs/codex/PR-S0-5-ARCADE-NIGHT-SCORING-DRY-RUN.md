@@ -90,6 +90,8 @@ On pourra assouplir plus tard avec une vraie colonne `startedAt` si besoin.
   5. matchs comptes
   6. date d'atteinte du score
 - Projection reward avec anti-concentration : un wallet ne prend qu'une reward competitive.
+- Si un wallet est eligible a deux rewards competitives de meme montant, le dry-run doit afficher un warning pour decision founder.
+- Le compteur "eligible" du resume compte les wallets uniques, pas les lignes Memory + Dames additionnees.
 - Reward beta helper reste `manual`.
 
 ---

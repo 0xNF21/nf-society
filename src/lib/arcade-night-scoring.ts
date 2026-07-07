@@ -94,7 +94,7 @@ export type ArcadeNightScoringSnapshot = {
     totalScannedMatches: number;
     totalValidMatches: number;
     totalCountedRows: number;
-    eligiblePlayers: number;
+    eligibleWallets: number;
   };
 };
 
@@ -153,17 +153,25 @@ export async function computeArcadeNightScoringSnapshot(): Promise<ArcadeNightSc
   }
 
   const projectedRewards = projectRewards(config, games, warnings);
-  const summary = games.reduce((acc, game) => ({
-    totalScannedMatches: acc.totalScannedMatches + game.scannedMatches,
-    totalValidMatches: acc.totalValidMatches + game.validMatches,
-    totalCountedRows: acc.totalCountedRows + game.countedRows,
-    eligiblePlayers: acc.eligiblePlayers + game.leaderboard.filter((entry) => entry.eligibleForRewards).length,
-  }), {
+  const eligibleWallets = new Set<string>();
+  const summaryBase = games.reduce((acc, game) => {
+    for (const entry of game.leaderboard) {
+      if (entry.eligibleForRewards) eligibleWallets.add(entry.address);
+    }
+    return {
+      totalScannedMatches: acc.totalScannedMatches + game.scannedMatches,
+      totalValidMatches: acc.totalValidMatches + game.validMatches,
+      totalCountedRows: acc.totalCountedRows + game.countedRows,
+    };
+  }, {
     totalScannedMatches: 0,
     totalValidMatches: 0,
     totalCountedRows: 0,
-    eligiblePlayers: 0,
   });
+  const summary = {
+    ...summaryBase,
+    eligibleWallets: eligibleWallets.size,
+  };
 
   return {
     version: 1,
@@ -214,7 +222,7 @@ export async function saveArcadeNightScoringSnapshot(audit?: AuditInput): Promis
         actor: "admin",
         ipAddress: audit?.ipAddress ?? null,
         userAgent: audit?.userAgent ?? null,
-        summary: `Arcade Night scoring snapshot: ${snapshot.summary.totalValidMatches} valid match(es), ${snapshot.summary.eligiblePlayers} eligible player rows`,
+        summary: `Arcade Night scoring snapshot: ${snapshot.summary.totalValidMatches} valid match(es), ${snapshot.summary.eligibleWallets} eligible wallet(s)`,
         metadata: {
           generatedAt: snapshot.generatedAt,
           summary: snapshot.summary,
@@ -255,16 +263,21 @@ async function loadMemoryCandidates(startAt: Date, endAt: Date) {
     }
 
     const winner = normalizeAddress(row.winnerAddress);
-    if (row.result === "draw" || !winner) {
+    if (row.result === "draw") {
       candidates.push(candidate("memory", row.slug, p1, p2, "draw", row.createdAt, row.updatedAt));
       candidates.push(candidate("memory", row.slug, p2, p1, "draw", row.createdAt, row.updatedAt));
       continue;
     }
 
-    if (winner === p1) {
+    if (!winner) {
+      invalidRows += 1;
+      continue;
+    }
+
+    if (row.result === "player1" && winner === p1) {
       candidates.push(candidate("memory", row.slug, p1, p2, "win", row.createdAt, row.updatedAt));
       candidates.push(candidate("memory", row.slug, p2, p1, "loss", row.createdAt, row.updatedAt));
-    } else if (winner === p2) {
+    } else if (row.result === "player2" && winner === p2) {
       candidates.push(candidate("memory", row.slug, p2, p1, "win", row.createdAt, row.updatedAt));
       candidates.push(candidate("memory", row.slug, p1, p2, "loss", row.createdAt, row.updatedAt));
     } else {
@@ -471,6 +484,7 @@ function projectRewards(
   warnings: string[],
 ): ArcadeNightProjectedReward[] {
   const usedAddresses = new Set<string>();
+  const assignedByAddress = new Map<string, ArcadeNightProjectedReward[]>();
   const byGame = new Map(games.map((game) => [game.gameKey, game]));
   const slotOrder: Array<{ key: string; gameKey: GameKey; rank: number; label: string }> = [
     { key: "memory1", gameKey: "memory", rank: 1, label: "Memory #1" },
@@ -481,22 +495,34 @@ function projectRewards(
 
   const rewards: ArcadeNightProjectedReward[] = slotOrder.map((slot) => {
     const reward = config.rewards.find((item) => item.key === slot.key);
+    const amountCrc = reward?.amountCrc ?? 0;
     const game = byGame.get(slot.gameKey);
     const eligible = game?.leaderboard.filter((entry) => entry.eligibleForRewards) ?? [];
+    for (const skipped of eligible.filter((entry) => usedAddresses.has(entry.address))) {
+      const previousRewards = assignedByAddress.get(skipped.address) ?? [];
+      const equalReward = previousRewards.find((previous) => previous.amountCrc === amountCrc);
+      if (equalReward) {
+        warnings.push(`${slot.label}: ${skipped.address} est aussi eligible pour une reward egale a ${equalReward.label}; decision founder requise.`);
+      }
+    }
     const winner = eligible.find((entry) => !usedAddresses.has(entry.address)) ?? null;
     if (winner) usedAddresses.add(winner.address);
     if (!winner && eligible.length > 0) {
       warnings.push(`${slot.label}: aucun wallet libre apres regle anti-concentration.`);
     }
-    return {
+    const projected = {
       key: slot.key,
       label: slot.label,
       gameKey: slot.gameKey,
-      amountCrc: reward?.amountCrc ?? 0,
+      amountCrc,
       address: winner?.address ?? null,
       sourceRank: winner?.rank ?? null,
       status: winner ? "projected" as const : "unassigned" as const,
     };
+    if (winner) {
+      assignedByAddress.set(winner.address, [...(assignedByAddress.get(winner.address) ?? []), projected]);
+    }
+    return projected;
   });
 
   const helper = config.rewards.find((item) => item.key === "helper");
@@ -546,7 +572,7 @@ function emptySnapshot(
       totalScannedMatches: 0,
       totalValidMatches: 0,
       totalCountedRows: 0,
-      eligiblePlayers: 0,
+      eligibleWallets: 0,
     },
   };
 }
