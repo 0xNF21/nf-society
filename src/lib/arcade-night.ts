@@ -167,6 +167,14 @@ export async function updateArcadeNightConfig(input: unknown, audit?: {
   const now = new Date();
 
   try {
+    const [existingSeason] = await db
+      .select({ config: seasons.config })
+      .from(seasons)
+      .where(eq(seasons.slug, ARCADE_NIGHT_SLUG))
+      .limit(1);
+    const existingArcadeConfig = readArcadeConfig(existingSeason?.config);
+    const seasonConfig = buildSeasonConfig(config, existingArcadeConfig);
+
     await db.transaction(async (tx) => {
       await tx
         .insert(seasons)
@@ -177,7 +185,7 @@ export async function updateArcadeNightConfig(input: unknown, audit?: {
           startAt,
           endAt,
           poolCrc: config.poolCrc,
-          config: buildSeasonConfig(config),
+          config: seasonConfig,
           updatedAt: now,
         })
         .onConflictDoUpdate({
@@ -188,7 +196,7 @@ export async function updateArcadeNightConfig(input: unknown, audit?: {
             startAt,
             endAt,
             poolCrc: config.poolCrc,
-            config: buildSeasonConfig(config),
+            config: seasonConfig,
             updatedAt: now,
           },
         });
@@ -322,16 +330,21 @@ function normalizeConfig(season: SeasonRow, rows: SeasonGameRow[]): ArcadeNightC
   };
 }
 
-function buildSeasonConfig(config: ArcadeNightConfig): ConfigRecord {
+function buildSeasonConfig(config: ArcadeNightConfig, existingArcadeConfig: ConfigRecord = {}): ConfigRecord {
+  const arcadeNight: ConfigRecord = {
+    publicStatus: config.publicStatus,
+    durationMinutes: config.durationMinutes,
+    betaParticipants: config.betaParticipants,
+    note: config.note,
+    rewards: config.rewards,
+    games: config.games.map(buildGameConfig),
+  };
+  if (existingArcadeConfig.lastScoringSnapshot !== undefined) {
+    arcadeNight.lastScoringSnapshot = existingArcadeConfig.lastScoringSnapshot;
+  }
+
   return {
-    arcadeNight: {
-      publicStatus: config.publicStatus,
-      durationMinutes: config.durationMinutes,
-      betaParticipants: config.betaParticipants,
-      note: config.note,
-      rewards: config.rewards,
-      games: config.games.map(buildGameConfig),
-    },
+    arcadeNight,
   };
 }
 
